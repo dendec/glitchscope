@@ -1,4 +1,7 @@
 APP      := mdpp
+FONT_SUBSET := internal/ui/assets/unifont.otf
+FONT_RANGES := internal/ui/font_ranges.json
+FONT_URL := https://unifoundry.com/pub/unifont/unifont-17.0.05/font-builds/unifont-17.0.05.otf
 GO       := go
 GOFLAGS  := CGO_ENABLED=1
 
@@ -45,7 +48,14 @@ $(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt $(PROJECTM_PATCH)
 		-DCMAKE_BUILD_TYPE=Release \
 		-DENABLE_INSTALL=OFF
 
-build: projectm-build
+$(FONT_SUBSET): $(FONT_RANGES)
+	wget -q -O /tmp/unifont-full.otf $(FONT_URL)
+	pyftsubset /tmp/unifont-full.otf \
+		--unicodes=$$(python3 -c "import json; print(','.join(json.load(open('$(FONT_RANGES)'))))") \
+		--output-file=$(FONT_SUBSET) 2>&1
+	rm -f /tmp/unifont-full.otf
+
+build: $(FONT_SUBSET) projectm-build
 	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 		$(GO) build -ldflags="-s -w" -o $(APP) ./cmd/$(APP)
 

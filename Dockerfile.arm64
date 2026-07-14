@@ -13,6 +13,7 @@ RUN dpkg --add-architecture arm64 && apt-get update && apt-get install -y --no-i
         libsdl2-dev:arm64 \
         libgles2-mesa-dev:arm64 \
         libopenmpt-dev:arm64 \
+        python3-fonttools \
         autoconf automake libtool \
     && rm -rf /var/lib/apt/lists/*
 
@@ -77,6 +78,13 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 COPY test_data/ test_data/
 COPY portmaster/ portmaster/
+
+# Download & subset font using config ranges
+RUN wget -q https://unifoundry.com/pub/unifont/unifont-17.0.05/font-builds/unifont-17.0.05.otf -O /tmp/unifont-full.otf \
+    && pyftsubset /tmp/unifont-full.otf \
+        --unicodes=$$(python3 -c "import json; print(','.join(json.load(open('internal/ui/font_ranges.json'))))") \
+        --output-file=internal/ui/assets/unifont.otf 2>&1 \
+    && rm -f /tmp/unifont-full.otf
 
 ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
