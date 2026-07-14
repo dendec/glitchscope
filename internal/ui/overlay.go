@@ -130,9 +130,8 @@ import (
 	"unsafe"
 
 	"github.com/dendec/mdpp/internal/player"
-	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/gofont/gomono"
+	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -210,13 +209,20 @@ func (o *Overlay) ShowTrack(path string) {
 	if o.hidden {
 		return // user toggled overlay off
 	}
-	// Parse font once; cache for potential reuse.
-	f, err := truetype.Parse(gomono.TTF)
+	f, err := opentype.Parse(unifontData)
 	if err != nil {
 		slog.Error("font parse", "error", err)
 		return
 	}
-	face := truetype.NewFace(f, &truetype.Options{Size: fontSize})
+	face, err := opentype.NewFace(f, &opentype.FaceOptions{
+		Size:    fontSize,
+		DPI:     72,
+		Hinting: font.HintingNone,
+	})
+	if err != nil {
+		slog.Error("font face", "error", err)
+		return
+	}
 	defer face.Close()
 
 	title := player.TrackTitle(path)
