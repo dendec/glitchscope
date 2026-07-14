@@ -1,10 +1,14 @@
 package player
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/dendec/mdpp/internal/openmpt"
+	"github.com/dendec/mdpp/internal/soloud"
 )
 
 // Album represents a directory containing audio files.
@@ -12,6 +16,14 @@ type Album struct {
 	Name   string   // display name (directory basename)
 	Path   string   // full directory path
 	Tracks []string // full paths to audio files
+}
+
+// TrackInfo holds metadata for a single track.
+type TrackInfo struct {
+	Path     string
+	Duration float64
+	BPM      float64
+	Channels int
 }
 
 // Library manages a list of albums scanned from a music root directory.
@@ -163,10 +175,91 @@ func (l *Library) AlbumCount() int {
 	return len(l.Albums)
 }
 
+// CurrentAlbumIndex returns the current album index.
+func (l *Library) CurrentAlbumIndex() int { return l.albumIdx }
+
+// CurrentTrackIndex returns the current track index.
+func (l *Library) CurrentTrackIndex() int { return l.trackIdx }
+
+// SelectAlbum sets the album index and returns the first track path.
+func (l *Library) SelectAlbum(idx int) string {
+	if idx < 0 || idx >= len(l.Albums) {
+		return ""
+	}
+	l.albumIdx = idx
+	l.trackIdx = 0
+	if len(l.Albums[idx].Tracks) > 0 {
+		return l.Albums[idx].Tracks[0]
+	}
+	return ""
+}
+
+// SelectTrack sets the track index within the current album and returns its path.
+func (l *Library) SelectTrack(idx int) string {
+	if l.albumIdx < 0 || l.albumIdx >= len(l.Albums) {
+		return ""
+	}
+	if idx < 0 || idx >= len(l.Albums[l.albumIdx].Tracks) {
+		return ""
+	}
+	l.trackIdx = idx
+	return l.Albums[l.albumIdx].Tracks[idx]
+}
+
 // PlayCurrent returns the current track path to be played.
 // Returns "" if nothing to play.
 func (l *Library) PlayCurrent() string {
 	return l.CurrentTrack()
+}
+
+// GetAlbumTracks returns TrackInfo for each track in the given album index.
+// Reads metadata cache first; computes missing entries on demand.
+func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
+	if idx < 0 || idx >= len(l.Albums) {
+		return nil
+	}
+	album := l.Albums[idx]
+	cache := readMetaCache(album.Path)
+	if cache == nil {
+		cache = &albumMeta{Tracks: map[string]TrackMeta{}}
+	}
+
+	infos := make([]TrackInfo, len(album.Tracks))
+	dirty := false
+	for i, tp := range album.Tracks {
+		fname := filepath.Base(tp)
+		info := TrackInfo{Path: tp}
+		if m, ok := cache.Tracks[fname]; ok {
+			info.Duration = m.Duration
+			info.BPM = m.BPM
+			info.Channels = m.Channels
+		} else {
+			m := TrackMeta{}
+			ext := strings.ToLower(filepath.Ext(tp))
+			if openmpt.SupportedExts[ext] {
+				if bpm, ch, dur, err := openmpt.GetTrackerMeta(tp); err == nil {
+					m.Duration = dur
+					m.BPM = bpm
+					m.Channels = ch
+				}
+			} else if w, err := soloud.LoadWav(tp); err == nil {
+				m.Duration = w.GetLength()
+				w.Destroy()
+			}
+			cache.Tracks[fname] = m
+			info.Duration = m.Duration
+			info.BPM = m.BPM
+			info.Channels = m.Channels
+			dirty = true
+		}
+		infos[i] = info
+	}
+	if dirty {
+		if err := writeMetaCache(album.Path, cache); err != nil {
+			slog.Warn("write meta cache", "album", album.Name, "error", err)
+		}
+	}
+	return infos
 }
 
 // TrackTitle returns a display-friendly name for a track path.

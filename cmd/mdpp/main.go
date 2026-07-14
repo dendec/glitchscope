@@ -15,6 +15,8 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
+const fpsWindow = 60
+
 const (
 	winTitle = "MDPP — MilkDrop Portable Player"
 	winW     = 640
@@ -141,7 +143,67 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 	ticker := time.NewTicker(time.Second / 60)
 	defer ticker.Stop()
 
+	lastFrame := time.Now()
+	fpsBuf := make([]float64, 0, fpsWindow)
+
+	var lastAlbumIdx = -1
+
 	for range ticker.C {
+		now := time.Now()
+		dt := now.Sub(lastFrame).Seconds()
+		lastFrame = now
+
+		// FPS sliding window.
+		if dt > 0 {
+			fpsBuf = append(fpsBuf, 1.0/dt)
+			if len(fpsBuf) > fpsWindow {
+				fpsBuf = fpsBuf[1:]
+			}
+		}
+		var fpsAvg float64
+		for _, v := range fpsBuf {
+			fpsAvg += v
+		}
+		fpsAvg /= float64(len(fpsBuf))
+
+		w, h := window.GLGetDrawableSize()
+
+		// Push playback data to overlay each frame.
+		if overlay != nil {
+			overlay.SetFPS(fpsAvg)
+			if pl != nil {
+				overlay.SetPlayback(pl.Position(), pl.Duration(), pl.SampleRate(), pl.Channels(), pl.BPM(), pl.IsPaused())
+			}
+			if lib != nil {
+				albumNames := make([]string, lib.AlbumCount())
+				for i := 0; i < lib.AlbumCount(); i++ {
+					albumNames[i] = lib.Albums[i].Name
+				}
+				overlay.SetAlbums(albumNames, lib.CurrentAlbumIndex())
+
+				// In UI mode, show tracks for the album under the UI cursor;
+				// otherwise show the album currently playing.
+				trackAlbumIdx := lib.CurrentAlbumIndex()
+				if overlay.UIVisible() {
+					trackAlbumIdx = overlay.AlbumCursor()
+				}
+				if trackAlbumIdx != lastAlbumIdx {
+					trackCursor := 0
+					if trackAlbumIdx == lib.CurrentAlbumIndex() {
+						trackCursor = lib.CurrentTrackIndex()
+					}
+					overlay.SetTrackInfos(lib.GetAlbumTracks(trackAlbumIdx), trackCursor)
+					lastAlbumIdx = trackAlbumIdx
+				}
+
+				if pl != nil {
+					curTrack := pl.TrackPath()
+					curAlbum := lib.CurrentAlbum().Name
+					overlay.SetPlaying(curAlbum, curTrack)
+				}
+			}
+		}
+
 		// Process events → dispatch actions.
 		for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 			act := inp.ProcessEvent(e)
@@ -165,7 +227,6 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 			}
 		}
 
-		w, h := window.GLGetDrawableSize()
 		pm.RenderFrame()
 
 		if overlay != nil {
@@ -179,8 +240,92 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 	}
 }
 
-// handleAction dispatches an input action to the appropriate player/library/overlay logic.
+// handleAction dispatches an input action.
+// When UI is visible: actions navigate the overlay UI.
+// When UI is hidden: actions control playback directly (cursor→album, focus→track).
 func handleAction(act input.Action, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, lib *player.Library, presetNames []string, presetIdx *int) {
+	if overlay != nil && overlay.UIVisible() {
+		handleUIAction(act, pm, pl, overlay, lib, presetNames, presetIdx)
+	} else {
+		handleNormalAction(act, pm, pl, overlay, lib, presetNames, presetIdx)
+	}
+}
+
+func handleUIAction(act input.Action, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, lib *player.Library, presetNames []string, presetIdx *int) {
+	switch act {
+	case input.ActionQuit:
+		return
+
+	case input.ActionPlayPause:
+		if pl != nil {
+			pl.TogglePause()
+		}
+
+	case input.ActionToggleUI:
+		overlay.ToggleUI()
+
+	case input.ActionCursorUp:
+		overlay.CursorUp()
+
+	case input.ActionCursorDown:
+		overlay.CursorDown()
+
+	case input.ActionFocusLeft:
+		overlay.FocusLeft()
+
+	case input.ActionFocusRight:
+		overlay.FocusRight()
+
+	case input.ActionSelect:
+		if overlay.FocusPanel() == 0 {
+			if lib != nil {
+				if path := lib.SelectAlbum(overlay.AlbumCursor()); path != "" {
+					playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
+				}
+			}
+		} else {
+			if lib != nil {
+				lib.SelectAlbum(overlay.AlbumCursor())
+				if path := lib.SelectTrack(overlay.TrackCursor()); path != "" {
+					playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
+				}
+			}
+		}
+
+	case input.ActionBack:
+		overlay.Back()
+
+	case input.ActionToggleOverlay:
+		if overlay != nil {
+			overlay.ToggleVisibility()
+		}
+
+	case input.ActionNextPreset:
+		if len(presetNames) == 0 {
+			return
+		}
+		*presetIdx = (*presetIdx + 1) % len(presetNames)
+		d, err := presets.Read(presetNames[*presetIdx])
+		if err == nil {
+			pm.LoadPresetData(string(d), true)
+			slog.Info("preset", "name", presetNames[*presetIdx])
+		}
+
+	case input.ActionPrevPreset:
+		if len(presetNames) == 0 {
+			return
+		}
+		*presetIdx = (*presetIdx - 1 + len(presetNames)) % len(presetNames)
+		d, err := presets.Read(presetNames[*presetIdx])
+		if err == nil {
+			pm.LoadPresetData(string(d), true)
+			slog.Info("preset", "name", presetNames[*presetIdx])
+		}
+	}
+}
+
+func handleNormalAction(act input.Action, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, lib *player.Library, presetNames []string, presetIdx *int) {
+	// Map gamepad cursor/focus → album/track when UI is hidden.
 	switch act {
 	case input.ActionQuit:
 		return
@@ -195,23 +340,20 @@ func handleAction(act input.Action, pm *projectm.Handle, pl *player.Player, over
 			overlay.ToggleVisibility()
 		}
 
-	case input.ActionNextTrack:
+	case input.ActionToggleUI:
+		if overlay != nil {
+			overlay.ToggleUI()
+		}
+
+	case input.ActionCursorUp, input.ActionPrevAlbum:
 		if lib == nil || pl == nil {
 			return
 		}
-		if path := lib.TrackNext(); path != "" {
+		if path := lib.AlbumPrev(); path != "" {
 			playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
 		}
 
-	case input.ActionPrevTrack:
-		if lib == nil || pl == nil {
-			return
-		}
-		if path := lib.TrackPrev(); path != "" {
-			playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
-		}
-
-	case input.ActionNextAlbum:
+	case input.ActionCursorDown, input.ActionNextAlbum:
 		if lib == nil || pl == nil {
 			return
 		}
@@ -219,11 +361,19 @@ func handleAction(act input.Action, pm *projectm.Handle, pl *player.Player, over
 			playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
 		}
 
-	case input.ActionPrevAlbum:
+	case input.ActionFocusLeft, input.ActionPrevTrack:
 		if lib == nil || pl == nil {
 			return
 		}
-		if path := lib.AlbumPrev(); path != "" {
+		if path := lib.TrackPrev(); path != "" {
+			playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
+		}
+
+	case input.ActionFocusRight, input.ActionNextTrack:
+		if lib == nil || pl == nil {
+			return
+		}
+		if path := lib.TrackNext(); path != "" {
 			playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
 		}
 
@@ -265,5 +415,3 @@ func playTrack(pl *player.Player, overlay *ui.Overlay, path string, album string
 	}
 	slog.Info("now playing", "track", path, "album", album)
 }
-
-

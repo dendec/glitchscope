@@ -22,7 +22,9 @@ LOCAL_OPENMPT := /tmp/libopenmpt/usr
 CGO_CFLAGS := -I$(LOCAL_OPENMPT)/include
 CGO_LDFLAGS += -L$(LOCAL_OPENMPT)/lib/x86_64-linux-gnu
 
-.PHONY: build clean dist-arm64 dist-portmaster lint run projectm-build submodules tidy
+DOCKER_IMAGE_X64 := mdpp-builder
+
+.PHONY: build clean dist dist-arm64 dist-portmaster lint run projectm-build submodules test tidy
 
 submodules:
 	git submodule update --init --recursive
@@ -52,23 +54,50 @@ $(FONT_SUBSET): $(FONT_RANGES)
 	wget -q -O /tmp/unifont-full.otf $(FONT_URL)
 	pyftsubset /tmp/unifont-full.otf \
 		--unicodes=$$(python3 -c "import json; print(','.join(json.load(open('$(FONT_RANGES)'))))") \
+		--no-subset-tables+=OS/2 \
 		--output-file=$(FONT_SUBSET) 2>&1
 	rm -f /tmp/unifont-full.otf
 
+# Docker build (CI/packaging).
+dist:
+	docker build -t $(DOCKER_IMAGE_X64) -f Dockerfile .
+	@mkdir -p dist
+	@docker rm -f mdpp-extract-x64 2>/dev/null || true
+	docker create --name mdpp-extract-x64 $(DOCKER_IMAGE_X64)
+	docker cp mdpp-extract-x64:/dist/mdpp/mdpp ./$(APP)
+	docker cp mdpp-extract-x64:/dist/mdpp/presets ./presets 2>/dev/null; true
+	docker rm mdpp-extract-x64
+	@echo "=== Built $(APP) ==="
+	@ls -lh $(APP)
+
+# Local build (default for dev, needs all deps installed).
 build: $(FONT_SUBSET) projectm-build
 	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 		$(GO) build -ldflags="-s -w" -o $(APP) ./cmd/$(APP)
+
+# Run via Docker with X11 + audio + music mount.
+run: dist
+	@mkdir -p music
+	docker run --rm -it \
+		--net=host \
+		-e DISPLAY=$${DISPLAY} \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:ro \
+		-v /dev/snd:/dev/snd:ro \
+		-v "$$(pwd)/music:/build/test_data/music:ro" \
+		--group-add audio \
+		$(DOCKER_IMAGE_X64)
 
 lint:
 	@which golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 		golangci-lint run ./cmd/... ./internal/...
 
+test:
+	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
+		$(GO) test -count=1 ./cmd/... ./internal/...
+
 tidy:
 	$(GO) mod tidy
-
-run: build
-	./$(APP)
 
 clean:
 	rm -f $(APP) go.sum

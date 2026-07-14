@@ -58,4 +58,20 @@ int Wav_loadRawF32(void * aWav, float * aMem, unsigned int aLength, float aSampl
 	return ((Wav *)aWav)->loadRawWave(aMem, aLength, aSamplerate, aChannels, true, false);
 }
 
+double Soloud_getStreamTime(void * aClassPtr, unsigned int aVoiceHandle) {
+	return ((Soloud *)aClassPtr)->getStreamTime(aVoiceHandle);
+}
+
+float Soloud_getSamplerate(void * aClassPtr, unsigned int aVoiceHandle) {
+	return ((Soloud *)aClassPtr)->getSamplerate(aVoiceHandle);
+}
+
+float Soloud_getInfo(void * aClassPtr, unsigned int aVoiceHandle, unsigned int aInfoKey) {
+	return ((Soloud *)aClassPtr)->getInfo(aVoiceHandle, aInfoKey);
+}
+
+double Wav_getLength(void * aClassPtr) {
+	return ((Wav *)aClassPtr)->getLength();
+}
+
 } // extern "C"

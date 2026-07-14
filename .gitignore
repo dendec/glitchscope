@@ -3,6 +3,7 @@
 
 # Build output
 dist/
+presets/
 
 # OS
 .DS_Store

@@ -21,6 +21,14 @@ const (
 	ActionNextPreset
 	ActionPrevPreset
 	ActionQuit
+	// UI navigation actions.
+	ActionSelect
+	ActionBack
+	ActionToggleUI
+	ActionFocusLeft
+	ActionFocusRight
+	ActionCursorUp
+	ActionCursorDown
 )
 
 const axisDeadZone int16 = 8000
@@ -114,19 +122,25 @@ func keyToAction(key sdl.Keycode) Action {
 	case sdl.K_SPACE:
 		return ActionPlayPause
 	case sdl.K_LEFT:
-		return ActionPrevTrack
+		return ActionFocusLeft
 	case sdl.K_RIGHT:
-		return ActionNextTrack
+		return ActionFocusRight
 	case sdl.K_UP:
-		return ActionPrevAlbum
+		return ActionCursorUp
 	case sdl.K_DOWN:
-		return ActionNextAlbum
+		return ActionCursorDown
 	case sdl.K_n, sdl.K_r:
 		return ActionNextPreset
 	case sdl.K_p, sdl.K_m:
 		return ActionPrevPreset
 	case sdl.K_b:
 		return ActionToggleOverlay
+	case sdl.K_TAB:
+		return ActionToggleUI
+	case sdl.K_RETURN, sdl.K_KP_ENTER:
+		return ActionSelect
+	case sdl.K_BACKSPACE:
+		return ActionBack
 	}
 	return ActionNone
 }
@@ -137,14 +151,16 @@ func buttonToAction(btn uint8) Action {
 		return ActionPlayPause
 	case sdl.CONTROLLER_BUTTON_A:
 		return ActionToggleOverlay
-	case sdl.CONTROLLER_BUTTON_DPAD_LEFT:
-		return ActionPrevTrack
-	case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
-		return ActionNextTrack
 	case sdl.CONTROLLER_BUTTON_DPAD_UP:
-		return ActionPrevAlbum
+		return ActionCursorUp
 	case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
-		return ActionNextAlbum
+		return ActionCursorDown
+	case sdl.CONTROLLER_BUTTON_DPAD_LEFT:
+		return ActionFocusLeft
+	case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
+		return ActionFocusRight
+	case sdl.CONTROLLER_BUTTON_BACK:
+		return ActionToggleUI
 	case sdl.CONTROLLER_BUTTON_LEFTSHOULDER:
 		return ActionPrevPreset
 	case sdl.CONTROLLER_BUTTON_RIGHTSHOULDER:
@@ -156,14 +172,14 @@ func buttonToAction(btn uint8) Action {
 func axisToAction(in *Input, e *sdl.ControllerAxisEvent) Action {
 	switch e.Axis {
 	case sdl.CONTROLLER_AXIS_LEFTY:
-		// Up/Down: album navigation
+		// Up/Down: cursor navigation (maps to album nav when UI hidden)
 		if e.Value > axisDeadZone && in.lAxisY <= axisDeadZone {
 			in.lAxisY = e.Value
-			return ActionNextAlbum
+			return ActionCursorDown
 		}
 		if e.Value < -axisDeadZone && in.lAxisY >= -axisDeadZone {
 			in.lAxisY = e.Value
-			return ActionPrevAlbum
+			return ActionCursorUp
 		}
 		if e.Value > -axisDeadZone && e.Value < axisDeadZone {
 			in.lAxisY = 0
@@ -172,14 +188,14 @@ func axisToAction(in *Input, e *sdl.ControllerAxisEvent) Action {
 		}
 
 	case sdl.CONTROLLER_AXIS_LEFTX:
-		// Left/Right: track navigation
+		// Left/Right: focus navigation (maps to track nav when UI hidden)
 		if e.Value > axisDeadZone && in.lAxisX <= axisDeadZone {
 			in.lAxisX = e.Value
-			return ActionNextTrack
+			return ActionFocusRight
 		}
 		if e.Value < -axisDeadZone && in.lAxisX >= -axisDeadZone {
 			in.lAxisX = e.Value
-			return ActionPrevTrack
+			return ActionFocusLeft
 		}
 		if e.Value > -axisDeadZone && e.Value < axisDeadZone {
 			in.lAxisX = 0

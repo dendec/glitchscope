@@ -27,14 +27,36 @@ var SupportedExts = map[string]bool{
 }
 
 // DecodeToF32 decodes a tracker file to interleaved stereo float32 PCM at 44100 Hz.
-// Returns the raw PCM data and the sample rate.
-func DecodeToF32(path string) (data []float32, sampleRate int, err error) {
+// Returns raw PCM data, sample rate, estimated BPM, and tracker channel count.
+// GetTrackerMeta returns BPM, channel count, and duration for a tracker file
+// without decoding audio.
+func GetTrackerMeta(path string) (bpm float64, channels int, duration float64, err error) {
 	fileBuf, err := os.ReadFile(path)
 	if err != nil {
-		return nil, 0, err
+		return 0, 0, 0, err
+	}
+	mod := C.openmpt_module_create_from_memory(
+		unsafe.Pointer(&fileBuf[0]),
+		C.size_t(len(fileBuf)),
+		nil, nil, nil,
+	)
+	if mod == nil {
+		return 0, 0, 0, fmt.Errorf("openmpt: create module failed")
+	}
+	defer C.openmpt_module_destroy(mod)
+	bpm = float64(C.openmpt_module_get_current_estimated_bpm(mod))
+	channels = int(C.openmpt_module_get_num_channels(mod))
+	duration = float64(C.openmpt_module_get_duration_seconds(mod))
+	return bpm, channels, duration, nil
+}
+
+func DecodeToF32(path string) (data []float32, sampleRate int, bpm float64, channels int, err error) {
+	fileBuf, err := os.ReadFile(path)
+	if err != nil {
+		return nil, 0, 0, 0, err
 	}
 	if len(fileBuf) == 0 {
-		return nil, 0, fmt.Errorf("openmpt: empty file")
+		return nil, 0, 0, 0, fmt.Errorf("openmpt: empty file")
 	}
 
 	mod := C.openmpt_module_create_from_memory(
@@ -45,9 +67,12 @@ func DecodeToF32(path string) (data []float32, sampleRate int, err error) {
 		nil, // ctls
 	)
 	if mod == nil {
-		return nil, 0, fmt.Errorf("openmpt: create module failed")
+		return nil, 0, 0, 0, fmt.Errorf("openmpt: create module failed")
 	}
 	defer C.openmpt_module_destroy(mod)
+
+	bpm = float64(C.openmpt_module_get_current_estimated_bpm(mod))
+	channels = int(C.openmpt_module_get_num_channels(mod))
 
 	const sr = 44100
 	duration := float64(C.openmpt_module_get_duration_seconds(mod))
@@ -80,8 +105,8 @@ func DecodeToF32(path string) (data []float32, sampleRate int, err error) {
 	}
 
 	if len(data) == 0 {
-		return nil, 0, fmt.Errorf("openmpt: no audio rendered")
+		return nil, 0, 0, 0, fmt.Errorf("openmpt: no audio rendered")
 	}
 
-	return data, sr, nil
+	return data, sr, bpm, channels, nil
 }

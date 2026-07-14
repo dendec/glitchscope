@@ -137,6 +137,26 @@ func (s *Soloud) GetPause(voice uint) bool {
 	return C.Soloud_getPause(s.p, C.uint(voice)) != 0
 }
 
+// GetStreamTime returns the current playback position in seconds for a voice.
+func (s *Soloud) GetStreamTime(voice uint) float64 {
+	return float64(C.Soloud_getStreamTime(s.p, C.uint(voice)))
+}
+
+// GetLength returns the total length in seconds of a Wav.
+func (w *Wav) GetLength() float64 {
+	return float64(C.Wav_getLength(w.p))
+}
+
+// GetSamplerate returns the sample rate of a voice.
+func (s *Soloud) GetSamplerate(voice uint) float32 {
+	return float32(C.Soloud_getSamplerate(s.p, C.uint(voice)))
+}
+
+// GetInfo returns an info value for a voice (e.g. channels = 2).
+func (s *Soloud) GetInfo(voice uint, infoKey uint) float32 {
+	return float32(C.Soloud_getInfo(s.p, C.uint(voice), C.uint(infoKey)))
+}
+
 // StopAll stops all playing voices.
 func (s *Soloud) StopAll() {
 	C.Soloud_stopAll(s.p)

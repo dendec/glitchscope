@@ -73,18 +73,23 @@ RUN wget -q https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.8.7+releas
 COPY go.mod go.sum* ./
 RUN go mod download 2>/dev/null || true
 
+# Subset the font before copying application source so this network-bound
+# layer is reused while only Go code changes.
+COPY internal/ui/font_ranges.json internal/ui/font_ranges.json
+RUN mkdir -p internal/ui/assets \
+    && wget -q https://unifoundry.com/pub/unifont/unifont-17.0.05/font-builds/unifont-17.0.05.otf -O /tmp/unifont-full.otf \
+    && python3 -m fontTools.subset /tmp/unifont-full.otf \
+        --unicodes=$(python3 -c "import json; print(','.join(json.load(open('internal/ui/font_ranges.json'))))") \
+        --no-subset-tables+=OS/2 \
+        --no-prune-unicode-ranges \
+        --output-file=internal/ui/assets/unifont.otf 2>&1 \
+    && rm -f /tmp/unifont-full.otf
+
 # Copy Go source only — lib/ is already built, don't overwrite patched projectM
 COPY cmd/ cmd/
 COPY internal/ internal/
 COPY test_data/ test_data/
 COPY portmaster/ portmaster/
-
-# Download & subset font using config ranges
-RUN wget -q https://unifoundry.com/pub/unifont/unifont-17.0.05/font-builds/unifont-17.0.05.otf -O /tmp/unifont-full.otf \
-    && pyftsubset /tmp/unifont-full.otf \
-        --unicodes=$$(python3 -c "import json; print(','.join(json.load(open('internal/ui/font_ranges.json'))))") \
-        --output-file=internal/ui/assets/unifont.otf 2>&1 \
-    && rm -f /tmp/unifont-full.otf
 
 ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 

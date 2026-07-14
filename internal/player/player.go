@@ -17,6 +17,8 @@ type Player struct {
 	voice       uint
 	currentWav  *soloud.Wav // keep alive while SoLoud references it
 	currentPath string
+	currentBPM  float64
+	channels    int
 }
 
 // New creates and initializes a Player.
@@ -52,17 +54,19 @@ func (p *Player) PlayFile(path string) error {
 }
 
 func (p *Player) playTracker(path string) error {
-	data, sr, err := openmpt.DecodeToF32(path)
+	data, sr, bpm, ch, err := openmpt.DecodeToF32(path)
 	if err != nil {
 		return fmt.Errorf("tracker %s: %w", path, err)
 	}
-	w, err := soloud.NewWavFromF32(data, float32(sr), 2)
+	w, err := soloud.NewWavFromF32(data, float32(sr), uint(ch))
 	if err != nil {
 		return fmt.Errorf("tracker wav %s: %w", path, err)
 	}
 	p.replaceSource(w)
 	p.currentPath = path
-	slog.Info("tracker", "path", path, "samples", len(data), "sr", sr)
+	p.currentBPM = bpm
+	p.channels = ch
+	slog.Info("tracker", "path", path, "samples", len(data), "sr", sr, "bpm", bpm, "channels", ch)
 	return nil
 }
 
@@ -146,4 +150,51 @@ func (p *Player) Close() {
 	p.s.Deinit()
 	p.s.Destroy()
 	slog.Info("SoLoud shut down")
+}
+
+// Position returns the current playback position in seconds.
+func (p *Player) Position() float64 {
+	if p.voice == 0 {
+		return 0
+	}
+	return p.s.GetStreamTime(p.voice)
+}
+
+// Duration returns the total duration of the current track in seconds.
+func (p *Player) Duration() float64 {
+	if p.currentWav == nil {
+		return 0
+	}
+	return p.currentWav.GetLength()
+}
+
+// SampleRate returns the sample rate of the current voice.
+func (p *Player) SampleRate() float32 {
+	if p.voice == 0 {
+		return 0
+	}
+	return p.s.GetSamplerate(p.voice)
+}
+
+// Channels returns the number of tracker channels (0 for non-tracker).
+func (p *Player) Channels() int {
+	return p.channels
+}
+
+// BPM returns the current track's BPM (0 for non-tracker).
+func (p *Player) BPM() float64 {
+	return p.currentBPM
+}
+
+// IsPaused returns true if the current voice is paused.
+func (p *Player) IsPaused() bool {
+	if p.voice == 0 {
+		return false
+	}
+	return p.s.GetPause(p.voice)
+}
+
+// TrackPath returns the path of the currently playing track.
+func (p *Player) TrackPath() string {
+	return p.currentPath
 }
