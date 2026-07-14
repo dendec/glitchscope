@@ -41,7 +41,7 @@
 #include "../../lib/soloud/src/audiosource/wav/stb_vorbis.c"
 #include "../../lib/soloud/src/audiosource/wav/soloud_wav.cpp"
 
-// SDL2 backend
-#include "../../lib/soloud/src/backend/soloud_sdl2_static.cpp"
+// SDL2 backend (upstream path: backend/sdl2_static/ subdir)
+#include "../../lib/soloud/src/backend/sdl2_static/soloud_sdl2_static.cpp"
 
 

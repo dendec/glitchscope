@@ -29,7 +29,7 @@ $(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt
 	sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
 		$(PROJECTM_DIR)/config.h.cmake.in 2>/dev/null; true
 	mkdir -p $(PROJECTM_BUILD)
-	cd $(PROJECTM_BUILD) && cmake $(PROJECTM_DIR) \
+	cd $(PROJECTM_BUILD) && cmake .. \
 		-DBUILD_SHARED_LIBS=OFF \
 		-DENABLE_PLAYLIST=OFF \
 		-DENABLE_SDL_UI=OFF \
