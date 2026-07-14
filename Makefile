@@ -13,14 +13,21 @@ PROJECTM_EVAL_LIB := $(PROJECTM_BUILD)/vendor/projectm-eval/projectm-eval/libpro
 CGO_CXXFLAGS := $(SDL_CFLAGS) -Wno-write-strings
 CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lm
 
-.PHONY: build clean dist-arm64 dist-portmaster run projectm-build
+.PHONY: build clean dist-arm64 dist-portmaster run projectm-build submodules
 
-projectm-build: $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB)
+submodules:
+	git submodule update --init --recursive
+
+projectm-build: submodules $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB)
 
 $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB): $(PROJECTM_BUILD)/Makefile
 	cmake --build $(PROJECTM_BUILD) --target projectM -- -j$$(nproc)
 
 $(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt
+	@# Patch config.h.cmake.in — upstream uses git hash but we
+	@# build in detached/submodule mode without full git history.
+	sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
+		$(PROJECTM_DIR)/config.h.cmake.in 2>/dev/null; true
 	mkdir -p $(PROJECTM_BUILD)
 	cd $(PROJECTM_BUILD) && cmake $(PROJECTM_DIR) \
 		-DBUILD_SHARED_LIBS=OFF \
@@ -96,3 +103,7 @@ deploy-portmaster: dist-portmaster
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push test_data/song.mp3 $(DEVICE_DIR)/song.mp3
 	@echo "=== Song deployed to $(DEVICE_DIR) ==="
+
+kill:
+	adb shell "killall -9 mdpp 2>/dev/null || true"
+	@echo "=== Killed mdpp on device ==="

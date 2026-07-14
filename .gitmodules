@@ -1,0 +1,6 @@
+[submodule "lib/projectm"]
+	path = lib/projectm
+	url = https://github.com/projectM-visualizer/projectm.git
+[submodule "lib/soloud"]
+	path = lib/soloud
+	url = https://github.com/jarikomppa/soloud.git
