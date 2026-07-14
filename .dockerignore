@@ -4,3 +4,4 @@ mdpp
 lib/projectm/build/
 dist_portmaster/
 .git/
+**/.git

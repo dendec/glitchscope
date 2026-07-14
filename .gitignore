@@ -1,5 +1,5 @@
-# Binary
-mdpp
+# Binary (root-level only)
+/mdpp
 
 # Build output
 dist/

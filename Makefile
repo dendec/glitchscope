@@ -12,7 +12,7 @@ PROJECTM_EVAL_LIB := $(PROJECTM_BUILD)/vendor/projectm-eval/projectm-eval/libpro
 PROJECTM_PATCH    := patches/projectm-feedback.patch
 
 CGO_CXXFLAGS := $(SDL_CFLAGS) -Wno-write-strings
-CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lm
+CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm
 
 .PHONY: build clean dist-arm64 dist-portmaster run projectm-build submodules
 
@@ -83,7 +83,6 @@ dist-portmaster: dist-arm64
 	cp portmaster/licenses/* dist/portmaster_build/mdpp/licenses/ 2>/dev/null; true
 	cp portmaster/README.md dist/portmaster_build/mdpp/
 	cp portmaster/screenshot.png dist/portmaster_build/mdpp/cover.png 2>/dev/null; true
-	cp portmaster/loading.png dist/portmaster_build/mdpp/ 2>/dev/null; true
 	@RELEASE_DATE=$$(date +%Y%m%d)T000000; \
 	printf '<gameList>\n    <game>\n        <path>./MDPP.sh</path>\n        <name>MDPP</name>\n        <desc>MilkDrop Portable Player — plays MP3/FLAC/Ogg with real-time MilkDrop visualizations. Drop your music files into /roms/ports/mdpp/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./mdpp/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/mdpp/gameinfo.xml
 	@rm -f dist/mdpp.zip
@@ -95,7 +94,6 @@ deploy: dist-arm64
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push dist/mdpp/mdpp $(DEVICE_DIR)/
 	adb push portmaster/MDPP.sh $(PORTS_DIR)/
-	adb push portmaster/loading.png $(DEVICE_DIR)/ 2>/dev/null || true
 	adb push test_data/song.mp3 $(DEVICE_DIR)/song.mp3
 	adb shell "killall -9 mdpp 2>/dev/null; true"
 	@echo "=== Fast deployed binary and song ==="

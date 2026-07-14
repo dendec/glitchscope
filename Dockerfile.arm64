@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certifi
 ENV PATH=/usr/local/go/bin:$PATH
 
 RUN dpkg --add-architecture arm64 && apt-get update && apt-get install -y --no-install-recommends \
-        build-essential g++-aarch64-linux-gnu binutils-aarch64-linux-gnu cmake git \
+        build-essential g++-aarch64-linux-gnu binutils-aarch64-linux-gnu cmake git patchelf \
         libsdl2-dev:arm64 \
         libgles2-mesa-dev:arm64 \
     && rm -rf /var/lib/apt/lists/*
@@ -30,12 +30,15 @@ RUN git clone --depth 1 https://github.com/jarikomppa/soloud.git lib/soloud
 
 # Clone & patch projectM (v4.1.6 with feedback framebuffer injection)
 RUN git clone --depth 1 --branch v4.1.6 \
-    https://github.com/projectM-visualizer/projectm.git lib/projectm
+    https://github.com/projectM-visualizer/projectm.git lib/projectm \
+    && cd lib/projectm && git submodule update --init --recursive
 COPY patches/ patches/
 RUN cd lib/projectm \
     && git apply /build/patches/projectm-feedback.patch \
     && sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
-        config.h.cmake.in
+        config.h.cmake.in \
+    && grep -q "bind_feedback_framebuffer" src/api/include/projectM-4/render_opengl.h \
+    && echo "Patch verified: bind_feedback_framebuffer found in header"
 
 # Build projectM static lib with GLES
 RUN mkdir -p lib/projectm/build && cd lib/projectm/build && \
@@ -54,16 +57,22 @@ RUN mkdir -p lib/projectm/build && cd lib/projectm/build && \
 COPY go.mod go.sum* ./
 RUN go mod download 2>/dev/null || true
 
-COPY . .
+# Copy Go source only — lib/ is already built, don't overwrite patched projectM
+COPY cmd/ cmd/
+COPY internal/ internal/
+COPY test_data/ test_data/
+COPY portmaster/ portmaster/
+COPY go.mod go.sum* ./
 
 ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
     CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ \
-    CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I ../../lib/soloud/include -I ../../lib/projectm/src/api/include -I ../../lib/projectm/build/src/api/include -I/usr/include/SDL2 -D_REENTRANT" \
+    CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I lib/soloud/include -I lib/projectm/src/api/include -I lib/projectm/build/src/api/include -I/usr/include/SDL2 -D_REENTRANT" \
     CGO_LDFLAGS="-lSDL2 -lm -lpthread lib/projectm/build/src/libprojectM/libprojectM-4.a lib/projectm/build/vendor/projectm-eval/projectm-eval/libprojectM_eval.a -lGLESv2 -lm" \
     go build -ldflags="-s -w" -o mdpp ./cmd/mdpp \
-    && aarch64-linux-gnu-strip mdpp
+    && aarch64-linux-gnu-strip mdpp \
+    && patchelf --remove-needed libGL.so.1 mdpp 2>/dev/null; true
 
 # Prepare dist
 RUN mkdir -p /dist/mdpp/presets \

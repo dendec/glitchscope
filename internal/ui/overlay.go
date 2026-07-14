@@ -2,18 +2,20 @@
 package ui
 
 /*
-#cgo LDFLAGS: -lGL
-#define GL_GLEXT_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glext.h>
+#cgo LDFLAGS: -lGLESv2
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 
 static const char *vertexShaderSource =
-	"#version 120\n"
+	"#version 100\n"
+	"attribute vec2 pos;\n"
+	"attribute vec2 tc;\n"
 	"varying vec2 uv;\n"
-	"void main() { uv = gl_MultiTexCoord0.st; gl_Position = gl_Vertex; }";
+	"void main() { uv = tc; gl_Position = vec4(pos, 0.0, 1.0); }";
 
 static const char *fragmentShaderSource =
-	"#version 120\n"
+	"#version 100\n"
+	"precision mediump float;\n"
 	"uniform sampler2D text;\n"
 	"uniform float opacity;\n"
 	"varying vec2 uv;\n"
@@ -73,14 +75,19 @@ static void drawText(unsigned int program, unsigned int text, float opacity,
 	float right = (x + textWidth) / (float)w * 2.0f - 1.0f;
 	float bottom = y / (float)h * 2.0f - 1.0f;
 	float top = (y + textHeight) / (float)h * 2.0f - 1.0f;
-	float bottomV = flipY ? 1.0f : 0.0f;
-	float topV = flipY ? 0.0f : 1.0f;
-	glBegin(GL_TRIANGLE_STRIP);
-	glTexCoord2f(0, bottomV); glVertex2f(left, bottom);
-	glTexCoord2f(1, bottomV); glVertex2f(right, bottom);
-	glTexCoord2f(0, topV); glVertex2f(left, top);
-	glTexCoord2f(1, topV); glVertex2f(right, top);
-	glEnd();
+	float bv = flipY ? 1.0f : 0.0f;
+	float tv = flipY ? 0.0f : 1.0f;
+	float verts[] = { left,bottom, right,bottom, left,top, right,top };
+	float uvs[]   = { 0,bv, 1,bv, 0,tv, 1,tv };
+	GLuint pos = (GLuint)glGetAttribLocation(program, "pos");
+	glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 0, verts);
+	glEnableVertexAttribArray(pos);
+	GLuint tc = (GLuint)glGetAttribLocation(program, "tc");
+	glVertexAttribPointer(tc, 2, GL_FLOAT, GL_FALSE, 0, uvs);
+	glEnableVertexAttribArray(tc);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glDisableVertexAttribArray(pos);
+	glDisableVertexAttribArray(tc);
 	glUseProgram(0);
 	glDisable(GL_BLEND);
 }

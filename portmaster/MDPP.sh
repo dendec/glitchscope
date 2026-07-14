@@ -28,6 +28,7 @@ export XDG_DATA_HOME="$CONFDIR"
 
 export LD_LIBRARY_PATH="$GAMEDIR/lib:/usr/lib:$LD_LIBRARY_PATH"
 export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
+export SDL_AUDIODRIVER="alsa"
 
 # Display standard PortMaster loading text
 pm_message "Loading MDPP... (Compiling shaders)"
