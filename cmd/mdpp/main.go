@@ -42,7 +42,11 @@ func main() {
 		slog.Error("window", "error", err)
 		os.Exit(1)
 	}
-	defer window.Destroy()
+	defer func() {
+		if err := window.Destroy(); err != nil {
+			slog.Debug("window destroy", "error", err)
+		}
+	}()
 
 	glCtx, err := window.GLCreateContext()
 	if err != nil {
@@ -137,44 +141,41 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 	ticker := time.NewTicker(time.Second / 60)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			// Process events → dispatch actions.
-			for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
-				act := inp.ProcessEvent(e)
-				handleAction(act, pm, pl, overlay, lib, presetNames, presetIdx)
-				if act == input.ActionQuit {
-					return
-				}
+	for range ticker.C {
+		// Process events → dispatch actions.
+		for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
+			act := inp.ProcessEvent(e)
+			handleAction(act, pm, pl, overlay, lib, presetNames, presetIdx)
+			if act == input.ActionQuit {
+				return
 			}
-
-			// Feed wave data → projectM.
-			if pl != nil {
-				if wave := pl.GetWave(); wave != nil {
-					pm.PCMAddFloat(wave, projectm.Mono)
-				}
-			}
-
-			// Auto-advance to next track when current one finishes.
-			if pl != nil && lib != nil && pl.Voice() != 0 && !pl.IsValidVoice() {
-				if path := lib.TrackNext(); path != "" {
-					playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
-				}
-			}
-
-			w, h := window.GLGetDrawableSize()
-			pm.RenderFrame()
-
-			if overlay != nil {
-				overlay.Update()
-				overlay.Draw(int(w), int(h))
-				pm.BindFeedbackFramebuffer()
-				overlay.Inject(int(w), int(h))
-			}
-
-			window.GLSwap()
 		}
+
+		// Feed wave data → projectM.
+		if pl != nil {
+			if wave := pl.GetWave(); wave != nil {
+				pm.PCMAddFloat(wave, projectm.Mono)
+			}
+		}
+
+		// Auto-advance to next track when current one finishes.
+		if pl != nil && lib != nil && pl.Voice() != 0 && !pl.IsValidVoice() {
+			if path := lib.TrackNext(); path != "" {
+				playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
+			}
+		}
+
+		w, h := window.GLGetDrawableSize()
+		pm.RenderFrame()
+
+		if overlay != nil {
+			overlay.Update()
+			overlay.Draw(int(w), int(h))
+			pm.BindFeedbackFramebuffer()
+			overlay.Inject(int(w), int(h))
+		}
+
+		window.GLSwap()
 	}
 }
 

@@ -223,7 +223,11 @@ func (o *Overlay) ShowTrack(path string) {
 		slog.Error("font face", "error", err)
 		return
 	}
-	defer face.Close()
+	defer func() {
+		if err := face.Close(); err != nil {
+			slog.Debug("font face close", "error", err)
+		}
+	}()
 
 	title := player.TrackTitle(path)
 	if title == "" {

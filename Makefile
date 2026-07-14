@@ -22,7 +22,7 @@ LOCAL_OPENMPT := /tmp/libopenmpt/usr
 CGO_CFLAGS := -I$(LOCAL_OPENMPT)/include
 CGO_LDFLAGS += -L$(LOCAL_OPENMPT)/lib/x86_64-linux-gnu
 
-.PHONY: build clean dist-arm64 dist-portmaster run projectm-build submodules
+.PHONY: build clean dist-arm64 dist-portmaster lint run projectm-build submodules tidy
 
 submodules:
 	git submodule update --init --recursive
@@ -58,6 +58,11 @@ $(FONT_SUBSET): $(FONT_RANGES)
 build: $(FONT_SUBSET) projectm-build
 	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 		$(GO) build -ldflags="-s -w" -o $(APP) ./cmd/$(APP)
+
+lint:
+	@which golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
+		golangci-lint run ./cmd/... ./internal/...
 
 tidy:
 	$(GO) mod tidy
