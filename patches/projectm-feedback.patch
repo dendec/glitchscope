@@ -1,0 +1,115 @@
+diff --git a/src/api/include/projectM-4/render_opengl.h b/src/api/include/projectM-4/render_opengl.h
+index 0a061f7..64a5a87 100644
+--- a/src/api/include/projectM-4/render_opengl.h
++++ b/src/api/include/projectM-4/render_opengl.h
+@@ -41,6 +41,16 @@ extern "C" {
+  */
+ PROJECTM_EXPORT void projectm_opengl_render_frame(projectm_handle instance);
+ 
++/**
++ * @brief Binds the internal framebuffer used as the next frame's feedback input.
++ *
++ * Draw calls made after this function become part of the visualization history.
++ * Call only after projectm_opengl_render_frame() and before the next frame.
++ *
++ * @param instance The projectM instance handle.
++ */
++PROJECTM_EXPORT void projectm_opengl_bind_feedback_framebuffer(projectm_handle instance);
++
+ #ifdef __cplusplus
+ } // extern "C"
+ #endif
+diff --git a/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp b/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
+index e311cf0..27ffe11 100755
+--- a/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
++++ b/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
+@@ -169,6 +169,11 @@ void MilkdropPreset::RenderFrame(const libprojectM::Audio::FrameAudioData& audio
+     m_isFirstFrame = false;
+ }
+ 
++void MilkdropPreset::BindFeedbackFramebuffer()
++{
++    m_framebuffer.Bind(m_previousFrameBuffer);
++}
++
+ auto MilkdropPreset::OutputTexture() const -> std::shared_ptr<Renderer::Texture>
+ {
+     // the composited image is always stored in the "current" framebuffer after a frame is rendered.
+diff --git a/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp b/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp
+index cd55339..008ae64 100644
+--- a/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp
++++ b/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp
+@@ -82,6 +82,8 @@ public:
+     void RenderFrame(const libprojectM::Audio::FrameAudioData& audioData,
+                      const Renderer::RenderContext& renderContext) override;
+ 
++    void BindFeedbackFramebuffer() override;
++
+     auto OutputTexture() const -> std::shared_ptr<Renderer::Texture> override;
+ 
+     void DrawInitialImage(const std::shared_ptr<Renderer::Texture>& image, const Renderer::RenderContext& renderContext) override;
+diff --git a/src/libprojectM/Preset.hpp b/src/libprojectM/Preset.hpp
+index ba06a14..cb63747 100644
+--- a/src/libprojectM/Preset.hpp
++++ b/src/libprojectM/Preset.hpp
+@@ -29,6 +29,11 @@ public:
+     virtual void RenderFrame(const libprojectM::Audio::FrameAudioData& audioData,
+                              const Renderer::RenderContext& renderContext) = 0;
+ 
++    /**
++     * @brief Binds the texture that will be used as input for the next frame.
++     */
++    virtual void BindFeedbackFramebuffer() = 0;
++
+     /**
+      * @brief Returns a pointer to the current rendering output texture.
+      * This pointer (the actual texture) may change from frame to frame, so this pointer should not be stored for use
+diff --git a/src/libprojectM/ProjectM.cpp b/src/libprojectM/ProjectM.cpp
+index ae9390e..5c9bcf5 100644
+--- a/src/libprojectM/ProjectM.cpp
++++ b/src/libprojectM/ProjectM.cpp
+@@ -182,6 +182,14 @@ void ProjectM::RenderFrame()
+     m_previousFrameVolume = audioData.vol;
+ }
+ 
++void ProjectM::BindFeedbackFramebuffer()
++{
++    if (m_activePreset)
++    {
++        m_activePreset->BindFeedbackFramebuffer();
++    }
++}
++
+ void ProjectM::Initialize()
+ {
+     /** Initialise start time */
+diff --git a/src/libprojectM/ProjectM.hpp b/src/libprojectM/ProjectM.hpp
+index b84e293..6158547 100644
+--- a/src/libprojectM/ProjectM.hpp
++++ b/src/libprojectM/ProjectM.hpp
+@@ -103,6 +103,8 @@ public:
+ 
+     void RenderFrame();
+ 
++    void BindFeedbackFramebuffer();
++
+     void SetBeatSensitivity(float sensitivity);
+ 
+     auto GetBeatSensitivity() const -> float;
+diff --git a/src/libprojectM/ProjectMCWrapper.cpp b/src/libprojectM/ProjectMCWrapper.cpp
+index cbf5f6e..8c12bc0 100644
+--- a/src/libprojectM/ProjectMCWrapper.cpp
++++ b/src/libprojectM/ProjectMCWrapper.cpp
+@@ -171,6 +171,12 @@ void projectm_opengl_render_frame(projectm_handle instance)
+     projectMInstance->RenderFrame();
+ }
+ 
++void projectm_opengl_bind_feedback_framebuffer(projectm_handle instance)
++{
++    auto projectMInstance = handle_to_instance(instance);
++    projectMInstance->BindFeedbackFramebuffer();
++}
++
+ void projectm_set_beat_sensitivity(projectm_handle instance, float sensitivity)
+ {
+     auto projectMInstance = handle_to_instance(instance);

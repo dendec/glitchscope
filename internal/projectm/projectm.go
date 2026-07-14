@@ -2,7 +2,7 @@
 package projectm
 
 /*
-#cgo CFLAGS: -I ../../lib/projectm/src/api/include
+#cgo CFLAGS: -I ../../lib/projectm/src/api/include -I ../../lib/projectm/build/src/api/include
 #include <stdlib.h>
 #include "projectM-4/projectM.h"
 */
@@ -64,6 +64,12 @@ func (h *Handle) SetWindowSize(width, height int) {
 // OpenGL context must be current.
 func (h *Handle) RenderFrame() {
 	C.projectm_opengl_render_frame(h.p)
+}
+
+// BindFeedbackFramebuffer binds the internal image consumed by the next frame.
+// OpenGL drawing performed after this call becomes part of projectM's feedback.
+func (h *Handle) BindFeedbackFramebuffer() {
+	C.projectm_opengl_bind_feedback_framebuffer(h.p)
 }
 
 // SetPresetSwitchFailedCallback is a no-op until cgo callback forwarding is implemented.

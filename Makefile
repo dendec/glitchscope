@@ -9,6 +9,7 @@ PROJECTM_DIR      := lib/projectm
 PROJECTM_BUILD    := $(PROJECTM_DIR)/build
 PROJECTM_LIB      := $(PROJECTM_BUILD)/src/libprojectM/libprojectM-4.a
 PROJECTM_EVAL_LIB := $(PROJECTM_BUILD)/vendor/projectm-eval/projectm-eval/libprojectM_eval.a
+PROJECTM_PATCH    := patches/projectm-feedback.patch
 
 CGO_CXXFLAGS := $(SDL_CFLAGS) -Wno-write-strings
 CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lm
@@ -23,7 +24,9 @@ projectm-build: submodules $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB)
 $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB): $(PROJECTM_BUILD)/Makefile
 	cmake --build $(PROJECTM_BUILD) --target projectM -- -j$$(nproc)
 
-$(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt
+$(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt $(PROJECTM_PATCH)
+	@# Apply custom patch for feedback framebuffer injection.
+	cd $(PROJECTM_DIR) && git apply ../../$(PROJECTM_PATCH) 2>/dev/null; true
 	@# Patch config.h.cmake.in — upstream uses git hash but we
 	@# build in detached/submodule mode without full git history.
 	sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \

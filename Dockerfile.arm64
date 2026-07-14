@@ -25,13 +25,19 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)\n\
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)\n\
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)' > /build/toolchain.cmake
 
-# Clone SoLoud (audio engine)
+# Clone SoLoud (audio engine, no tag — master is stable)
 RUN git clone --depth 1 https://github.com/jarikomppa/soloud.git lib/soloud
 
-# Clone & build projectM static lib with GLES
-RUN git clone --depth 1 --branch v4.1.6 https://github.com/projectM-visualizer/projectm.git lib/projectm \
+# Clone & patch projectM (v4.1.6 with feedback framebuffer injection)
+RUN git clone --depth 1 --branch v4.1.6 \
+    https://github.com/projectM-visualizer/projectm.git lib/projectm
+COPY patches/ patches/
+RUN cd lib/projectm \
+    && git apply /build/patches/projectm-feedback.patch \
     && sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
-        lib/projectm/config.h.cmake.in
+        config.h.cmake.in
+
+# Build projectM static lib with GLES
 RUN mkdir -p lib/projectm/build && cd lib/projectm/build && \
     PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig \
     cmake .. -DCMAKE_TOOLCHAIN_FILE=/build/toolchain.cmake \
@@ -54,7 +60,7 @@ ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
     CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ \
-    CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I ../../lib/soloud/include -I/usr/include/SDL2 -D_REENTRANT" \
+    CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I ../../lib/soloud/include -I ../../lib/projectm/src/api/include -I ../../lib/projectm/build/src/api/include -I/usr/include/SDL2 -D_REENTRANT" \
     CGO_LDFLAGS="-lSDL2 -lm -lpthread lib/projectm/build/src/libprojectM/libprojectM-4.a lib/projectm/build/vendor/projectm-eval/projectm-eval/libprojectM_eval.a -lGLESv2 -lm" \
     go build -ldflags="-s -w" -o mdpp ./cmd/mdpp \
     && aarch64-linux-gnu-strip mdpp
