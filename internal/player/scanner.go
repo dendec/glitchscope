@@ -31,6 +31,7 @@ var skipPrefixes = []string{
 // SupportedExts maps lower-case file extensions that the scanner looks for.
 var SupportedExts = map[string]bool{
 	".mp3": true, ".ogg": true, ".flac": true, ".wav": true,
+	// Tracker formats via libopenmpt
 	".mod": true, ".xm": true, ".it": true, ".s3m": true,
 }
 

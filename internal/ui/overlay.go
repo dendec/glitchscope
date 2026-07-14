@@ -152,6 +152,7 @@ type Overlay struct {
 	visible  bool
 	injected bool
 	program  uint32
+	hidden   bool // B button toggles — overrides visibility
 }
 
 // New creates an Overlay. Font is loaded once; no GL state touched yet.
@@ -161,7 +162,7 @@ func New() *Overlay {
 
 // Draw renders readable text over the completed visualization frame.
 func (o *Overlay) Draw(width, height int) {
-	if !o.visible || o.tex == 0 || o.program == 0 || width <= 0 || height <= 0 {
+	if o.hidden || !o.visible || o.tex == 0 || o.program == 0 || width <= 0 || height <= 0 {
 		return
 	}
 	if o.injected {
@@ -175,7 +176,7 @@ func (o *Overlay) Draw(width, height int) {
 
 // Inject stamps the text once into projectM's bound feedback framebuffer.
 func (o *Overlay) Inject(width, height int) {
-	if !o.visible || o.injected || o.tex == 0 || o.program == 0 || width <= 0 || height <= 0 {
+	if o.hidden || !o.visible || o.injected || o.tex == 0 || o.program == 0 || width <= 0 || height <= 0 {
 		return
 	}
 	if time.Since(o.started) < fadeInDuration+holdDuration {
@@ -205,6 +206,9 @@ func (o *Overlay) layout(width, height int) (x, y, drawWidth, drawHeight float32
 
 // ShowTrack begins the fade-in animation for the given track path.
 func (o *Overlay) ShowTrack(path string) {
+	if o.hidden {
+		return // user toggled overlay off
+	}
 	// Parse font once; cache for potential reuse.
 	f, err := truetype.Parse(gomono.TTF)
 	if err != nil {
@@ -258,6 +262,19 @@ func (o *Overlay) ShowTrack(path string) {
 	o.injected = false
 	o.alpha = 0
 	slog.Info("overlay show", "text", title, "texW", o.texW, "texH", o.texH)
+}
+
+// ToggleVisibility shows or hides the overlay (B button).
+func (o *Overlay) ToggleVisibility() {
+	o.hidden = !o.hidden
+	if !o.hidden && o.text != "" {
+		// Re-show current text with fresh animation.
+		o.visible = true
+		o.started = time.Now()
+		o.injected = false
+		o.alpha = 0
+	}
+	slog.Debug("overlay visibility", "hidden", o.hidden)
 }
 
 // Update advances the fade animation. Call every frame.

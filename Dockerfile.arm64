@@ -12,6 +12,8 @@ RUN dpkg --add-architecture arm64 && apt-get update && apt-get install -y --no-i
         build-essential g++-aarch64-linux-gnu binutils-aarch64-linux-gnu cmake git patchelf \
         libsdl2-dev:arm64 \
         libgles2-mesa-dev:arm64 \
+        libopenmpt-dev:arm64 \
+        autoconf automake libtool \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -53,6 +55,19 @@ RUN mkdir -p lib/projectm/build && cd lib/projectm/build && \
              -DENABLE_GLES=ON && \
     cmake --build . --target projectM -- -j$(nproc)
 
+# Build libopenmpt static from source
+RUN wget -q https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.8.7+release.autotools.tar.gz \
+    && tar xzf libopenmpt-0.8.7+release.autotools.tar.gz \
+    && rm libopenmpt-0.8.7+release.autotools.tar.gz \
+    && cd libopenmpt-0.8.7+release.autotools \
+    && ./configure --host=aarch64-linux-gnu --enable-static --disable-shared \
+        --without-mpg123 --without-ogg --without-vorbis --without-vorbisfile \
+        --without-pulseaudio --without-sdl2 --without-portaudio --without-portaudiocpp --without-dsound \
+        --without-sndfile --without-zlib --without-flac \
+    && make -j$(nproc) \
+    && make install DESTDIR=/build/openmpt-install \
+    && rm -rf /build/libopenmpt-0.8.7+release.autotools
+
 # Build Go app
 COPY go.mod go.sum* ./
 RUN go mod download 2>/dev/null || true
@@ -68,8 +83,9 @@ ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
     CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ \
+    CGO_CFLAGS="-I/build/openmpt-install/usr/local/include" \
     CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I lib/soloud/include -I lib/projectm/src/api/include -I lib/projectm/build/src/api/include -I/usr/include/SDL2 -D_REENTRANT" \
-    CGO_LDFLAGS="-lSDL2 -lm -lpthread lib/projectm/build/src/libprojectM/libprojectM-4.a lib/projectm/build/vendor/projectm-eval/projectm-eval/libprojectM_eval.a -lGLESv2 -lm" \
+    CGO_LDFLAGS="-lSDL2 -lm -lpthread lib/projectm/build/src/libprojectM/libprojectM-4.a lib/projectm/build/vendor/projectm-eval/projectm-eval/libprojectM_eval.a -lGLESv2 -lm -L/build/openmpt-install/usr/local/lib -lopenmpt" \
     go build -ldflags="-s -w" -o mdpp ./cmd/mdpp \
     && aarch64-linux-gnu-strip mdpp \
     && patchelf --remove-needed libGL.so.1 mdpp 2>/dev/null; true
@@ -77,7 +93,8 @@ RUN CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
 # Prepare dist
 RUN mkdir -p /dist/mdpp/presets \
     && cp mdpp /dist/mdpp/ \
-    && cp test_data/presets/test.milk /dist/mdpp/presets/ \
+    && cp lib/projectm/presets/tests/*.milk /dist/mdpp/presets/ \
+    && rm -f /dist/mdpp/presets/999-empty.milk 2>/dev/null; true \
     && cp portmaster/MDPP.sh /dist/ \
     && cp portmaster/port.json /dist/ \
     && cp portmaster/screenshot.png /dist/ 2>/dev/null; true \
@@ -86,7 +103,7 @@ RUN mkdir -p /dist/mdpp/presets \
     && cp portmaster/README.md /dist/mdpp/
 
 # Launcher wrapper
-RUN printf '#!/bin/sh\nDIR="$(dirname "$0")"\nexport LD_LIBRARY_PATH="$DIR/lib:/usr/lib:$LD_LIBRARY_PATH"\n"$DIR/mdpp" "$DIR/song.mp3"\n' > /dist/mdpp/mdpp.sh \
+RUN printf '#!/bin/sh\nDIR="$(dirname "$0")"\n"$DIR/mdpp" "$DIR/song.mp3"\n' > /dist/mdpp/mdpp.sh \
     && chmod +x /dist/mdpp/mdpp.sh
 
 RUN echo "=== Dist ===" && find /dist -type f -exec ls -lh {} \;

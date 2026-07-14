@@ -12,7 +12,12 @@ PROJECTM_EVAL_LIB := $(PROJECTM_BUILD)/vendor/projectm-eval/projectm-eval/libpro
 PROJECTM_PATCH    := patches/projectm-feedback.patch
 
 CGO_CXXFLAGS := $(SDL_CFLAGS) -Wno-write-strings
-CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm
+CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm -lopenmpt
+
+# For local dev without libopenmpt-dev installed system-wide:
+LOCAL_OPENMPT := /tmp/libopenmpt/usr
+CGO_CFLAGS := -I$(LOCAL_OPENMPT)/include
+CGO_LDFLAGS += -L$(LOCAL_OPENMPT)/lib/x86_64-linux-gnu
 
 .PHONY: build clean dist-arm64 dist-portmaster run projectm-build submodules
 
@@ -41,7 +46,7 @@ $(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt $(PROJECTM_PATCH)
 		-DENABLE_INSTALL=OFF
 
 build: projectm-build go.sum
-	CGO_ENABLED=1 CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
+	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 		$(GO) build -ldflags="-s -w" -o $(APP) ./cmd/$(APP)
 
 go.sum: go.mod
@@ -79,12 +84,16 @@ dist-portmaster: dist-arm64
 	cp portmaster/port.json dist/portmaster_build/
 	cp portmaster/screenshot.png dist/portmaster_build/ 2>/dev/null; true
 	cp dist/mdpp/mdpp dist/portmaster_build/mdpp/
-	cp -r dist/mdpp/presets/* dist/portmaster_build/mdpp/presets/ 2>/dev/null; true
+	# libopenmpt is statically linked — no .so to bundle
+	# Copy presets from projectM source (more variety than what's in the Docker image)
+	cp lib/projectm/presets/tests/*.milk dist/portmaster_build/mdpp/presets/ 2>/dev/null; true
+	cp dist/mdpp/presets/*.milk dist/portmaster_build/mdpp/presets/ 2>/dev/null; true
+	rm -f dist/portmaster_build/mdpp/presets/999-empty.milk 2>/dev/null; true
 	cp portmaster/licenses/* dist/portmaster_build/mdpp/licenses/ 2>/dev/null; true
 	cp portmaster/README.md dist/portmaster_build/mdpp/
 	cp portmaster/screenshot.png dist/portmaster_build/mdpp/cover.png 2>/dev/null; true
 	@RELEASE_DATE=$$(date +%Y%m%d)T000000; \
-	printf '<gameList>\n    <game>\n        <path>./MDPP.sh</path>\n        <name>MDPP</name>\n        <desc>MilkDrop Portable Player — plays MP3/FLAC/Ogg with real-time MilkDrop visualizations. Drop your music files into /roms/ports/mdpp/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./mdpp/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/mdpp/gameinfo.xml
+	printf '<gameList>\n    <game>\n        <path>./MDPP.sh</path>\n        <name>MDPP</name>\n        <desc>MilkDrop Portable Player — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/mdpp/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./mdpp/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/mdpp/gameinfo.xml
 	@rm -f dist/mdpp.zip
 	cd dist/portmaster_build && zip -r ../mdpp.zip "MDPP.sh" port.json screenshot.png mdpp
 	@echo "=== Generated dist/mdpp.zip ==="
@@ -94,9 +103,15 @@ deploy: dist-arm64
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push dist/mdpp/mdpp $(DEVICE_DIR)/
 	adb push portmaster/MDPP.sh $(PORTS_DIR)/
-	adb push test_data/song.mp3 $(DEVICE_DIR)/song.mp3
+	adb push test_data/music $(DEVICE_DIR)/music
 	adb shell "killall -9 mdpp 2>/dev/null; true"
-	@echo "=== Fast deployed binary and song ==="
+	@echo "=== Fast deployed binary + music library ==="
+
+deploy-song:
+	adb shell "mkdir -p $(DEVICE_DIR)/music"
+	adb push test_data/song.mp3 $(DEVICE_DIR)/
+	adb push test_data/music $(DEVICE_DIR)/music
+	@echo "=== Deployed song + music test dirs ==="
 
 deploy-portmaster: dist-portmaster
 	adb push dist/mdpp.zip $(PM_AUTOINSTALL)/

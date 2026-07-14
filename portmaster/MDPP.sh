@@ -33,7 +33,10 @@ export SDL_AUDIODRIVER="alsa"
 # Display standard PortMaster loading text
 pm_message "Loading MDPP... (Compiling shaders)"
 
+# gptokeyb handles START+SELECT quit combo; kills mdpp on combo press
+$GPTOKEYB "mdpp" &
+
 pm_platform_helper "$GAMEDIR/mdpp"
-./mdpp "$GAMEDIR/song.mp3"
+./mdpp
 
 pm_finish

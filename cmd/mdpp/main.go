@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/dendec/mdpp/internal/input"
 	"github.com/dendec/mdpp/internal/player"
 	"github.com/dendec/mdpp/internal/projectm"
 	"github.com/dendec/mdpp/internal/ui"
@@ -26,7 +27,7 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
-	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS); err != nil {
+	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK); err != nil {
 		slog.Error("sdl init", "error", err)
 		os.Exit(1)
 	}
@@ -49,33 +50,35 @@ func main() {
 	}
 	defer sdl.GLDeleteContext(glCtx)
 
-	slog.Info("MDPP skeleton OK. Press ESC to quit.")
-
 	// projectM visualization
+	t0 := time.Now()
 	pm, err := projectm.Create()
 	if err != nil {
 		slog.Error("projectm init", "error", err)
 		os.Exit(1)
 	}
 	defer pm.Destroy()
+	slog.Info("projectM init", "ms", time.Since(t0).Milliseconds())
 
-	slog.Info("projectM initialized")
 	w, h := window.GLGetDrawableSize()
 	pm.SetWindowSize(int(w), int(h))
 
-	// Load test preset (relative to binary dir, then CWD)
-	binDir, _ := os.Executable() // best-effort
-	baseDir := ""
+	// Find base dir (where binary lives — presets, music relative to this).
+	binDir, _ := os.Executable()
+	baseDir := "."
 	if binDir != "" {
-		baseDir = filepath.Dir(binDir) + "/"
+		baseDir = filepath.Dir(binDir)
 	}
+
+	// Load first preset from dirs in priority order.
 	presetPaths := []string{
-		baseDir + "presets/test.milk",
+		baseDir + "/presets/test.milk",
 		"presets/test.milk",
-		baseDir + "test_data/presets/test.milk",
+		baseDir + "/test_data/presets/test.milk",
 		"test_data/presets/test.milk",
 	}
 	loaded := false
+	t1 := time.Now()
 	for _, p := range presetPaths {
 		if _, err := os.Stat(p); err == nil {
 			pm.LoadPresetFile(p, false)
@@ -84,16 +87,14 @@ func main() {
 			break
 		}
 	}
-	if !loaded {
+	if loaded {
+		slog.Info("preset load", "ms", time.Since(t1).Milliseconds())
+	} else {
 		slog.Warn("no preset found, using idle")
 	}
 
-	// Audio player (non-fatal — visualizer works without sound)
-	mp3Path := "test_data/song.mp3"
-	if len(os.Args) > 1 {
-		mp3Path = os.Args[1]
-	}
-
+	// Audio player (non-fatal).
+	t2 := time.Now()
 	var p *player.Player
 	var overlay *ui.Overlay
 	if pl, err := player.New(); err != nil {
@@ -101,41 +102,69 @@ func main() {
 	} else {
 		p = pl
 		overlay = ui.New()
-		defer overlay.Close()
-		if err := p.PlayFile(mp3Path); err != nil {
-			slog.Error("play file", "error", err)
-		} else {
-			overlay.ShowTrack(mp3Path)
-		}
 		defer p.Close()
+		defer overlay.Close()
+	}
+	slog.Info("audio init", "ms", time.Since(t2).Milliseconds())
+
+	// Music library scan — prefer music/ subdirs, fallback to base dir.
+	musicDir := baseDir + "/music"
+	if _, err := os.Stat(musicDir); os.IsNotExist(err) {
+		musicDir = baseDir + "/test_data/music"
+	}
+	if _, err := os.Stat(musicDir); os.IsNotExist(err) {
+		musicDir = baseDir
+	}
+	t3 := time.Now()
+	lib, err := player.NewLibrary(musicDir)
+	if err != nil {
+		slog.Warn("music scan failed", "error", err)
+	}
+	if lib != nil {
+		slog.Info("music scan", "albums", lib.AlbumCount(), "ms", time.Since(t3).Milliseconds())
 	}
 
-	appLoop(window, pm, p, overlay)
+	// Start playing first track if available.
+	if p != nil && lib != nil {
+		if first := lib.PlayCurrent(); first != "" {
+			playTrack(p, overlay, first, lib.CurrentAlbum().Name)
+		}
+	}
+
+	// Input handler.
+	inp := input.New()
+	defer inp.Close()
+
+	appLoop(window, pm, p, overlay, inp, lib)
 }
 
-func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay) {
-	ticker := time.NewTicker(time.Second / 60) // ~60 fps
+func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, inp *input.Input, lib *player.Library) {
+	ticker := time.NewTicker(time.Second / 60)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			// Process events
+			// Process events → dispatch actions.
 			for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
-				switch ev := e.(type) {
-				case *sdl.QuitEvent:
+				act := inp.ProcessEvent(e)
+				handleAction(act, pm, pl, overlay, lib)
+				if act == input.ActionQuit {
 					return
-				case *sdl.KeyboardEvent:
-					if ev.Keysym.Sym == sdl.K_ESCAPE && ev.State == sdl.PRESSED {
-						return
-					}
 				}
 			}
 
-			// Feed wave data from SoLoud to projectM (no-op if no player)
+			// Feed wave data → projectM.
 			if pl != nil {
 				if wave := pl.GetWave(); wave != nil {
 					pm.PCMAddFloat(wave, projectm.Mono)
+				}
+			}
+
+			// Auto-advance to next track when current one finishes.
+			if pl != nil && lib != nil && pl.Voice() != 0 && !pl.IsValidVoice() {
+				if path := lib.TrackNext(); path != "" {
+					playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
 				}
 			}
 
@@ -153,3 +182,79 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 		}
 	}
 }
+
+// handleAction dispatches an input action to the appropriate player/library/overlay logic.
+func handleAction(act input.Action, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, lib *player.Library) {
+	switch act {
+	case input.ActionQuit:
+		return
+
+	case input.ActionPlayPause:
+		if pl != nil {
+			pl.TogglePause()
+		}
+
+	case input.ActionToggleOverlay:
+		if overlay != nil {
+			overlay.ToggleVisibility()
+		}
+
+	case input.ActionNextTrack:
+		if lib == nil || pl == nil {
+			return
+		}
+		if path := lib.TrackNext(); path != "" {
+			playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
+		}
+
+	case input.ActionPrevTrack:
+		if lib == nil || pl == nil {
+			return
+		}
+		if path := lib.TrackPrev(); path != "" {
+			playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
+		}
+
+	case input.ActionNextAlbum:
+		if lib == nil || pl == nil {
+			return
+		}
+		if path := lib.AlbumNext(); path != "" {
+			playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
+		}
+
+	case input.ActionPrevAlbum:
+		if lib == nil || pl == nil {
+			return
+		}
+		if path := lib.AlbumPrev(); path != "" {
+			playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
+		}
+
+	case input.ActionNextPreset:
+		pm.RenderFrame() // refresh before switching
+		// projectM hardcode cycling: just render triggers slow preset change via callback.
+		// We can't force next preset without direct API, skip for now.
+		slog.Debug("next preset — projectM auto-cycles")
+
+	case input.ActionPrevPreset:
+		slog.Debug("prev preset — projectM auto-cycles")
+	}
+}
+
+func playTrack(pl *player.Player, overlay *ui.Overlay, path string, album string) {
+	if err := pl.PlayFile(path); err != nil {
+		slog.Error("play", "path", path, "error", err)
+		return
+	}
+	if overlay != nil {
+		label := album
+		if album != "" {
+			label = album + " — " + player.TrackTitle(path)
+		}
+		overlay.ShowTrack(label)
+	}
+	slog.Info("now playing", "track", path, "album", album)
+}
+
+

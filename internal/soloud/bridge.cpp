@@ -27,12 +27,32 @@ void Soloud_stopAll(void * aClassPtr) {
 	((Soloud *)aClassPtr)->stopAll();
 }
 
-void Soloud_setVisualizationEnable(void * aClassPtr, int aEnable) {
-	((Soloud *)aClassPtr)->setVisualizationEnable(aEnable != 0);
+	void Soloud_setVisualizationEnable(void * aClassPtr, int aEnable) {
+		((Soloud *)aClassPtr)->setVisualizationEnable(aEnable != 0);
+	}
+
+	void Soloud_setPause(void * aClassPtr, unsigned int aVoiceHandle, int aPause) {
+		((Soloud *)aClassPtr)->setPause(aVoiceHandle, aPause != 0);
+	}
+
+	int Soloud_getPause(void * aClassPtr, unsigned int aVoiceHandle) {
+		return ((Soloud *)aClassPtr)->getPause(aVoiceHandle) ? 1 : 0;
+	}
+
+	int Soloud_isValidVoiceHandle(void * aClassPtr, unsigned int aVoiceHandle) {
+		return ((Soloud *)aClassPtr)->isValidVoiceHandle(aVoiceHandle) ? 1 : 0;
+	}
+
+	float * Soloud_calcFFT(void * aClassPtr) {
+	return ((Soloud *)aClassPtr)->calcFFT();
 }
 
-float * Soloud_calcFFT(void * aClassPtr) {
-	return ((Soloud *)aClassPtr)->calcFFT();
+void Soloud_lockAudioMutex(void * aClassPtr) {
+	((Soloud *)aClassPtr)->lockAudioMutex_internal();
+}
+
+void Soloud_unlockAudioMutex(void * aClassPtr) {
+	((Soloud *)aClassPtr)->unlockAudioMutex_internal();
 }
 
 float * Soloud_getWave(void * aClassPtr) {
@@ -44,6 +64,10 @@ void * Wav_create() { return (void *)new Wav; }
 
 int Wav_load(void * aClassPtr, const char * aFilename) {
 	return ((Wav *)aClassPtr)->load(aFilename);
+}
+
+int Wav_loadRawF32(void * aWav, float * aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels) {
+	return ((Wav *)aWav)->loadRawWave(aMem, aLength, aSamplerate, aChannels, true, false);
 }
 
 } // extern "C"

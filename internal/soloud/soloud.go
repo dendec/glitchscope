@@ -6,6 +6,11 @@ package soloud
 #cgo CXXFLAGS: -std=c++11 -DWITH_SDL2_STATIC -I ../../lib/soloud/include
 #include <stdlib.h>
 #include "soloud_c.h"
+
+// Forward declarations for bridge functions.
+int Wav_loadRawF32(void * aWav, float * aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels);
+void Soloud_lockAudioMutex(void * aClassPtr);
+void Soloud_unlockAudioMutex(void * aClassPtr);
 */
 import "C"
 import (
@@ -61,6 +66,33 @@ func LoadWav(path string) (*Wav, error) {
 	return &Wav{p: p}, nil
 }
 
+// NewWavFromF32 creates a Wav from raw interleaved float32 PCM data.
+func NewWavFromF32(data []float32, sampleRate float32, channels uint) (*Wav, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("wav from f32: empty data")
+	}
+	p := C.Wav_create()
+	r := int(C.Wav_loadRawF32(unsafe.Pointer(p),
+		(*C.float)(unsafe.Pointer(&data[0])),
+		C.uint(len(data)),
+		C.float(sampleRate),
+		C.uint(channels),
+	))
+	if r != 0 {
+		C.Wav_destroy(p)
+		return nil, fmt.Errorf("wav load raw: %d", r)
+	}
+	return &Wav{p: p}, nil
+}
+
+// Destroy frees the Wav resource.
+func (w *Wav) Destroy() {
+	if w.p != nil {
+		C.Wav_destroy(w.p)
+		w.p = nil
+	}
+}
+
 // Play starts playing a Wav source. Returns the voice handle.
 func (s *Soloud) Play(w *Wav) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(unsafe.Pointer(w.p))))
@@ -88,7 +120,36 @@ func (s *Soloud) CalcFFT() []float32 {
 	return unsafe.Slice((*float32)(unsafe.Pointer(p)), 256)
 }
 
+// IsValidVoiceHandle returns true if the voice handle is still active.
+func (s *Soloud) IsValidVoiceHandle(voice uint) bool {
+	return C.Soloud_isValidVoiceHandle(s.p, C.uint(voice)) != 0
+}
+
+// SetPause pauses/resumes a voice.
+func (s *Soloud) SetPause(voice uint, pause bool) {
+	v := 0
+	if pause {
+		v = 1
+	}
+	C.Soloud_setPause(s.p, C.uint(voice), C.int(v))
+}
+
+// GetPause returns whether a voice is paused.
+func (s *Soloud) GetPause(voice uint) bool {
+	return C.Soloud_getPause(s.p, C.uint(voice)) != 0
+}
+
 // StopAll stops all playing voices.
 func (s *Soloud) StopAll() {
 	C.Soloud_stopAll(s.p)
+}
+
+// LockMixer blocks until audio mixer is idle.
+func (s *Soloud) LockMixer() {
+	C.Soloud_lockAudioMutex(unsafe.Pointer(s.p))
+}
+
+// UnlockMixer releases the mixer lock.
+func (s *Soloud) UnlockMixer() {
+	C.Soloud_unlockAudioMutex(unsafe.Pointer(s.p))
 }
