@@ -51,11 +51,6 @@ func (in *Input) Close() {
 	in.joyIdx = -1
 }
 
-// Controller returns the current game controller or nil.
-func (in *Input) Controller() *sdl.GameController {
-	return in.controller
-}
-
 // ProcessEvent translates an SDL event into an Action.
 func (in *Input) ProcessEvent(event sdl.Event) Action {
 	switch e := event.(type) {

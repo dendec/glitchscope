@@ -45,11 +45,11 @@ $(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt $(PROJECTM_PATCH)
 		-DCMAKE_BUILD_TYPE=Release \
 		-DENABLE_INSTALL=OFF
 
-build: projectm-build go.sum
+build: projectm-build
 	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 		$(GO) build -ldflags="-s -w" -o $(APP) ./cmd/$(APP)
 
-go.sum: go.mod
+tidy:
 	$(GO) mod tidy
 
 run: build

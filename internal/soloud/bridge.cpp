@@ -27,10 +27,6 @@ void Soloud_stopAll(void * aClassPtr) {
 	((Soloud *)aClassPtr)->stopAll();
 }
 
-	void Soloud_setVisualizationEnable(void * aClassPtr, int aEnable) {
-		((Soloud *)aClassPtr)->setVisualizationEnable(aEnable != 0);
-	}
-
 	void Soloud_setPause(void * aClassPtr, unsigned int aVoiceHandle, int aPause) {
 		((Soloud *)aClassPtr)->setPause(aVoiceHandle, aPause != 0);
 	}
@@ -45,14 +41,6 @@ void Soloud_stopAll(void * aClassPtr) {
 
 	float * Soloud_calcFFT(void * aClassPtr) {
 	return ((Soloud *)aClassPtr)->calcFFT();
-}
-
-void Soloud_lockAudioMutex(void * aClassPtr) {
-	((Soloud *)aClassPtr)->lockAudioMutex_internal();
-}
-
-void Soloud_unlockAudioMutex(void * aClassPtr) {
-	((Soloud *)aClassPtr)->unlockAudioMutex_internal();
 }
 
 float * Soloud_getWave(void * aClassPtr) {

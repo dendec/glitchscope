@@ -163,26 +163,13 @@ func (l *Library) AlbumCount() int {
 	return len(l.Albums)
 }
 
-// TrackCount returns the number of tracks in the current album.
-func (l *Library) TrackCount() int {
-	if l.albumIdx >= 0 && l.albumIdx < len(l.Albums) {
-		return len(l.Albums[l.albumIdx].Tracks)
-	}
-	return 0
-}
-
-// CurrentAlbumIndex returns the current album index, or -1.
-func (l *Library) CurrentAlbumIndex() int {
-	return l.albumIdx
-}
-
-// CurrentTrackIndex returns the current track index within album, or -1.
-func (l *Library) CurrentTrackIndex() int {
-	return l.trackIdx
-}
-
 // PlayCurrent returns the current track path to be played.
 // Returns "" if nothing to play.
 func (l *Library) PlayCurrent() string {
 	return l.CurrentTrack()
+}
+
+// TrackTitle returns a display-friendly name for a track path.
+func TrackTitle(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }

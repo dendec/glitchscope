@@ -77,7 +77,6 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 COPY test_data/ test_data/
 COPY portmaster/ portmaster/
-COPY go.mod go.sum* ./
 
 ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 

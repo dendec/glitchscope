@@ -129,6 +129,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/dendec/mdpp/internal/player"
 	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/gomono"
@@ -218,7 +219,7 @@ func (o *Overlay) ShowTrack(path string) {
 	face := truetype.NewFace(f, &truetype.Options{Size: fontSize})
 	defer face.Close()
 
-	title := trackTitle(path)
+	title := player.TrackTitle(path)
 	if title == "" {
 		return
 	}
@@ -320,28 +321,6 @@ func (o *Overlay) hide() {
 	o.visible = false
 	o.text = ""
 	o.alpha = 0
-}
-
-func trackTitle(path string) string {
-	if path == "" {
-		return ""
-	}
-	// Just the filename without extension.
-	name := path
-	for i := len(path) - 1; i >= 0; i-- {
-		if path[i] == '/' || path[i] == '\\' {
-			name = path[i+1:]
-			break
-		}
-	}
-	// Trim extension.
-	for i := len(name) - 1; i >= 0; i-- {
-		if name[i] == '.' {
-			name = name[:i]
-			break
-		}
-	}
-	return name
 }
 
 func uploadTexture(rgba *image.RGBA) uint32 {

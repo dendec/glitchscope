@@ -86,12 +86,6 @@ func (p *Player) GetWave() []float32 {
 	return p.s.GetWave()
 }
 
-// GetFFT returns the current SoLoud FFT data (256 float32 bins).
-// Returns nil if visualization is not enabled.
-func (p *Player) GetFFT() []float32 {
-	return p.s.CalcFFT()
-}
-
 // Pause pauses playback. No-op if nothing playing.
 func (p *Player) Pause() {
 	if p.voice == 0 {
@@ -133,11 +127,6 @@ func (p *Player) IsValidVoice() bool {
 		return false
 	}
 	return p.s.IsValidVoiceHandle(p.voice)
-}
-
-// CurrentPath returns the path of the currently (or last) loaded file.
-func (p *Player) CurrentPath() string {
-	return p.currentPath
 }
 
 // Stop stops all playback.

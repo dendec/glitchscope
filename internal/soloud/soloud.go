@@ -7,10 +7,8 @@ package soloud
 #include <stdlib.h>
 #include "soloud_c.h"
 
-// Forward declarations for bridge functions.
+// Forward declaration for loadRawWave bridge.
 int Wav_loadRawF32(void * aWav, float * aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels);
-void Soloud_lockAudioMutex(void * aClassPtr);
-void Soloud_unlockAudioMutex(void * aClassPtr);
 */
 import "C"
 import (
@@ -144,12 +142,4 @@ func (s *Soloud) StopAll() {
 	C.Soloud_stopAll(s.p)
 }
 
-// LockMixer blocks until audio mixer is idle.
-func (s *Soloud) LockMixer() {
-	C.Soloud_lockAudioMutex(unsafe.Pointer(s.p))
-}
 
-// UnlockMixer releases the mixer lock.
-func (s *Soloud) UnlockMixer() {
-	C.Soloud_unlockAudioMutex(unsafe.Pointer(s.p))
-}

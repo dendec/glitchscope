@@ -9,6 +9,7 @@ import (
 
 	"github.com/dendec/mdpp/internal/input"
 	"github.com/dendec/mdpp/internal/player"
+	"github.com/dendec/mdpp/internal/presets"
 	"github.com/dendec/mdpp/internal/projectm"
 	"github.com/dendec/mdpp/internal/ui"
 	"github.com/veandco/go-sdl2/sdl"
@@ -63,35 +64,29 @@ func main() {
 	w, h := window.GLGetDrawableSize()
 	pm.SetWindowSize(int(w), int(h))
 
-	// Find base dir (where binary lives — presets, music relative to this).
+	// Find base dir (where binary lives — music relative to this).
 	binDir, _ := os.Executable()
 	baseDir := "."
 	if binDir != "" {
 		baseDir = filepath.Dir(binDir)
 	}
 
-	// Load first preset from dirs in priority order.
-	presetPaths := []string{
-		baseDir + "/presets/test.milk",
-		"presets/test.milk",
-		baseDir + "/test_data/presets/test.milk",
-		"test_data/presets/test.milk",
-	}
-	loaded := false
+	// Load first preset from embedded library.
+	presetNames := presets.Names()
+	presetIdx := 0
 	t1 := time.Now()
-	for _, p := range presetPaths {
-		if _, err := os.Stat(p); err == nil {
-			pm.LoadPresetFile(p, false)
-			slog.Info("loaded preset", "path", p)
-			loaded = true
-			break
+	if len(presetNames) > 0 {
+		d, err := presets.Read(presetNames[0])
+		if err == nil {
+			pm.LoadPresetData(string(d), false)
+			slog.Info("preset loaded", "name", presetNames[0], "count", len(presetNames))
+		} else {
+			slog.Warn("preset read error", "name", presetNames[0], "error", err)
 		}
-	}
-	if loaded {
-		slog.Info("preset load", "ms", time.Since(t1).Milliseconds())
 	} else {
-		slog.Warn("no preset found, using idle")
+		slog.Warn("no embedded presets")
 	}
+	slog.Info("preset load", "ms", time.Since(t1).Milliseconds())
 
 	// Audio player (non-fatal).
 	t2 := time.Now()
@@ -135,10 +130,10 @@ func main() {
 	inp := input.New()
 	defer inp.Close()
 
-	appLoop(window, pm, p, overlay, inp, lib)
+	appLoop(window, pm, p, overlay, inp, lib, presetNames, &presetIdx)
 }
 
-func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, inp *input.Input, lib *player.Library) {
+func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, inp *input.Input, lib *player.Library, presetNames []string, presetIdx *int) {
 	ticker := time.NewTicker(time.Second / 60)
 	defer ticker.Stop()
 
@@ -148,7 +143,7 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 			// Process events → dispatch actions.
 			for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 				act := inp.ProcessEvent(e)
-				handleAction(act, pm, pl, overlay, lib)
+				handleAction(act, pm, pl, overlay, lib, presetNames, presetIdx)
 				if act == input.ActionQuit {
 					return
 				}
@@ -184,7 +179,7 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 }
 
 // handleAction dispatches an input action to the appropriate player/library/overlay logic.
-func handleAction(act input.Action, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, lib *player.Library) {
+func handleAction(act input.Action, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, lib *player.Library, presetNames []string, presetIdx *int) {
 	switch act {
 	case input.ActionQuit:
 		return
@@ -232,13 +227,26 @@ func handleAction(act input.Action, pm *projectm.Handle, pl *player.Player, over
 		}
 
 	case input.ActionNextPreset:
-		pm.RenderFrame() // refresh before switching
-		// projectM hardcode cycling: just render triggers slow preset change via callback.
-		// We can't force next preset without direct API, skip for now.
-		slog.Debug("next preset — projectM auto-cycles")
+		if len(presetNames) == 0 {
+			return
+		}
+		*presetIdx = (*presetIdx + 1) % len(presetNames)
+		d, err := presets.Read(presetNames[*presetIdx])
+		if err == nil {
+			pm.LoadPresetData(string(d), true)
+			slog.Info("preset", "name", presetNames[*presetIdx])
+		}
 
 	case input.ActionPrevPreset:
-		slog.Debug("prev preset — projectM auto-cycles")
+		if len(presetNames) == 0 {
+			return
+		}
+		*presetIdx = (*presetIdx - 1 + len(presetNames)) % len(presetNames)
+		d, err := presets.Read(presetNames[*presetIdx])
+		if err == nil {
+			pm.LoadPresetData(string(d), true)
+			slog.Info("preset", "name", presetNames[*presetIdx])
+		}
 	}
 }
 

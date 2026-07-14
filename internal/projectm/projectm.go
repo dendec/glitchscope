@@ -12,10 +12,7 @@ import (
 	"unsafe"
 )
 
-const (
-	Mono   = C.PROJECTM_MONO
-	Stereo = C.PROJECTM_STEREO
-)
+const Mono = C.PROJECTM_MONO
 
 // Handle wraps the opaque projectM instance handle.
 type Handle struct {
@@ -40,11 +37,11 @@ func (h *Handle) Destroy() {
 	}
 }
 
-// LoadPresetFile loads a .milk preset file.
-func (h *Handle) LoadPresetFile(path string, smooth bool) {
-	cpath := C.CString(path)
-	defer C.free(unsafe.Pointer(cpath))
-	C.projectm_load_preset_file(h.p, cpath, C.bool(smooth))
+// LoadPresetData loads a preset from an in-memory .milk string content.
+func (h *Handle) LoadPresetData(data string, smooth bool) {
+	cdata := C.CString(data)
+	defer C.free(unsafe.Pointer(cdata))
+	C.projectm_load_preset_data(h.p, cdata, C.bool(smooth))
 }
 
 // PCMAddFloat feeds PCM audio samples to projectM (float32, mono or stereo).
@@ -72,30 +69,4 @@ func (h *Handle) BindFeedbackFramebuffer() {
 	C.projectm_opengl_bind_feedback_framebuffer(h.p)
 }
 
-// SetPresetSwitchFailedCallback is a no-op until cgo callback forwarding is implemented.
-func (h *Handle) SetPresetSwitchFailedCallback(cb func(filename, message string)) {
-	_ = cb
-}
 
-// SetPresetSwitchRequestedCallback is a no-op until cgo callback forwarding is implemented.
-func (h *Handle) SetPresetSwitchRequestedCallback(cb func(hardCut bool)) {
-	_ = cb
-}
-
-// GetVersion returns the library version and VCS revision strings.
-func GetVersion() (string, string) {
-	major, minor, patch := C.int(0), C.int(0), C.int(0)
-	C.projectm_get_version_components(&major, &minor, &patch)
-	ver := fmt.Sprintf("%d.%d.%d", major, minor, patch)
-
-	vcs := C.projectm_get_vcs_version_string()
-	if vcs != nil {
-		defer C.projectm_free_string(vcs)
-	}
-	return ver, C.GoString(vcs)
-}
-
-// PCMGetMaxSamples returns the maximum number of PCM samples per channel.
-func PCMGetMaxSamples() int {
-	return int(C.projectm_pcm_get_max_samples())
-}
