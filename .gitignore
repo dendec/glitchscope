@@ -11,3 +11,6 @@ Thumbs.db
 # local test data (too large, dev only)
 test_data/music/
 test_data/presets/
+
+# generated font subset (built from unifont-full.otf + font_ranges.json)
+internal/ui/assets/unifont.otf
