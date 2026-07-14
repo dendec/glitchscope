@@ -7,3 +7,7 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# local test data (too large, dev only)
+test_data/music/
+test_data/presets/
