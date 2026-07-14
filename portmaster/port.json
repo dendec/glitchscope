@@ -1,0 +1,26 @@
+{
+  "version": 4,
+  "name": "mdpp.zip",
+  "items": [
+    "MDPP.sh",
+    "mdpp/"
+  ],
+  "items_opt": null,
+  "attr": {
+    "title": "MDPP",
+    "desc": "MilkDrop Portable Player — plays MP3/FLAC/Ogg with real-time MilkDrop visualizations. Drop your music files into /roms/ports/mdpp/ and enjoy a psychedelic audio experience on your handheld.",
+    "inst": "Copy song.mp3 (or any MP3/FLAC/Ogg) to /roms/ports/mdpp/. Presets are in /roms/ports/mdpp/presets/.",
+    "genres": ["music"],
+    "porter": ["dendec"],
+    "image": {
+      "screenshot": "screenshot.png",
+      "covers": [],
+      "thumbnail": null,
+      "video": null
+    },
+    "rtr": false,
+    "runtime": [],
+    "reqs": [],
+    "arch": ["aarch64"]
+  }
+}

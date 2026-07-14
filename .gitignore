@@ -1,0 +1,12 @@
+# Binary
+mdpp
+
+# Build output
+dist/
+
+# CMake build artifacts
+lib/projectm/build/
+
+# OS
+.DS_Store
+Thumbs.db
