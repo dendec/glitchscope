@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -17,10 +18,10 @@ import (
 
 const fpsWindow = 60
 
-const (
-	winTitle = "MDPP — MilkDrop Portable Player"
-	winW     = 640
-	winH     = 480
+var (
+	flagFullscreen = flag.Bool("fullscreen", false, "fullscreen mode")
+	flagWidth      = flag.Int("w", 1280, "window width")
+	flagHeight     = flag.Int("h", 720, "window height")
 )
 
 func main() {
@@ -30,16 +31,22 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
+	flag.Parse()
+
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK); err != nil {
 		slog.Error("sdl init", "error", err)
 		os.Exit(1)
 	}
 	defer sdl.Quit()
 
-	window, err := sdl.CreateWindow(winTitle,
+	winFlags := uint32(sdl.WINDOW_OPENGL | sdl.WINDOW_SHOWN | sdl.WINDOW_RESIZABLE)
+	if *flagFullscreen {
+		winFlags |= sdl.WINDOW_FULLSCREEN_DESKTOP
+	}
+	window, err := sdl.CreateWindow("MDPP — MilkDrop Portable Player",
 		sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		winW, winH,
-		sdl.WINDOW_OPENGL|sdl.WINDOW_SHOWN|sdl.WINDOW_FULLSCREEN_DESKTOP)
+		int32(*flagWidth), int32(*flagHeight),
+		winFlags)
 	if err != nil {
 		slog.Error("window", "error", err)
 		os.Exit(1)
@@ -103,6 +110,8 @@ func main() {
 	} else {
 		p = pl
 		overlay = ui.New()
+		w, h := window.GLGetDrawableSize()
+		overlay.SetScreenSize(int(w), int(h))
 		defer p.Close()
 		defer overlay.Close()
 	}
@@ -167,6 +176,10 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 		fpsAvg /= float64(len(fpsBuf))
 
 		w, h := window.GLGetDrawableSize()
+
+		if overlay != nil {
+			overlay.SetScreenSize(int(w), int(h))
+		}
 
 		// Push playback data to overlay each frame.
 		if overlay != nil {
@@ -277,14 +290,12 @@ func handleUIAction(act input.Action, pm *projectm.Handle, pl *player.Player, ov
 		overlay.FocusRight()
 
 	case input.ActionSelect:
-		if overlay.FocusPanel() == 0 {
-			if lib != nil {
+		if overlay.Select() && lib != nil && pl != nil {
+			if overlay.FocusPanel() == 0 {
 				if path := lib.SelectAlbum(overlay.AlbumCursor()); path != "" {
 					playTrack(pl, overlay, path, lib.CurrentAlbum().Name)
 				}
-			}
-		} else {
-			if lib != nil {
+			} else {
 				lib.SelectAlbum(overlay.AlbumCursor())
 				if path := lib.SelectTrack(overlay.TrackCursor()); path != "" {
 					playTrack(pl, overlay, path, lib.CurrentAlbum().Name)

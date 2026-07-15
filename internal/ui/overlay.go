@@ -175,8 +175,8 @@ import (
 const (
 	fadeInDuration = 400 * time.Millisecond
 	holdDuration   = 3 * time.Second
-	uiFontSize     = 28.0
-	titleFontSize  = 96.0
+	refFontSize    = 26.0
+	refHeight      = 720
 )
 
 // Overlay manages UI and notification rendering.
@@ -197,7 +197,12 @@ type Overlay struct {
 	notifHidden   bool
 
 	// UI mode.
-	uiVisible bool
+	uiVisible   bool
+	panelEntered bool // true = inside panel navigating items, false = choosing panels
+
+	// Screen dimensions and computed font size.
+	screenW, screenH int
+	fontSize         float64
 
 	// UI data (updated each frame from main loop).
 	albums       []string
@@ -232,34 +237,21 @@ type Overlay struct {
 	fpsDirty    bool
 }
 
-// New creates an Overlay. Loads font face once.
+// New creates an Overlay.
 func New() *Overlay {
-	o := &Overlay{
+	return &Overlay{
 		programText: uint32(C.createTextProgram()),
 		programRect: uint32(C.createRectProgram()),
 	}
-
-	// Pre-load font face for UI text.
-	f, err := opentype.Parse(unifontData)
-	if err != nil {
-		slog.Error("font parse", "error", err)
-		return o
-	}
-	o.face, err = opentype.NewFace(f, &opentype.FaceOptions{
-		Size:    uiFontSize,
-		DPI:     72,
-		Hinting: font.HintingNone,
-	})
-	if err != nil {
-		slog.Error("font face", "error", err)
-	}
-	return o
 }
 
 // Draw renders either the UI overlay or the notification.
 func (o *Overlay) Draw(width, height int) {
 	if o.uiVisible {
 		o.renderUI(width, height)
+		if o.notifVisible && o.notifTex != 0 && !o.notifHidden {
+			o.renderNotification(width, height)
+		}
 	} else if o.notifVisible && !o.notifHidden && !o.notifInjected {
 		o.renderNotification(width, height)
 	}
@@ -267,22 +259,23 @@ func (o *Overlay) Draw(width, height int) {
 
 // Update advances animations. Call every frame.
 func (o *Overlay) Update() {
-	if o.uiVisible {
-		return // no fade animation in UI mode
-	}
 	if !o.notifVisible {
 		return
 	}
-	if o.notifInjected {
+	if o.notifInjected && !o.uiVisible {
 		o.hideNotification()
 		return
 	}
 	elapsed := time.Since(o.notifStarted)
+	if elapsed >= fadeInDuration+holdDuration {
+		if o.uiVisible {
+			o.hideNotification()
+		}
+		return
+	}
 	switch {
 	case elapsed < fadeInDuration:
 		o.notifAlpha = float64(elapsed) / float64(fadeInDuration)
-	case elapsed < fadeInDuration+holdDuration:
-		o.notifAlpha = 1.0
 	default:
 		o.notifAlpha = 1.0
 	}
@@ -295,13 +288,17 @@ func (o *Overlay) ShowTrack(path string) {
 	if o.notifHidden {
 		return
 	}
+	notifSize := o.fontSize * 3.5
+	if notifSize < 20 {
+		notifSize = 20
+	}
 	f, err := opentype.Parse(unifontData)
 	if err != nil {
 		slog.Error("font parse", "error", err)
 		return
 	}
 	face, err := opentype.NewFace(f, &opentype.FaceOptions{
-		Size:    titleFontSize,
+		Size:    notifSize,
 		DPI:     72,
 		Hinting: font.HintingNone,
 	})
@@ -415,6 +412,8 @@ func (o *Overlay) hideNotification() {
 func (o *Overlay) ToggleUI() {
 	o.uiVisible = !o.uiVisible
 	if o.uiVisible {
+		o.panelEntered = false
+		o.focusPanel = 0
 		o.albumsDirty = true
 		o.tracksDirty = true
 		o.bottomDirty = true
@@ -428,16 +427,62 @@ func (o *Overlay) UIVisible() bool {
 	return o.uiVisible
 }
 
-// CursorUp moves the cursor up in the active panel.
+// SetScreenSize updates screen dimensions and recomputes font size.
+// Call when window is created or resized.
+func (o *Overlay) SetScreenSize(w, h int) {
+	if o.screenW == w && o.screenH == h {
+		return
+	}
+	o.screenW = w
+	o.screenH = h
+	newSize := float64(h) * refFontSize / float64(refHeight)
+	if newSize < 10 {
+		newSize = 10
+	}
+	if o.fontSize != newSize {
+		o.fontSize = newSize
+		o.rebuildFace()
+		o.albumsDirty = true
+		o.tracksDirty = true
+		o.bottomDirty = true
+		o.fpsDirty = true
+	}
+}
+
+func (o *Overlay) rebuildFace() {
+	f, err := opentype.Parse(unifontData)
+	if err != nil {
+		slog.Error("font parse", "error", err)
+		return
+	}
+	if o.face != nil {
+		_ = o.face.Close()
+		o.face = nil
+	}
+	o.face, err = opentype.NewFace(f, &opentype.FaceOptions{
+		Size:    o.fontSize,
+		DPI:     72,
+		Hinting: font.HintingNone,
+	})
+	if err != nil {
+		slog.Error("font face", "error", err)
+	}
+}
+
+// CursorUp moves the cursor up in the active panel. Only works when inside a panel.
 func (o *Overlay) CursorUp() {
-	if o.focusPanel == 0 {
+	if !o.panelEntered {
+		return
+	}
+	switch o.focusPanel {
+	case 0:
 		if o.albumCursor > 0 {
 			o.albumCursor--
 			o.trackCursor = 0
 			o.tracksDirty = true
 			o.albumsDirty = true
 		}
-	} else {
+	case 1:
 		if o.trackCursor > 0 {
 			o.trackCursor--
 			o.tracksDirty = true
@@ -445,16 +490,20 @@ func (o *Overlay) CursorUp() {
 	}
 }
 
-// CursorDown moves the cursor down in the active panel.
+// CursorDown moves the cursor down in the active panel. Only works when inside a panel.
 func (o *Overlay) CursorDown() {
-	if o.focusPanel == 0 {
+	if !o.panelEntered {
+		return
+	}
+	switch o.focusPanel {
+	case 0:
 		if o.albumCursor < len(o.albums)-1 {
 			o.albumCursor++
 			o.trackCursor = 0
 			o.tracksDirty = true
 			o.albumsDirty = true
 		}
-	} else {
+	case 1:
 		if o.trackCursor < len(o.trackInfos)-1 {
 			o.trackCursor++
 			o.tracksDirty = true
@@ -462,49 +511,53 @@ func (o *Overlay) CursorDown() {
 	}
 }
 
-// FocusLeft switches focus to the albums panel.
+// FocusLeft switches focus to the previous panel. Only works in panel mode.
 func (o *Overlay) FocusLeft() {
-	if o.focusPanel == 1 {
-		o.focusPanel = 0
-		o.albumsDirty = true
-		o.tracksDirty = true
+	if o.panelEntered {
+		return
 	}
+	o.focusPanel--
+	if o.focusPanel < 0 {
+		o.focusPanel = 2
+	}
+	o.albumsDirty = true
+	o.tracksDirty = true
 }
 
-// FocusRight switches focus to the tracks panel.
+// FocusRight switches focus to the next panel. Only works in panel mode.
 func (o *Overlay) FocusRight() {
-	if o.focusPanel == 0 && len(o.trackInfos) > 0 {
-		o.focusPanel = 1
+	if o.panelEntered {
+		return
+	}
+	o.focusPanel = (o.focusPanel + 1) % 3
+	o.albumsDirty = true
+	o.tracksDirty = true
+}
+
+// Select enters the focused panel or confirms item selection.
+// Returns true when an item was selected (caller should play).
+func (o *Overlay) Select() bool {
+	if !o.panelEntered {
+		o.panelEntered = true
 		o.albumsDirty = true
 		o.tracksDirty = true
+		return false
 	}
+	return o.focusPanel <= 1 // albums or tracks — items exist
 }
 
-// Select plays the currently highlighted album or track.
-func (o *Overlay) Select() string {
-	if o.focusPanel == 0 {
-		if o.albumCursor >= 0 && o.albumCursor < len(o.albums) {
-			return o.albums[o.albumCursor]
-		}
-	} else {
-		if o.trackCursor >= 0 && o.trackCursor < len(o.trackInfos) {
-			return o.trackInfos[o.trackCursor].Path
-		}
-	}
-	return ""
-}
-
-// Back navigates up one level.
+// Back exits item mode or closes UI.
 func (o *Overlay) Back() string {
-	if o.focusPanel == 1 {
-		o.focusPanel = 0
+	if o.panelEntered {
+		o.panelEntered = false
 		o.albumsDirty = true
 		o.tracksDirty = true
 		return ""
 	}
-	// Close UI when already on albums panel.
+	// Close UI.
 	if o.uiVisible {
 		o.uiVisible = false
+		o.panelEntered = false
 		o.focusPanel = 0
 	}
 	return ""
@@ -596,53 +649,104 @@ func (o *Overlay) renderUI(w, h int) {
 			5, 0, C.float(o.fpsTexW), C.float(o.fpsTexH), C.int(w), C.int(h))
 	}
 
-	// Layout constants.
-	bottomH := 84
-	panelY := 52
-	panelH := h - panelY - bottomH - 18
+	// Layout constants — proportional to font size.
+	bottomH := int(o.fontSize * 3.2)
+	panelY := int(o.fontSize * 2)
+	panelH := h - panelY - bottomH - int(o.fontSize*0.7)
 	if panelH < 0 {
 		panelH = 0
 	}
-	albumW := w * 35 / 100
-	trackW := w - albumW - 20
+	thirdW := w / 3
 
-	// Albums panel background + text.
+	lh := o.face.Metrics().Height.Ceil()
+
+	// --- Albums panel (left, 1/3 width) ---
 	if o.albumsDirty {
-		o.rebuildAlbumsTex(albumW, panelH)
+		o.rebuildAlbumsTex(thirdW, panelH)
 	}
 	if o.albumsTex != 0 {
-		C.drawFilledRect(C.uint(o.programRect), 10, C.float(panelY), C.float(albumW), C.float(panelH), 0, 0, 0, 0.4, C.int(w), C.int(h))
+		px := C.float(0)
+		py := C.float(panelY)
+		// Background — always semi-transparent black.
+		C.drawFilledRect(C.uint(o.programRect), px, py, C.float(thirdW), C.float(panelH),
+			0, 0, 0, 0.4, C.int(w), C.int(h))
+		// Border if focused — 4 thin edges, no inner fill.
+		if o.focusPanel == 0 {
+			C.drawFilledRect(C.uint(o.programRect), px-1, py-1, C.float(thirdW+2), 1,
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+			C.drawFilledRect(C.uint(o.programRect), px-1, py+C.float(panelH), C.float(thirdW+2), 1,
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+			C.drawFilledRect(C.uint(o.programRect), px-1, py-1, 1, C.float(panelH+2),
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+			C.drawFilledRect(C.uint(o.programRect), px+C.float(thirdW), py-1, 1, C.float(panelH+2),
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+		}
+		// Text
 		C.drawOverlayText(C.uint(o.programText), C.uint(o.albumsTex), 1,
-			10, C.float(panelY), C.float(o.albumsTexW), C.float(o.albumsTexH), C.int(w), C.int(h))
+			px, py, C.float(o.albumsTexW), C.float(o.albumsTexH), C.int(w), C.int(h))
+		// Item highlight
+		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
+			hiY := py + C.float(o.albumCursor*lh+2)
+			C.drawFilledRect(C.uint(o.programRect), px+2, hiY, C.float(thirdW-4), C.float(lh),
+				0.3, 0.8, 1, 0.3, C.int(w), C.int(h))
+		}
 	}
 
-	// Tracks panel background + text.
+	// --- Tracks panel (right, 1/3 width) ---
 	if o.tracksDirty {
-		o.rebuildTracksTex(trackW, panelH)
+		o.rebuildTracksTex(thirdW, panelH)
 	}
 	if o.tracksTex != 0 {
-		left := albumW + 20
-		C.drawFilledRect(C.uint(o.programRect), C.float(left), C.float(panelY), C.float(trackW), C.float(panelH), 0, 0, 0, 0.4, C.int(w), C.int(h))
+		tx := C.float(w * 2 / 3)
+		ty := C.float(panelY)
+		C.drawFilledRect(C.uint(o.programRect), tx, ty, C.float(thirdW), C.float(panelH),
+			0, 0, 0, 0.4, C.int(w), C.int(h))
+		if o.focusPanel == 1 {
+			C.drawFilledRect(C.uint(o.programRect), tx-1, ty-1, C.float(thirdW+2), 1,
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+			C.drawFilledRect(C.uint(o.programRect), tx-1, ty+C.float(panelH), C.float(thirdW+2), 1,
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+			C.drawFilledRect(C.uint(o.programRect), tx-1, ty-1, 1, C.float(panelH+2),
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+			C.drawFilledRect(C.uint(o.programRect), tx+C.float(thirdW), ty-1, 1, C.float(panelH+2),
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+		}
 		C.drawOverlayText(C.uint(o.programText), C.uint(o.tracksTex), 1,
-			C.float(left), C.float(panelY), C.float(o.tracksTexW), C.float(o.tracksTexH), C.int(w), C.int(h))
+			tx, ty, C.float(o.tracksTexW), C.float(o.tracksTexH), C.int(w), C.int(h))
+		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
+			hiY := ty + C.float(o.trackCursor*lh+2)
+			C.drawFilledRect(C.uint(o.programRect), tx+2, hiY, C.float(thirdW-4), C.float(lh),
+				0.3, 0.8, 1, 0.3, C.int(w), C.int(h))
+		}
 	}
 
-	// Bottom bar.
+	// --- Bottom bar (full width) ---
 	if o.bottomDirty {
 		o.rebuildBottomTex(w, bottomH)
 	}
 	if o.bottomTex != 0 {
-		by := h - bottomH
-		C.drawFilledRect(C.uint(o.programRect), 0, C.float(by), C.float(w), C.float(bottomH), 0, 0, 0, 0.5, C.int(w), C.int(h))
+		by := C.float(h - bottomH)
+		C.drawFilledRect(C.uint(o.programRect), 0, by, C.float(w), C.float(bottomH),
+			0, 0, 0, 0.5, C.int(w), C.int(h))
+		if o.focusPanel == 2 {
+			C.drawFilledRect(C.uint(o.programRect), -1, by-1, C.float(w+2), 1,
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+			C.drawFilledRect(C.uint(o.programRect), -1, by+C.float(bottomH), C.float(w+2), 1,
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+			C.drawFilledRect(C.uint(o.programRect), -1, by-1, 1, C.float(bottomH+2),
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+			C.drawFilledRect(C.uint(o.programRect), C.float(w), by-1, 1, C.float(bottomH+2),
+				1, 1, 1, 0.5, C.int(w), C.int(h))
+		}
 		C.drawOverlayText(C.uint(o.programText), C.uint(o.bottomTex), 1,
-			0, C.float(by), C.float(o.bottomTexW), C.float(o.bottomTexH), C.int(w), C.int(h))
+			0, by, C.float(o.bottomTexW), C.float(o.bottomTexH), C.int(w), C.int(h))
 	}
 }
 
 func (o *Overlay) rebuildFPSTex() {
 	o.fpsDirty = false
 	o.deleteTex(&o.fpsTex)
-	o.fpsTex, o.fpsTexW, o.fpsTexH = o.renderTextToTex(fmt.Sprintf("FPS: %.0f", o.fps), uiFontSize, 255, 255, 255, 255)
+	o.fpsTex, o.fpsTexW, o.fpsTexH = o.renderTextToTex(fmt.Sprintf("FPS: %.0f", o.fps), 255, 255, 255, 255)
 }
 
 func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
@@ -666,7 +770,7 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 		lines = append(lines, prefix+name+mark)
 	}
 	text := strings.Join(lines, "\n")
-	o.albumsTex, o.albumsTexW, o.albumsTexH = o.renderTextToTex(text, uiFontSize, 255, 255, 255, 255)
+	o.albumsTex, o.albumsTexW, o.albumsTexH = o.renderTextToTex(text, 255, 255, 255, 255)
 }
 
 func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
@@ -692,7 +796,7 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 		}
 	}
 	text := strings.Join(lines, "\n")
-	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderTextToTex(text, uiFontSize, 255, 255, 255, 255)
+	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderTextToTex(text, 255, 255, 255, 255)
 }
 
 func (o *Overlay) rebuildBottomTex(w, botH int) {
@@ -721,7 +825,7 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 
 	text := fmt.Sprintf("%s  %s / %s\n%s Play    ⏭ Next    ⏮ Prev\n%s",
 		barStr, pos, dur, status, tech)
-	o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(text, uiFontSize, 255, 255, 255, 255)
+	o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(text, 255, 255, 255, 255)
 }
 
 // --- Helpers ---
@@ -733,7 +837,7 @@ func (o *Overlay) deleteTex(tex *uint32) {
 	}
 }
 
-func (o *Overlay) renderTextToTex(text string, fontSize float64, r, g, b, a byte) (uint32, int, int) {
+func (o *Overlay) renderTextToTex(text string, r, g, b, a byte) (uint32, int, int) {
 	if o.face == nil {
 		return 0, 0, 0
 	}

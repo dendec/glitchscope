@@ -28,6 +28,7 @@ var SupportedExts = map[string]bool{
 
 // DecodeToF32 decodes a tracker file to interleaved stereo float32 PCM at 44100 Hz.
 // Returns raw PCM data, sample rate, estimated BPM, and tracker channel count.
+// The PCM always contains two channels, independently of the tracker channel count.
 // GetTrackerMeta returns BPM, channel count, and duration for a tracker file
 // without decoding audio.
 func GetTrackerMeta(path string) (bpm float64, channels int, duration float64, err error) {
