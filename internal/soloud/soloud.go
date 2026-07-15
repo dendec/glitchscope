@@ -69,6 +69,10 @@ func NewWavFromF32(data []float32, sampleRate float32, channels uint) (*Wav, err
 	if len(data) == 0 {
 		return nil, fmt.Errorf("wav from f32: empty data")
 	}
+	if channels == 0 || len(data)%int(channels) != 0 {
+		return nil, fmt.Errorf("wav from f32: invalid channel layout")
+	}
+	data = interleavedToPlanar(data, int(channels))
 	p := C.Wav_create()
 	r := int(C.Wav_loadRawF32(unsafe.Pointer(p),
 		(*C.float)(unsafe.Pointer(&data[0])),
@@ -81,6 +85,18 @@ func NewWavFromF32(data []float32, sampleRate float32, channels uint) (*Wav, err
 		return nil, fmt.Errorf("wav load raw: %d", r)
 	}
 	return &Wav{p: p}, nil
+}
+
+// interleavedToPlanar converts frames such as LRLR into SoLoud's LLRR layout.
+func interleavedToPlanar(data []float32, channels int) []float32 {
+	frames := len(data) / channels
+	planar := make([]float32, len(data))
+	for frame := 0; frame < frames; frame++ {
+		for channel := 0; channel < channels; channel++ {
+			planar[channel*frames+frame] = data[frame*channels+channel]
+		}
+	}
+	return planar
 }
 
 // Destroy frees the Wav resource.

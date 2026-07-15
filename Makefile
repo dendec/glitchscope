@@ -17,11 +17,6 @@ PROJECTM_PATCH    := patches/projectm-feedback.patch
 CGO_CXXFLAGS := $(SDL_CFLAGS) -Wno-write-strings
 CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm -lopenmpt
 
-# For local dev without libopenmpt-dev installed system-wide:
-LOCAL_OPENMPT := /tmp/libopenmpt/usr
-CGO_CFLAGS := -I$(LOCAL_OPENMPT)/include
-CGO_LDFLAGS += -L$(LOCAL_OPENMPT)/lib/x86_64-linux-gnu
-
 DOCKER_IMAGE_X64 := mdpp-builder
 
 .PHONY: build clean dist dist-arm64 dist-portmaster lint run projectm-build submodules test tidy
@@ -50,7 +45,7 @@ $(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt $(PROJECTM_PATCH)
 		-DCMAKE_BUILD_TYPE=Release \
 		-DENABLE_INSTALL=OFF
 
-$(FONT_SUBSET): $(FONT_RANGES)
+$(FONT_SUBSET):
 	wget -q -O /tmp/unifont-full.otf $(FONT_URL)
 	pyftsubset /tmp/unifont-full.otf \
 		--unicodes=$$(python3 -c "import json; print(','.join(json.load(open('$(FONT_RANGES)'))))") \

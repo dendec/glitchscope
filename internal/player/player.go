@@ -58,7 +58,7 @@ func (p *Player) playTracker(path string) error {
 	if err != nil {
 		return fmt.Errorf("tracker %s: %w", path, err)
 	}
-	w, err := soloud.NewWavFromF32(data, float32(sr), uint(ch))
+	w, err := soloud.NewWavFromF32(data, float32(sr), 2)
 	if err != nil {
 		return fmt.Errorf("tracker wav %s: %w", path, err)
 	}
@@ -147,7 +147,6 @@ func (p *Player) Stop() {
 // Close shuts down the player.
 func (p *Player) Close() {
 	p.Stop()
-	p.s.Deinit()
 	p.s.Destroy()
 	slog.Info("SoLoud shut down")
 }
