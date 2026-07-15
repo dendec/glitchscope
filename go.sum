@@ -1,3 +1,5 @@
+github.com/klauspost/compress v1.19.0 h1:sXLILfc9jV2QYWkzFOPWStmcUVH2RHEB1JCdY2oVvCQ=
+github.com/klauspost/compress v1.19.0/go.mod h1:cwPg85FWrGar70rWktvGQj8/hthj3wpl0PGDogxkrSQ=
 github.com/veandco/go-sdl2 v0.4.40 h1:fZv6wC3zz1Xt167P09gazawnpa0KY5LM7JAvKpX9d/U=
 github.com/veandco/go-sdl2 v0.4.40/go.mod h1:OROqMhHD43nT4/i9crJukyVecjPNYYuCofep6SNiAjY=
 golang.org/x/image v0.44.0 h1:+tDekMZED9+LrtB3G5xzRggpVh9CARjZqROla3R3R+I=

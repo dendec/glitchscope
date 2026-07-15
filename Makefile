@@ -19,7 +19,11 @@ CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLE
 
 DOCKER_IMAGE_X64 := mdpp-builder
 
-.PHONY: build clean dist dist-arm64 dist-portmaster lint run projectm-build submodules test tidy
+PRESETS_REPO  := https://github.com/projectM-visualizer/presets-cream-of-the-crop.git
+PRESETS_DIR   := dist/presets-cream-of-the-crop
+MDP_FILE      := dist/presets.mdp
+
+.PHONY: build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp
 
 submodules:
 	git submodule update --init --recursive
@@ -60,15 +64,23 @@ dist:
 	@docker rm -f mdpp-extract-x64 2>/dev/null || true
 	docker create --name mdpp-extract-x64 $(DOCKER_IMAGE_X64)
 	docker cp mdpp-extract-x64:/dist/mdpp/mdpp ./$(APP)
-	docker cp mdpp-extract-x64:/dist/mdpp/presets ./presets 2>/dev/null; true
 	docker rm mdpp-extract-x64
 	@echo "=== Built $(APP) ==="
 	@ls -lh $(APP)
 
 # Local build (default for dev, needs all deps installed).
 build: $(FONT_SUBSET) projectm-build
+	@rm -rf dist/$(APP)
+	@mkdir -p dist
 	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-		$(GO) build -ldflags="-s -w" -o $(APP) ./cmd/$(APP)
+		$(GO) build -ldflags="-s -w" -o dist/$(APP) ./cmd/$(APP)
+
+# Run locally with presets + test music (run `make build` first).
+run-local: mdp
+	@mkdir -p dist/presets dist/music
+	cp $(MDP_FILE) dist/presets/.mdp
+	cp test_data/music/* dist/music/ 2>/dev/null; true
+	./dist/mdpp
 
 # Run via Docker with X11 + audio + music mount.
 run: dist
@@ -98,6 +110,23 @@ clean:
 	rm -f $(APP) go.sum
 	rm -rf dist
 
+# Download cream-of-the-crop presets (9.8K presets, ~160MB).
+presets:
+	@if [ -d "$(PRESETS_DIR)" ]; then \
+		echo "Presets already in $(PRESETS_DIR). Delete and rerun to re-clone."; \
+	else \
+		git clone --depth 1 $(PRESETS_REPO) $(PRESETS_DIR); \
+		echo "=== Downloaded cream-of-the-crop presets ==="; \
+	fi
+
+# Build presets.mdp archive from cream-of-the-crop dir (only if missing).
+$(MDP_FILE):
+	$(GO) run ./cmd/mdp-pack $(PRESETS_DIR) $@
+	@echo "=== Built $@ ==="
+	@ls -lh $@
+
+mdp: presets $(MDP_FILE)
+
 # ARM64 cross-build via Docker.
 DOCKER_IMAGE := mdpp-arm64
 DOCKER_FILE  := Dockerfile.arm64
@@ -116,18 +145,14 @@ dist-arm64:
 	@ls -lhR dist/
 
 # PortMaster packaging.
-dist-portmaster: dist-arm64
+dist-portmaster: dist-arm64 mdp
 	@rm -rf dist/portmaster_build
 	@mkdir -p dist/portmaster_build/mdpp/presets dist/portmaster_build/mdpp/licenses
 	cp portmaster/MDPP.sh dist/portmaster_build/
 	cp portmaster/port.json dist/portmaster_build/
 	cp portmaster/screenshot.png dist/portmaster_build/ 2>/dev/null; true
 	cp dist/mdpp/mdpp dist/portmaster_build/mdpp/
-	# libopenmpt is statically linked — no .so to bundle
-	# Copy presets from projectM source (more variety than what's in the Docker image)
-	cp lib/projectm/presets/tests/*.milk dist/portmaster_build/mdpp/presets/ 2>/dev/null; true
-	cp dist/mdpp/presets/*.milk dist/portmaster_build/mdpp/presets/ 2>/dev/null; true
-	rm -f dist/portmaster_build/mdpp/presets/999-empty.milk 2>/dev/null; true
+	cp $(MDP_FILE) dist/portmaster_build/mdpp/presets/.mdp
 	cp portmaster/licenses/* dist/portmaster_build/mdpp/licenses/ 2>/dev/null; true
 	cp portmaster/README.md dist/portmaster_build/mdpp/
 	cp portmaster/screenshot.png dist/portmaster_build/mdpp/cover.png 2>/dev/null; true
@@ -138,13 +163,17 @@ dist-portmaster: dist-arm64
 	@echo "=== Generated dist/mdpp.zip ==="
 	@ls -lh dist/mdpp.zip
 
-deploy: dist-arm64
+deploy: dist-arm64 mdp
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push dist/mdpp/mdpp $(DEVICE_DIR)/
 	adb push portmaster/MDPP.sh $(PORTS_DIR)/
-	adb push test_data/music $(DEVICE_DIR)/music
+	adb shell "mkdir -p $(DEVICE_DIR)/music"
+	adb push test_data/music/* $(DEVICE_DIR)/music/
+	# Deploy presets as single .mdp archive (fast on FAT32).
+	adb shell "mkdir -p $(DEVICE_DIR)/presets"
+	adb push $(MDP_FILE) $(DEVICE_DIR)/presets/.mdp
 	adb shell "killall -9 mdpp 2>/dev/null; true"
-	@echo "=== Fast deployed binary + music library ==="
+	@echo "=== Deployed binary + music + presets ==="
 
 deploy-song:
 	adb shell "mkdir -p $(DEVICE_DIR)/music"

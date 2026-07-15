@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log/slog"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -84,22 +85,45 @@ func main() {
 		baseDir = filepath.Dir(binDir)
 	}
 
-	// Load first preset from embedded library.
+	// Load presets from presets/ dir (.mdp archive + user .milk files).
+	presetDir := baseDir + "/presets"
+	if err := presets.Open(presetDir); err != nil {
+		slog.Warn("presets dir not found", "error", err)
+	}
 	presetNames := presets.Names()
 	presetIdx := 0
 	t1 := time.Now()
 	if len(presetNames) > 0 {
-		d, err := presets.Read(presetNames[0])
-		if err == nil {
+		// Build list of non-transition presets for startup.
+		var normals []string
+		for _, n := range presetNames {
+			if n[0] != '!' {
+				normals = append(normals, n)
+			}
+		}
+		if len(normals) == 0 {
+			normals = presetNames
+		}
+		// Random initial preset.
+		normIdx := rand.Intn(len(normals))
+		for i, n := range presetNames {
+			if n == normals[normIdx] {
+				presetIdx = i
+				break
+			}
+		}
+		if d, err := presets.Read(presetNames[presetIdx]); err == nil {
 			pm.LoadPresetData(string(d), false)
-			slog.Info("preset loaded", "name", presetNames[0], "count", len(presetNames))
+			slog.Info("preset loaded", "name", presetNames[presetIdx], "count", len(presetNames))
 		} else {
-			slog.Warn("preset read error", "name", presetNames[0], "error", err)
+			slog.Warn("preset read error", "name", presetNames[presetIdx], "error", err)
 		}
 	} else {
-		slog.Warn("no embedded presets")
+		pm.LoadPresetData(string(presets.DefaultPreset()), false)
+		slog.Warn("no external presets, using minimal built-in")
 	}
 	slog.Info("preset load", "ms", time.Since(t1).Milliseconds())
+	slog.Info("keys", "nav", "arrows", "select", "enter", "back", "bsp", "next-preset", "n", "prev-preset", "p", "random", "r", "toggle-ui", "tab", "play/pause", "space")
 
 	// Audio player (non-fatal).
 	t2 := time.Now()
@@ -148,6 +172,11 @@ func main() {
 	appLoop(window, pm, p, overlay, inp, lib, presetNames, &presetIdx)
 }
 
+type pendingPreset struct {
+	name string
+	at   time.Time
+}
+
 func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay *ui.Overlay, inp *input.Input, lib *player.Library, presetNames []string, presetIdx *int) {
 	ticker := time.NewTicker(time.Second / 60)
 	defer ticker.Stop()
@@ -156,6 +185,7 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 	fpsBuf := make([]float64, 0, fpsWindow)
 
 	var lastAlbumIdx = -1
+	var pending pendingPreset
 
 	for range ticker.C {
 		now := time.Now()
@@ -220,10 +250,29 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 		// Process events → dispatch actions.
 		for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 			act := inp.ProcessEvent(e)
-			handleAction(act, pm, pl, overlay, lib, presetNames, presetIdx)
 			if act == input.ActionQuit {
 				return
 			}
+			if act == input.ActionRandomPreset {
+				randPreset(pm, presetNames, presetIdx, &pending)
+			} else {
+				handleAction(act, pm, pl, overlay, lib, presetNames, presetIdx)
+			}
+		}
+
+		// Complete pending transition: load target preset.
+		if pending.name != "" && !now.Before(pending.at) {
+			if d, err := presets.Read(pending.name); err == nil {
+				pm.LoadPresetData(string(d), true)
+				for i, n := range presetNames {
+					if n == pending.name {
+						*presetIdx = i
+						break
+					}
+				}
+				slog.Info("preset", "name", pending.name)
+			}
+			pending.name = ""
 		}
 
 		// Feed wave data → projectM.
@@ -250,6 +299,59 @@ func appLoop(window *sdl.Window, pm *projectm.Handle, pl *player.Player, overlay
 		}
 
 		window.GLSwap()
+	}
+}
+
+// randPreset picks a random non-transition preset, transitions through a random
+// "!" preset, and loads the target after ~1.5s.
+func randPreset(pm *projectm.Handle, presetNames []string, presetIdx *int, pending *pendingPreset) {
+	if len(presetNames) == 0 {
+		return
+	}
+
+	// Filter: non-transition and transition presets.
+	var normal, trans []string
+	for _, n := range presetNames {
+		if n[0] == '!' {
+			trans = append(trans, n)
+		} else {
+			normal = append(normal, n)
+		}
+	}
+	if len(normal) == 0 {
+		normal = presetNames // fallback: include all
+	}
+
+	// Pick target different from current.
+	target := normal[rand.Intn(len(normal))]
+	if len(normal) > 1 {
+		for target == presetNames[*presetIdx] {
+			target = normal[rand.Intn(len(normal))]
+		}
+	}
+
+	// Load transition if available, then schedule target.
+	if len(trans) > 0 {
+		t := trans[rand.Intn(len(trans))]
+		if d, err := presets.Read(t); err == nil {
+			pm.LoadPresetData(string(d), false)
+			slog.Info("transition", "name", t)
+		}
+		pending.name = target
+		return
+	}
+
+	// No transition presets: load target directly with smooth transition.
+	d, err := presets.Read(target)
+	if err == nil {
+		pm.LoadPresetData(string(d), true)
+		for i, n := range presetNames {
+			if n == target {
+				*presetIdx = i
+				break
+			}
+		}
+		slog.Info("preset", "name", target)
 	}
 }
 
@@ -355,6 +457,14 @@ func handleNormalAction(act input.Action, pm *projectm.Handle, pl *player.Player
 		if overlay != nil {
 			overlay.ToggleUI()
 		}
+
+	case input.ActionSelect:
+		if overlay != nil {
+			overlay.ToggleUI()
+		}
+
+	case input.ActionBack:
+		// ignored in normal mode
 
 	case input.ActionCursorUp, input.ActionPrevAlbum:
 		if lib == nil || pl == nil {

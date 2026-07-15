@@ -29,6 +29,7 @@ const (
 	ActionFocusRight
 	ActionCursorUp
 	ActionCursorDown
+	ActionRandomPreset
 )
 
 const axisDeadZone int16 = 8000
@@ -129,8 +130,10 @@ func keyToAction(key sdl.Keycode) Action {
 		return ActionCursorUp
 	case sdl.K_DOWN:
 		return ActionCursorDown
-	case sdl.K_n, sdl.K_r:
+	case sdl.K_n:
 		return ActionNextPreset
+	case sdl.K_r:
+		return ActionRandomPreset
 	case sdl.K_p, sdl.K_m:
 		return ActionPrevPreset
 	case sdl.K_b:
@@ -148,9 +151,11 @@ func keyToAction(key sdl.Keycode) Action {
 func buttonToAction(btn uint8) Action {
 	switch btn {
 	case sdl.CONTROLLER_BUTTON_B:
-		return ActionPlayPause
+		return ActionSelect
 	case sdl.CONTROLLER_BUTTON_A:
-		return ActionToggleOverlay
+		return ActionBack
+	case sdl.CONTROLLER_BUTTON_Y:
+		return ActionPlayPause
 	case sdl.CONTROLLER_BUTTON_DPAD_UP:
 		return ActionCursorUp
 	case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
@@ -159,12 +164,16 @@ func buttonToAction(btn uint8) Action {
 		return ActionFocusLeft
 	case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
 		return ActionFocusRight
-	case sdl.CONTROLLER_BUTTON_BACK:
+	case sdl.CONTROLLER_BUTTON_START:
 		return ActionToggleUI
+	case sdl.CONTROLLER_BUTTON_BACK:
+		return ActionToggleOverlay
 	case sdl.CONTROLLER_BUTTON_LEFTSHOULDER:
 		return ActionPrevPreset
 	case sdl.CONTROLLER_BUTTON_RIGHTSHOULDER:
 		return ActionNextPreset
+	case sdl.CONTROLLER_BUTTON_X:
+		return ActionRandomPreset
 	}
 	return ActionNone
 }
