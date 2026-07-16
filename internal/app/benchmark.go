@@ -1,4 +1,3 @@
-// Package app wires the application — initialization, main loop, and benchmark.
 package app
 
 import (
@@ -349,7 +348,7 @@ func readBenchmarkedPresets(outPath string) map[string]bool {
 	}
 	// CSV columns: preset, status, compile_ms, steady_ms_per_frame, steady_fps, total_ms
 	for _, rec := range records[1:] {
-		if len(rec) > 1 && rec[1] == "ok" {
+		if len(rec) > 0 {
 			done[rec[0]] = true
 		}
 	}

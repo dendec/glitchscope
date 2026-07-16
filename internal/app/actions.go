@@ -218,28 +218,22 @@ func (a *App) applySettings(winW, winH int) {
 	}
 
 	// Row 0: Render resolution.
-	resValues := rows[0].Values
 	resIndex := rows[0].Index
-	if resIndex >= 0 && resIndex < len(resValues) {
-		resolutions := config.ComputeResolutions(winW, winH)
-		if resIndex < len(resolutions) {
-			r := resolutions[resIndex]
-			a.gs.RenderWidth = r.Width
-			a.gs.RenderHeight = r.Height
-			a.rt.Resize(r.Width, r.Height)
-			a.pm.SetWindowSize(r.Width, r.Height)
-		}
+	resolutions := config.ComputeResolutions(winW, winH)
+	if resIndex >= 0 && resIndex < len(resolutions) {
+		r := resolutions[resIndex]
+		a.gs.RenderWidth = r.Width
+		a.gs.RenderHeight = r.Height
+		a.rt.Resize(r.Width, r.Height)
+		a.pm.SetWindowSize(r.Width, r.Height)
 	}
 
 	// Row 1: Upscale filter.
-	filterValues := rows[1].Values
 	filterIndex := rows[1].Index
-	if filterIndex >= 0 && filterIndex < len(filterValues) {
-		filters := config.AllFilters()
-		if filterIndex < len(filters) {
-			a.gs.UpscaleFilter = filters[filterIndex]
-			a.rt.SetNearest(a.gs.UpscaleFilter.IsNearest())
-		}
+	filters := config.AllFilters()
+	if filterIndex >= 0 && filterIndex < len(filters) {
+		a.gs.UpscaleFilter = filters[filterIndex]
+		a.rt.SetNearest(a.gs.UpscaleFilter.IsNearest())
 	}
 
 	if err := config.SaveSettings(a.settingsPath, *a.gs); err != nil {

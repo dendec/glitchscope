@@ -39,12 +39,21 @@ static unsigned int createProgram(const char *vs, const char *fs) {
 	return program;
 }
 
-static void drawText(unsigned int program, unsigned int text, float opacity,
-	float x, float y, float textWidth, float textHeight, int w, int h) {
+static void beginDraw(int w, int h) {
 	glViewport(0, 0, w, h);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+static void endDraw() {
+	glUseProgram(0);
+	glDisable(GL_BLEND);
+}
+
+static void drawText(unsigned int program, unsigned int text, float opacity,
+	float x, float y, float textWidth, float textHeight, int w, int h) {
+	beginDraw(w, h);
 	glUseProgram(program);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, text);
@@ -68,8 +77,7 @@ static void drawText(unsigned int program, unsigned int text, float opacity,
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	glDisableVertexAttribArray(pos);
 	if (tc != (GLuint)-1) glDisableVertexAttribArray(tc);
-	glUseProgram(0);
-	glDisable(GL_BLEND);
+	endDraw();
 }
 
 static void drawOverlayText(unsigned int program, unsigned int text, float opacity,
@@ -78,18 +86,10 @@ static void drawOverlayText(unsigned int program, unsigned int text, float opaci
 	drawText(program, text, opacity, x, y, textWidth, textHeight, w, h);
 }
 
-static void drawFeedbackText(unsigned int program, unsigned int text, float opacity,
-	float x, float y, float textWidth, float textHeight, int w, int h) {
-	drawText(program, text, opacity, x, y, textWidth, textHeight, w, h);
-}
-
 static void drawFilledRect(unsigned int program,
 	float x, float y, float w, float h, float r, float g, float b, float a,
 	int winW, int winH) {
-	glViewport(0, 0, winW, winH);
-	glDisable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	beginDraw(winW, winH);
 	glUseProgram(program);
 	float left = x / (float)winW * 2.0f - 1.0f;
 	float right = (x + w) / (float)winW * 2.0f - 1.0f;
@@ -102,8 +102,7 @@ static void drawFilledRect(unsigned int program,
 	glEnableVertexAttribArray(pos);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	glDisableVertexAttribArray(pos);
-	glUseProgram(0);
-	glDisable(GL_BLEND);
+	endDraw();
 }
 
 static unsigned int createTextProgram() {
@@ -214,16 +213,8 @@ type Overlay struct {
 	programRect uint32
 	face        font.Face
 
-	// Notification state (existing).
-	notifTex      uint32
-	notifTexW     int
-	notifTexH     int
-	notifText     string
-	notifAlpha    float64
-	notifStarted  time.Time
-	notifVisible  bool
-	notifInjected bool
-	notifHidden   bool
+	// Notification.
+	notif Notifier
 
 	// UI mode.
 	uiVisible   bool
@@ -296,161 +287,37 @@ func New() *Overlay {
 func (o *Overlay) Draw(width, height int) {
 	if o.uiVisible {
 		o.renderUI(width, height)
-		if o.notifVisible && o.notifTex != 0 && !o.notifHidden {
-			o.renderNotification(width, height)
+		if o.notif.Visible() && o.notif.Tex() != 0 && !o.notif.Hidden() {
+			o.notif.Render(o.programText, width, height)
 		}
-	} else if o.notifVisible && !o.notifHidden && !o.notifInjected {
-		o.renderNotification(width, height)
+	} else if o.notif.Visible() && !o.notif.Hidden() && !o.notif.Injected() {
+		o.notif.Render(o.programText, width, height)
 	}
 }
 
 // Update advances animations. Call every frame.
 func (o *Overlay) Update() {
-	if !o.notifVisible {
-		return
-	}
-	if o.notifInjected && !o.uiVisible {
-		o.hideNotification()
-		return
-	}
-	elapsed := time.Since(o.notifStarted)
-	if elapsed >= fadeInDuration+holdDuration {
-		if o.uiVisible {
-			o.hideNotification()
-		}
-		return
-	}
-	switch {
-	case elapsed < fadeInDuration:
-		o.notifAlpha = float64(elapsed) / float64(fadeInDuration)
-	default:
-		o.notifAlpha = 1.0
-	}
+	o.notif.Update(o.uiVisible)
 }
 
-// --- Notification (existing behavior) ---
+// --- Notification (delegates to Notifier) ---
 
 // ShowTrack begins the fade-in animation for the given track path.
 func (o *Overlay) ShowTrack(path string) {
-	if o.notifHidden {
-		return
-	}
-	notifSize := o.fontSize * 3.5
-	if notifSize < 20 {
-		notifSize = 20
-	}
-	f, err := opentype.Parse(unifontData)
-	if err != nil {
-		slog.Error("font parse", "error", err)
-		return
-	}
-	face, err := opentype.NewFace(f, &opentype.FaceOptions{
-		Size:    notifSize,
-		DPI:     72,
-		Hinting: font.HintingNone,
-	})
-	if err != nil {
-		slog.Error("font face", "error", err)
-		return
-	}
-	defer func() { _ = face.Close() }()
-
-	title := player.TrackTitle(path)
-	if title == "" {
-		return
-	}
-
-	bounds, _ := font.BoundString(face, title)
-	const padding = 4
-	o.notifTexW = (bounds.Max.X - bounds.Min.X).Ceil() + padding*2
-	o.notifTexH = (bounds.Max.Y - bounds.Min.Y).Ceil() + padding*2
-	if o.notifTexW == 0 || o.notifTexH == 0 {
-		return
-	}
-
-	rgba := image.NewRGBA(image.Rect(0, 0, o.notifTexW, o.notifTexH))
-	d := &font.Drawer{
-		Dst:  rgba,
-		Src:  image.NewUniform(color.RGBA{255, 255, 255, 255}),
-		Face: face,
-		Dot:  fixed.Point26_6{X: fixed.I(padding) - bounds.Min.X, Y: fixed.I(padding) - bounds.Min.Y},
-	}
-	d.DrawString(title)
-
-	if o.notifTex != 0 {
-		C.texDelete(C.uint(o.notifTex))
-	}
-	o.notifTex = uploadTexture(rgba)
-	if o.notifTex == 0 {
-		return
-	}
-
-	o.notifText = title
-	o.notifStarted = time.Now()
-	o.notifVisible = true
-	o.notifInjected = false
-	o.notifAlpha = 0
-}
-
-func (o *Overlay) renderNotification(width, height int) {
-	if o.notifTex == 0 || o.programText == 0 || width <= 0 || height <= 0 {
-		return
-	}
-	x, y, dw, dh := o.notifLayout(width, height)
-	C.drawOverlayText(C.uint(o.programText), C.uint(o.notifTex), C.float(o.notifAlpha),
-		C.float(x), C.float(y), C.float(dw), C.float(dh),
-		C.int(width), C.int(height))
-}
-
-func (o *Overlay) notifLayout(width, height int) (x, y, drawWidth, drawHeight float32) {
-	drawHeight = float32(height) * 0.12
-	scale := drawHeight / float32(o.notifTexH)
-	drawWidth = float32(o.notifTexW) * scale
-	maxWidth := float32(width) * 0.85
-	if drawWidth > maxWidth {
-		scale = maxWidth / float32(o.notifTexW)
-		drawWidth = maxWidth
-		drawHeight = float32(o.notifTexH) * scale
-	}
-	x = (float32(width) - drawWidth) / 2
-	y = (float32(height) - drawHeight) / 2
-	return
+	o.notif.ShowTrack(path, o.fontSize)
 }
 
 // Inject stamps the notification text once into projectM's feedback framebuffer.
 func (o *Overlay) Inject(width, height int) {
-	if o.uiVisible || o.notifHidden || o.notifInjected || o.notifTex == 0 || o.programText == 0 || width <= 0 || height <= 0 {
+	if o.uiVisible {
 		return
 	}
-	if time.Since(o.notifStarted) < fadeInDuration+holdDuration {
-		return
-	}
-	x, y, dw, dh := o.notifLayout(width, height)
-	C.drawFeedbackText(C.uint(o.programText), C.uint(o.notifTex), 1,
-		C.float(x), C.float(y), C.float(dw), C.float(dh),
-		C.int(width), C.int(height))
-	o.notifInjected = true
+	o.notif.Inject(o.programText, width, height)
 }
 
 // ToggleVisibility shows or hides the notification (B button legacy).
 func (o *Overlay) ToggleVisibility() {
-	o.notifHidden = !o.notifHidden
-	if !o.notifHidden && o.notifText != "" {
-		o.notifVisible = true
-		o.notifStarted = time.Now()
-		o.notifInjected = false
-		o.notifAlpha = 0
-	}
-}
-
-func (o *Overlay) hideNotification() {
-	if o.notifTex != 0 {
-		C.texDelete(C.uint(o.notifTex))
-		o.notifTex = 0
-	}
-	o.notifVisible = false
-	o.notifText = ""
-	o.notifAlpha = 0
+	o.notif.Toggle()
 }
 
 // --- UI mode ---
@@ -462,11 +329,7 @@ func (o *Overlay) ToggleUI() {
 		o.panelEntered = false
 		o.focusPanel = 0
 		o.uiPage = PageLibrary
-		o.albumsDirty = true
-		o.tracksDirty = true
-		o.bottomDirty = true
-		o.fpsDirty = true
-		o.settingsDirty = true
+		o.markAllDirty()
 	}
 	slog.Debug("ui visibility", "visible", o.uiVisible)
 }
@@ -491,11 +354,7 @@ func (o *Overlay) OpenSettingsPage() {
 	o.panelEntered = false
 	o.settingsCursor = 0
 	o.settingsEditing = false
-	o.settingsDirty = true
-	o.albumsDirty = true
-	o.tracksDirty = true
-	o.bottomDirty = true
-	o.fpsDirty = true
+	o.markAllDirty()
 }
 
 // SettingsCursor returns the current settings cursor index.
@@ -509,6 +368,15 @@ func (o *Overlay) IsSettingsEditing() bool { return o.settingsEditing }
 
 // SelectEntered reports whether a panel has been entered for item navigation.
 func (o *Overlay) SelectEntered() bool { return o.panelEntered }
+
+// markAllDirty sets every texture-dirty flag. Used on resize, page open, etc.
+func (o *Overlay) markAllDirty() {
+	o.albumsDirty = true
+	o.tracksDirty = true
+	o.bottomDirty = true
+	o.fpsDirty = true
+	o.settingsDirty = true
+}
 
 // SetScreenSize updates screen dimensions and recomputes font size.
 // Call when window is created or resized.
@@ -525,11 +393,7 @@ func (o *Overlay) SetScreenSize(w, h int) {
 	if o.fontSize != newSize {
 		o.fontSize = newSize
 		o.rebuildFace()
-		o.albumsDirty = true
-		o.tracksDirty = true
-		o.bottomDirty = true
-		o.fpsDirty = true
-		o.settingsDirty = true
+		o.markAllDirty()
 	}
 }
 
@@ -854,14 +718,7 @@ func (o *Overlay) renderUI(w, h int) {
 		C.drawFilledRect(C.uint(o.programRect), 0, by, C.float(w), C.float(bottomH),
 			0, 0, 0, 0.5, C.int(w), C.int(h))
 		if o.focusPanel == 2 {
-			C.drawFilledRect(C.uint(o.programRect), -1, by-1, C.float(w+2), 1,
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-			C.drawFilledRect(C.uint(o.programRect), -1, by+C.float(bottomH), C.float(w+2), 1,
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-			C.drawFilledRect(C.uint(o.programRect), -1, by-1, 1, C.float(bottomH+2),
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-			C.drawFilledRect(C.uint(o.programRect), C.float(w), by-1, 1, C.float(bottomH+2),
-				1, 1, 1, 0.5, C.int(w), C.int(h))
+			drawPanelBorder(o, 0, by, C.float(w), C.float(bottomH), C.int(w), C.int(h))
 		}
 		C.drawOverlayText(C.uint(o.programText), C.uint(o.bottomTex), 1,
 			0, by, C.float(o.bottomTexW), C.float(o.bottomTexH), C.int(w), C.int(h))
@@ -1014,6 +871,24 @@ func drawPanelBorder(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
 func drawAccentHighlight(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
 	C.drawFilledRect(C.uint(o.programRect), x, y, w, h,
 		accentR, accentG, accentB, accentA, winW, winH)
+}
+
+// --- GL wrapper functions (callable from other files in this package) ---
+
+func glDrawOverlayText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH int) {
+	C.drawOverlayText(C.uint(program), C.uint(tex), C.float(opacity),
+		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH))
+}
+
+func glDrawText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH int) {
+	C.drawText(C.uint(program), C.uint(tex), C.float(opacity),
+		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH))
+}
+
+func glDeleteTex(tex uint32) {
+	if tex != 0 {
+		C.texDelete(C.uint(tex))
+	}
 }
 
 func (o *Overlay) rebuildFPSTex() {
@@ -1229,7 +1104,7 @@ func renderProgressBar(pixelWidth int, total, current float64) string {
 
 // Close releases GL resources.
 func (o *Overlay) Close() {
-	o.deleteTex(&o.notifTex)
+	o.notif.Hide()
 	o.deleteTex(&o.albumsTex)
 	o.deleteTex(&o.tracksTex)
 	o.deleteTex(&o.bottomTex)

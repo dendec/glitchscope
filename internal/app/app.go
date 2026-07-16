@@ -1,3 +1,4 @@
+// Package app wires the application — initialization, main loop, and benchmark.
 package app
 
 import (
@@ -18,7 +19,7 @@ import (
 )
 
 const (
-	fpsWindow       = 60
+	fpsWindow       = 30
 	lowFPSThresh    = 30.0
 	transitionDelay = 1500 * time.Millisecond
 )
