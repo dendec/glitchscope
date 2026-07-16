@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/csv"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
@@ -18,12 +20,20 @@ func fatal(err error) {
 }
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Fprintf(os.Stderr, "Usage: mdp-pack <input-dir> <output.mdp>\n")
+	if len(os.Args) != 3 && len(os.Args) != 4 {
+		fmt.Fprintf(os.Stderr, "Usage: mdp-pack <input-dir> <output.mdp> [benchmark.csv]\n")
 		os.Exit(1)
 	}
 	inputDir := os.Args[1]
 	outputPath := os.Args[2]
+	blacklist := make(map[string]bool)
+	if len(os.Args) == 4 {
+		var err error
+		blacklist, err = loadBlacklist(os.Args[3], 20.0)
+		if err != nil {
+			fatal(fmt.Errorf("load benchmark: %w", err))
+		}
+	}
 
 	type entry struct {
 		name string
@@ -44,6 +54,9 @@ func main() {
 		rel, err := filepath.Rel(inputDir, path)
 		if err != nil {
 			return err
+		}
+		if blacklist[filepath.ToSlash(rel)] {
+			return nil
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -119,4 +132,39 @@ func main() {
 	}
 
 	fmt.Printf("wrote %d presets to %s\n", len(compressed), outputPath)
+}
+
+func loadBlacklist(path string, minFPS float64) (map[string]bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+
+	records, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	if len(records) == 0 || len(records[0]) != 6 || records[0][0] != "preset" || records[0][1] != "status" {
+		return nil, fmt.Errorf("invalid benchmark CSV header")
+	}
+
+	blacklist := make(map[string]bool)
+	for i, row := range records[1:] {
+		if len(row) != 6 {
+			return nil, fmt.Errorf("invalid benchmark CSV row %d", i+2)
+		}
+		if row[1] != "ok" {
+			blacklist[row[0]] = true
+			continue
+		}
+		fps, err := strconv.ParseFloat(row[4], 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid FPS in benchmark CSV row %d: %w", i+2, err)
+		}
+		if fps < minFPS {
+			blacklist[row[0]] = true
+		}
+	}
+	return blacklist, nil
 }

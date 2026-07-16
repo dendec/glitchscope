@@ -37,6 +37,6 @@ pm_message "Loading MDPP... (Compiling shaders)"
 $GPTOKEYB "mdpp" &
 
 pm_platform_helper "$GAMEDIR/mdpp"
-./mdpp
+./mdpp -render-scale 0.5
 
 pm_finish

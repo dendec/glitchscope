@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -39,7 +40,8 @@ func LoadSettings(path string) (GraphicsSettings, error) {
 		} `json:"graphics"`
 	}
 	if err := json.NewDecoder(f).Decode(&raw); err != nil {
-		return DefaultGraphics(), nil // ignore malformed
+		slog.Warn("settings: malformed JSON, using defaults", "path", path, "error", err)
+		return DefaultGraphics(), nil
 	}
 	if raw.Graphics == nil {
 		return DefaultGraphics(), nil

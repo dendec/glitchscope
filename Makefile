@@ -22,8 +22,10 @@ DOCKER_IMAGE_X64 := mdpp-builder
 PRESETS_REPO  := https://github.com/projectM-visualizer/presets-cream-of-the-crop.git
 PRESETS_DIR   := dist/presets-cream-of-the-crop
 MDP_FILE      := dist/presets.mdp
+FULL_MDP_FILE := dist/presets-all.mdp
+BENCHMARK_CSV := docs/benchmark/render-scale-0.5_mesh-8.csv
 
-.PHONY: build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp
+.PHONY: build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp
 
 submodules:
 	git submodule update --init --recursive
@@ -120,12 +122,19 @@ presets:
 	fi
 
 # Build presets.mdp archive from cream-of-the-crop dir (only if missing).
-$(MDP_FILE):
+$(FULL_MDP_FILE):
 	$(GO) run ./cmd/mdp-pack $(PRESETS_DIR) $@
-	@echo "=== Built $@ ==="
+	@echo "=== Built full preset archive ==="
 	@ls -lh $@
 
-mdp: presets $(MDP_FILE)
+mdp: presets $(FULL_MDP_FILE)
+
+$(MDP_FILE): presets $(BENCHMARK_CSV) cmd/mdp-pack/main.go
+	$(GO) run ./cmd/mdp-pack $(PRESETS_DIR) $@ $(BENCHMARK_CSV)
+	@echo "=== Built filtered portable preset archive ==="
+	@ls -lh $@
+
+portable-mdp: presets $(MDP_FILE)
 
 # ARM64 cross-build via Docker.
 DOCKER_IMAGE := mdpp-arm64
@@ -139,31 +148,33 @@ dist-arm64:
 	@mkdir -p dist
 	@docker rm -f mdpp-extract 2>/dev/null || true
 	docker create --name mdpp-extract $(DOCKER_IMAGE)
+	@rm -rf dist/mdpp  # remove stale file from local build, Docker has a dir
 	docker cp mdpp-extract:/dist/. dist/
 	docker rm mdpp-extract
 	@echo "=== dist/ ==="
 	@ls -lhR dist/
 
-# PortMaster packaging.
-dist-portmaster: dist-arm64 mdp
+# PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
+dist-portmaster: dist-arm64 portable-mdp
 	@rm -rf dist/portmaster_build
 	@mkdir -p dist/portmaster_build/mdpp/presets dist/portmaster_build/mdpp/licenses
 	cp portmaster/MDPP.sh dist/portmaster_build/
 	cp portmaster/port.json dist/portmaster_build/
-	cp portmaster/screenshot.png dist/portmaster_build/ 2>/dev/null; true
+	cp portmaster/README.md dist/portmaster_build/
+	cp portmaster/screenshot.png dist/portmaster_build/
+	cp portmaster/gameinfo.xml dist/portmaster_build/ 2>/dev/null; true
+	@RELEASE_DATE=$$(date +%Y%m%d)T000000; \
+	printf '<gameList>\n    <game>\n        <path>./MDPP.sh</path>\n        <name>MDPP</name>\n        <desc>MilkDrop Portable Player — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/mdpp/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./mdpp/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/mdpp/gameinfo.xml
 	cp dist/mdpp/mdpp dist/portmaster_build/mdpp/
 	cp $(MDP_FILE) dist/portmaster_build/mdpp/presets/.mdp
 	cp portmaster/licenses/* dist/portmaster_build/mdpp/licenses/ 2>/dev/null; true
-	cp portmaster/README.md dist/portmaster_build/mdpp/
 	cp portmaster/screenshot.png dist/portmaster_build/mdpp/cover.png 2>/dev/null; true
-	@RELEASE_DATE=$$(date +%Y%m%d)T000000; \
-	printf '<gameList>\n    <game>\n        <path>./MDPP.sh</path>\n        <name>MDPP</name>\n        <desc>MilkDrop Portable Player — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/mdpp/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./mdpp/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/mdpp/gameinfo.xml
 	@rm -f dist/mdpp.zip
-	cd dist/portmaster_build && zip -r ../mdpp.zip "MDPP.sh" port.json screenshot.png mdpp
+	cd dist/portmaster_build && zip -r ../mdpp.zip "MDPP.sh" README.md gameinfo.xml port.json screenshot.png mdpp
 	@echo "=== Generated dist/mdpp.zip ==="
 	@ls -lh dist/mdpp.zip
 
-deploy: dist-arm64 mdp
+deploy: dist-arm64 portable-mdp
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push dist/mdpp/mdpp $(DEVICE_DIR)/
 	adb push portmaster/MDPP.sh $(PORTS_DIR)/

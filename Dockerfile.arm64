@@ -100,7 +100,7 @@ RUN CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
     CGO_LDFLAGS="-lSDL2 -lm -lpthread lib/projectm/build/src/libprojectM/libprojectM-4.a lib/projectm/build/vendor/projectm-eval/projectm-eval/libprojectM_eval.a -lGLESv2 -lm -L/build/openmpt-install/usr/local/lib -lopenmpt" \
     go build -ldflags="-s -w" -o mdpp ./cmd/mdpp \
     && aarch64-linux-gnu-strip mdpp \
-    && patchelf --remove-needed libGL.so.1 mdpp 2>/dev/null; true
+    && (patchelf --remove-needed libGL.so.1 mdpp 2>/dev/null || true)
 
 # Prepare dist
 RUN mkdir -p /dist/mdpp/presets \

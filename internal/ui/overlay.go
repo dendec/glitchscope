@@ -686,18 +686,18 @@ func (o *Overlay) Select() bool {
 }
 
 // Back exits item mode or closes UI.
-func (o *Overlay) Back() string {
+func (o *Overlay) Back() {
 	if o.uiPage == PageSettings {
 		if o.settingsEditing {
 			// Cancel editing: revert value cursor.
 			o.settingsEditing = false
 			o.settingsDirty = true
-			return ""
+			return
 		}
 		if o.panelEntered {
 			o.panelEntered = false
 			o.settingsDirty = true
-			return ""
+			return
 		}
 		// Exit settings page.
 		o.uiPage = PageLibrary
@@ -705,14 +705,14 @@ func (o *Overlay) Back() string {
 		o.focusPanel = 0
 		o.albumsDirty = true
 		o.tracksDirty = true
-		return ""
+		return
 	}
 
 	if o.panelEntered {
 		o.panelEntered = false
 		o.albumsDirty = true
 		o.tracksDirty = true
-		return ""
+		return
 	}
 	// Close UI.
 	if o.uiVisible {
@@ -720,7 +720,6 @@ func (o *Overlay) Back() string {
 		o.panelEntered = false
 		o.focusPanel = 0
 	}
-	return ""
 }
 
 // --- Data setters ---
