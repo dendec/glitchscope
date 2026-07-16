@@ -166,6 +166,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/dendec/mdpp/internal/config"
 	"github.com/dendec/mdpp/internal/player"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
@@ -178,6 +179,34 @@ const (
 	refFontSize    = 26.0
 	refHeight      = 720
 )
+
+// Accent colour — light blue, used for the playing-track indicator,
+// active setting row highlight, and selected value highlight.
+const (
+	accentR = 0.3
+	accentG = 0.8
+	accentB = 1.0
+	accentA = 0.3
+
+	panelBgAlpha   = 0.4
+	borderAlpha    = 0.5
+	dimAlpha       = 0.3
+)
+
+// UIPage selects which screen the overlay shows.
+type UIPage int
+
+const (
+	PageLibrary UIPage = iota
+	PageSettings
+)
+
+// SettingRow describes one line in the settings page.
+type SettingRow struct {
+	Label  string
+	Values []string
+	Index  int
+}
 
 // Overlay manages UI and notification rendering.
 type Overlay struct {
@@ -199,6 +228,7 @@ type Overlay struct {
 	// UI mode.
 	uiVisible   bool
 	panelEntered bool // true = inside panel navigating items, false = choosing panels
+	uiPage      UIPage
 
 	// Screen dimensions and computed font size.
 	screenW, screenH int
@@ -216,9 +246,23 @@ type Overlay struct {
 	bpm          float64
 	paused       bool
 	fps          float64
+	presetName   string
 	playingAlbum string
 	playingTrack string
 	focusPanel   int // 0=albums, 1=tracks
+
+	// Settings page state.
+	settingsRows         []SettingRow
+	settingsCursor       int
+	settingsValueCursor  int
+	settingsEditing      bool
+	settingsDirty        bool
+	settingsTexL         uint32
+	settingsTexLW        int
+	settingsTexLH        int
+	settingsTexR         uint32
+	settingsTexRW        int
+	settingsTexRH        int
 
 	// Cached UI textures.
 	albumsTex              uint32
@@ -229,12 +273,15 @@ type Overlay struct {
 	bottomTexW, bottomTexH int
 	fpsTex                 uint32
 	fpsTexW, fpsTexH       int
+	presetNameTex          uint32
+	presetNameTexW, presetNameTexH int
 
 	// Dirty flags.
 	albumsDirty bool
 	tracksDirty bool
 	bottomDirty bool
 	fpsDirty    bool
+	presetNameDirty bool
 }
 
 // New creates an Overlay.
@@ -414,18 +461,54 @@ func (o *Overlay) ToggleUI() {
 	if o.uiVisible {
 		o.panelEntered = false
 		o.focusPanel = 0
+		o.uiPage = PageLibrary
 		o.albumsDirty = true
 		o.tracksDirty = true
 		o.bottomDirty = true
 		o.fpsDirty = true
+		o.settingsDirty = true
 	}
 	slog.Debug("ui visibility", "visible", o.uiVisible)
+}
+
+// SetSettingsRows updates the settings model and marks textures dirty.
+func (o *Overlay) SetSettingsRows(rows []SettingRow, cursor int) {
+	o.settingsRows = rows
+	o.settingsCursor = cursor
+	o.settingsDirty = true
 }
 
 // UIVisible returns true if the overlay UI is currently shown.
 func (o *Overlay) UIVisible() bool {
 	return o.uiVisible
 }
+
+// OpenSettingsPage switches the overlay into settings mode.
+// Caller should call SetSettingsRows separately to populate the data.
+func (o *Overlay) OpenSettingsPage() {
+	o.uiVisible = true
+	o.uiPage = PageSettings
+	o.panelEntered = false
+	o.settingsCursor = 0
+	o.settingsEditing = false
+	o.settingsDirty = true
+	o.albumsDirty = true
+	o.tracksDirty = true
+	o.bottomDirty = true
+	o.fpsDirty = true
+}
+
+// SettingsCursor returns the current settings cursor index.
+func (o *Overlay) SettingsCursor() int { return o.settingsCursor }
+
+// IsSettingsPage reports whether the overlay is showing the settings page.
+func (o *Overlay) IsSettingsPage() bool { return o.uiPage == PageSettings }
+
+// IsSettingsEditing reports whether the user is editing a value (right panel active).
+func (o *Overlay) IsSettingsEditing() bool { return o.settingsEditing }
+
+// SelectEntered reports whether a panel has been entered for item navigation.
+func (o *Overlay) SelectEntered() bool { return o.panelEntered }
 
 // SetScreenSize updates screen dimensions and recomputes font size.
 // Call when window is created or resized.
@@ -446,6 +529,7 @@ func (o *Overlay) SetScreenSize(w, h int) {
 		o.tracksDirty = true
 		o.bottomDirty = true
 		o.fpsDirty = true
+		o.settingsDirty = true
 	}
 }
 
@@ -474,6 +558,20 @@ func (o *Overlay) CursorUp() {
 	if !o.panelEntered {
 		return
 	}
+	if o.uiPage == PageSettings {
+		if o.settingsEditing {
+			if o.settingsValueCursor > 0 {
+				o.settingsValueCursor--
+				o.settingsDirty = true
+			}
+		} else {
+			if o.settingsCursor > 0 {
+				o.settingsCursor--
+				o.settingsDirty = true
+			}
+		}
+		return
+	}
 	switch o.focusPanel {
 	case 0:
 		if o.albumCursor > 0 {
@@ -495,6 +593,21 @@ func (o *Overlay) CursorDown() {
 	if !o.panelEntered {
 		return
 	}
+	if o.uiPage == PageSettings {
+		if o.settingsEditing {
+			vals := o.settingsRows[o.settingsCursor].Values
+			if o.settingsValueCursor < len(vals)-1 {
+				o.settingsValueCursor++
+				o.settingsDirty = true
+			}
+		} else {
+			if o.settingsCursor < len(o.settingsRows)-1 {
+				o.settingsCursor++
+				o.settingsDirty = true
+			}
+		}
+		return
+	}
 	switch o.focusPanel {
 	case 0:
 		if o.albumCursor < len(o.albums)-1 {
@@ -513,7 +626,7 @@ func (o *Overlay) CursorDown() {
 
 // FocusLeft switches focus to the previous panel. Only works in panel mode.
 func (o *Overlay) FocusLeft() {
-	if o.panelEntered {
+	if o.panelEntered || o.uiPage == PageSettings {
 		return
 	}
 	o.focusPanel--
@@ -526,7 +639,7 @@ func (o *Overlay) FocusLeft() {
 
 // FocusRight switches focus to the next panel. Only works in panel mode.
 func (o *Overlay) FocusRight() {
-	if o.panelEntered {
+	if o.panelEntered || o.uiPage == PageSettings {
 		return
 	}
 	o.focusPanel = (o.focusPanel + 1) % 3
@@ -535,9 +648,35 @@ func (o *Overlay) FocusRight() {
 }
 
 // Select enters the focused panel or confirms item selection.
-// Returns true when an item was selected (caller should play).
+// Returns true when an item was selected (caller should play / apply).
 func (o *Overlay) Select() bool {
+	if o.uiPage == PageSettings {
+		if !o.panelEntered {
+			// Enter settings page: activate left panel.
+			o.panelEntered = true
+			o.settingsDirty = true
+			return false
+		}
+		if !o.settingsEditing {
+			// Enter value editing mode: copy current index to value cursor.
+			o.settingsEditing = true
+			o.settingsValueCursor = o.settingsRows[o.settingsCursor].Index
+			o.settingsDirty = true
+			return false
+		}
+		// Confirm value: apply it.
+		o.settingsRows[o.settingsCursor].Index = o.settingsValueCursor
+		o.settingsEditing = false
+		o.settingsDirty = true
+		return true
+	}
+
 	if !o.panelEntered {
+		if o.focusPanel == 2 {
+			// Bottom panel selected → open settings.
+			o.OpenSettingsPage()
+			return false
+		}
 		o.panelEntered = true
 		o.albumsDirty = true
 		o.tracksDirty = true
@@ -548,6 +687,27 @@ func (o *Overlay) Select() bool {
 
 // Back exits item mode or closes UI.
 func (o *Overlay) Back() string {
+	if o.uiPage == PageSettings {
+		if o.settingsEditing {
+			// Cancel editing: revert value cursor.
+			o.settingsEditing = false
+			o.settingsDirty = true
+			return ""
+		}
+		if o.panelEntered {
+			o.panelEntered = false
+			o.settingsDirty = true
+			return ""
+		}
+		// Exit settings page.
+		o.uiPage = PageLibrary
+		o.panelEntered = false
+		o.focusPanel = 0
+		o.albumsDirty = true
+		o.tracksDirty = true
+		return ""
+	}
+
 	if o.panelEntered {
 		o.panelEntered = false
 		o.albumsDirty = true
@@ -621,6 +781,15 @@ func (o *Overlay) SetFPS(fps float64) {
 	o.fpsDirty = true
 }
 
+// SetPresetName sets the current preset name and marks dirty.
+func (o *Overlay) SetPresetName(name string) {
+	if o.presetName == name {
+		return
+	}
+	o.presetName = name
+	o.presetNameDirty = true
+}
+
 // AlbumCursor returns the current album cursor index.
 func (o *Overlay) AlbumCursor() int { return o.albumCursor }
 
@@ -630,6 +799,9 @@ func (o *Overlay) TrackCursor() int { return o.trackCursor }
 // FocusPanel returns the focused panel (0=albums, 1=tracks).
 func (o *Overlay) FocusPanel() int { return o.focusPanel }
 
+// SettingsRows returns the current settings rows.
+func (o *Overlay) SettingsRows() []SettingRow { return o.settingsRows }
+
 // --- UI rendering ---
 
 func (o *Overlay) renderUI(w, h int) {
@@ -638,7 +810,7 @@ func (o *Overlay) renderUI(w, h int) {
 	}
 
 	// Full screen dim.
-	C.drawFilledRect(C.uint(o.programRect), 0, 0, C.float(w), C.float(h), 0, 0, 0, 0.3, C.int(w), C.int(h))
+	C.drawFilledRect(C.uint(o.programRect), 0, 0, C.float(w), C.float(h), 0, 0, 0, dimAlpha, C.int(w), C.int(h))
 
 	// FPS counter.
 	if o.fpsDirty {
@@ -647,6 +819,14 @@ func (o *Overlay) renderUI(w, h int) {
 	if o.fpsTex != 0 {
 		C.drawOverlayText(C.uint(o.programText), C.uint(o.fpsTex), 1,
 			5, 0, C.float(o.fpsTexW), C.float(o.fpsTexH), C.int(w), C.int(h))
+	}
+	// Preset name — below FPS.
+	if o.presetNameDirty {
+		o.rebuildPresetNameTex()
+	}
+	if o.presetNameTex != 0 {
+		C.drawOverlayText(C.uint(o.programText), C.uint(o.presetNameTex), 1,
+			C.float(5), C.float(o.fpsTexH+4), C.float(o.presetNameTexW), C.float(o.presetNameTexH), C.int(w), C.int(h))
 	}
 
 	// Layout constants — proportional to font size.
@@ -660,64 +840,10 @@ func (o *Overlay) renderUI(w, h int) {
 
 	lh := o.face.Metrics().Height.Ceil()
 
-	// --- Albums panel (left, 1/3 width) ---
-	if o.albumsDirty {
-		o.rebuildAlbumsTex(thirdW, panelH)
-	}
-	if o.albumsTex != 0 {
-		px := C.float(0)
-		py := C.float(panelY)
-		// Background — always semi-transparent black.
-		C.drawFilledRect(C.uint(o.programRect), px, py, C.float(thirdW), C.float(panelH),
-			0, 0, 0, 0.4, C.int(w), C.int(h))
-		// Border if focused — 4 thin edges, no inner fill.
-		if o.focusPanel == 0 {
-			C.drawFilledRect(C.uint(o.programRect), px-1, py-1, C.float(thirdW+2), 1,
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-			C.drawFilledRect(C.uint(o.programRect), px-1, py+C.float(panelH), C.float(thirdW+2), 1,
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-			C.drawFilledRect(C.uint(o.programRect), px-1, py-1, 1, C.float(panelH+2),
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-			C.drawFilledRect(C.uint(o.programRect), px+C.float(thirdW), py-1, 1, C.float(panelH+2),
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-		}
-		// Text
-		C.drawOverlayText(C.uint(o.programText), C.uint(o.albumsTex), 1,
-			px, py, C.float(o.albumsTexW), C.float(o.albumsTexH), C.int(w), C.int(h))
-		// Item highlight
-		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
-			hiY := py + C.float(o.albumCursor*lh+2)
-			C.drawFilledRect(C.uint(o.programRect), px+2, hiY, C.float(thirdW-4), C.float(lh),
-				0.3, 0.8, 1, 0.3, C.int(w), C.int(h))
-		}
-	}
-
-	// --- Tracks panel (right, 1/3 width) ---
-	if o.tracksDirty {
-		o.rebuildTracksTex(thirdW, panelH)
-	}
-	if o.tracksTex != 0 {
-		tx := C.float(w * 2 / 3)
-		ty := C.float(panelY)
-		C.drawFilledRect(C.uint(o.programRect), tx, ty, C.float(thirdW), C.float(panelH),
-			0, 0, 0, 0.4, C.int(w), C.int(h))
-		if o.focusPanel == 1 {
-			C.drawFilledRect(C.uint(o.programRect), tx-1, ty-1, C.float(thirdW+2), 1,
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-			C.drawFilledRect(C.uint(o.programRect), tx-1, ty+C.float(panelH), C.float(thirdW+2), 1,
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-			C.drawFilledRect(C.uint(o.programRect), tx-1, ty-1, 1, C.float(panelH+2),
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-			C.drawFilledRect(C.uint(o.programRect), tx+C.float(thirdW), ty-1, 1, C.float(panelH+2),
-				1, 1, 1, 0.5, C.int(w), C.int(h))
-		}
-		C.drawOverlayText(C.uint(o.programText), C.uint(o.tracksTex), 1,
-			tx, ty, C.float(o.tracksTexW), C.float(o.tracksTexH), C.int(w), C.int(h))
-		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
-			hiY := ty + C.float(o.trackCursor*lh+2)
-			C.drawFilledRect(C.uint(o.programRect), tx+2, hiY, C.float(thirdW-4), C.float(lh),
-				0.3, 0.8, 1, 0.3, C.int(w), C.int(h))
-		}
+	if o.uiPage == PageSettings {
+		o.renderSettingsPanels(w, h, thirdW, panelY, panelH, lh)
+	} else {
+		o.renderLibraryPanels(w, h, thirdW, panelY, panelH, lh)
 	}
 
 	// --- Bottom bar (full width) ---
@@ -743,10 +869,164 @@ func (o *Overlay) renderUI(w, h int) {
 	}
 }
 
+// renderLibraryPanels draws the albums (left) and tracks (right) panels.
+func (o *Overlay) renderLibraryPanels(w, h int, thirdW, panelY, panelH, lh int) {
+	// --- Albums panel ---
+	if o.albumsDirty {
+		o.rebuildAlbumsTex(thirdW, panelH)
+	}
+	if o.albumsTex != 0 {
+		px := C.float(0)
+		py := C.float(panelY)
+		drawPanelBg(o, px, py, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
+		if o.focusPanel == 0 {
+			drawPanelBorder(o, px, py, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
+		}
+		C.drawOverlayText(C.uint(o.programText), C.uint(o.albumsTex), 1,
+			px, py, C.float(o.albumsTexW), C.float(o.albumsTexH), C.int(w), C.int(h))
+		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
+			hiY := py + C.float(o.albumCursor*lh+2)
+			drawAccentHighlight(o, px+2, hiY, C.float(thirdW-4), C.float(lh), C.int(w), C.int(h))
+		}
+	}
+
+	// --- Tracks panel ---
+	if o.tracksDirty {
+		o.rebuildTracksTex(thirdW, panelH)
+	}
+	if o.tracksTex != 0 {
+		tx := C.float(w * 2 / 3)
+		ty := C.float(panelY)
+		drawPanelBg(o, tx, ty, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
+		if o.focusPanel == 1 {
+			drawPanelBorder(o, tx, ty, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
+		}
+		C.drawOverlayText(C.uint(o.programText), C.uint(o.tracksTex), 1,
+			tx, ty, C.float(o.tracksTexW), C.float(o.tracksTexH), C.int(w), C.int(h))
+		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
+			hiY := ty + C.float(o.trackCursor*lh+2)
+			drawAccentHighlight(o, tx+2, hiY, C.float(thirdW-4), C.float(lh), C.int(w), C.int(h))
+		}
+	}
+}
+
+// renderSettingsPanels draws the settings labels (left) and values (right).
+func (o *Overlay) renderSettingsPanels(w, h int, thirdW, panelY, panelH, lh int) {
+	if !o.settingsDirty {
+		// Still draw textures from cache.
+		o.drawSettingsTextures(w, h, thirdW, panelY, panelH, lh)
+		return
+	}
+	o.settingsDirty = false
+
+	// Rebuild left panel texture (setting names).
+	o.deleteTex(&o.settingsTexL)
+	var leftLines []string
+	for i, row := range o.settingsRows {
+		prefix := "  "
+		if i == o.settingsCursor && o.panelEntered {
+			prefix = "▸ "
+		}
+		leftLines = append(leftLines, prefix+row.Label)
+	}
+	leftText := strings.Join(leftLines, "\n")
+	o.settingsTexL, o.settingsTexLW, o.settingsTexLH = o.renderTextToTex(leftText, 255, 255, 255, 255)
+
+	// Rebuild right panel texture (values for the focused setting).
+	o.deleteTex(&o.settingsTexR)
+	var rightLines []string
+	if o.settingsCursor < len(o.settingsRows) {
+		row := o.settingsRows[o.settingsCursor]
+		for i, v := range row.Values {
+			mark := "  "
+			selIdx := row.Index
+			if o.settingsEditing {
+				selIdx = o.settingsValueCursor
+			}
+			if i == selIdx {
+				// ponytail: using a Unicode right-pointing triangle as the
+				// selection marker; same approach as albums/tracks panels.
+				mark = "▸ "
+			}
+			rightLines = append(rightLines, mark+v)
+		}
+	}
+	rightText := strings.Join(rightLines, "\n")
+	o.settingsTexR, o.settingsTexRW, o.settingsTexRH = o.renderTextToTex(rightText, 255, 255, 255, 255)
+
+	o.drawSettingsTextures(w, h, thirdW, panelY, panelH, lh)
+}
+
+func (o *Overlay) drawSettingsTextures(w, h int, thirdW, panelY, panelH, lh int) {
+	// Left panel.
+	lx := C.float(0)
+	ly := C.float(panelY)
+	drawPanelBg(o, lx, ly, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
+	if o.panelEntered && !o.settingsEditing {
+		drawPanelBorder(o, lx, ly, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
+	}
+	if o.settingsTexL != 0 {
+		C.drawOverlayText(C.uint(o.programText), C.uint(o.settingsTexL), 1,
+			lx, ly, C.float(o.settingsTexLW), C.float(o.settingsTexLH), C.int(w), C.int(h))
+		if o.panelEntered && len(o.settingsRows) > 0 && !o.settingsEditing {
+			hiY := ly + C.float(o.settingsCursor*lh+2)
+			drawAccentHighlight(o, lx+2, hiY, C.float(thirdW-4), C.float(lh), C.int(w), C.int(h))
+		}
+	}
+
+	// Right panel.
+	rx := C.float(w * 2 / 3)
+	ry := C.float(panelY)
+	drawPanelBg(o, rx, ry, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
+	if o.panelEntered && o.settingsEditing {
+		drawPanelBorder(o, rx, ry, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
+	}
+	if o.settingsTexR != 0 {
+		C.drawOverlayText(C.uint(o.programText), C.uint(o.settingsTexR), 1,
+			rx, ry, C.float(o.settingsTexRW), C.float(o.settingsTexRH), C.int(w), C.int(h))
+		if o.panelEntered && o.settingsEditing && len(o.settingsRows) > 0 {
+			row := o.settingsRows[o.settingsCursor]
+			if o.settingsValueCursor < len(row.Values) {
+				hiY := ry + C.float(o.settingsValueCursor*lh+2)
+				drawAccentHighlight(o, rx+2, hiY, C.float(thirdW-4), C.float(lh), C.int(w), C.int(h))
+			}
+		}
+	}
+}
+
+// --- Panel drawing helpers ---
+
+func drawPanelBg(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
+	C.drawFilledRect(C.uint(o.programRect), x, y, w, h,
+		0, 0, 0, panelBgAlpha, winW, winH)
+}
+
+func drawPanelBorder(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
+	C.drawFilledRect(C.uint(o.programRect), x-1, y-1, w+2, 1,
+		1, 1, 1, borderAlpha, winW, winH)
+	C.drawFilledRect(C.uint(o.programRect), x-1, y+h, w+2, 1,
+		1, 1, 1, borderAlpha, winW, winH)
+	C.drawFilledRect(C.uint(o.programRect), x-1, y-1, 1, h+2,
+		1, 1, 1, borderAlpha, winW, winH)
+	C.drawFilledRect(C.uint(o.programRect), x+w, y-1, 1, h+2,
+		1, 1, 1, borderAlpha, winW, winH)
+}
+
+func drawAccentHighlight(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
+	C.drawFilledRect(C.uint(o.programRect), x, y, w, h,
+		accentR, accentG, accentB, accentA, winW, winH)
+}
+
 func (o *Overlay) rebuildFPSTex() {
 	o.fpsDirty = false
 	o.deleteTex(&o.fpsTex)
 	o.fpsTex, o.fpsTexW, o.fpsTexH = o.renderTextToTex(fmt.Sprintf("FPS: %.0f", o.fps), 255, 255, 255, 255)
+}
+
+func (o *Overlay) rebuildPresetNameTex() {
+	o.presetNameDirty = false
+	o.deleteTex(&o.presetNameTex)
+	o.presetNameTex, o.presetNameTexW, o.presetNameTexH = o.renderTextToTex(o.presetName, 200, 200, 200, 255)
 }
 
 func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
@@ -826,6 +1106,46 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	text := fmt.Sprintf("%s  %s / %s\n%s Play    ⏭ Next    ⏮ Prev\n%s",
 		barStr, pos, dur, status, tech)
 	o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(text, 255, 255, 255, 255)
+}
+
+// BuildSettingsRows creates SettingRow entries from the current graphics
+// config and window dimensions. Call on page open and on window resize.
+func BuildSettingsRows(gs config.GraphicsSettings, winW, winH int) []SettingRow {
+	resolutions := config.ComputeResolutions(winW, winH)
+	resValues := make([]string, len(resolutions))
+	resIndex := 0
+	found := false
+	for i, r := range resolutions {
+		resValues[i] = r.String()
+		if !found && r.Width == gs.RenderWidth && r.Height == gs.RenderHeight {
+			resIndex = i
+			found = true
+		}
+	}
+	if !found && len(resolutions) > 0 {
+		closest := config.ClosestResolution(resolutions, config.RenderResolution{Width: gs.RenderWidth, Height: gs.RenderHeight})
+		for i, r := range resolutions {
+			if r == closest {
+				resIndex = i
+				break
+			}
+		}
+	}
+
+	filters := config.AllFilters()
+	filterValues := make([]string, len(filters))
+	filterIndex := 0
+	for i, f := range filters {
+		filterValues[i] = f.String()
+		if f == gs.UpscaleFilter {
+			filterIndex = i
+		}
+	}
+
+	return []SettingRow{
+		{Label: "Render resolution", Values: resValues, Index: resIndex},
+		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
+	}
 }
 
 // --- Helpers ---
@@ -915,6 +1235,9 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.tracksTex)
 	o.deleteTex(&o.bottomTex)
 	o.deleteTex(&o.fpsTex)
+	o.deleteTex(&o.presetNameTex)
+	o.deleteTex(&o.settingsTexL)
+	o.deleteTex(&o.settingsTexR)
 	if o.programText != 0 {
 		C.glDeleteProgram(C.uint(o.programText))
 		o.programText = 0
