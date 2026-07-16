@@ -134,7 +134,7 @@ func keyToAction(key sdl.Keycode) Action {
 		return ActionNextPreset
 	case sdl.K_r:
 		return ActionRandomPreset
-	case sdl.K_p, sdl.K_m:
+	case sdl.K_p:
 		return ActionPrevPreset
 	case sdl.K_b:
 		return ActionToggleOverlay

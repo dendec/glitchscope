@@ -28,7 +28,7 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 		return
 	case input.ActionToggleUI:
 		if a.overlay != nil {
-			a.overlay.ToggleUI()
+			a.overlay.ToggleUI() // always show/hide the UI, never cycles pages
 		}
 		return
 	}
@@ -59,6 +59,12 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 			if a.overlay.Select() {
 				a.applySettings(winW, winH)
 			}
+		} else if a.overlay.IsPresetsPage() {
+			if a.overlay.Select() {
+				if key := a.overlay.SelectedPresetKey(); key != "" {
+					a.loadPresetByKey(key)
+				}
+			}
 		} else if a.overlay.Select() && a.lib != nil && a.pl != nil {
 			if a.overlay.FocusPanel() == 0 {
 				if path := a.lib.SelectAlbum(a.overlay.AlbumCursor()); path != "" {
@@ -71,21 +77,30 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 				}
 			}
 		}
-		// Initialize settings rows on first Select after opening the page.
-		// Select() sets panelEntered=true, so this only runs once (when
-		// OpenSettingsPage() just reset panelEntered to false).
-		if a.overlay.IsSettingsPage() && !a.overlay.IsSettingsEditing() && !a.overlay.SelectEntered() {
-			rows := ui.BuildSettingsRows(*a.gs, winW, winH)
-			a.overlay.SetSettingsRows(rows, 0)
-		}
 	case input.ActionBack:
 		a.overlay.Back()
 
 	case input.ActionNextPreset:
-		a.loadPreset(a.presetIdx + 1)
+		// While the UI is open, L1/R1 page through Library/Settings/Presets
+		// instead of quick-switching presets (Presets page covers that now).
+		a.switchScreen(winW, winH, true)
 
 	case input.ActionPrevPreset:
-		a.loadPreset(a.presetIdx - 1)
+		a.switchScreen(winW, winH, false)
+	}
+}
+
+// switchScreen moves the overlay to the next/previous page and, when landing
+// on the settings page, (re)builds its rows from the current graphics config.
+func (a *App) switchScreen(winW, winH int, forward bool) {
+	if forward {
+		a.overlay.NextScreen()
+	} else {
+		a.overlay.PrevScreen()
+	}
+	if a.overlay.IsSettingsPage() {
+		rows := ui.BuildSettingsRows(*a.gs, winW, winH)
+		a.overlay.SetSettingsRows(rows, 0)
 	}
 }
 
@@ -155,6 +170,27 @@ func (a *App) loadPreset(idx int) {
 		a.overlay.SetPresetName(a.presetNames[a.presetIdx])
 	}
 	slog.Info("preset", "name", a.presetNames[a.presetIdx])
+}
+
+// loadPresetByKey loads a preset by its store key (e.g. "category/name.milk").
+func (a *App) loadPresetByKey(key string) {
+	d, err := presets.Read(key)
+	if err != nil {
+		slog.Error("preset load", "key", key, "error", err)
+		return
+	}
+	a.pm.LoadPresetData(string(d), true)
+	// Update index if found in flat list.
+	for i, n := range a.presetNames {
+		if n == key {
+			a.presetIdx = i
+			break
+		}
+	}
+	if a.overlay != nil {
+		a.overlay.SetPresetName(key)
+	}
+	slog.Info("preset", "name", key)
 }
 
 // randPreset picks a random non-transition preset, optionally transitions

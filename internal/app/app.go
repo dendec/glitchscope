@@ -45,6 +45,7 @@ type App struct {
 	settingsPath string
 	presetNames  []string
 	presetIdx    int
+	presetCats   []ui.PresetCat // categories for presets page
 
 	renderScale         float64
 	renderScaleExplicit bool
@@ -78,6 +79,10 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 		return nil, fmt.Errorf("window: %w", err)
 	}
 	a.window = win
+	// On Linux, input methods (ibus/fcitx) consume letter-key KEYDOWN
+	// events and only emit TEXTINPUT. Disable text input so all keypresses
+	// arrive as KEYDOWN — needed for n/p/m/q/r/b bindings.
+	sdl.StopTextInput()
 
 	glCtx, err := win.GLCreateContext()
 	if err != nil {
@@ -232,6 +237,17 @@ func (a *App) initPreset() {
 	}
 	a.pm.LoadPresetData(string(d), false)
 	slog.Info("preset loaded", "name", a.presetNames[a.presetIdx], "count", len(a.presetNames))
+
+	// Build categories for presets page. Static for the process lifetime,
+	// so push once here rather than every frame.
+	cats := presets.Categories()
+	a.presetCats = make([]ui.PresetCat, len(cats))
+	for i, c := range cats {
+		a.presetCats[i] = ui.PresetCat{Name: c, Presets: presets.PresetsInCategory(c)}
+	}
+	if a.overlay != nil {
+		a.overlay.SetPresetCategories(a.presetCats)
+	}
 }
 
 func (a *App) playFirst() {

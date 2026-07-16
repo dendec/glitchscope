@@ -190,6 +190,48 @@ func Read(key string) ([]byte, error) {
 	return dst, nil
 }
 
+// Categories returns sorted category names derived from subdirectory structure.
+// Root-level presets belong to "Default".
+func Categories() []string {
+	if store == nil {
+		return nil
+	}
+	cats := make(map[string]bool)
+	for _, name := range store.names {
+		if strings.Contains(name, "/") {
+			cats[strings.SplitN(name, "/", 2)[0]] = true
+		} else {
+			cats["Default"] = true
+		}
+	}
+	out := make([]string, 0, len(cats))
+	for c := range cats {
+		out = append(out, c)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// PresetsInCategory returns sorted preset keys belonging to cat.
+func PresetsInCategory(cat string) []string {
+	if store == nil {
+		return nil
+	}
+	var out []string
+	for _, name := range store.names {
+		if cat == "Default" {
+			if !strings.Contains(name, "/") {
+				out = append(out, name)
+			}
+		} else {
+			if strings.HasPrefix(name, cat+"/") {
+				out = append(out, name)
+			}
+		}
+	}
+	return out
+}
+
 // DefaultPreset returns a minimal built-in preset (fallback).
 func DefaultPreset() []byte {
 	return []byte(`[preset00]
