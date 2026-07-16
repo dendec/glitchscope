@@ -266,6 +266,8 @@ type Overlay struct {
 	presetCursor         int
 	presetsColL          listTex // left column: category names
 	presetsColR          listTex // right column: presets in the focused category
+	presetsScrollL       int     // first visible row in the left column
+	presetsScrollR       int     // first visible row in the right column
 
 	// Cached UI textures.
 	albumsTex                      uint32
@@ -1435,9 +1437,24 @@ func (o *Overlay) renderPresetsPanels(w, h int, thirdW, panelY, panelH, lh int) 
 		prefixPx = font.MeasureString(o.face, "▸ ").Ceil()
 	}
 
+	// Only render as many rows as fit in the panel: with hundreds/thousands
+	// of presets, rendering every line into one texture can exceed the
+	// GPU's max texture size, silently failing and leaving the panel a
+	// solid black square. Scroll the window instead of rendering it all.
+	maxRows := panelH / lh
+	if maxRows < 1 {
+		maxRows = 1
+	}
+
 	// Left panel — category names.
+	o.presetsScrollL = scrollOffset(o.presetsScrollL, o.presetCategoryCursor, len(o.presetCategories), maxRows)
 	var leftLines []string
-	for i, cat := range o.presetCategories {
+	leftEnd := o.presetsScrollL + maxRows
+	if leftEnd > len(o.presetCategories) {
+		leftEnd = len(o.presetCategories)
+	}
+	for i := o.presetsScrollL; i < leftEnd; i++ {
+		cat := o.presetCategories[i]
 		prefix := "  "
 		if i == o.presetCategoryCursor && o.panelEntered {
 			prefix = "▸ "
@@ -1449,7 +1466,13 @@ func (o *Overlay) renderPresetsPanels(w, h int, thirdW, panelY, panelH, lh int) 
 	// Right panel — presets in current category.
 	var rightLines []string
 	if cat := o.currentCategory(); cat != nil {
-		for i, p := range cat.Presets {
+		o.presetsScrollR = scrollOffset(o.presetsScrollR, o.presetCursor, len(cat.Presets), maxRows)
+		rightEnd := o.presetsScrollR + maxRows
+		if rightEnd > len(cat.Presets) {
+			rightEnd = len(cat.Presets)
+		}
+		for i := o.presetsScrollR; i < rightEnd; i++ {
+			p := cat.Presets[i]
 			mark := "  "
 			if i == o.presetCursor && o.panelEntered && o.focusPanel == 1 {
 				mark = "▸ "
@@ -1457,10 +1480,34 @@ func (o *Overlay) renderPresetsPanels(w, h int, thirdW, panelY, panelH, lh int) 
 			name := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
 			rightLines = append(rightLines, mark+o.truncateMiddle(name, maxTextPx-prefixPx))
 		}
+	} else {
+		o.presetsScrollR = 0
 	}
 	o.rebuildListTex(&o.presetsColR, rightLines)
 
 	o.drawPresetsTextures(w, h, thirdW, panelY, panelH, lh)
+}
+
+// scrollOffset returns the first visible row index for a list of totalRows
+// items shown maxRows at a time, keeping cursor within the visible window
+// while clamping to the list bounds.
+func scrollOffset(current, cursor, totalRows, maxRows int) int {
+	if totalRows <= maxRows {
+		return 0
+	}
+	if cursor < current {
+		current = cursor
+	}
+	if cursor >= current+maxRows {
+		current = cursor - maxRows + 1
+	}
+	if current > totalRows-maxRows {
+		current = totalRows - maxRows
+	}
+	if current < 0 {
+		current = 0
+	}
+	return current
 }
 
 func (o *Overlay) drawPresetsTextures(w, h int, thirdW, panelY, panelH, lh int) {
@@ -1471,12 +1518,12 @@ func (o *Overlay) drawPresetsTextures(w, h int, thirdW, panelY, panelH, lh int) 
 
 	leftHighlight := o.panelEntered && o.focusPanel == 0 && len(o.presetCategories) > 0
 	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelEntered && o.focusPanel == 0,
-		o.presetCategoryCursor, leftHighlight, lh, winW, winH)
+		o.presetCategoryCursor-o.presetsScrollL, leftHighlight, lh, winW, winH)
 
 	rightHighlight := false
 	if cat := o.currentCategory(); o.panelEntered && o.focusPanel == 1 && cat != nil && len(cat.Presets) > 0 {
 		rightHighlight = true
 	}
 	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, o.panelEntered && o.focusPanel == 1,
-		o.presetCursor, rightHighlight, lh, winW, winH)
+		o.presetCursor-o.presetsScrollR, rightHighlight, lh, winW, winH)
 }
