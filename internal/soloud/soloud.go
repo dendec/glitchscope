@@ -6,6 +6,7 @@ package soloud
 #cgo CXXFLAGS: -std=c++11 -DWITH_SDL2_STATIC -I ../../lib/soloud/include
 #include <stdlib.h>
 #include "soloud_c.h"
+unsigned int Wav_getChannels(Wav * aClassPtr);
 */
 import "C"
 import (
@@ -166,6 +167,11 @@ func (w *Wav) GetLength() float64 {
 	return float64(C.Wav_getLength(w.p))
 }
 
+// GetChannels returns the number of decoded audio channels.
+func (w *Wav) GetChannels() int {
+	return int(C.Wav_getChannels(w.p))
+}
+
 // GetSamplerate returns the sample rate of a voice.
 func (s *Soloud) GetSamplerate(voice uint) float32 {
 	return float32(C.Soloud_getSamplerate(s.p, C.uint(voice)))
@@ -180,5 +186,3 @@ func (s *Soloud) GetInfo(voice uint, infoKey uint) float32 {
 func (s *Soloud) StopAll() {
 	C.Soloud_stopAll(s.p)
 }
-
-

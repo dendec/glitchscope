@@ -70,6 +70,12 @@ func (in *Input) ProcessEvent(event sdl.Event) Action {
 		if e.Type != sdl.KEYDOWN {
 			return ActionNone
 		}
+		if e.Repeat != 0 {
+			// Ignore OS key-repeat events: held-key acceleration (fast
+			// scrolling) is driven by polling GetKeyboardState in
+			// Overlay.Update, not by repeated KEYDOWN events.
+			return ActionNone
+		}
 		return keyToAction(e.Keysym.Sym)
 
 	case *sdl.ControllerButtonEvent:
@@ -96,6 +102,25 @@ func (in *Input) ProcessEvent(event sdl.Event) Action {
 	}
 
 	return ActionNone
+}
+
+// DPadUpHeld reports whether the controller's D-Pad up button is currently
+// held down. Used to drive scroll acceleration (SDL controller button events
+// don't auto-repeat like keyboard events do).
+func (in *Input) DPadUpHeld() bool {
+	if in.controller == nil {
+		return false
+	}
+	return in.controller.Button(sdl.CONTROLLER_BUTTON_DPAD_UP) != 0
+}
+
+// DPadDownHeld reports whether the controller's D-Pad down button is
+// currently held down.
+func (in *Input) DPadDownHeld() bool {
+	if in.controller == nil {
+		return false
+	}
+	return in.controller.Button(sdl.CONTROLLER_BUTTON_DPAD_DOWN) != 0
 }
 
 // tryOpenController attempts to open the first available game controller.

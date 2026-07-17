@@ -14,14 +14,16 @@ import (
 
 // Player manages audio playback.
 type Player struct {
-	s              *soloud.Soloud
-	voice          uint
-	currentWav     *soloud.Wav     // non-nil when playing WAV/MP3/FLAC etc.
-	currentMod     *soloud.Openmpt // non-nil when playing tracker module
-	currentPath    string
-	currentBPM     float64
+	s               *soloud.Soloud
+	voice           uint
+	currentWav      *soloud.Wav     // non-nil when playing WAV/MP3/FLAC etc.
+	currentMod      *soloud.Openmpt // non-nil when playing tracker module
+	currentPath     string
+	currentBPM      float64
 	currentDuration float64
-	channels       int
+	currentBitrate  float64
+	channels        int
+	isTracker       bool
 }
 
 // New creates and initializes a Player.
@@ -54,7 +56,9 @@ func (p *Player) PlayFile(path string) error {
 	p.currentPath = path
 	p.currentDuration = w.GetLength()
 	p.currentBPM = 0
-	p.channels = 0
+	p.currentBitrate = fileBitrate(path, p.currentDuration)
+	p.channels = w.GetChannels()
+	p.isTracker = false
 	slog.Info("playing", "path", path)
 	return nil
 }
@@ -77,7 +81,9 @@ func (p *Player) playTracker(path string) error {
 		slog.Warn("tracker meta", "path", path, "err", err)
 	}
 	p.currentBPM = bpm
+	p.currentBitrate = 0
 	p.channels = ch
+	p.isTracker = true
 	p.currentDuration = dur
 	slog.Info("tracker", "path", path, "bpm", bpm, "channels", ch, "duration", dur)
 	return nil
@@ -198,9 +204,14 @@ func (p *Player) SampleRate() float32 {
 	return p.s.GetSamplerate(p.voice)
 }
 
-// Channels returns the number of tracker channels (0 for non-tracker).
+// Channels returns the source channel count or tracker channel count.
 func (p *Player) Channels() int {
 	return p.channels
+}
+
+// IsTracker reports whether the current source is a tracker module.
+func (p *Player) IsTracker() bool {
+	return p.isTracker
 }
 
 // BPM returns the current track's BPM (0 for non-tracker).
@@ -219,4 +230,20 @@ func (p *Player) IsPaused() bool {
 // TrackPath returns the path of the currently playing track.
 func (p *Player) TrackPath() string {
 	return p.currentPath
+}
+
+// Bitrate returns the approximate encoded bitrate in kilobits per second.
+func (p *Player) Bitrate() float64 {
+	return p.currentBitrate
+}
+
+func fileBitrate(path string, duration float64) float64 {
+	if duration <= 0 {
+		return 0
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return float64(info.Size()) * 8 / duration / 1000
 }

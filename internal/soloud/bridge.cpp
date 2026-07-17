@@ -79,4 +79,8 @@ double Wav_getLength(void * aClassPtr) {
 	return ((Wav *)aClassPtr)->getLength();
 }
 
+unsigned int Wav_getChannels(void * aClassPtr) {
+	return ((Wav *)aClassPtr)->mChannels;
+}
+
 } // extern "C"

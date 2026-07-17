@@ -1,6 +1,7 @@
 APP      := mdpp
 FONT_SUBSET := internal/ui/assets/unifont.otf
 FONT_RANGES := internal/ui/font_ranges.json
+FONT_REQUIRED := U+2014,U+2026,U+2192,U+23F8,U+25B6,U+25B8,U+25C0
 FONT_URL := https://unifoundry.com/pub/unifont/unifont-17.0.05/font-builds/unifont-17.0.05.otf
 GO       := go
 GOFLAGS  := CGO_ENABLED=1
@@ -54,12 +55,14 @@ $(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt $(PROJECTM_PATCH)
 		-DCMAKE_BUILD_TYPE=Release \
 		-DENABLE_INSTALL=OFF
 
-$(FONT_SUBSET):
+$(FONT_SUBSET): $(FONT_RANGES)
 	wget -q -O /tmp/unifont-full.otf $(FONT_URL)
 	pyftsubset /tmp/unifont-full.otf \
 		--unicodes=$$(python3 -c "import json; print(','.join(json.load(open('$(FONT_RANGES)'))))") \
+		--no-prune-unicode-ranges \
 		--no-subset-tables+=OS/2 \
 		--output-file=$(FONT_SUBSET) 2>&1
+	python3 -c "from fontTools.ttLib import TTFont; f=TTFont('$(FONT_SUBSET)'); c={cp for t in f['cmap'].tables for cp in t.cmap}; r='$(FONT_REQUIRED)'.split(','); m=[x for x in r if int(x[2:],16) not in c]; assert not m, 'missing UI glyphs: '+','.join(m)"
 	rm -f /tmp/unifont-full.otf
 
 # Docker build (CI/packaging).  Depends on mdp so the preset archive is ready.

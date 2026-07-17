@@ -42,8 +42,8 @@ type App struct {
 	inp     *input.Input
 	lib     *player.Library
 
-	prof        *prof.Collector
-	gs          *config.GraphicsSettings
+	prof         *prof.Collector
+	gs           *config.GraphicsSettings
 	settingsPath string
 	presetNames  []string
 	presetIdx    int
@@ -242,6 +242,9 @@ func (a *App) initPreset() {
 		return
 	}
 	a.pm.LoadPresetData(string(d), false)
+	if a.overlay != nil {
+		a.overlay.SetPresetName(a.presetNames[a.presetIdx])
+	}
 	slog.Info("preset loaded", "name", a.presetNames[a.presetIdx], "count", len(a.presetNames))
 
 	// Build categories for presets page. Static for the process lifetime,
@@ -367,7 +370,7 @@ func (a *App) Run() {
 			}
 			a.overlay.SetStats(line)
 			if a.pl != nil {
-				a.overlay.SetPlayback(a.pl.Position(), a.pl.Duration(), a.pl.SampleRate(), a.pl.Channels(), a.pl.BPM(), a.pl.IsPaused())
+				a.overlay.SetPlayback(a.pl.Position(), a.pl.Duration(), a.pl.SampleRate(), a.pl.Bitrate(), a.pl.BPM(), a.pl.Channels(), a.pl.IsPaused(), a.pl.IsTracker())
 			}
 			if a.lib != nil {
 				albumNames := make([]string, a.lib.AlbumCount())
@@ -391,6 +394,9 @@ func (a *App) Run() {
 
 				if a.pl != nil {
 					curTrack := a.pl.TrackPath()
+					if !a.pl.IsValidVoice() {
+						curTrack = ""
+					}
 					curAlbum := a.lib.CurrentAlbum().Name
 					a.overlay.SetPlaying(curAlbum, curTrack)
 				}
@@ -450,7 +456,7 @@ func (a *App) Run() {
 
 		if a.overlay != nil {
 			rw, rh := a.rt.Size()
-			a.overlay.Update()
+			a.overlay.Update(a.inp.DPadUpHeld(), a.inp.DPadDownHeld())
 			a.overlay.Draw(w, h)
 			a.pm.BindFeedbackFramebuffer()
 			a.overlay.Inject(rw, rh)

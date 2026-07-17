@@ -161,6 +161,7 @@ import (
 	"image"
 	"image/color"
 	"log/slog"
+	"math"
 	"path/filepath"
 	"strings"
 	"time"
@@ -168,6 +169,7 @@ import (
 
 	"github.com/dendec/mdpp/internal/config"
 	"github.com/dendec/mdpp/internal/player"
+	"github.com/veandco/go-sdl2/sdl"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
@@ -215,6 +217,15 @@ type PresetCat struct {
 	Presets []string
 }
 
+// scrollHold tracks key-hold timing for scroll acceleration.
+type scrollHold struct {
+	holdStart  time.Time
+	lastStep   time.Time
+	active     bool
+	uiPage     UIPage
+	focusPanel int
+}
+
 // Overlay manages UI and notification rendering.
 type Overlay struct {
 	programText uint32
@@ -242,9 +253,11 @@ type Overlay struct {
 	position     float64
 	duration     float64
 	sampleRate   float32
-	channels     int
+	bitrate      float64
 	bpm          float64
+	channels     int
 	paused       bool
+	isTracker    bool
 	presetName   string
 	playingAlbum string
 	playingTrack string
@@ -268,6 +281,14 @@ type Overlay struct {
 	presetsColR          listTex // right column: presets in the focused category
 	presetsScrollL       int     // first visible row in the left column
 	presetsScrollR       int     // first visible row in the right column
+
+	// Scroll acceleration state.
+	scrollUp   scrollHold
+	scrollDown scrollHold
+
+	// Scroll offsets for library panels.
+	albumsScroll int
+	tracksScroll int
 
 	// Cached UI textures.
 	albumsTex                      uint32
@@ -316,9 +337,55 @@ func (o *Overlay) Draw(width, height int) {
 	}
 }
 
-// Update advances animations. Call every frame.
-func (o *Overlay) Update() {
+// Update advances animations and handles scroll acceleration. Call every frame.
+// gamepadUp/gamepadDown report whether the controller D-Pad up/down button is
+// currently held (SDL controller button events don't auto-repeat, unlike
+// keyboard events, so this must be polled explicitly).
+func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	o.notif.Update(o.uiVisible)
+
+	if !o.uiVisible || !o.panelEntered {
+		return
+	}
+
+	state := sdl.GetKeyboardState()
+	now := time.Now()
+
+	o.updateScrollHold(&o.scrollUp, state[sdl.SCANCODE_UP] != 0 || gamepadUp, now, o.cursorUp1)
+	o.updateScrollHold(&o.scrollDown, state[sdl.SCANCODE_DOWN] != 0 || gamepadDown, now, o.cursorDown1)
+}
+
+// updateScrollHold drives held-key scroll acceleration for a single direction:
+// after held is true for 0.2s, step repeatedly at a rate that doubles every
+// second (starting at 5 steps/sec), invoking step for each advance.
+func (o *Overlay) updateScrollHold(h *scrollHold, held bool, now time.Time, step func()) {
+	if !held {
+		h.active = false
+		return
+	}
+	if !h.active || h.uiPage != o.uiPage || h.focusPanel != o.focusPanel {
+		// New hold — start tracking (initial move already done by CursorUp/Down).
+		*h = scrollHold{holdStart: now, lastStep: now, active: true, uiPage: o.uiPage, focusPanel: o.focusPanel}
+		return
+	}
+	elapsed := now.Sub(h.holdStart).Seconds()
+	if elapsed < 0.2 {
+		return
+	}
+	rate := 5.0 * math.Pow(2, math.Floor(elapsed))
+	stepInterval := 1.0 / rate
+	sinceLast := now.Sub(h.lastStep).Seconds()
+	if sinceLast < stepInterval {
+		return
+	}
+	steps := int(sinceLast / stepInterval)
+	if steps < 1 {
+		steps = 1
+	}
+	for i := 0; i < steps; i++ {
+		step()
+	}
+	h.lastStep = now
 }
 
 // --- Notification (delegates to Notifier) ---
@@ -362,6 +429,7 @@ func (o *Overlay) NextScreen() {
 		o.uiPage = PageSettings
 	case PageSettings:
 		o.uiPage = PagePresets
+		o.syncPresetCursors()
 	case PagePresets:
 		o.uiPage = PageLibrary
 	}
@@ -376,6 +444,7 @@ func (o *Overlay) PrevScreen() {
 	switch o.uiPage {
 	case PageLibrary:
 		o.uiPage = PagePresets
+		o.syncPresetCursors()
 	case PagePresets:
 		o.uiPage = PageSettings
 	case PageSettings:
@@ -508,11 +577,16 @@ func (o *Overlay) rebuildFace() {
 	}
 }
 
-// CursorUp moves the cursor up in the active panel. Only works when inside a panel.
+// CursorUp moves the cursor up by one item. Acceleration is driven by Update().
 func (o *Overlay) CursorUp() {
 	if !o.panelEntered {
 		return
 	}
+	o.cursorUp1()
+}
+
+// cursorUp1 moves the cursor up by one item.
+func (o *Overlay) cursorUp1() {
 	if o.uiPage == PageSettings {
 		if o.settingsEditing {
 			if o.settingsValueCursor > 0 {
@@ -559,11 +633,16 @@ func (o *Overlay) CursorUp() {
 	}
 }
 
-// CursorDown moves the cursor down in the active panel. Only works when inside a panel.
+// CursorDown moves the cursor down by one item. Acceleration is driven by Update().
 func (o *Overlay) CursorDown() {
 	if !o.panelEntered {
 		return
 	}
+	o.cursorDown1()
+}
+
+// cursorDown1 moves the cursor down by one item.
+func (o *Overlay) cursorDown1() {
 	if o.uiPage == PageSettings {
 		if o.settingsEditing {
 			vals := o.settingsRows[o.settingsCursor].Values
@@ -625,15 +704,11 @@ func (o *Overlay) FocusLeft() {
 			o.presetsDirty = true
 		}
 	default: // Library
-		if o.panelEntered {
-			return
+		if o.focusPanel > 0 {
+			o.focusPanel--
+			o.albumsDirty = true
+			o.tracksDirty = true
 		}
-		o.focusPanel--
-		if o.focusPanel < 0 {
-			o.focusPanel = 1
-		}
-		o.albumsDirty = true
-		o.tracksDirty = true
 	}
 }
 
@@ -654,12 +729,11 @@ func (o *Overlay) FocusRight() {
 			o.presetsDirty = true
 		}
 	default: // Library
-		if o.panelEntered {
-			return
+		if o.focusPanel < 1 {
+			o.focusPanel++
+			o.albumsDirty = true
+			o.tracksDirty = true
 		}
-		o.focusPanel = (o.focusPanel + 1) % 2
-		o.albumsDirty = true
-		o.tracksDirty = true
 	}
 }
 
@@ -710,7 +784,13 @@ func (o *Overlay) Select() bool {
 		o.tracksDirty = true
 		return false
 	}
-	return o.focusPanel <= 1 // albums or tracks — items exist
+	// Album panel selected — switch to tracks panel, let user pick a track.
+	if o.focusPanel == 0 {
+		o.focusPanel = 1
+		o.tracksDirty = true
+		return false
+	}
+	return true // track panel — play the track
 }
 
 // Back exits item mode or closes UI.
@@ -802,16 +882,19 @@ func (o *Overlay) SetTrackInfos(infos []player.TrackInfo, cursor int) {
 }
 
 // SetPlayback updates playback state.
-func (o *Overlay) SetPlayback(pos, dur float64, sr float32, ch int, bpm float64, paused bool) {
-	if o.position != pos || o.duration != dur || o.paused != paused {
+func (o *Overlay) SetPlayback(pos, dur float64, sr float32, bitrate, bpm float64, ch int, paused, isTracker bool) {
+	if o.position != pos || o.duration != dur || o.paused != paused ||
+		o.sampleRate != sr || o.bitrate != bitrate || o.bpm != bpm || o.channels != ch || o.isTracker != isTracker {
 		o.bottomDirty = true
 	}
 	o.position = pos
 	o.duration = dur
 	o.sampleRate = sr
-	o.channels = ch
+	o.bitrate = bitrate
 	o.bpm = bpm
+	o.channels = ch
 	o.paused = paused
+	o.isTracker = isTracker
 }
 
 // SetPlaying identifies the currently playing album and track.
@@ -821,6 +904,7 @@ func (o *Overlay) SetPlaying(album, track string) {
 		o.playingTrack = track
 		o.albumsDirty = true
 		o.tracksDirty = true
+		o.bottomDirty = true
 	}
 }
 
@@ -853,6 +937,25 @@ func (o *Overlay) FocusPanel() int { return o.focusPanel }
 
 // SettingsRows returns the current settings rows.
 func (o *Overlay) SettingsRows() []SettingRow { return o.settingsRows }
+
+// syncPresetCursors positions category/preset cursors on the currently
+// playing preset so the Presets page opens at the right place.
+func (o *Overlay) syncPresetCursors() {
+	key := o.presetName
+	if key == "" {
+		return
+	}
+	for ci, cat := range o.presetCategories {
+		for pi, p := range cat.Presets {
+			if p == key {
+				o.presetCategoryCursor = ci
+				o.presetCursor = pi
+				o.presetsDirty = true
+				return
+			}
+		}
+	}
+}
 
 // currentCategory returns the currently focused preset category, or nil.
 func (o *Overlay) currentCategory() *PresetCat {
@@ -893,7 +996,7 @@ func (o *Overlay) renderUI(w, h int) {
 	o.renderPageIndicator(w, h)
 
 	// Layout constants — proportional to font size.
-	bottomH := int(o.fontSize * 3.2)
+	bottomH := int(o.fontSize * 1.35)
 	indicatorH := int(o.fontSize * 1.5)
 	panelY := int(o.fontSize*2) + indicatorH
 	panelH := h - panelY - bottomH - int(o.fontSize*0.7)
@@ -913,11 +1016,11 @@ func (o *Overlay) renderUI(w, h int) {
 		o.renderLibraryPanels(w, h, thirdW, panelY, panelH, lh)
 	}
 
-	// --- Bottom bar (full width) ---
-	if o.bottomDirty {
+	// --- Compact playback status (full width) ---
+	if o.playingTrack != "" && o.bottomDirty {
 		o.rebuildBottomTex(w, bottomH)
 	}
-	if o.bottomTex != 0 {
+	if o.playingTrack != "" && o.bottomTex != 0 {
 		by := C.float(h - bottomH)
 		C.drawFilledRect(C.uint(o.programRect), 0, by, C.float(w), C.float(bottomH),
 			0, 0, 0, 0.5, C.int(w), C.int(h))
@@ -942,9 +1045,14 @@ func (o *Overlay) renderLibraryPanels(w, h int, thirdW, panelY, panelH, lh int) 
 		C.drawOverlayText(C.uint(o.programText), C.uint(o.albumsTex), 1,
 			px, py, C.float(o.albumsTexW), C.float(o.albumsTexH), C.int(w), C.int(h))
 		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
-			hiY := py + C.float(o.albumCursor*lh+2)
+			hiY := py + C.float((o.albumCursor-o.albumsScroll)*lh+2)
 			drawAccentHighlight(o, px+2, hiY, C.float(thirdW-4), C.float(lh), C.int(w), C.int(h))
 		}
+		am := panelH / lh
+		if am < 1 {
+			am = 1
+		}
+		drawScrollbar(o, px+C.float(thirdW-4), py, C.float(panelH), len(o.albums), am, o.albumsScroll, C.int(w), C.int(h))
 	}
 
 	// --- Tracks panel ---
@@ -961,9 +1069,14 @@ func (o *Overlay) renderLibraryPanels(w, h int, thirdW, panelY, panelH, lh int) 
 		C.drawOverlayText(C.uint(o.programText), C.uint(o.tracksTex), 1,
 			tx, ty, C.float(o.tracksTexW), C.float(o.tracksTexH), C.int(w), C.int(h))
 		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
-			hiY := ty + C.float(o.trackCursor*lh+2)
+			hiY := ty + C.float((o.trackCursor-o.tracksScroll)*lh+2)
 			drawAccentHighlight(o, tx+2, hiY, C.float(thirdW-4), C.float(lh), C.int(w), C.int(h))
 		}
+		tm := panelH / lh
+		if tm < 1 {
+			tm = 1
+		}
+		drawScrollbar(o, tx+C.float(thirdW-4), ty, C.float(panelH), len(o.trackInfos), tm, o.tracksScroll, C.int(w), C.int(h))
 	}
 }
 
@@ -976,9 +1089,21 @@ func (o *Overlay) renderSettingsPanels(w, h int, thirdW, panelY, panelH, lh int)
 	}
 	o.settingsDirty = false
 
-	// Rebuild left column texture (setting names).
+	maxRows := panelH / lh
+	if maxRows < 1 {
+		maxRows = 1
+	}
+
+	// Rebuild left column texture (setting names) with scroll window.
+	leftTotal := len(o.settingsRows)
+	o.albumsScroll = scrollOffset(o.albumsScroll, o.settingsCursor, leftTotal, maxRows)
 	var leftLines []string
-	for i, row := range o.settingsRows {
+	leftEnd := o.albumsScroll + maxRows
+	if leftEnd > leftTotal {
+		leftEnd = leftTotal
+	}
+	for i := o.albumsScroll; i < leftEnd; i++ {
+		row := o.settingsRows[i]
 		prefix := "  "
 		if i == o.settingsCursor && o.panelEntered {
 			prefix = "▸ "
@@ -987,22 +1112,27 @@ func (o *Overlay) renderSettingsPanels(w, h int, thirdW, panelY, panelH, lh int)
 	}
 	o.rebuildListTex(&o.settingsColL, leftLines)
 
-	// Rebuild right column texture (values for the focused setting).
+	// Rebuild right column texture (values for the focused setting) with scroll window.
 	var rightLines []string
+	rightTotal := 0
 	if o.settingsCursor < len(o.settingsRows) {
 		row := o.settingsRows[o.settingsCursor]
-		for i, v := range row.Values {
+		rightTotal = len(row.Values)
+		selIdx := row.Index
+		if o.settingsEditing {
+			selIdx = o.settingsValueCursor
+		}
+		o.tracksScroll = scrollOffset(o.tracksScroll, selIdx, rightTotal, maxRows)
+		rightEnd := o.tracksScroll + maxRows
+		if rightEnd > rightTotal {
+			rightEnd = rightTotal
+		}
+		for i := o.tracksScroll; i < rightEnd; i++ {
 			mark := "  "
-			selIdx := row.Index
-			if o.settingsEditing {
-				selIdx = o.settingsValueCursor
-			}
 			if i == selIdx {
-				// ponytail: using a Unicode right-pointing triangle as the
-				// selection marker; same approach as albums/tracks panels.
 				mark = "▸ "
 			}
-			rightLines = append(rightLines, mark+v)
+			rightLines = append(rightLines, mark+row.Values[i])
 		}
 	}
 	o.rebuildListTex(&o.settingsColR, rightLines)
@@ -1016,21 +1146,30 @@ func (o *Overlay) drawSettingsTextures(w, h int, thirdW, panelY, panelH, lh int)
 	colW, colH := C.float(thirdW), C.float(panelH)
 	winW, winH := C.int(w), C.int(h)
 
+	maxRows := panelH / lh
+	if maxRows < 1 {
+		maxRows = 1
+	}
+
 	leftHighlight := o.panelEntered && len(o.settingsRows) > 0 && !o.settingsEditing
 	drawListColumn(o, lx, ly, colW, colH, o.settingsColL, o.panelEntered && !o.settingsEditing,
-		o.settingsCursor, leftHighlight, lh, winW, winH)
+		o.settingsCursor-o.albumsScroll, leftHighlight, lh, winW, winH)
+	drawScrollbar(o, lx+colW-3, ly, colH, len(o.settingsRows), maxRows, o.albumsScroll, winW, winH)
 
 	rightHighlight := false
 	rightRow := 0
+	rightTotal := 0
 	if o.panelEntered && o.settingsEditing && len(o.settingsRows) > 0 {
 		row := o.settingsRows[o.settingsCursor]
+		rightTotal = len(row.Values)
 		if o.settingsValueCursor < len(row.Values) {
 			rightHighlight = true
-			rightRow = o.settingsValueCursor
+			rightRow = o.settingsValueCursor - o.tracksScroll
 		}
 	}
 	drawListColumn(o, rx, ry, colW, colH, o.settingsColR, o.panelEntered && o.settingsEditing,
 		rightRow, rightHighlight, lh, winW, winH)
+	drawScrollbar(o, rx+colW-3, ry, colH, rightTotal, maxRows, o.tracksScroll, winW, winH)
 }
 
 // --- Panel drawing helpers ---
@@ -1054,6 +1193,26 @@ func drawPanelBorder(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
 func drawAccentHighlight(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
 	C.drawFilledRect(C.uint(o.programRect), x, y, w, h,
 		accentR, accentG, accentB, accentA, winW, winH)
+}
+
+func drawScrollbar(o *Overlay, sbX, panelY, panelH C.float, totalItems, visibleItems, scrollPos int, winW, winH C.int) {
+	if totalItems <= visibleItems {
+		return
+	}
+	thumbW := C.float(3)
+	// Track.
+	C.drawFilledRect(C.uint(o.programRect), sbX, panelY, thumbW, panelH, 1, 1, 1, 0.1, winW, winH)
+	// Thumb.
+	thumbH := panelH * C.float(visibleItems) / C.float(totalItems)
+	if thumbH < 8 {
+		thumbH = 8
+	}
+	maxScroll := totalItems - visibleItems
+	if maxScroll < 1 {
+		maxScroll = 1
+	}
+	thumbY := panelY + (panelH-thumbH)*C.float(scrollPos)/C.float(maxScroll)
+	C.drawFilledRect(C.uint(o.programRect), sbX, thumbY, thumbW, thumbH, 1, 1, 1, 0.35, winW, winH)
 }
 
 // listTex caches a rendered text texture for one column of a two-column list
@@ -1129,8 +1288,21 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 		return
 	}
 
+	lh := o.face.Metrics().Height.Ceil()
+	maxRows := maxH / lh
+	if maxRows < 1 {
+		maxRows = 1
+	}
+	o.albumsScroll = scrollOffset(o.albumsScroll, o.albumCursor, len(o.albums), maxRows)
+
+	start := o.albumsScroll
+	end := start + maxRows
+	if end > len(o.albums) {
+		end = len(o.albums)
+	}
 	var lines []string
-	for i, name := range o.albums {
+	for i := start; i < end; i++ {
+		name := o.albums[i]
 		prefix := "  "
 		if i == o.albumCursor && o.focusPanel == 0 {
 			prefix = "▸ "
@@ -1153,8 +1325,21 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 		return
 	}
 
+	lh := o.face.Metrics().Height.Ceil()
+	maxRows := maxH / lh
+	if maxRows < 1 {
+		maxRows = 1
+	}
+	o.tracksScroll = scrollOffset(o.tracksScroll, o.trackCursor, len(o.trackInfos), maxRows)
+
+	start := o.tracksScroll
+	end := start + maxRows
+	if end > len(o.trackInfos) {
+		end = len(o.trackInfos)
+	}
 	var lines []string
-	for i, info := range o.trackInfos {
+	for i := start; i < end; i++ {
+		info := o.trackInfos[i]
 		prefix := "  "
 		if i == o.trackCursor && o.focusPanel == 1 {
 			prefix = "▸ "
@@ -1175,6 +1360,10 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	o.bottomDirty = false
 	o.deleteTex(&o.bottomTex)
 
+	if o.playingTrack == "" {
+		return
+	}
+
 	pos := formatDuration(o.position)
 	dur := formatDuration(o.duration)
 	status := "▶"
@@ -1182,21 +1371,38 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 		status = "⏸"
 	}
 
-	// Progress bar.
-	barW := w * 60 / 100
-	barStr := renderProgressBar(barW, o.duration, o.position)
-
-	// Tech info.
-	tech := fmt.Sprintf("%.0fHz", o.sampleRate)
-	if o.channels > 0 {
-		tech += fmt.Sprintf(", %dch", o.channels)
+	title := player.TrackTitle(o.playingTrack)
+	maxTitleW := w - int(o.fontSize*14)
+	title = o.truncateMiddle(title, maxTitleW)
+	info := ""
+	if !o.isTracker && o.sampleRate > 0 {
+		info = fmt.Sprintf("%.0fkHz", o.sampleRate/1000)
 	}
-	if o.bpm > 0 {
-		tech += fmt.Sprintf(", %.0f BPM", o.bpm)
+	if !o.isTracker && o.bitrate > 0 {
+		info += fmt.Sprintf(" %.0fkbps", o.bitrate)
+	}
+	if o.isTracker {
+		if o.bpm > 0 {
+			info += fmt.Sprintf(" %.0f BPM", o.bpm)
+		}
+		if o.channels > 0 {
+			info += fmt.Sprintf(" %dch", o.channels)
+		}
+	} else if o.channels > 0 {
+		switch o.channels {
+		case 1:
+			info += " mono"
+		case 2:
+			info += " stereo"
+		default:
+			info += fmt.Sprintf(" %dch", o.channels)
+		}
 	}
 
-	text := fmt.Sprintf("%s  %s / %s\n%s Play    ⏭ Next    ⏮ Prev\n%s",
-		barStr, pos, dur, status, tech)
+	text := fmt.Sprintf("%s %s  %s/%s", status, title, pos, dur)
+	if info != "" {
+		text += "  " + info
+	}
 	o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(text, 255, 255, 255, 255)
 }
 
@@ -1324,21 +1530,6 @@ func formatDuration(sec float64) string {
 	m := int(sec) / 60
 	s := int(sec) % 60
 	return fmt.Sprintf("%d:%02d", m, s)
-}
-
-func renderProgressBar(pixelWidth int, total, current float64) string {
-	if total <= 0 {
-		return ""
-	}
-	filled := int(float64(pixelWidth-2) * current / total)
-	if filled < 0 {
-		filled = 0
-	}
-	if filled > pixelWidth-2 {
-		filled = pixelWidth - 2
-	}
-	empty := pixelWidth - 2 - filled
-	return "█" + strings.Repeat("█", filled) + strings.Repeat("░", empty) + "█"
 }
 
 // Close releases GL resources.
@@ -1519,14 +1710,23 @@ func (o *Overlay) drawPresetsTextures(w, h int, thirdW, panelY, panelH, lh int) 
 	colW, colH := C.float(thirdW), C.float(panelH)
 	winW, winH := C.int(w), C.int(h)
 
+	maxRows := panelH / lh
+	if maxRows < 1 {
+		maxRows = 1
+	}
+
 	leftHighlight := o.panelEntered && o.focusPanel == 0 && len(o.presetCategories) > 0
 	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelEntered && o.focusPanel == 0,
 		o.presetCategoryCursor-o.presetsScrollL, leftHighlight, lh, winW, winH)
+	drawScrollbar(o, lx+colW-3, ly, colH, len(o.presetCategories), maxRows, o.presetsScrollL, winW, winH)
 
 	rightHighlight := false
+	rightTotal := 0
 	if cat := o.currentCategory(); o.panelEntered && o.focusPanel == 1 && cat != nil && len(cat.Presets) > 0 {
 		rightHighlight = true
+		rightTotal = len(cat.Presets)
 	}
 	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, o.panelEntered && o.focusPanel == 1,
 		o.presetCursor-o.presetsScrollR, rightHighlight, lh, winW, winH)
+	drawScrollbar(o, rx+colW-3, ry, colH, rightTotal, maxRows, o.presetsScrollR, winW, winH)
 }
