@@ -80,6 +80,23 @@ func (h *Handle) SetFPS(fps int32) {
 	C.projectm_set_fps(h.p, C.int32_t(fps))
 }
 
+// SetTextureSearchPaths tells projectM where to look for user textures (jpg/png).
+func (h *Handle) SetTextureSearchPaths(paths []string) {
+	if len(paths) == 0 {
+		return
+	}
+	cPaths := make([]*C.char, len(paths))
+	for i, p := range paths {
+		cPaths[i] = C.CString(p)
+	}
+	defer func() {
+		for _, cp := range cPaths {
+			C.free(unsafe.Pointer(cp))
+		}
+	}()
+	C.projectm_set_texture_search_paths(h.p, &cPaths[0], C.size_t(len(paths)))
+}
+
 // BindFeedbackFramebuffer binds the internal image consumed by the next frame.
 // OpenGL drawing performed after this call becomes part of projectM's feedback.
 func (h *Handle) BindFeedbackFramebuffer() {

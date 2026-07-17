@@ -6,9 +6,6 @@ package soloud
 #cgo CXXFLAGS: -std=c++11 -DWITH_SDL2_STATIC -I ../../lib/soloud/include
 #include <stdlib.h>
 #include "soloud_c.h"
-
-// Forward declaration for loadRawWave bridge.
-int Wav_loadRawF32(void * aWav, float * aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels);
 */
 import "C"
 import (
@@ -24,6 +21,11 @@ type Soloud struct {
 // Wav wraps a SoLoud Wav audio source (MP3/WAV/FLAC/Ogg).
 type Wav struct {
 	p *C.Wav
+}
+
+// Openmpt wraps a SoLoud Openmpt audio source for streaming tracker music.
+type Openmpt struct {
+	p *C.Openmpt
 }
 
 // New creates a SoLoud engine instance.
@@ -64,39 +66,27 @@ func LoadWav(path string) (*Wav, error) {
 	return &Wav{p: p}, nil
 }
 
-// NewWavFromF32 creates a Wav from raw interleaved float32 PCM data.
-func NewWavFromF32(data []float32, sampleRate float32, channels uint) (*Wav, error) {
+// NewOpenmpt creates an Openmpt source from tracker file data (.xm/.mod/.it/…).
+// Data is copied internally — caller may free the buffer after return.
+// aCopy=1 / aTakeOwnership=0: SoLoud copies the (small) file into its own buffer.
+// aTakeOwnership=1 would cause delete[] on Go-allocated memory → UB.
+func NewOpenmpt(data []byte) (*Openmpt, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("wav from f32: empty data")
+		return nil, fmt.Errorf("openmpt: empty data")
 	}
-	if channels == 0 || len(data)%int(channels) != 0 {
-		return nil, fmt.Errorf("wav from f32: invalid channel layout")
-	}
-	data = interleavedToPlanar(data, int(channels))
-	p := C.Wav_create()
-	r := int(C.Wav_loadRawF32(unsafe.Pointer(p),
-		(*C.float)(unsafe.Pointer(&data[0])),
+	p := C.Openmpt_create()
+	r := int(C.Openmpt_loadMemEx(
+		p,
+		(*C.uchar)(unsafe.Pointer(&data[0])),
 		C.uint(len(data)),
-		C.float(sampleRate),
-		C.uint(channels),
+		1, // aCopy = true
+		0, // aTakeOwnership = false
 	))
 	if r != 0 {
-		C.Wav_destroy(p)
-		return nil, fmt.Errorf("wav load raw: %d", r)
+		C.Openmpt_destroy(p)
+		return nil, fmt.Errorf("openmpt load: %d", r)
 	}
-	return &Wav{p: p}, nil
-}
-
-// interleavedToPlanar converts frames such as LRLR into SoLoud's LLRR layout.
-func interleavedToPlanar(data []float32, channels int) []float32 {
-	frames := len(data) / channels
-	planar := make([]float32, len(data))
-	for frame := 0; frame < frames; frame++ {
-		for channel := 0; channel < channels; channel++ {
-			planar[channel*frames+frame] = data[frame*channels+channel]
-		}
-	}
-	return planar
+	return &Openmpt{p: p}, nil
 }
 
 // Destroy frees the Wav resource.
@@ -107,9 +97,22 @@ func (w *Wav) Destroy() {
 	}
 }
 
+// Destroy frees the Openmpt resource.
+func (o *Openmpt) Destroy() {
+	if o.p != nil {
+		C.Openmpt_destroy(o.p)
+		o.p = nil
+	}
+}
+
 // Play starts playing a Wav source. Returns the voice handle.
 func (s *Soloud) Play(w *Wav) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(unsafe.Pointer(w.p))))
+}
+
+// PlayOpenmpt starts playing an Openmpt source. Returns the voice handle.
+func (s *Soloud) PlayOpenmpt(o *Openmpt) uint {
+	return uint(C.Soloud_play(s.p, (*C.AudioSource)(unsafe.Pointer(o.p))))
 }
 
 // GetWave returns the current waveform data (256 float32 samples).

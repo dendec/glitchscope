@@ -3,6 +3,7 @@
 // Uses void* for opaque handles matching the C API convention.
 #include "soloud.h"
 #include "soloud_wav.h"
+#include "soloud_openmpt.h"
 
 using namespace SoLoud;
 
@@ -47,15 +48,19 @@ float * Soloud_getWave(void * aClassPtr) {
 	return ((Soloud *)aClassPtr)->getWave();
 }
 
+void * Openmpt_create() { return (void *)new Openmpt; }
+
+void Openmpt_destroy(void * aClassPtr) { delete (Openmpt *)aClassPtr; }
+
+int Openmpt_loadMemEx(void * aClassPtr, const unsigned char * aMem, unsigned int aLength, int aCopy, int aTakeOwnership) {
+	return ((Openmpt *)aClassPtr)->loadMem(aMem, aLength, !!aCopy, !!aTakeOwnership);
+}
+
 void Wav_destroy(void * aClassPtr) { delete (Wav *)aClassPtr; }
 void * Wav_create() { return (void *)new Wav; }
 
 int Wav_load(void * aClassPtr, const char * aFilename) {
 	return ((Wav *)aClassPtr)->load(aFilename);
-}
-
-int Wav_loadRawF32(void * aWav, float * aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels) {
-	return ((Wav *)aWav)->loadRawWave(aMem, aLength, aSamplerate, aChannels, true, false);
 }
 
 double Soloud_getStreamTime(void * aClassPtr, unsigned int aVoiceHandle) {

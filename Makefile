@@ -25,7 +25,10 @@ MDP_FILE      := dist/presets.mdp
 FULL_MDP_FILE := dist/presets-all.mdp
 BENCHMARK_CSV := docs/benchmark/render-scale-0.5_mesh-8.csv
 
-.PHONY: build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp
+TEXTURES_REPO := https://github.com/projectM-visualizer/presets-milkdrop-texture-pack.git
+TEXTURES_DIR  := dist/presets-milkdrop-texture-pack
+
+.PHONY: build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures
 
 submodules:
 	git submodule update --init --recursive
@@ -59,16 +62,19 @@ $(FONT_SUBSET):
 		--output-file=$(FONT_SUBSET) 2>&1
 	rm -f /tmp/unifont-full.otf
 
-# Docker build (CI/packaging).
-dist:
+# Docker build (CI/packaging).  Depends on mdp so the preset archive is ready.
+dist: $(MDP_FILE)
 	docker build -t $(DOCKER_IMAGE_X64) -f Dockerfile .
 	@mkdir -p dist
 	@docker rm -f mdpp-extract-x64 2>/dev/null || true
 	docker create --name mdpp-extract-x64 $(DOCKER_IMAGE_X64)
-	docker cp mdpp-extract-x64:/dist/mdpp/mdpp ./$(APP)
+	docker cp mdpp-extract-x64:/dist/mdpp/ ./dist/mdpp/
 	docker rm mdpp-extract-x64
+	@# Replace test presets with the real .mdp archive.
+	rm -rf dist/mdpp/presets/*
+	cp $(MDP_FILE) dist/mdpp/presets/.mdp
 	@echo "=== Built $(APP) ==="
-	@ls -lh $(APP)
+	@ls -lhR dist/mdpp/
 
 # Local build (default for dev, needs all deps installed).
 build: $(FONT_SUBSET) projectm-build
@@ -77,15 +83,16 @@ build: $(FONT_SUBSET) projectm-build
 	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
 		$(GO) build -ldflags="-s -w" -o dist/$(APP) ./cmd/$(APP)
 
-# Run locally with presets + test music (run `make build` first).
-run-local: mdp
-	@mkdir -p dist/presets dist/music
+# Run locally with presets + textures + test music (run `make build` first).
+run-local: mdp textures
+	@mkdir -p dist/presets dist/textures dist/music
 	cp $(MDP_FILE) dist/presets/.mdp
+	cp -r $(TEXTURES_DIR)/textures/* dist/textures/ 2>/dev/null; true
 	cp test_data/music/* dist/music/ 2>/dev/null; true
 	./dist/mdpp
 
 # Run via Docker with X11 + audio + music mount.
-run: dist
+run: dist textures
 	@mkdir -p music
 	docker run --rm -it \
 		--net=host \
@@ -93,6 +100,7 @@ run: dist
 		-v /tmp/.X11-unix:/tmp/.X11-unix:ro \
 		-v /dev/snd:/dev/snd:ro \
 		-v "$$(pwd)/music:/build/test_data/music:ro" \
+		-v "$$(pwd)/$(TEXTURES_DIR)/textures:/dist/mdpp/textures:ro" \
 		--group-add audio \
 		$(DOCKER_IMAGE_X64)
 
@@ -121,6 +129,15 @@ presets:
 		echo "=== Downloaded cream-of-the-crop presets ==="; \
 	fi
 
+# Download milkdrop texture pack (~15MB, needed for presets with user textures).
+textures:
+	@if [ -d "$(TEXTURES_DIR)" ]; then \
+		echo "Textures already in $(TEXTURES_DIR). Delete and rerun to re-clone."; \
+	else \
+		git clone --depth 1 $(TEXTURES_REPO) $(TEXTURES_DIR); \
+		echo "=== Downloaded milkdrop texture pack ==="; \
+	fi
+
 # Build presets.mdp archive from cream-of-the-crop dir (only if missing).
 $(FULL_MDP_FILE):
 	$(GO) run ./cmd/mdp-pack $(PRESETS_DIR) $@
@@ -143,7 +160,7 @@ PORTS_DIR    := /userdata/roms/ports
 DEVICE_DIR   := $(PORTS_DIR)/mdpp
 PM_AUTOINSTALL := /userdata/system/.local/share/PortMaster/autoinstall
 
-dist-arm64:
+dist-arm64: textures
 	docker build -t $(DOCKER_IMAGE) -f $(DOCKER_FILE) .
 	@mkdir -p dist
 	@docker rm -f mdpp-extract 2>/dev/null || true
@@ -155,9 +172,9 @@ dist-arm64:
 	@ls -lhR dist/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
-dist-portmaster: dist-arm64 portable-mdp
+dist-portmaster: dist-arm64 portable-mdp textures
 	@rm -rf dist/portmaster_build
-	@mkdir -p dist/portmaster_build/mdpp/presets dist/portmaster_build/mdpp/licenses
+	@mkdir -p dist/portmaster_build/mdpp/presets dist/portmaster_build/mdpp/textures dist/portmaster_build/mdpp/licenses
 	cp portmaster/MDPP.sh dist/portmaster_build/
 	cp portmaster/port.json dist/portmaster_build/
 	cp portmaster/README.md dist/portmaster_build/
@@ -167,6 +184,7 @@ dist-portmaster: dist-arm64 portable-mdp
 	printf '<gameList>\n    <game>\n        <path>./MDPP.sh</path>\n        <name>MDPP</name>\n        <desc>MilkDrop Portable Player — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/mdpp/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./mdpp/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/mdpp/gameinfo.xml
 	cp dist/mdpp/mdpp dist/portmaster_build/mdpp/
 	cp $(MDP_FILE) dist/portmaster_build/mdpp/presets/.mdp
+	cp $(TEXTURES_DIR)/textures/* dist/portmaster_build/mdpp/textures/ 2>/dev/null; true
 	cp portmaster/licenses/* dist/portmaster_build/mdpp/licenses/ 2>/dev/null; true
 	cp portmaster/screenshot.png dist/portmaster_build/mdpp/cover.png 2>/dev/null; true
 	@rm -f dist/mdpp.zip
@@ -174,7 +192,7 @@ dist-portmaster: dist-arm64 portable-mdp
 	@echo "=== Generated dist/mdpp.zip ==="
 	@ls -lh dist/mdpp.zip
 
-deploy: dist-arm64 portable-mdp
+deploy: dist-arm64 portable-mdp textures
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push dist/mdpp/mdpp $(DEVICE_DIR)/
 	adb push portmaster/MDPP.sh $(PORTS_DIR)/
@@ -183,8 +201,11 @@ deploy: dist-arm64 portable-mdp
 	# Deploy presets as single .mdp archive (fast on FAT32).
 	adb shell "mkdir -p $(DEVICE_DIR)/presets"
 	adb push $(MDP_FILE) $(DEVICE_DIR)/presets/.mdp
+	# Deploy textures for milkdrop presets with user textures.
+	adb shell "mkdir -p $(DEVICE_DIR)/textures"
+	adb push $(TEXTURES_DIR)/textures/* $(DEVICE_DIR)/textures/
 	adb shell "killall -9 mdpp 2>/dev/null; true"
-	@echo "=== Deployed binary + music + presets ==="
+	@echo "=== Deployed binary + music + presets + textures ==="
 
 deploy-song:
 	adb shell "mkdir -p $(DEVICE_DIR)/music"

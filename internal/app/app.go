@@ -13,6 +13,7 @@ import (
 	"github.com/dendec/mdpp/internal/input"
 	"github.com/dendec/mdpp/internal/player"
 	"github.com/dendec/mdpp/internal/presets"
+	"github.com/dendec/mdpp/internal/prof"
 	"github.com/dendec/mdpp/internal/projectm"
 	"github.com/dendec/mdpp/internal/ui"
 	"github.com/veandco/go-sdl2/sdl"
@@ -41,7 +42,8 @@ type App struct {
 	inp     *input.Input
 	lib     *player.Library
 
-	gs           *config.GraphicsSettings
+	prof        *prof.Collector
+	gs          *config.GraphicsSettings
 	settingsPath string
 	presetNames  []string
 	presetIdx    int
@@ -58,6 +60,7 @@ type App struct {
 // are created later by Init().
 func New(fullscreen bool, width, height int, renderScale float64, renderNearest bool, renderScaleExplicit, renderNearestSet bool) (*App, error) {
 	a := &App{
+		prof:                prof.NewCollector(),
 		settingsPath:        config.SettingsPath(),
 		renderScale:         renderScale,
 		renderScaleExplicit: renderScaleExplicit,
@@ -102,6 +105,9 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	}
 	a.pm = pm
 	slog.Info("projectM init", "ms", time.Since(t0).Milliseconds())
+
+	// Set texture search paths for user textures (milkdrop texture pack).
+	pm.SetTextureSearchPaths([]string{baseDir() + "/textures"})
 
 	w, h := win.GLGetDrawableSize()
 
@@ -354,7 +360,12 @@ func (a *App) Run() {
 
 		// Push UI data each frame.
 		if a.overlay != nil {
-			a.overlay.SetFPS(fpsAvg)
+			s := a.prof.ReadStats()
+			line := fmt.Sprintf("FPS:%.0f MEM:%.0fM CPU:%.0f%%", fpsAvg, s.MemKB/1024, s.CPUPct)
+			if s.GPUOK {
+				line += fmt.Sprintf(" GPU:%.0fM %.0f%%", s.GPUMemKB/1024, s.GPUUtilPct)
+			}
+			a.overlay.SetStats(line)
 			if a.pl != nil {
 				a.overlay.SetPlayback(a.pl.Position(), a.pl.Duration(), a.pl.SampleRate(), a.pl.Channels(), a.pl.BPM(), a.pl.IsPaused())
 			}

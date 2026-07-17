@@ -73,10 +73,12 @@ RUN CGO_ENABLED=1 \
     CGO_LDFLAGS="-lSDL2 lib/projectm/build/src/libprojectM/libprojectM-4.a lib/projectm/build/vendor/projectm-eval/projectm-eval/libprojectM_eval.a -lGL -lGLESv2 -lm -lopenmpt" \
     go build -ldflags="-s -w" -o mdpp ./cmd/mdpp
 
-# Prepare dist
-RUN mkdir -p /dist/mdpp/presets \
+# Prepare dist (clone textures here — only needed for packaging, not build)
+RUN git clone --depth 1 https://github.com/projectM-visualizer/presets-milkdrop-texture-pack.git /tmp/textures \
+    && mkdir -p /dist/mdpp/presets /dist/mdpp/textures \
     && cp mdpp /dist/mdpp/ \
     && cp lib/projectm/presets/tests/*.milk /dist/mdpp/presets/ \
-    && rm -f /dist/mdpp/presets/999-empty.milk 2>/dev/null; true
+    && cp /tmp/textures/textures/* /dist/mdpp/textures/ \
+    && rm -f /dist/mdpp/presets/999-empty.milk /tmp/textures 2>/dev/null; true
 
 ENTRYPOINT ["/dist/mdpp/mdpp"]

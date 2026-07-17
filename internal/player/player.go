@@ -4,6 +4,7 @@ package player
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -13,12 +14,14 @@ import (
 
 // Player manages audio playback.
 type Player struct {
-	s           *soloud.Soloud
-	voice       uint
-	currentWav  *soloud.Wav // keep alive while SoLoud references it
-	currentPath string
-	currentBPM  float64
-	channels    int
+	s              *soloud.Soloud
+	voice          uint
+	currentWav     *soloud.Wav     // non-nil when playing WAV/MP3/FLAC etc.
+	currentMod     *soloud.Openmpt // non-nil when playing tracker module
+	currentPath    string
+	currentBPM     float64
+	currentDuration float64
+	channels       int
 }
 
 // New creates and initializes a Player.
@@ -36,7 +39,7 @@ func New() (*Player, error) {
 }
 
 // PlayFile loads and plays an audio file. Only one file at a time.
-// Tracker formats (.mod/.xm/.it/.s3m/…) are decoded via libopenmpt.
+// Tracker formats (.mod/.xm/.it/.s3m/…) are streamed via SoLoud's built-in Openmpt.
 func (p *Player) PlayFile(path string) error {
 	ext := strings.ToLower(filepath.Ext(path))
 	if openmpt.SupportedExts[ext] {
@@ -47,41 +50,57 @@ func (p *Player) PlayFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("load %s: %w", path, err)
 	}
-	p.replaceSource(w)
+	p.replaceSource(w, nil)
 	p.currentPath = path
+	p.currentDuration = w.GetLength()
+	p.currentBPM = 0
+	p.channels = 0
 	slog.Info("playing", "path", path)
 	return nil
 }
 
 func (p *Player) playTracker(path string) error {
-	data, sr, bpm, ch, err := openmpt.DecodeToF32(path)
+	fileBuf, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("tracker read %s: %w", path, err)
+	}
+	mod, err := soloud.NewOpenmpt(fileBuf)
 	if err != nil {
 		return fmt.Errorf("tracker %s: %w", path, err)
 	}
-	w, err := soloud.NewWavFromF32(data, float32(sr), 2)
-	if err != nil {
-		return fmt.Errorf("tracker wav %s: %w", path, err)
-	}
-	p.replaceSource(w)
+	p.replaceSource(nil, mod)
 	p.currentPath = path
+
+	// Metadata via lightweight libopenmpt probe (no decode).
+	bpm, ch, dur, err := openmpt.GetTrackerMetaFromBytes(fileBuf)
+	if err != nil {
+		slog.Warn("tracker meta", "path", path, "err", err)
+	}
 	p.currentBPM = bpm
 	p.channels = ch
-	slog.Info("tracker", "path", path, "samples", len(data), "sr", sr, "bpm", bpm, "channels", ch)
+	p.currentDuration = dur
+	slog.Info("tracker", "path", path, "bpm", bpm, "channels", ch, "duration", dur)
 	return nil
 }
 
-// replaceSource stops current playback and swaps in a new Wav source.
-func (p *Player) replaceSource(w *soloud.Wav) {
+// replaceSource stops current playback and swaps in a new audio source.
+func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Openmpt) {
 	p.s.StopAll()
-	old := p.currentWav
-	p.currentWav = nil
-	// Mixer is free again. StopAll already cleared all voices,
-	// so it's safe to destroy the old Wav — no voice references it.
-	if old != nil {
-		old.Destroy()
+	if p.currentWav != nil {
+		p.currentWav.Destroy()
+		p.currentWav = nil
 	}
-	p.voice = p.s.Play(w)
-	p.currentWav = w
+	if p.currentMod != nil {
+		p.currentMod.Destroy()
+		p.currentMod = nil
+	}
+	if w != nil {
+		p.currentWav = w
+		p.voice = p.s.Play(w)
+	} else if mod != nil {
+		p.currentMod = mod
+		p.voice = p.s.PlayOpenmpt(mod)
+	}
 }
 
 // GetWave returns the current SoLoud waveform data (256 float32 samples).
@@ -141,6 +160,10 @@ func (p *Player) Stop() {
 		p.currentWav.Destroy()
 		p.currentWav = nil
 	}
+	if p.currentMod != nil {
+		p.currentMod.Destroy()
+		p.currentMod = nil
+	}
 	p.currentPath = ""
 }
 
@@ -161,10 +184,10 @@ func (p *Player) Position() float64 {
 
 // Duration returns the total duration of the current track in seconds.
 func (p *Player) Duration() float64 {
-	if p.currentWav == nil {
-		return 0
+	if p.currentWav != nil {
+		return p.currentWav.GetLength()
 	}
-	return p.currentWav.GetLength()
+	return p.currentDuration
 }
 
 // SampleRate returns the sample rate of the current voice.

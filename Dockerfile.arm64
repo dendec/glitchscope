@@ -102,11 +102,13 @@ RUN CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
     && aarch64-linux-gnu-strip mdpp \
     && (patchelf --remove-needed libGL.so.1 mdpp 2>/dev/null || true)
 
-# Prepare dist
-RUN mkdir -p /dist/mdpp/presets \
+# Prepare dist (clone textures here — only needed for packaging, not build)
+RUN git clone --depth 1 https://github.com/projectM-visualizer/presets-milkdrop-texture-pack.git /tmp/textures \
+    && mkdir -p /dist/mdpp/presets /dist/mdpp/textures \
     && cp mdpp /dist/mdpp/ \
     && cp lib/projectm/presets/tests/*.milk /dist/mdpp/presets/ \
-    && rm -f /dist/mdpp/presets/999-empty.milk 2>/dev/null; true \
+    && cp /tmp/textures/textures/* /dist/mdpp/textures/ \
+    && rm -f /dist/mdpp/presets/999-empty.milk /tmp/textures 2>/dev/null; true \
     && cp portmaster/MDPP.sh /dist/ \
     && cp portmaster/port.json /dist/ \
     && cp portmaster/screenshot.png /dist/ 2>/dev/null; true \

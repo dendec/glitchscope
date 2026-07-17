@@ -238,13 +238,13 @@ type Overlay struct {
 	albumCursor  int
 	trackInfos   []player.TrackInfo
 	trackCursor  int
+	statsLine    string
 	position     float64
 	duration     float64
 	sampleRate   float32
 	channels     int
 	bpm          float64
 	paused       bool
-	fps          float64
 	presetName   string
 	playingAlbum string
 	playingTrack string
@@ -276,8 +276,8 @@ type Overlay struct {
 	tracksTexW, tracksTexH         int
 	bottomTex                      uint32
 	bottomTexW, bottomTexH         int
-	fpsTex                         uint32
-	fpsTexW, fpsTexH               int
+	statsTex                       uint32
+	statsTexW, statsTexH           int
 	presetNameTex                  uint32
 	presetNameTexW, presetNameTexH int
 
@@ -290,8 +290,8 @@ type Overlay struct {
 	// Dirty flags.
 	albumsDirty     bool
 	tracksDirty     bool
+	statsDirty      bool
 	bottomDirty     bool
-	fpsDirty        bool
 	presetNameDirty bool
 	presetsDirty    bool
 }
@@ -463,7 +463,7 @@ func (o *Overlay) markAllDirty() {
 	o.albumsDirty = true
 	o.tracksDirty = true
 	o.bottomDirty = true
-	o.fpsDirty = true
+	o.statsDirty = true
 	o.settingsDirty = true
 	o.presetsDirty = true
 	o.pageIndicatorDirty = true
@@ -824,10 +824,13 @@ func (o *Overlay) SetPlaying(album, track string) {
 	}
 }
 
-// SetFPS sets the FPS counter value and marks dirty.
-func (o *Overlay) SetFPS(fps float64) {
-	o.fps = fps
-	o.fpsDirty = true
+// SetStats sets the stats line and marks dirty.
+func (o *Overlay) SetStats(line string) {
+	if o.statsLine == line {
+		return
+	}
+	o.statsLine = line
+	o.statsDirty = true
 }
 
 // SetPresetName sets the current preset name and marks dirty.
@@ -869,21 +872,21 @@ func (o *Overlay) renderUI(w, h int) {
 	// Full screen dim.
 	C.drawFilledRect(C.uint(o.programRect), 0, 0, C.float(w), C.float(h), 0, 0, 0, dimAlpha, C.int(w), C.int(h))
 
-	// FPS counter.
-	if o.fpsDirty {
-		o.rebuildFPSTex()
+	// Stats line (FPS, MEM, CPU, GPU).
+	if o.statsDirty {
+		o.rebuildStatsTex()
 	}
-	if o.fpsTex != 0 {
-		C.drawOverlayText(C.uint(o.programText), C.uint(o.fpsTex), 1,
-			5, 0, C.float(o.fpsTexW), C.float(o.fpsTexH), C.int(w), C.int(h))
+	if o.statsTex != 0 {
+		C.drawOverlayText(C.uint(o.programText), C.uint(o.statsTex), 1,
+			5, 0, C.float(o.statsTexW), C.float(o.statsTexH), C.int(w), C.int(h))
 	}
-	// Preset name — below FPS.
+	// Preset name — below stats.
 	if o.presetNameDirty {
 		o.rebuildPresetNameTex()
 	}
 	if o.presetNameTex != 0 {
 		C.drawOverlayText(C.uint(o.programText), C.uint(o.presetNameTex), 1,
-			C.float(5), C.float(o.fpsTexH+4), C.float(o.presetNameTexW), C.float(o.presetNameTexH), C.int(w), C.int(h))
+			C.float(5), C.float(o.statsTexH+4), C.float(o.presetNameTexW), C.float(o.presetNameTexH), C.int(w), C.int(h))
 	}
 
 	// Page indicator.
@@ -1106,10 +1109,10 @@ func glDeleteTex(tex uint32) {
 	}
 }
 
-func (o *Overlay) rebuildFPSTex() {
-	o.fpsDirty = false
-	o.deleteTex(&o.fpsTex)
-	o.fpsTex, o.fpsTexW, o.fpsTexH = o.renderTextToTex(fmt.Sprintf("FPS: %.0f", o.fps), 255, 255, 255, 255)
+func (o *Overlay) rebuildStatsTex() {
+	o.statsDirty = false
+	o.deleteTex(&o.statsTex)
+	o.statsTex, o.statsTexW, o.statsTexH = o.renderTextToTex(o.statsLine, 255, 255, 255, 255)
 }
 
 func (o *Overlay) rebuildPresetNameTex() {
@@ -1344,7 +1347,7 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.albumsTex)
 	o.deleteTex(&o.tracksTex)
 	o.deleteTex(&o.bottomTex)
-	o.deleteTex(&o.fpsTex)
+	o.deleteTex(&o.statsTex)
 	o.deleteTex(&o.presetNameTex)
 	o.deleteTex(&o.settingsColL.tex)
 	o.deleteTex(&o.settingsColR.tex)

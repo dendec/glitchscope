@@ -16,8 +16,8 @@ import (
 var zstdDec, _ = zstd.NewReader(nil)
 
 type entry struct {
-	name   string
-	zstLen uint32
+	name    string
+	zstLen  uint32
 	dataOff int64 // offset in .mdp, -1 = filesystem
 }
 
@@ -190,6 +190,23 @@ func Read(key string) ([]byte, error) {
 	return dst, nil
 }
 
+// categoryOf returns the category a preset key belongs to. Presets nested at
+// least two directories deep (top/sub/.../file.milk) are grouped by their
+// first two path segments (top/sub) so large top-level folders split into
+// smaller, more specific categories. Presets one directory deep (top/file.milk)
+// use just that directory, and root-level presets belong to "Default".
+func categoryOf(name string) string {
+	parts := strings.Split(name, "/")
+	switch {
+	case len(parts) >= 3:
+		return parts[0] + "/" + parts[1]
+	case len(parts) == 2:
+		return parts[0]
+	default:
+		return "Default"
+	}
+}
+
 // Categories returns sorted category names derived from subdirectory structure.
 // Root-level presets belong to "Default".
 func Categories() []string {
@@ -198,11 +215,7 @@ func Categories() []string {
 	}
 	cats := make(map[string]bool)
 	for _, name := range store.names {
-		if strings.Contains(name, "/") {
-			cats[strings.SplitN(name, "/", 2)[0]] = true
-		} else {
-			cats["Default"] = true
-		}
+		cats[categoryOf(name)] = true
 	}
 	out := make([]string, 0, len(cats))
 	for c := range cats {
@@ -219,14 +232,8 @@ func PresetsInCategory(cat string) []string {
 	}
 	var out []string
 	for _, name := range store.names {
-		if cat == "Default" {
-			if !strings.Contains(name, "/") {
-				out = append(out, name)
-			}
-		} else {
-			if strings.HasPrefix(name, cat+"/") {
-				out = append(out, name)
-			}
+		if categoryOf(name) == cat {
+			out = append(out, name)
 		}
 	}
 	return out
