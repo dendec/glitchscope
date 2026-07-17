@@ -88,7 +88,7 @@ func (n *Notifier) ShowTrack(path string, fontSize float64) {
 	d.DrawString(title)
 
 	glDeleteTex(n.tex)
-	n.tex = uploadTexture(rgba)
+	n.tex = glUploadTexture(rgba)
 	if n.tex == 0 {
 		return
 	}

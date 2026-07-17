@@ -1,179 +1,20 @@
 // Package ui injects text into the visualizer's frame feedback.
 package ui
 
-/*
-#cgo LDFLAGS: -lGLESv2
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
-
-static unsigned int createTextProgram();
-static unsigned int createRectProgram();
-
-static unsigned int compileShader(unsigned int type, const char *source) {
-	GLuint shader = glCreateShader(type);
-	glShaderSource(shader, 1, &source, 0);
-	glCompileShader(shader);
-	GLint ok = 0;
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
-	if (!ok) { glDeleteShader(shader); return 0; }
-	return shader;
-}
-
-static unsigned int createProgram(const char *vs, const char *fs) {
-	GLuint vertex = compileShader(GL_VERTEX_SHADER, vs);
-	GLuint fragment = compileShader(GL_FRAGMENT_SHADER, fs);
-	if (!vertex || !fragment) {
-		if (vertex) glDeleteShader(vertex);
-		if (fragment) glDeleteShader(fragment);
-		return 0;
-	}
-	GLuint program = glCreateProgram();
-	glAttachShader(program, vertex);
-	glAttachShader(program, fragment);
-	glLinkProgram(program);
-	glDeleteShader(vertex);
-	glDeleteShader(fragment);
-	GLint ok = 0;
-	glGetProgramiv(program, GL_LINK_STATUS, &ok);
-	if (!ok) { glDeleteProgram(program); return 0; }
-	return program;
-}
-
-static void beginDraw(int w, int h) {
-	glViewport(0, 0, w, h);
-	glDisable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-}
-
-static void endDraw() {
-	glUseProgram(0);
-	glDisable(GL_BLEND);
-}
-
-static void drawText(unsigned int program, unsigned int text, float opacity,
-	float x, float y, float textWidth, float textHeight, int w, int h) {
-	beginDraw(w, h);
-	glUseProgram(program);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, text);
-	glUniform1i(glGetUniformLocation(program, "text"), 0);
-	glUniform1f(glGetUniformLocation(program, "opacity"), opacity);
-	float left = x / (float)w * 2.0f - 1.0f;
-	float right = (x + textWidth) / (float)w * 2.0f - 1.0f;
-	// Go layout coordinates use a top-left origin; OpenGL uses bottom-left.
-	float bottom = ((float)h - y - textHeight) / (float)h * 2.0f - 1.0f;
-	float top = ((float)h - y) / (float)h * 2.0f - 1.0f;
-	float verts[] = { left,bottom, right,bottom, left,top, right,top };
-	float uvs[]   = { 0,1, 1,1, 0,0, 1,0 };
-	GLuint pos = (GLuint)glGetAttribLocation(program, "pos");
-	glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 0, verts);
-	glEnableVertexAttribArray(pos);
-	GLuint tc = (GLuint)glGetAttribLocation(program, "tc");
-	if (tc != (GLuint)-1) {
-		glVertexAttribPointer(tc, 2, GL_FLOAT, GL_FALSE, 0, uvs);
-		glEnableVertexAttribArray(tc);
-	}
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	glDisableVertexAttribArray(pos);
-	if (tc != (GLuint)-1) glDisableVertexAttribArray(tc);
-	endDraw();
-}
-
-static void drawOverlayText(unsigned int program, unsigned int text, float opacity,
-	float x, float y, float textWidth, float textHeight, int w, int h) {
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	drawText(program, text, opacity, x, y, textWidth, textHeight, w, h);
-}
-
-static void drawFilledRect(unsigned int program,
-	float x, float y, float w, float h, float r, float g, float b, float a,
-	int winW, int winH) {
-	beginDraw(winW, winH);
-	glUseProgram(program);
-	float left = x / (float)winW * 2.0f - 1.0f;
-	float right = (x + w) / (float)winW * 2.0f - 1.0f;
-	float bottom = ((float)winH - y - h) / (float)winH * 2.0f - 1.0f;
-	float top = ((float)winH - y) / (float)winH * 2.0f - 1.0f;
-	float verts[] = { left,bottom, right,bottom, left,top, right,top };
-	glUniform4f(glGetUniformLocation(program, "uColor"), r, g, b, a);
-	GLuint pos = (GLuint)glGetAttribLocation(program, "pos");
-	glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 0, verts);
-	glEnableVertexAttribArray(pos);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	glDisableVertexAttribArray(pos);
-	endDraw();
-}
-
-static unsigned int createTextProgram() {
-	const char *vs =
-		"#version 100\n"
-		"attribute vec2 pos;\n"
-		"attribute vec2 tc;\n"
-		"varying vec2 uv;\n"
-		"void main() { uv = tc; gl_Position = vec4(pos, 0.0, 1.0); }";
-	const char *fs =
-		"#version 100\n"
-		"precision mediump float;\n"
-		"uniform sampler2D text;\n"
-		"uniform float opacity;\n"
-		"varying vec2 uv;\n"
-		"void main() {\n"
-		"  vec4 glyph = texture2D(text, uv);\n"
-		"  gl_FragColor = vec4(glyph.rgb, glyph.a * opacity);\n"
-		"}";
-	return createProgram(vs, fs);
-}
-
-static unsigned int createRectProgram() {
-	const char *vs =
-		"#version 100\n"
-		"attribute vec2 pos;\n"
-		"void main() { gl_Position = vec4(pos, 0.0, 1.0); }";
-	const char *fs =
-		"#version 100\n"
-		"precision mediump float;\n"
-		"uniform vec4 uColor;\n"
-		"void main() { gl_FragColor = uColor; }";
-	return createProgram(vs, fs);
-}
-
-static unsigned int texUpload(unsigned char *pixels, int w, int h) {
-	GLuint tex;
-	glGenTextures(1, &tex);
-	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-	return tex;
-}
-
-static void texDelete(unsigned int tex) {
-	GLuint t = tex;
-	glDeleteTextures(1, &t);
-}
-*/
-import "C"
 import (
-	"fmt"
-	"image"
-	"image/color"
 	"log/slog"
 	"math"
-	"path/filepath"
-	"strings"
 	"time"
-	"unsafe"
 
-	"github.com/dendec/mdpp/internal/config"
 	"github.com/dendec/mdpp/internal/player"
 	"github.com/veandco/go-sdl2/sdl"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
-	"golang.org/x/image/math/fixed"
 )
+
+// This file owns Overlay's state, lifecycle and input handling (cursor
+// movement, panel focus, page switching). Rendering lives in
+// overlay_render.go; GL/cgo calls are isolated in gl.go.
 
 const (
 	fadeInDuration = 400 * time.Millisecond
@@ -320,8 +161,32 @@ type Overlay struct {
 // New creates an Overlay.
 func New() *Overlay {
 	return &Overlay{
-		programText: uint32(C.createTextProgram()),
-		programRect: uint32(C.createRectProgram()),
+		programText: glCreateTextProgram(),
+		programRect: glCreateRectProgram(),
+	}
+}
+
+// Close releases GL resources.
+func (o *Overlay) Close() {
+	o.notif.Hide()
+	o.deleteTex(&o.albumsTex)
+	o.deleteTex(&o.tracksTex)
+	o.deleteTex(&o.bottomTex)
+	o.deleteTex(&o.statsTex)
+	o.deleteTex(&o.presetNameTex)
+	o.deleteTex(&o.settingsColL.tex)
+	o.deleteTex(&o.settingsColR.tex)
+	o.deleteTex(&o.presetsColL.tex)
+	o.deleteTex(&o.presetsColR.tex)
+	for i := range o.pageIndicatorTex {
+		o.deleteTex(&o.pageIndicatorTex[i])
+	}
+	glDeleteProgram(o.programText)
+	o.programText = 0
+	glDeleteProgram(o.programRect)
+	o.programRect = 0
+	if o.face != nil {
+		_ = o.face.Close()
 	}
 }
 
@@ -414,16 +279,29 @@ func (o *Overlay) ToggleVisibility() {
 func (o *Overlay) ToggleUI() {
 	o.uiVisible = !o.uiVisible
 	if o.uiVisible {
-		o.panelEntered = false
-		o.focusPanel = 0
+		o.panelEntered = true
+		o.focusPanel = 1
 		o.uiPage = PageLibrary
 		o.markAllDirty()
 	}
 	slog.Debug("ui visibility", "visible", o.uiVisible)
 }
 
+// FocusPlayingTrack points the library page cursor at the given album/track
+// and focuses the tracks (right) panel. Called when the playlist screen is
+// opened so the cursor starts on the currently playing file.
+func (o *Overlay) FocusPlayingTrack(albumIdx, trackIdx int) {
+	o.albumCursor = albumIdx
+	o.trackCursor = trackIdx
+	o.focusPanel = 1
+	o.panelEntered = true
+	o.albumsDirty = true
+	o.tracksDirty = true
+}
+
 // NextScreen cycles Library → Settings → Presets → Library.
 func (o *Overlay) NextScreen() {
+	o.focusPanel = 0
 	switch o.uiPage {
 	case PageLibrary:
 		o.uiPage = PageSettings
@@ -435,12 +313,12 @@ func (o *Overlay) NextScreen() {
 	}
 	o.panelEntered = true
 	o.settingsEditing = false
-	o.focusPanel = 0
 	o.markAllDirty()
 }
 
 // PrevScreen cycles Library → Presets → Settings → Library.
 func (o *Overlay) PrevScreen() {
+	o.focusPanel = 0
 	switch o.uiPage {
 	case PageLibrary:
 		o.uiPage = PagePresets
@@ -452,7 +330,6 @@ func (o *Overlay) PrevScreen() {
 	}
 	o.panelEntered = true
 	o.settingsEditing = false
-	o.focusPanel = 0
 	o.markAllDirty()
 }
 
@@ -577,6 +454,8 @@ func (o *Overlay) rebuildFace() {
 	}
 }
 
+// --- Cursor & panel navigation ---
+
 // CursorUp moves the cursor up by one item. Acceleration is driven by Update().
 func (o *Overlay) CursorUp() {
 	if !o.panelEntered {
@@ -690,6 +569,18 @@ func (o *Overlay) cursorDown1() {
 	}
 }
 
+// focusPanelBy shifts focusPanel by delta (-1 or +1), clamped to the valid
+// [0,1] range, and marks dirty if it actually changed. Shared by every page
+// with a two-panel (left/right) layout.
+func (o *Overlay) focusPanelBy(delta int, markDirty func()) {
+	next := o.focusPanel + delta
+	if next < 0 || next > 1 {
+		return
+	}
+	o.focusPanel = next
+	markDirty()
+}
+
 // FocusLeft switches focus to the previous panel.
 func (o *Overlay) FocusLeft() {
 	switch o.uiPage {
@@ -699,16 +590,9 @@ func (o *Overlay) FocusLeft() {
 			o.settingsDirty = true
 		}
 	case PagePresets:
-		if o.focusPanel > 0 {
-			o.focusPanel--
-			o.presetsDirty = true
-		}
+		o.focusPanelBy(-1, func() { o.presetsDirty = true })
 	default: // Library
-		if o.focusPanel > 0 {
-			o.focusPanel--
-			o.albumsDirty = true
-			o.tracksDirty = true
-		}
+		o.focusPanelBy(-1, func() { o.albumsDirty = true; o.tracksDirty = true })
 	}
 }
 
@@ -724,17 +608,22 @@ func (o *Overlay) FocusRight() {
 			o.settingsDirty = true
 		}
 	case PagePresets:
-		if o.focusPanel < 1 {
-			o.focusPanel++
-			o.presetsDirty = true
-		}
+		o.focusPanelBy(1, func() { o.presetsDirty = true })
 	default: // Library
-		if o.focusPanel < 1 {
-			o.focusPanel++
-			o.albumsDirty = true
-			o.tracksDirty = true
-		}
+		o.focusPanelBy(1, func() { o.albumsDirty = true; o.tracksDirty = true })
 	}
+}
+
+// backToLeftPanel moves focus from the right panel back to the left one.
+// Returns true if it handled the back action (focus was on the right panel),
+// false if focus was already on the left panel (caller should exit/close).
+func (o *Overlay) backToLeftPanel(markDirty func()) bool {
+	if o.focusPanel != 1 {
+		return false
+	}
+	o.focusPanel = 0
+	markDirty()
+	return true
 }
 
 // Select enters the focused panel or confirms item selection.
@@ -778,12 +667,6 @@ func (o *Overlay) Select() bool {
 		return o.currentCategory() != nil && len(o.currentCategory().Presets) > 0
 	}
 
-	if !o.panelEntered {
-		o.panelEntered = true
-		o.albumsDirty = true
-		o.tracksDirty = true
-		return false
-	}
 	// Album panel selected — switch to tracks panel, let user pick a track.
 	if o.focusPanel == 0 {
 		o.focusPanel = 1
@@ -818,10 +701,7 @@ func (o *Overlay) Back() {
 
 	if o.uiPage == PagePresets {
 		if o.panelEntered {
-			if o.focusPanel == 1 {
-				// In presets panel → go back to categories.
-				o.focusPanel = 0
-				o.presetsDirty = true
+			if o.backToLeftPanel(func() { o.presetsDirty = true }) {
 				return
 			}
 			// In categories panel → exit panel mode.
@@ -838,10 +718,7 @@ func (o *Overlay) Back() {
 		return
 	}
 
-	if o.panelEntered {
-		o.panelEntered = false
-		o.albumsDirty = true
-		o.tracksDirty = true
+	if o.backToLeftPanel(func() { o.albumsDirty = true; o.tracksDirty = true }) {
 		return
 	}
 	// Close UI.
@@ -939,7 +816,9 @@ func (o *Overlay) FocusPanel() int { return o.focusPanel }
 func (o *Overlay) SettingsRows() []SettingRow { return o.settingsRows }
 
 // syncPresetCursors positions category/preset cursors on the currently
-// playing preset so the Presets page opens at the right place.
+// playing preset and focuses the presets (right) panel, so the Presets page
+// opens with the cursor on the active preset — mirroring FocusPlayingTrack
+// on the Library page.
 func (o *Overlay) syncPresetCursors() {
 	key := o.presetName
 	if key == "" {
@@ -950,6 +829,7 @@ func (o *Overlay) syncPresetCursors() {
 			if p == key {
 				o.presetCategoryCursor = ci
 				o.presetCursor = pi
+				o.focusPanel = 1
 				o.presetsDirty = true
 				return
 			}
@@ -963,770 +843,4 @@ func (o *Overlay) currentCategory() *PresetCat {
 		return nil
 	}
 	return &o.presetCategories[o.presetCategoryCursor]
-}
-
-// --- UI rendering ---
-
-func (o *Overlay) renderUI(w, h int) {
-	if o.programRect == 0 {
-		return
-	}
-
-	// Full screen dim.
-	C.drawFilledRect(C.uint(o.programRect), 0, 0, C.float(w), C.float(h), 0, 0, 0, dimAlpha, C.int(w), C.int(h))
-
-	// Stats line (FPS, MEM, CPU, GPU).
-	if o.statsDirty {
-		o.rebuildStatsTex()
-	}
-	if o.statsTex != 0 {
-		C.drawOverlayText(C.uint(o.programText), C.uint(o.statsTex), 1,
-			5, 0, C.float(o.statsTexW), C.float(o.statsTexH), C.int(w), C.int(h))
-	}
-	// Preset name — below stats.
-	if o.presetNameDirty {
-		o.rebuildPresetNameTex()
-	}
-	if o.presetNameTex != 0 {
-		C.drawOverlayText(C.uint(o.programText), C.uint(o.presetNameTex), 1,
-			C.float(5), C.float(o.statsTexH+4), C.float(o.presetNameTexW), C.float(o.presetNameTexH), C.int(w), C.int(h))
-	}
-
-	// Page indicator.
-	o.renderPageIndicator(w, h)
-
-	// Layout constants — proportional to font size.
-	bottomH := int(o.fontSize * 1.35)
-	indicatorH := int(o.fontSize * 1.5)
-	panelY := int(o.fontSize*2) + indicatorH
-	panelH := h - panelY - bottomH - int(o.fontSize*0.7)
-	if panelH < 0 {
-		panelH = 0
-	}
-	thirdW := w / 3
-
-	lh := o.face.Metrics().Height.Ceil()
-
-	switch o.uiPage {
-	case PageSettings:
-		o.renderSettingsPanels(w, h, thirdW, panelY, panelH, lh)
-	case PagePresets:
-		o.renderPresetsPanels(w, h, thirdW, panelY, panelH, lh)
-	default:
-		o.renderLibraryPanels(w, h, thirdW, panelY, panelH, lh)
-	}
-
-	// --- Compact playback status (full width) ---
-	if o.playingTrack != "" && o.bottomDirty {
-		o.rebuildBottomTex(w, bottomH)
-	}
-	if o.playingTrack != "" && o.bottomTex != 0 {
-		by := C.float(h - bottomH)
-		C.drawFilledRect(C.uint(o.programRect), 0, by, C.float(w), C.float(bottomH),
-			0, 0, 0, 0.5, C.int(w), C.int(h))
-		C.drawOverlayText(C.uint(o.programText), C.uint(o.bottomTex), 1,
-			0, by, C.float(o.bottomTexW), C.float(o.bottomTexH), C.int(w), C.int(h))
-	}
-}
-
-// renderLibraryPanels draws the albums (left) and tracks (right) panels.
-func (o *Overlay) renderLibraryPanels(w, h int, thirdW, panelY, panelH, lh int) {
-	// --- Albums panel ---
-	if o.albumsDirty {
-		o.rebuildAlbumsTex(thirdW, panelH)
-	}
-	if o.albumsTex != 0 {
-		px := C.float(0)
-		py := C.float(panelY)
-		drawPanelBg(o, px, py, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
-		if o.focusPanel == 0 {
-			drawPanelBorder(o, px, py, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
-		}
-		C.drawOverlayText(C.uint(o.programText), C.uint(o.albumsTex), 1,
-			px, py, C.float(o.albumsTexW), C.float(o.albumsTexH), C.int(w), C.int(h))
-		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
-			hiY := py + C.float((o.albumCursor-o.albumsScroll)*lh+2)
-			drawAccentHighlight(o, px+2, hiY, C.float(thirdW-4), C.float(lh), C.int(w), C.int(h))
-		}
-		am := panelH / lh
-		if am < 1 {
-			am = 1
-		}
-		drawScrollbar(o, px+C.float(thirdW-4), py, C.float(panelH), len(o.albums), am, o.albumsScroll, C.int(w), C.int(h))
-	}
-
-	// --- Tracks panel ---
-	if o.tracksDirty {
-		o.rebuildTracksTex(thirdW, panelH)
-	}
-	if o.tracksTex != 0 {
-		tx := C.float(w * 2 / 3)
-		ty := C.float(panelY)
-		drawPanelBg(o, tx, ty, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
-		if o.focusPanel == 1 {
-			drawPanelBorder(o, tx, ty, C.float(thirdW), C.float(panelH), C.int(w), C.int(h))
-		}
-		C.drawOverlayText(C.uint(o.programText), C.uint(o.tracksTex), 1,
-			tx, ty, C.float(o.tracksTexW), C.float(o.tracksTexH), C.int(w), C.int(h))
-		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
-			hiY := ty + C.float((o.trackCursor-o.tracksScroll)*lh+2)
-			drawAccentHighlight(o, tx+2, hiY, C.float(thirdW-4), C.float(lh), C.int(w), C.int(h))
-		}
-		tm := panelH / lh
-		if tm < 1 {
-			tm = 1
-		}
-		drawScrollbar(o, tx+C.float(thirdW-4), ty, C.float(panelH), len(o.trackInfos), tm, o.tracksScroll, C.int(w), C.int(h))
-	}
-}
-
-// renderSettingsPanels draws the settings labels (left) and values (right).
-func (o *Overlay) renderSettingsPanels(w, h int, thirdW, panelY, panelH, lh int) {
-	if !o.settingsDirty {
-		// Still draw textures from cache.
-		o.drawSettingsTextures(w, h, thirdW, panelY, panelH, lh)
-		return
-	}
-	o.settingsDirty = false
-
-	maxRows := panelH / lh
-	if maxRows < 1 {
-		maxRows = 1
-	}
-
-	// Rebuild left column texture (setting names) with scroll window.
-	leftTotal := len(o.settingsRows)
-	o.albumsScroll = scrollOffset(o.albumsScroll, o.settingsCursor, leftTotal, maxRows)
-	var leftLines []string
-	leftEnd := o.albumsScroll + maxRows
-	if leftEnd > leftTotal {
-		leftEnd = leftTotal
-	}
-	for i := o.albumsScroll; i < leftEnd; i++ {
-		row := o.settingsRows[i]
-		prefix := "  "
-		if i == o.settingsCursor && o.panelEntered {
-			prefix = "▸ "
-		}
-		leftLines = append(leftLines, prefix+row.Label)
-	}
-	o.rebuildListTex(&o.settingsColL, leftLines)
-
-	// Rebuild right column texture (values for the focused setting) with scroll window.
-	var rightLines []string
-	rightTotal := 0
-	if o.settingsCursor < len(o.settingsRows) {
-		row := o.settingsRows[o.settingsCursor]
-		rightTotal = len(row.Values)
-		selIdx := row.Index
-		if o.settingsEditing {
-			selIdx = o.settingsValueCursor
-		}
-		o.tracksScroll = scrollOffset(o.tracksScroll, selIdx, rightTotal, maxRows)
-		rightEnd := o.tracksScroll + maxRows
-		if rightEnd > rightTotal {
-			rightEnd = rightTotal
-		}
-		for i := o.tracksScroll; i < rightEnd; i++ {
-			mark := "  "
-			if i == selIdx {
-				mark = "▸ "
-			}
-			rightLines = append(rightLines, mark+row.Values[i])
-		}
-	}
-	o.rebuildListTex(&o.settingsColR, rightLines)
-
-	o.drawSettingsTextures(w, h, thirdW, panelY, panelH, lh)
-}
-
-func (o *Overlay) drawSettingsTextures(w, h int, thirdW, panelY, panelH, lh int) {
-	lx, ly := C.float(0), C.float(panelY)
-	rx, ry := C.float(w*2/3), C.float(panelY)
-	colW, colH := C.float(thirdW), C.float(panelH)
-	winW, winH := C.int(w), C.int(h)
-
-	maxRows := panelH / lh
-	if maxRows < 1 {
-		maxRows = 1
-	}
-
-	leftHighlight := o.panelEntered && len(o.settingsRows) > 0 && !o.settingsEditing
-	drawListColumn(o, lx, ly, colW, colH, o.settingsColL, o.panelEntered && !o.settingsEditing,
-		o.settingsCursor-o.albumsScroll, leftHighlight, lh, winW, winH)
-	drawScrollbar(o, lx+colW-3, ly, colH, len(o.settingsRows), maxRows, o.albumsScroll, winW, winH)
-
-	rightHighlight := false
-	rightRow := 0
-	rightTotal := 0
-	if o.panelEntered && o.settingsEditing && len(o.settingsRows) > 0 {
-		row := o.settingsRows[o.settingsCursor]
-		rightTotal = len(row.Values)
-		if o.settingsValueCursor < len(row.Values) {
-			rightHighlight = true
-			rightRow = o.settingsValueCursor - o.tracksScroll
-		}
-	}
-	drawListColumn(o, rx, ry, colW, colH, o.settingsColR, o.panelEntered && o.settingsEditing,
-		rightRow, rightHighlight, lh, winW, winH)
-	drawScrollbar(o, rx+colW-3, ry, colH, rightTotal, maxRows, o.tracksScroll, winW, winH)
-}
-
-// --- Panel drawing helpers ---
-
-func drawPanelBg(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
-	C.drawFilledRect(C.uint(o.programRect), x, y, w, h,
-		0, 0, 0, panelBgAlpha, winW, winH)
-}
-
-func drawPanelBorder(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
-	C.drawFilledRect(C.uint(o.programRect), x-1, y-1, w+2, 1,
-		1, 1, 1, borderAlpha, winW, winH)
-	C.drawFilledRect(C.uint(o.programRect), x-1, y+h, w+2, 1,
-		1, 1, 1, borderAlpha, winW, winH)
-	C.drawFilledRect(C.uint(o.programRect), x-1, y-1, 1, h+2,
-		1, 1, 1, borderAlpha, winW, winH)
-	C.drawFilledRect(C.uint(o.programRect), x+w, y-1, 1, h+2,
-		1, 1, 1, borderAlpha, winW, winH)
-}
-
-func drawAccentHighlight(o *Overlay, x, y, w, h C.float, winW, winH C.int) {
-	C.drawFilledRect(C.uint(o.programRect), x, y, w, h,
-		accentR, accentG, accentB, accentA, winW, winH)
-}
-
-func drawScrollbar(o *Overlay, sbX, panelY, panelH C.float, totalItems, visibleItems, scrollPos int, winW, winH C.int) {
-	if totalItems <= visibleItems {
-		return
-	}
-	thumbW := C.float(3)
-	// Track.
-	C.drawFilledRect(C.uint(o.programRect), sbX, panelY, thumbW, panelH, 1, 1, 1, 0.1, winW, winH)
-	// Thumb.
-	thumbH := panelH * C.float(visibleItems) / C.float(totalItems)
-	if thumbH < 8 {
-		thumbH = 8
-	}
-	maxScroll := totalItems - visibleItems
-	if maxScroll < 1 {
-		maxScroll = 1
-	}
-	thumbY := panelY + (panelH-thumbH)*C.float(scrollPos)/C.float(maxScroll)
-	C.drawFilledRect(C.uint(o.programRect), sbX, thumbY, thumbW, thumbH, 1, 1, 1, 0.35, winW, winH)
-}
-
-// listTex caches a rendered text texture for one column of a two-column list
-// panel (Settings, Presets, ...). Each page keeps its own instance so pages
-// never alias each other's GL textures.
-type listTex struct {
-	tex  uint32
-	w, h int
-}
-
-// rebuildListTex re-renders lines into t's cached texture, replacing any
-// previous one.
-func (o *Overlay) rebuildListTex(t *listTex, lines []string) {
-	o.deleteTex(&t.tex)
-	t.tex, t.w, t.h = o.renderTextToTex(strings.Join(lines, "\n"), 255, 255, 255, 255)
-}
-
-// drawListColumn draws one column of a two-column list panel: background,
-// optional focus border, cached text, and an optional accent highlight row.
-// Shared by Settings and Presets so their layout/highlight logic stays in
-// one place.
-func drawListColumn(o *Overlay, x, y, w, h C.float, t listTex, bordered bool,
-	highlightRow int, showHighlight bool, lh int, winW, winH C.int) {
-	drawPanelBg(o, x, y, w, h, winW, winH)
-	if bordered {
-		drawPanelBorder(o, x, y, w, h, winW, winH)
-	}
-	if t.tex == 0 {
-		return
-	}
-	C.drawOverlayText(C.uint(o.programText), C.uint(t.tex), 1, x, y, C.float(t.w), C.float(t.h), winW, winH)
-	if showHighlight {
-		hiY := y + C.float(highlightRow*lh+2)
-		drawAccentHighlight(o, x+2, hiY, w-4, C.float(lh), winW, winH)
-	}
-}
-
-// --- GL wrapper functions (callable from other files in this package) ---
-
-func glDrawOverlayText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH int) {
-	C.drawOverlayText(C.uint(program), C.uint(tex), C.float(opacity),
-		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH))
-}
-
-func glDrawText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH int) {
-	C.drawText(C.uint(program), C.uint(tex), C.float(opacity),
-		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH))
-}
-
-func glDeleteTex(tex uint32) {
-	if tex != 0 {
-		C.texDelete(C.uint(tex))
-	}
-}
-
-func (o *Overlay) rebuildStatsTex() {
-	o.statsDirty = false
-	o.deleteTex(&o.statsTex)
-	o.statsTex, o.statsTexW, o.statsTexH = o.renderTextToTex(o.statsLine, 255, 255, 255, 255)
-}
-
-func (o *Overlay) rebuildPresetNameTex() {
-	o.presetNameDirty = false
-	o.deleteTex(&o.presetNameTex)
-	o.presetNameTex, o.presetNameTexW, o.presetNameTexH = o.renderTextToTex(o.presetName, 200, 200, 200, 255)
-}
-
-func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
-	o.albumsDirty = false
-	o.deleteTex(&o.albumsTex)
-
-	if len(o.albums) == 0 {
-		return
-	}
-
-	lh := o.face.Metrics().Height.Ceil()
-	maxRows := maxH / lh
-	if maxRows < 1 {
-		maxRows = 1
-	}
-	o.albumsScroll = scrollOffset(o.albumsScroll, o.albumCursor, len(o.albums), maxRows)
-
-	start := o.albumsScroll
-	end := start + maxRows
-	if end > len(o.albums) {
-		end = len(o.albums)
-	}
-	var lines []string
-	for i := start; i < end; i++ {
-		name := o.albums[i]
-		prefix := "  "
-		if i == o.albumCursor && o.focusPanel == 0 {
-			prefix = "▸ "
-		}
-		mark := "  "
-		if name == o.playingAlbum {
-			mark = " ▶"
-		}
-		lines = append(lines, prefix+name+mark)
-	}
-	text := strings.Join(lines, "\n")
-	o.albumsTex, o.albumsTexW, o.albumsTexH = o.renderTextToTex(text, 255, 255, 255, 255)
-}
-
-func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
-	o.tracksDirty = false
-	o.deleteTex(&o.tracksTex)
-
-	if len(o.trackInfos) == 0 {
-		return
-	}
-
-	lh := o.face.Metrics().Height.Ceil()
-	maxRows := maxH / lh
-	if maxRows < 1 {
-		maxRows = 1
-	}
-	o.tracksScroll = scrollOffset(o.tracksScroll, o.trackCursor, len(o.trackInfos), maxRows)
-
-	start := o.tracksScroll
-	end := start + maxRows
-	if end > len(o.trackInfos) {
-		end = len(o.trackInfos)
-	}
-	var lines []string
-	for i := start; i < end; i++ {
-		info := o.trackInfos[i]
-		prefix := "  "
-		if i == o.trackCursor && o.focusPanel == 1 {
-			prefix = "▸ "
-		}
-		dur := formatDuration(info.Duration)
-		title := player.TrackTitle(info.Path)
-		if info.Path == o.playingTrack {
-			lines = append(lines, prefix+title+"  "+dur+" ◀")
-		} else {
-			lines = append(lines, prefix+title+"  "+dur)
-		}
-	}
-	text := strings.Join(lines, "\n")
-	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderTextToTex(text, 255, 255, 255, 255)
-}
-
-func (o *Overlay) rebuildBottomTex(w, botH int) {
-	o.bottomDirty = false
-	o.deleteTex(&o.bottomTex)
-
-	if o.playingTrack == "" {
-		return
-	}
-
-	pos := formatDuration(o.position)
-	dur := formatDuration(o.duration)
-	status := "▶"
-	if o.paused {
-		status = "⏸"
-	}
-
-	title := player.TrackTitle(o.playingTrack)
-	maxTitleW := w - int(o.fontSize*14)
-	title = o.truncateMiddle(title, maxTitleW)
-	info := ""
-	if !o.isTracker && o.sampleRate > 0 {
-		info = fmt.Sprintf("%.0fkHz", o.sampleRate/1000)
-	}
-	if !o.isTracker && o.bitrate > 0 {
-		info += fmt.Sprintf(" %.0fkbps", o.bitrate)
-	}
-	if o.isTracker {
-		if o.bpm > 0 {
-			info += fmt.Sprintf(" %.0f BPM", o.bpm)
-		}
-		if o.channels > 0 {
-			info += fmt.Sprintf(" %dch", o.channels)
-		}
-	} else if o.channels > 0 {
-		switch o.channels {
-		case 1:
-			info += " mono"
-		case 2:
-			info += " stereo"
-		default:
-			info += fmt.Sprintf(" %dch", o.channels)
-		}
-	}
-
-	text := fmt.Sprintf("%s %s  %s/%s", status, title, pos, dur)
-	if info != "" {
-		text += "  " + info
-	}
-	o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(text, 255, 255, 255, 255)
-}
-
-// truncateMiddle shortens s so it fits within maxPx pixels, replacing the
-// middle with an ellipsis. Returns s unchanged if it already fits.
-func (o *Overlay) truncateMiddle(s string, maxPx int) string {
-	if o.face == nil || maxPx <= 0 {
-		return s
-	}
-	if font.MeasureString(o.face, s).Ceil() <= maxPx {
-		return s
-	}
-	const ellipsis = "…"
-	runes := []rune(s)
-	n := len(runes)
-	for keep := (n - 1) / 2; keep > 0; keep-- {
-		candidate := string(runes[:keep]) + ellipsis + string(runes[n-keep:])
-		if font.MeasureString(o.face, candidate).Ceil() <= maxPx {
-			return candidate
-		}
-	}
-	return ellipsis
-}
-
-// BuildSettingsRows creates SettingRow entries from the current graphics
-// config and window dimensions. Call on page open and on window resize.
-func BuildSettingsRows(gs config.GraphicsSettings, winW, winH int) []SettingRow {
-	resolutions := config.ComputeResolutions(winW, winH)
-	resValues := make([]string, len(resolutions))
-	resIndex := 0
-	found := false
-	for i, r := range resolutions {
-		resValues[i] = r.String()
-		if !found && r.Width == gs.RenderWidth && r.Height == gs.RenderHeight {
-			resIndex = i
-			found = true
-		}
-	}
-	if !found && len(resolutions) > 0 {
-		closest := config.ClosestResolution(resolutions, config.RenderResolution{Width: gs.RenderWidth, Height: gs.RenderHeight})
-		for i, r := range resolutions {
-			if r == closest {
-				resIndex = i
-				break
-			}
-		}
-	}
-
-	filters := config.AllFilters()
-	filterValues := make([]string, len(filters))
-	filterIndex := 0
-	for i, f := range filters {
-		filterValues[i] = f.String()
-		if f == gs.UpscaleFilter {
-			filterIndex = i
-		}
-	}
-
-	return []SettingRow{
-		{Label: "Render resolution", Values: resValues, Index: resIndex},
-		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
-	}
-}
-
-// --- Helpers ---
-
-func (o *Overlay) deleteTex(tex *uint32) {
-	if *tex != 0 {
-		C.texDelete(C.uint(*tex))
-		*tex = 0
-	}
-}
-
-func (o *Overlay) renderTextToTex(text string, r, g, b, a byte) (uint32, int, int) {
-	if o.face == nil {
-		return 0, 0, 0
-	}
-	lines := strings.Split(text, "\n")
-	const pad = 4
-	lineHeight := o.face.Metrics().Height.Ceil()
-	texW := 0
-	for _, line := range lines {
-		bounds, _ := font.BoundString(o.face, line)
-		if width := (bounds.Max.X - bounds.Min.X).Ceil(); width > texW {
-			texW = width
-		}
-	}
-	texW += pad * 2
-	texH := lineHeight*len(lines) + pad*2
-	if texW <= 0 || texH <= 0 {
-		return 0, 0, 0
-	}
-
-	rgba := image.NewRGBA(image.Rect(0, 0, texW, texH))
-	for i, line := range lines {
-		bounds, _ := font.BoundString(o.face, line)
-		d := &font.Drawer{
-			Dst:  rgba,
-			Src:  image.NewUniform(color.RGBA{r, g, b, a}),
-			Face: o.face,
-			Dot: fixed.Point26_6{
-				X: fixed.I(pad) - bounds.Min.X,
-				Y: fixed.I(pad+i*lineHeight) - bounds.Min.Y,
-			},
-		}
-		d.DrawString(line)
-	}
-
-	tex := uploadTexture(rgba)
-	return tex, texW, texH
-}
-
-func uploadTexture(rgba *image.RGBA) uint32 {
-	if len(rgba.Pix) == 0 {
-		return 0
-	}
-	pix := (*C.uchar)(unsafe.Pointer(&rgba.Pix[0]))
-	return uint32(C.texUpload(pix, C.int(rgba.Rect.Dx()), C.int(rgba.Rect.Dy())))
-}
-
-func formatDuration(sec float64) string {
-	if sec <= 0 {
-		return "0:00"
-	}
-	m := int(sec) / 60
-	s := int(sec) % 60
-	return fmt.Sprintf("%d:%02d", m, s)
-}
-
-// Close releases GL resources.
-func (o *Overlay) Close() {
-	o.notif.Hide()
-	o.deleteTex(&o.albumsTex)
-	o.deleteTex(&o.tracksTex)
-	o.deleteTex(&o.bottomTex)
-	o.deleteTex(&o.statsTex)
-	o.deleteTex(&o.presetNameTex)
-	o.deleteTex(&o.settingsColL.tex)
-	o.deleteTex(&o.settingsColR.tex)
-	o.deleteTex(&o.presetsColL.tex)
-	o.deleteTex(&o.presetsColR.tex)
-	for i := range o.pageIndicatorTex {
-		o.deleteTex(&o.pageIndicatorTex[i])
-	}
-	if o.programText != 0 {
-		C.glDeleteProgram(C.uint(o.programText))
-		o.programText = 0
-	}
-	if o.programRect != 0 {
-		C.glDeleteProgram(C.uint(o.programRect))
-		o.programRect = 0
-	}
-	if o.face != nil {
-		_ = o.face.Close()
-	}
-}
-
-// --- Page indicator ---
-
-func (o *Overlay) renderPageIndicator(w, h int) {
-	if o.pageIndicatorDirty {
-		o.rebuildPageIndicatorTextures()
-	}
-	pages := []string{"Library", "Settings", "Presets"}
-	gap := int(o.fontSize * 2)
-	lh := o.face.Metrics().Height.Ceil()
-
-	// Compute total width.
-	totalW := 0
-	for i := range pages {
-		totalW += o.pageIndicatorTexW[i]
-		if i > 0 {
-			totalW += gap
-		}
-	}
-
-	startX := (w - totalW) / 2
-	y := int(o.fontSize * 0.5)
-
-	x := startX
-	for i := range pages {
-		if o.pageIndicatorTex[i] != 0 {
-			C.drawOverlayText(C.uint(o.programText), C.uint(o.pageIndicatorTex[i]), 1,
-				C.float(x), C.float(y), C.float(o.pageIndicatorTexW[i]), C.float(o.pageIndicatorTexH[i]),
-				C.int(w), C.int(h))
-		}
-		// Accent background for active page.
-		if UIPage(i) == o.uiPage {
-			drawAccentHighlight(o, C.float(x-4), C.float(y-2), C.float(o.pageIndicatorTexW[i]+8), C.float(lh+4), C.int(w), C.int(h))
-		}
-		x += o.pageIndicatorTexW[i] + gap
-	}
-}
-
-func (o *Overlay) rebuildPageIndicatorTextures() {
-	o.pageIndicatorDirty = false
-	pages := []string{"Library", "Settings", "Presets"}
-	for i, name := range pages {
-		o.deleteTex(&o.pageIndicatorTex[i])
-		label := "  " + name + "  "
-		if UIPage(i) == o.uiPage {
-			label = "[ " + name + " ]"
-		}
-		o.pageIndicatorTex[i], o.pageIndicatorTexW[i], o.pageIndicatorTexH[i] =
-			o.renderTextToTex(label, 255, 255, 255, 255)
-	}
-}
-
-// --- Presets page ---
-
-func (o *Overlay) renderPresetsPanels(w, h int, thirdW, panelY, panelH, lh int) {
-	texturesValid := o.presetsColL.tex != 0 && o.presetsColR.tex != 0 &&
-		C.glIsTexture(C.uint(o.presetsColL.tex)) != 0 &&
-		C.glIsTexture(C.uint(o.presetsColR.tex)) != 0
-	if !o.presetsDirty && texturesValid {
-		o.drawPresetsTextures(w, h, thirdW, panelY, panelH, lh)
-		return
-	}
-	o.presetsDirty = false
-
-	// Reserve room for the prefix marker ("▸ ") and padding on each side.
-	const rowPad = 16
-	maxTextPx := thirdW - rowPad
-	prefixPx := 0
-	if o.face != nil {
-		prefixPx = font.MeasureString(o.face, "▸ ").Ceil()
-	}
-
-	// Only render as many rows as fit in the panel: with hundreds/thousands
-	// of presets, rendering every line into one texture can exceed the
-	// GPU's max texture size, silently failing and leaving the panel a
-	// solid black square. Scroll the window instead of rendering it all.
-	maxRows := panelH / lh
-	if maxRows < 1 {
-		maxRows = 1
-	}
-
-	// Left panel — category names.
-	o.presetsScrollL = scrollOffset(o.presetsScrollL, o.presetCategoryCursor, len(o.presetCategories), maxRows)
-	var leftLines []string
-	leftEnd := o.presetsScrollL + maxRows
-	if leftEnd > len(o.presetCategories) {
-		leftEnd = len(o.presetCategories)
-	}
-	for i := o.presetsScrollL; i < leftEnd; i++ {
-		cat := o.presetCategories[i]
-		prefix := "  "
-		if i == o.presetCategoryCursor && o.panelEntered {
-			prefix = "▸ "
-		}
-		leftLines = append(leftLines, prefix+o.truncateMiddle(cat.Name, maxTextPx-prefixPx))
-	}
-	o.rebuildListTex(&o.presetsColL, leftLines)
-
-	// Right panel — presets in current category.
-	var rightLines []string
-	if cat := o.currentCategory(); cat != nil {
-		o.presetsScrollR = scrollOffset(o.presetsScrollR, o.presetCursor, len(cat.Presets), maxRows)
-		rightEnd := o.presetsScrollR + maxRows
-		if rightEnd > len(cat.Presets) {
-			rightEnd = len(cat.Presets)
-		}
-		for i := o.presetsScrollR; i < rightEnd; i++ {
-			p := cat.Presets[i]
-			mark := "  "
-			if i == o.presetCursor && o.panelEntered && o.focusPanel == 1 {
-				mark = "▸ "
-			}
-			name := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
-			rightLines = append(rightLines, mark+o.truncateMiddle(name, maxTextPx-prefixPx))
-		}
-	} else {
-		o.presetsScrollR = 0
-	}
-	o.rebuildListTex(&o.presetsColR, rightLines)
-
-	o.drawPresetsTextures(w, h, thirdW, panelY, panelH, lh)
-}
-
-// scrollOffset returns the first visible row index for a list of totalRows
-// items shown maxRows at a time, keeping cursor within the visible window
-// while clamping to the list bounds.
-func scrollOffset(current, cursor, totalRows, maxRows int) int {
-	if totalRows <= maxRows {
-		return 0
-	}
-	if cursor < current {
-		current = cursor
-	}
-	if cursor >= current+maxRows {
-		current = cursor - maxRows + 1
-	}
-	if current > totalRows-maxRows {
-		current = totalRows - maxRows
-	}
-	if current < 0 {
-		current = 0
-	}
-	return current
-}
-
-func (o *Overlay) drawPresetsTextures(w, h int, thirdW, panelY, panelH, lh int) {
-	lx, ly := C.float(0), C.float(panelY)
-	rx, ry := C.float(w*2/3), C.float(panelY)
-	colW, colH := C.float(thirdW), C.float(panelH)
-	winW, winH := C.int(w), C.int(h)
-
-	maxRows := panelH / lh
-	if maxRows < 1 {
-		maxRows = 1
-	}
-
-	leftHighlight := o.panelEntered && o.focusPanel == 0 && len(o.presetCategories) > 0
-	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelEntered && o.focusPanel == 0,
-		o.presetCategoryCursor-o.presetsScrollL, leftHighlight, lh, winW, winH)
-	drawScrollbar(o, lx+colW-3, ly, colH, len(o.presetCategories), maxRows, o.presetsScrollL, winW, winH)
-
-	rightHighlight := false
-	rightTotal := 0
-	if cat := o.currentCategory(); o.panelEntered && o.focusPanel == 1 && cat != nil && len(cat.Presets) > 0 {
-		rightHighlight = true
-		rightTotal = len(cat.Presets)
-	}
-	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, o.panelEntered && o.focusPanel == 1,
-		o.presetCursor-o.presetsScrollR, rightHighlight, lh, winW, winH)
-	drawScrollbar(o, rx+colW-3, ry, colH, rightTotal, maxRows, o.presetsScrollR, winW, winH)
 }
