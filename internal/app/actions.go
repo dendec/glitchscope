@@ -97,7 +97,7 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 }
 
 // switchScreen moves the overlay to the next/previous page and, when landing
-// on the settings page, (re)builds its rows from the current graphics config.
+// on the settings page, (re)builds its rows from the current config.
 func (a *App) switchScreen(winW, winH int, forward bool) {
 	if forward {
 		a.overlay.NextScreen()
@@ -105,7 +105,7 @@ func (a *App) switchScreen(winW, winH int, forward bool) {
 		a.overlay.PrevScreen()
 	}
 	if a.overlay.IsSettingsPage() {
-		rows := ui.BuildSettingsRows(*a.gs, winW, winH)
+		rows := ui.BuildSettingsRows(*a.settings, winW, winH)
 		a.overlay.SetSettingsRows(rows, 0)
 	}
 }
@@ -160,102 +160,89 @@ func (a *App) handleNormalAction(act input.Action) {
 	}
 }
 
-// loadPreset loads a preset by index (with wrapping) and sets it on projectM.
+// loadPreset loads a preset by index (with wrapping) via transition.
 func (a *App) loadPreset(idx int) {
 	if len(a.presetNames) == 0 {
 		return
 	}
 	n := len(a.presetNames)
-	a.presetIdx = ((idx % n) + n) % n
-	d, err := presets.Read(a.presetNames[a.presetIdx])
-	if err != nil {
-		return
-	}
-	a.pm.LoadPresetData(string(d), true)
-	if a.overlay != nil {
-		a.overlay.SetPresetName(a.presetNames[a.presetIdx])
-	}
-	slog.Info("preset", "name", a.presetNames[a.presetIdx])
+	name := a.presetNames[((idx%n)+n)%n]
+	a.transitionPreset(name)
 }
 
-// loadPresetByKey loads a preset by its store key (e.g. "category/name.milk").
+// loadPresetByKey loads a preset by its store key via transition.
 func (a *App) loadPresetByKey(key string) {
-	d, err := presets.Read(key)
-	if err != nil {
-		slog.Error("preset load", "key", key, "error", err)
-		return
-	}
-	a.pm.LoadPresetData(string(d), true)
-	// Update index if found in flat list.
-	for i, n := range a.presetNames {
-		if n == key {
-			a.presetIdx = i
-			break
-		}
-	}
-	if a.overlay != nil {
-		a.overlay.SetPresetName(key)
-	}
-	slog.Info("preset", "name", key)
+	a.transitionPreset(key)
 }
 
-// randPreset picks a random non-transition preset, optionally transitions
-// through a random "!" preset, and loads the target.
+// randPreset picks a random non-transition preset and loads it via transition.
 func (a *App) randPreset() {
 	if len(a.presetNames) == 0 {
 		return
 	}
 
-	var normal, trans []string
+	// Build pool of normal (non-"!") presets.
+	var normals []string
 	for _, n := range a.presetNames {
-		if n[0] == '!' {
-			trans = append(trans, n)
-		} else {
-			normal = append(normal, n)
+		if n[0] != '!' {
+			normals = append(normals, n)
 		}
 	}
-	if len(normal) == 0 {
-		normal = a.presetNames
+	if len(normals) == 0 {
+		normals = a.presetNames
 	}
 
-	target := normal[rand.Intn(len(normal))]
-	if len(normal) > 1 {
+	// Pick random target, avoid repeating current.
+	target := normals[rand.Intn(len(normals))]
+	if len(normals) > 1 {
 		for target == a.presetNames[a.presetIdx] {
-			target = normal[rand.Intn(len(normal))]
+			target = normals[rand.Intn(len(normals))]
 		}
 	}
 
-	if len(trans) > 0 {
-		t := trans[rand.Intn(len(trans))]
+	a.transitionPreset(target)
+}
+
+// transitionPreset loads a preset with a smooth "!" transition when available.
+// All preset changes route through here — DRY single path.
+func (a *App) transitionPreset(name string) {
+	if len(a.transitionPresets) > 0 {
+		t := a.transitionPresets[rand.Intn(len(a.transitionPresets))]
 		if d, err := presets.Read(t); err == nil {
 			a.pm.LoadPresetData(string(d), false)
 			slog.Info("transition", "name", t)
 		}
-		a.pending = pendingPreset{name: target, at: time.Now().Add(transitionDelay)}
+		a.pending = pendingPreset{name: name, at: time.Now().Add(transitionDelay)}
 		return
 	}
 
-	d, err := presets.Read(target)
+	// No transition presets: load target directly.
+	d, err := presets.Read(name)
 	if err != nil {
 		return
 	}
 	a.pm.LoadPresetData(string(d), true)
+	a.applyPresetName(name)
+}
+
+// applyPresetName updates the preset index and overlay after a preset is loaded.
+func (a *App) applyPresetName(name string) {
 	for i, n := range a.presetNames {
-		if n == target {
+		if n == name {
 			a.presetIdx = i
 			break
 		}
 	}
 	if a.overlay != nil {
-		a.overlay.SetPresetName(target)
+		a.overlay.SetPresetName(name)
 	}
-	slog.Info("preset", "name", target)
+	slog.Info("preset", "name", name)
 }
 
 // applySettings reads confirmed settings rows and applies changes.
 func (a *App) applySettings(winW, winH int) {
 	rows := a.overlay.SettingsRows()
-	if len(rows) < 2 {
+	if len(rows) < 5 {
 		return
 	}
 
@@ -264,8 +251,8 @@ func (a *App) applySettings(winW, winH int) {
 	resolutions := config.ComputeResolutions(winW, winH)
 	if resIndex >= 0 && resIndex < len(resolutions) {
 		r := resolutions[resIndex]
-		a.gs.RenderWidth = r.Width
-		a.gs.RenderHeight = r.Height
+		a.settings.Graphics.RenderWidth = r.Width
+		a.settings.Graphics.RenderHeight = r.Height
 		a.rt.Resize(r.Width, r.Height)
 		a.pm.SetWindowSize(r.Width, r.Height)
 	}
@@ -274,17 +261,33 @@ func (a *App) applySettings(winW, winH int) {
 	filterIndex := rows[1].Index
 	filters := config.AllFilters()
 	if filterIndex >= 0 && filterIndex < len(filters) {
-		a.gs.UpscaleFilter = filters[filterIndex]
-		a.rt.SetNearest(a.gs.UpscaleFilter.IsNearest())
+		a.settings.Graphics.UpscaleFilter = filters[filterIndex]
+		a.rt.SetNearest(a.settings.Graphics.UpscaleFilter.IsNearest())
 	}
 
-	if err := config.SaveSettings(a.settingsPath, *a.gs); err != nil {
+	// Row 2: Shuffle.
+	a.settings.Playback.Shuffle = rows[2].Index == 1
+
+	// Row 3: Repeat.
+	repeatModes := config.AllRepeatModes()
+	if rows[3].Index >= 0 && rows[3].Index < len(repeatModes) {
+		a.settings.Playback.Repeat = repeatModes[rows[3].Index]
+	}
+
+	// Row 4: Preset auto-switch.
+	presetIntervals := config.AllPresetIntervals()
+	if rows[4].Index >= 0 && rows[4].Index < len(presetIntervals) {
+		a.settings.PresetInterval = presetIntervals[rows[4].Index]
+		a.resetPresetTicker()
+	}
+
+	if err := config.SaveSettings(a.settingsPath, *a.settings); err != nil {
 		slog.Warn("settings save", "error", err)
 	} else {
 		slog.Debug("settings saved", "path", a.settingsPath)
 	}
 
-	rows = ui.BuildSettingsRows(*a.gs, winW, winH)
+	rows = ui.BuildSettingsRows(*a.settings, winW, winH)
 	a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 }
 

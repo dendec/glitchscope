@@ -1,4 +1,8 @@
 APP      := mdpp
+DIST_DIR := dist
+LOCAL_DIST_DIR := $(DIST_DIR)/local
+X64_DIST_DIR := $(DIST_DIR)/linux-amd64
+ARM64_DIST_DIR := $(DIST_DIR)/linux-arm64
 FONT_SUBSET := internal/ui/assets/unifont.otf
 FONT_RANGES := internal/ui/font_ranges.json
 FONT_REQUIRED := U+2014,U+2026,U+2192,U+23F8,U+25B6,U+25B8,U+25C0
@@ -68,23 +72,24 @@ $(FONT_SUBSET): $(FONT_RANGES)
 # Docker build (CI/packaging).  Depends on mdp so the preset archive is ready.
 dist: $(MDP_FILE)
 	docker build -t $(DOCKER_IMAGE_X64) -f Dockerfile .
-	@mkdir -p dist
+	@rm -rf $(X64_DIST_DIR)
+	@mkdir -p $(X64_DIST_DIR)
 	@docker rm -f mdpp-extract-x64 2>/dev/null || true
 	docker create --name mdpp-extract-x64 $(DOCKER_IMAGE_X64)
-	docker cp mdpp-extract-x64:/dist/mdpp/ ./dist/mdpp/
+	docker cp mdpp-extract-x64:/dist/mdpp/. $(X64_DIST_DIR)/
 	docker rm mdpp-extract-x64
 	@# Replace test presets with the real .mdp archive.
-	rm -rf dist/mdpp/presets/*
-	cp $(MDP_FILE) dist/mdpp/presets/.mdp
+	rm -rf $(X64_DIST_DIR)/presets/*
+	cp $(MDP_FILE) $(X64_DIST_DIR)/presets/.mdp
 	@echo "=== Built $(APP) ==="
-	@ls -lhR dist/mdpp/
+	@ls -lhR $(X64_DIST_DIR)/
 
 # Local build (default for dev, needs all deps installed).
 build: $(FONT_SUBSET) projectm-build
-	@rm -rf dist/$(APP)
-	@mkdir -p dist
+	@rm -rf $(LOCAL_DIST_DIR)
+	@mkdir -p $(LOCAL_DIST_DIR)
 	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-		$(GO) build -ldflags="-s -w" -o dist/$(APP) ./cmd/$(APP)
+		$(GO) build -ldflags="-s -w" -o $(LOCAL_DIST_DIR)/$(APP) ./cmd/$(APP)
 
 # Run locally with presets + textures + test music (run `make build` first).
 run-local: mdp textures
@@ -92,7 +97,7 @@ run-local: mdp textures
 	cp $(MDP_FILE) dist/presets/.mdp
 	cp -r $(TEXTURES_DIR)/textures/* dist/textures/ 2>/dev/null; true
 	cp test_data/music/* dist/music/ 2>/dev/null; true
-	./dist/mdpp
+	./$(LOCAL_DIST_DIR)/$(APP)
 
 # Run via Docker with X11 + audio + music mount.
 run: dist textures
@@ -165,14 +170,14 @@ PM_AUTOINSTALL := /userdata/system/.local/share/PortMaster/autoinstall
 
 dist-arm64: textures
 	docker build -t $(DOCKER_IMAGE) -f $(DOCKER_FILE) .
-	@mkdir -p dist
+	@rm -rf $(ARM64_DIST_DIR)
+	@mkdir -p $(ARM64_DIST_DIR)
 	@docker rm -f mdpp-extract 2>/dev/null || true
 	docker create --name mdpp-extract $(DOCKER_IMAGE)
-	@rm -rf dist/mdpp  # remove stale file from local build, Docker has a dir
-	docker cp mdpp-extract:/dist/. dist/
+	docker cp mdpp-extract:/dist/. $(ARM64_DIST_DIR)/
 	docker rm mdpp-extract
-	@echo "=== dist/ ==="
-	@ls -lhR dist/
+	@echo "=== $(ARM64_DIST_DIR)/ ==="
+	@ls -lhR $(ARM64_DIST_DIR)/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
 dist-portmaster: dist-arm64 portable-mdp textures
@@ -185,7 +190,7 @@ dist-portmaster: dist-arm64 portable-mdp textures
 	cp portmaster/gameinfo.xml dist/portmaster_build/ 2>/dev/null; true
 	@RELEASE_DATE=$$(date +%Y%m%d)T000000; \
 	printf '<gameList>\n    <game>\n        <path>./MDPP.sh</path>\n        <name>MDPP</name>\n        <desc>MilkDrop Portable Player — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/mdpp/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./mdpp/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/mdpp/gameinfo.xml
-	cp dist/mdpp/mdpp dist/portmaster_build/mdpp/
+	cp $(ARM64_DIST_DIR)/mdpp/mdpp dist/portmaster_build/mdpp/
 	cp $(MDP_FILE) dist/portmaster_build/mdpp/presets/.mdp
 	cp $(TEXTURES_DIR)/textures/* dist/portmaster_build/mdpp/textures/ 2>/dev/null; true
 	cp portmaster/licenses/* dist/portmaster_build/mdpp/licenses/ 2>/dev/null; true
@@ -197,7 +202,7 @@ dist-portmaster: dist-arm64 portable-mdp textures
 
 deploy: dist-arm64 portable-mdp textures
 	adb shell "mkdir -p $(DEVICE_DIR)"
-	adb push dist/mdpp/mdpp $(DEVICE_DIR)/
+	adb push $(ARM64_DIST_DIR)/mdpp/mdpp $(DEVICE_DIR)/
 	adb push portmaster/MDPP.sh $(PORTS_DIR)/
 	adb shell "mkdir -p $(DEVICE_DIR)/music"
 	adb push test_data/music/* $(DEVICE_DIR)/music/

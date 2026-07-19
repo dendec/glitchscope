@@ -1,4 +1,4 @@
-// Package config handles graphics settings types, validation, and persistence.
+// Package config handles settings types, validation, and persistence.
 package config
 
 import (
@@ -98,4 +98,90 @@ func (g *GraphicsSettings) Validate() error {
 		return fmt.Errorf("invalid upscale filter %d", g.UpscaleFilter)
 	}
 	return nil
+}
+
+// RepeatMode controls what happens when a track finishes.
+type RepeatMode int
+
+const (
+	RepeatOff    RepeatMode = iota // stop after last track
+	RepeatOne                      // restart current track
+	RepeatAll                      // loop to first track of next/first album
+)
+
+func (m RepeatMode) String() string {
+	switch m {
+	case RepeatOff:
+		return "Off"
+	case RepeatOne:
+		return "Repeat One"
+	case RepeatAll:
+		return "Repeat All"
+	default:
+		return "Unknown"
+	}
+}
+
+// AllRepeatModes returns every valid RepeatMode in display order.
+func AllRepeatModes() []RepeatMode { return []RepeatMode{RepeatOff, RepeatOne, RepeatAll} }
+
+// PlaybackSettings holds shuffle/repeat configuration.
+type PlaybackSettings struct {
+	Shuffle bool       `json:"shuffle"`
+	Repeat  RepeatMode `json:"repeat"`
+}
+
+// DefaultPlayback returns sensible playback defaults.
+func DefaultPlayback() PlaybackSettings {
+	return PlaybackSettings{Shuffle: false, Repeat: RepeatOff}
+}
+
+// PresetInterval returns the auto-switch interval in seconds.
+// 0 means off.
+type PresetInterval int
+
+const (
+	PresetOff   PresetInterval = 0
+	Preset15s   PresetInterval = 15
+	Preset30s   PresetInterval = 30
+	Preset60s   PresetInterval = 60
+	Preset2m    PresetInterval = 120
+)
+
+func (p PresetInterval) String() string {
+	switch p {
+	case PresetOff:
+		return "Off"
+	case Preset15s:
+		return "15s"
+	case Preset30s:
+		return "30s"
+	case Preset60s:
+		return "60s"
+	case Preset2m:
+		return "2m"
+	default:
+		return "Unknown"
+	}
+}
+
+// AllPresetIntervals returns every valid PresetInterval in display order.
+func AllPresetIntervals() []PresetInterval {
+	return []PresetInterval{PresetOff, Preset15s, Preset30s, Preset60s, Preset2m}
+}
+
+// Settings is the full persisted settings envelope.
+type Settings struct {
+	Graphics      GraphicsSettings  `json:"graphics"`
+	Playback      PlaybackSettings  `json:"playback"`
+	PresetInterval PresetInterval   `json:"preset_interval"`
+}
+
+// DefaultSettings returns the full default settings.
+func DefaultSettings() Settings {
+	return Settings{
+		Graphics:       DefaultGraphics(),
+		Playback:       DefaultPlayback(),
+		PresetInterval: PresetOff,
+	}
 }

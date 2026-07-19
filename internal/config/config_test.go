@@ -139,11 +139,11 @@ func TestClosestResolution(t *testing.T) {
 }
 
 func TestLoadSettingsMissing(t *testing.T) {
-	gs, err := LoadSettings("/nonexistent/path/settings.json")
+	s, err := LoadSettings("/nonexistent/path/settings.json")
 	if err != nil {
 		t.Fatal("missing file should not error:", err)
 	}
-	if gs != DefaultGraphics() {
+	if s != DefaultSettings() {
 		t.Fatal("missing file should return defaults")
 	}
 }
@@ -154,11 +154,11 @@ func TestLoadSettingsMalformed(t *testing.T) {
 	if err := os.WriteFile(p, []byte("{bad json}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	gs, err := LoadSettings(p)
+	s, err := LoadSettings(p)
 	if err != nil {
 		t.Fatal("malformed file should not error:", err)
 	}
-	if gs != DefaultGraphics() {
+	if s != DefaultSettings() {
 		t.Fatal("malformed file should return defaults")
 	}
 }
@@ -167,7 +167,11 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "settings.json")
 
-	orig := GraphicsSettings{RenderWidth: 480, RenderHeight: 360, UpscaleFilter: FilterSmooth}
+	orig := Settings{
+		Graphics:       GraphicsSettings{RenderWidth: 480, RenderHeight: 360, UpscaleFilter: FilterSmooth},
+		Playback:       PlaybackSettings{Shuffle: true, Repeat: RepeatAll},
+		PresetInterval: Preset30s,
+	}
 	if err := SaveSettings(p, orig); err != nil {
 		t.Fatal("save:", err)
 	}
@@ -190,18 +194,21 @@ func TestLoadSettingsPartial(t *testing.T) {
 	if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	gs, err := LoadSettings(p)
+	s, err := LoadSettings(p)
 	if err != nil {
 		t.Fatal("load:", err)
 	}
-	if gs.RenderWidth != 640 {
-		t.Fatalf("expected width 640, got %d", gs.RenderWidth)
+	if s.Graphics.RenderWidth != 640 {
+		t.Fatalf("expected width 640, got %d", s.Graphics.RenderWidth)
 	}
-	if gs.RenderHeight != DefaultGraphics().RenderHeight {
+	if s.Graphics.RenderHeight != DefaultGraphics().RenderHeight {
 		t.Fatal("height should use default")
 	}
-	if gs.UpscaleFilter != DefaultGraphics().UpscaleFilter {
+	if s.Graphics.UpscaleFilter != DefaultGraphics().UpscaleFilter {
 		t.Fatal("missing upscale_filter should not change default")
+	}
+	if s.Playback != DefaultPlayback() {
+		t.Fatal("missing playback should use defaults")
 	}
 }
 
@@ -210,7 +217,7 @@ func TestSaveAtomic(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "settings.json")
 
-	_ = SaveSettings(p, DefaultGraphics())
+	_ = SaveSettings(p, DefaultSettings())
 
 	// Read back once to confirm it was written.
 	b, err := os.ReadFile(p)

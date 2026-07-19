@@ -22,13 +22,13 @@ func SettingsPath() string {
 
 // LoadSettings reads and validates a settings file. Missing or malformed
 // files silently return defaults.
-func LoadSettings(path string) (GraphicsSettings, error) {
+func LoadSettings(path string) (Settings, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return DefaultGraphics(), nil
+			return DefaultSettings(), nil
 		}
-		return DefaultGraphics(), fmt.Errorf("settings open: %w", err)
+		return DefaultSettings(), fmt.Errorf("settings open: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
@@ -38,44 +38,57 @@ func LoadSettings(path string) (GraphicsSettings, error) {
 			RenderHeight  *int           `json:"render_height"`
 			UpscaleFilter *UpscaleFilter `json:"upscale_filter"`
 		} `json:"graphics"`
+		Playback *struct {
+			Shuffle *bool       `json:"shuffle"`
+			Repeat  *RepeatMode `json:"repeat"`
+		} `json:"playback"`
+		PresetInterval *PresetInterval `json:"preset_interval"`
 	}
 	if err := json.NewDecoder(f).Decode(&raw); err != nil {
 		slog.Warn("settings: malformed JSON, using defaults", "path", path, "error", err)
-		return DefaultGraphics(), nil
-	}
-	if raw.Graphics == nil {
-		return DefaultGraphics(), nil
+		return DefaultSettings(), nil
 	}
 
-	gs := DefaultGraphics()
-	if raw.Graphics.RenderWidth != nil {
-		gs.RenderWidth = *raw.Graphics.RenderWidth
+	s := DefaultSettings()
+
+	if raw.Graphics != nil {
+		if raw.Graphics.RenderWidth != nil {
+			s.Graphics.RenderWidth = *raw.Graphics.RenderWidth
+		}
+		if raw.Graphics.RenderHeight != nil {
+			s.Graphics.RenderHeight = *raw.Graphics.RenderHeight
+		}
+		if raw.Graphics.UpscaleFilter != nil {
+			s.Graphics.UpscaleFilter = *raw.Graphics.UpscaleFilter
+		}
 	}
-	if raw.Graphics.RenderHeight != nil {
-		gs.RenderHeight = *raw.Graphics.RenderHeight
+	if raw.Playback != nil {
+		if raw.Playback.Shuffle != nil {
+			s.Playback.Shuffle = *raw.Playback.Shuffle
+		}
+		if raw.Playback.Repeat != nil {
+			s.Playback.Repeat = *raw.Playback.Repeat
+		}
 	}
-	if raw.Graphics.UpscaleFilter != nil {
-		gs.UpscaleFilter = *raw.Graphics.UpscaleFilter
+	if raw.PresetInterval != nil {
+		s.PresetInterval = *raw.PresetInterval
 	}
-	if err := gs.Validate(); err != nil {
-		return DefaultGraphics(), nil // fallback on invalid data
+
+	if err := s.Graphics.Validate(); err != nil {
+		return DefaultSettings(), nil // fallback on invalid data
 	}
-	return gs, nil
+	return s, nil
 }
 
 // SaveSettings writes settings atomically (write to temp, rename).
-func SaveSettings(path string, gs GraphicsSettings) error {
+func SaveSettings(path string, s Settings) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("settings mkdir: %w", err)
 	}
 
-	if err := gs.Validate(); err != nil {
+	if err := s.Graphics.Validate(); err != nil {
 		return fmt.Errorf("settings validate: %w", err)
 	}
-
-	doc := struct {
-		Graphics GraphicsSettings `json:"graphics"`
-	}{Graphics: gs}
 
 	tmp, err := os.CreateTemp(filepath.Dir(path), "settings*.tmp")
 	if err != nil {
@@ -83,7 +96,7 @@ func SaveSettings(path string, gs GraphicsSettings) error {
 	}
 	tmpPath := tmp.Name()
 
-	if err := json.NewEncoder(tmp).Encode(doc); err != nil {
+	if err := json.NewEncoder(tmp).Encode(s); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("settings encode: %w", err)

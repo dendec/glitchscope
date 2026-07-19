@@ -43,16 +43,18 @@ type App struct {
 	lib     *player.Library
 
 	prof         *prof.Collector
-	gs           *config.GraphicsSettings
+	settings     *config.Settings
 	settingsPath string
-	presetNames  []string
-	presetIdx    int
-	presetCats   []ui.PresetCat // categories for presets page
+	presetNames      []string
+	presetIdx        int
+	presetCats       []ui.PresetCat // categories for presets page
+	transitionPresets []string      // "!"-prefixed presets for smooth transitions
 
 	renderScale         float64
 	renderScaleExplicit bool
 
-	pending pendingPreset // pending preset name + scheduled load time
+	pending      pendingPreset // pending preset name + scheduled load time
+	presetTicker *time.Ticker
 }
 
 // New creates an App with display initialised (SDL, window, GL, projectM,
@@ -114,26 +116,26 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	gs, err := config.LoadSettings(a.settingsPath)
 	if err != nil {
 		slog.Warn("settings load", "error", err)
-		gs = config.DefaultGraphics()
+		gs = config.DefaultSettings()
 	}
 	if renderNearestSet && renderNearest {
-		gs.UpscaleFilter = config.FilterPixel
+		gs.Graphics.UpscaleFilter = config.FilterPixel
 	}
 
 	resolutions := config.ComputeResolutions(int(w), int(h))
-	savedRes := config.RenderResolution{Width: gs.RenderWidth, Height: gs.RenderHeight}
+	savedRes := config.RenderResolution{Width: gs.Graphics.RenderWidth, Height: gs.Graphics.RenderHeight}
 	target := config.ClosestResolution(resolutions, savedRes)
 	renderW, renderH := target.Width, target.Height
 	if renderScaleExplicit {
 		renderW, renderH = scaledDim(int(w), renderScale), scaledDim(int(h), renderScale)
 	}
-	gs.RenderWidth, gs.RenderHeight = renderW, renderH
+	gs.Graphics.RenderWidth, gs.Graphics.RenderHeight = renderW, renderH
 
 	pm.SetWindowSize(renderW, renderH)
 	rt := projectm.NewRenderTarget(renderW, renderH)
-	rt.SetNearest(gs.UpscaleFilter.IsNearest())
+	rt.SetNearest(gs.Graphics.UpscaleFilter.IsNearest())
 	a.rt = rt
-	a.gs = &gs
+	a.settings = &gs
 
 	slog.Info("render size", "window", fmt.Sprintf("%dx%d", int(w), int(h)),
 		"internal", fmt.Sprintf("%dx%d", renderW, renderH), "scale", renderScale)
@@ -148,6 +150,9 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 
 // Close releases all resources in reverse order.
 func (a *App) Close() {
+	if a.presetTicker != nil {
+		a.presetTicker.Stop()
+	}
 	if a.rt != nil {
 		a.rt.Destroy()
 	}
@@ -180,6 +185,7 @@ func (a *App) Init() {
 	a.initInput()
 	a.initPreset()
 	a.playFirst()
+	a.startPresetTicker()
 }
 
 func (a *App) initAudio() {
@@ -218,6 +224,14 @@ func (a *App) initPreset() {
 		slog.Warn("no external presets, using minimal built-in")
 		return
 	}
+
+	// Cache transition presets ("!" prefix) for smooth preset changes.
+	for _, n := range a.presetNames {
+		if n[0] == '!' {
+			a.transitionPresets = append(a.transitionPresets, n)
+		}
+	}
+
 	// Pick a random non-transition (! prefix) preset for startup.
 	var normals []string
 	for _, n := range a.presetNames {
@@ -335,23 +349,23 @@ func (a *App) Run() {
 
 		if winChanged && prevW > 0 && prevH > 0 {
 			if a.renderScaleExplicit {
-				a.gs.RenderWidth = scaledDim(w, a.renderScale)
-				a.gs.RenderHeight = scaledDim(h, a.renderScale)
+				a.settings.Graphics.RenderWidth = scaledDim(w, a.renderScale)
+				a.settings.Graphics.RenderHeight = scaledDim(h, a.renderScale)
 			} else {
 				resolutions := config.ComputeResolutions(w, h)
-				saved := config.RenderResolution{Width: a.gs.RenderWidth, Height: a.gs.RenderHeight}
+				saved := config.RenderResolution{Width: a.settings.Graphics.RenderWidth, Height: a.settings.Graphics.RenderHeight}
 				target := config.ClosestResolution(resolutions, saved)
-				a.gs.RenderWidth, a.gs.RenderHeight = target.Width, target.Height
+				a.settings.Graphics.RenderWidth, a.settings.Graphics.RenderHeight = target.Width, target.Height
 			}
 
 			if a.overlay != nil && a.overlay.IsSettingsPage() {
-				rows := ui.BuildSettingsRows(*a.gs, w, h)
+				rows := ui.BuildSettingsRows(*a.settings, w, h)
 				a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 			}
 		}
 		prevW, prevH = w, h
 
-		renderW, renderH := a.gs.RenderWidth, a.gs.RenderHeight
+		renderW, renderH := a.settings.Graphics.RenderWidth, a.settings.Graphics.RenderHeight
 		if rw, rh := a.rt.Size(); rw != renderW || rh != renderH {
 			a.rt.Resize(renderW, renderH)
 			a.pm.SetWindowSize(renderW, renderH)
@@ -420,16 +434,7 @@ func (a *App) Run() {
 		if a.pending.name != "" && now.After(a.pending.at) {
 			if d, err := presets.Read(a.pending.name); err == nil {
 				a.pm.LoadPresetData(string(d), true)
-				for i, n := range a.presetNames {
-					if n == a.pending.name {
-						a.presetIdx = i
-						break
-					}
-				}
-				if a.overlay != nil {
-					a.overlay.SetPresetName(a.pending.name)
-				}
-				slog.Info("preset", "name", a.pending.name)
+				a.applyPresetName(a.pending.name)
 			}
 			a.pending = pendingPreset{}
 		}
@@ -443,9 +448,7 @@ func (a *App) Run() {
 
 		// Auto-advance track.
 		if a.pl != nil && a.lib != nil && a.pl.Voice() != 0 && !a.pl.IsValidVoice() {
-			if path := a.lib.TrackNext(); path != "" {
-				a.playTrack(path, a.lib.CurrentAlbum().Name)
-			}
+			a.autoAdvance()
 		}
 
 		a.pm.SetFPS(int32(fpsAvg))
@@ -484,4 +487,106 @@ func scaledDim(v int, scale float64) int {
 // presetDirPath returns the presets/ directory next to the running binary.
 func presetDirPath() string {
 	return baseDir() + "/presets"
+}
+
+// autoAdvance picks the next track based on shuffle/repeat settings.
+func (a *App) autoAdvance() {
+	if a.lib == nil || a.pl == nil {
+		return
+	}
+
+	ps := a.settings.Playback
+
+	// Repeat One: restart the same track.
+	if ps.Repeat == config.RepeatOne {
+		path := a.lib.CurrentTrack()
+		if path != "" {
+			a.playTrack(path, a.lib.CurrentAlbum().Name)
+		}
+		return
+	}
+
+	// Shuffle: pick a random track from all albums.
+	if ps.Shuffle {
+		tracks := a.allTracks()
+		if len(tracks) == 0 {
+			return
+		}
+		// Avoid replaying the same track if possible.
+		cur := a.pl.TrackPath()
+		if len(tracks) > 1 {
+			for {
+				t := tracks[rand.Intn(len(tracks))]
+				if t.path != cur {
+					a.lib.SelectAlbum(t.albumIdx)
+					a.lib.SelectTrack(t.trackIdx)
+					a.playTrack(t.path, t.album)
+					return
+				}
+			}
+		}
+		t := tracks[0]
+		a.lib.SelectAlbum(t.albumIdx)
+		a.lib.SelectTrack(t.trackIdx)
+		a.playTrack(t.path, t.album)
+		return
+	}
+
+	// Sequential: try next track in album, then next album.
+	path := a.lib.TrackNext()
+	if path != "" {
+		a.playTrack(path, a.lib.CurrentAlbum().Name)
+		return
+	}
+
+	// TrackNext wrapped to first track — in RepeatAll, advance album.
+	if ps.Repeat == config.RepeatAll {
+		path = a.lib.AlbumNext()
+		if path != "" {
+			a.playTrack(path, a.lib.CurrentAlbum().Name)
+		}
+	}
+	// RepeatOff + end of album: stop (no next track played).
+}
+
+// trackRef is a lightweight reference to a track across all albums.
+type trackRef struct {
+	path     string
+	album    string
+	albumIdx int
+	trackIdx int
+}
+
+// allTracks flattens the library into a list of all tracks.
+func (a *App) allTracks() []trackRef {
+	var all []trackRef
+	for ai, album := range a.lib.Albums {
+		for ti, path := range album.Tracks {
+			all = append(all, trackRef{path: path, album: album.Name, albumIdx: ai, trackIdx: ti})
+		}
+	}
+	return all
+}
+
+// startPresetTicker starts the auto-preset-switch ticker if configured.
+func (a *App) startPresetTicker() {
+	interval := a.settings.PresetInterval
+	if interval == config.PresetOff {
+		return
+	}
+	a.presetTicker = time.NewTicker(time.Duration(interval) * time.Second)
+	go func() {
+		for range a.presetTicker.C {
+			a.randPreset()
+		}
+	}()
+}
+
+// resetPresetTicker recreates the ticker with the current interval.
+func (a *App) resetPresetTicker() {
+	if a.presetTicker != nil {
+		a.presetTicker.Stop()
+		a.presetTicker = nil
+	}
+	a.startPresetTicker()
 }
