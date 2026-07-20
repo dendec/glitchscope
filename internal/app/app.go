@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/dendec/mdpp/internal/archive"
 	"github.com/dendec/mdpp/internal/config"
 	"github.com/dendec/mdpp/internal/input"
 	"github.com/dendec/mdpp/internal/player"
@@ -42,13 +43,14 @@ type App struct {
 	inp     *input.Input
 	lib     *player.Library
 
-	prof         *prof.Collector
-	settings     *config.Settings
-	settingsPath string
-	presetNames      []string
-	presetIdx        int
-	presetCats       []ui.PresetCat // categories for presets page
-	transitionPresets []string      // "!"-prefixed presets for smooth transitions
+	prof              *prof.Collector
+	settings          *config.Settings
+	settingsPath      string
+	textureDir        string
+	presetNames       []string
+	presetIdx         int
+	presetCats        []ui.PresetCat // categories for presets page
+	transitionPresets []string       // "!"-prefixed presets for smooth transitions
 
 	renderScale         float64
 	renderScaleExplicit bool
@@ -108,8 +110,28 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	a.pm = pm
 	slog.Info("projectM init", "ms", time.Since(t0).Milliseconds())
 
-	// Set texture search paths for user textures (milkdrop texture pack).
-	pm.SetTextureSearchPaths([]string{baseDir() + "/textures"})
+	// Keep bundled and user textures in one temporary search directory. User
+	// files are copied last so they override matching bundled textures.
+	extractedDir, extractErr := os.MkdirTemp("", "mdpp-textures-")
+	if extractErr == nil {
+		a.textureDir = extractedDir
+		textureArchive, archiveErr := archive.Open(filepath.Join(presetDirPath(), "textures.mdp"), 10000)
+		if archiveErr == nil {
+			_, extractErr = textureArchive.Extract(extractedDir)
+			_ = textureArchive.Close()
+			if extractErr != nil {
+				slog.Warn("texture archive extract failed", "error", extractErr)
+			}
+		} else if !os.IsNotExist(archiveErr) {
+			slog.Warn("texture archive open failed", "error", archiveErr)
+		}
+		if copyErr := copyPresetTextures(presetDirPath(), extractedDir); copyErr != nil {
+			slog.Warn("preset texture copy failed", "error", copyErr)
+		}
+		pm.SetTextureSearchPaths([]string{extractedDir})
+	} else {
+		slog.Warn("texture temporary directory creation failed", "error", extractErr)
+	}
 
 	w, h := win.GLGetDrawableSize()
 
@@ -167,6 +189,9 @@ func (a *App) Close() {
 	}
 	if a.pm != nil {
 		a.pm.Destroy()
+	}
+	if a.textureDir != "" {
+		_ = os.RemoveAll(a.textureDir)
 	}
 	if a.glCtx != nil {
 		sdl.GLDeleteContext(a.glCtx)
@@ -433,7 +458,7 @@ func (a *App) Run() {
 		// Complete pending transition (load target after delay).
 		if a.pending.name != "" && now.After(a.pending.at) {
 			if d, err := presets.Read(a.pending.name); err == nil {
-				a.pm.LoadPresetData(string(d), true)
+				a.pm.LoadPresetData(string(d), false)
 				a.applyPresetName(a.pending.name)
 			}
 			a.pending = pendingPreset{}
@@ -487,6 +512,36 @@ func scaledDim(v int, scale float64) int {
 // presetDirPath returns the presets/ directory next to the running binary.
 func presetDirPath() string {
 	return baseDir() + "/presets"
+}
+
+func copyPresetTextures(sourceDir, targetDir string) error {
+	return filepath.WalkDir(sourceDir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !entry.Type().IsRegular() {
+			return nil
+		}
+		ext := filepath.Ext(entry.Name())
+		switch ext {
+		case ".jpg", ".jpeg", ".png", ".dds", ".tga", ".bmp", ".dib":
+		default:
+			return nil
+		}
+		relative, err := filepath.Rel(sourceDir, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(targetDir, relative)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0o644)
+	})
 }
 
 // autoAdvance picks the next track based on shuffle/repeat settings.

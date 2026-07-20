@@ -3,15 +3,16 @@
 
 # Build output
 dist/
-presets/
+/presets/
+/docs/texture-usage.csv
+/docs/texture-optimization.csv
 
 # OS
 .DS_Store
 Thumbs.db
 
 # local test data (too large, dev only)
-test_data/music/
-test_data/presets/
+test_data
 
 # runtime-generated settings
 settings.json

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"encoding/csv"
 	"fmt"
 	"io/fs"
@@ -11,137 +10,100 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/klauspost/compress/zstd"
+	"github.com/dendec/mdpp/internal/archive"
 )
 
-func fatal(err error) {
-	fmt.Fprintf(os.Stderr, "error: %v\n", err)
-	os.Exit(1)
-}
+const (
+	presetKind  = "presets"
+	textureKind = "textures"
+)
 
 func main() {
-	if len(os.Args) != 3 && len(os.Args) != 4 {
-		fmt.Fprintf(os.Stderr, "Usage: mdp-pack <input-dir> <output.mdp> [benchmark.csv]\n")
+	if len(os.Args) != 4 && len(os.Args) != 5 {
+		fmt.Fprintln(os.Stderr, "Usage: mdp-pack <presets|textures> <input-dir> <output.mdp> [benchmark.csv]")
 		os.Exit(1)
 	}
-	inputDir := os.Args[1]
-	outputPath := os.Args[2]
-	blacklist := make(map[string]bool)
-	if len(os.Args) == 4 {
+	kind, inputDir, outputPath := os.Args[1], os.Args[2], os.Args[3]
+	if kind != presetKind && kind != textureKind {
+		fatal(fmt.Errorf("unknown archive kind %q", kind))
+	}
+
+	blacklist := map[string]bool{}
+	if len(os.Args) == 5 {
 		var err error
-		blacklist, err = loadBlacklist(os.Args[3], 20.0)
+		blacklist, err = loadBlacklist(os.Args[4], 20.0)
 		if err != nil {
 			fatal(fmt.Errorf("load benchmark: %w", err))
 		}
 	}
-
-	type entry struct {
-		name string
-		data []byte
+	entries, err := collect(inputDir, kind, blacklist)
+	if err != nil {
+		fatal(err)
 	}
-	var entries []entry
+	if len(entries) == 0 {
+		fatal(fmt.Errorf("no %s files found in %s", kind, inputDir))
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		fatal(err)
+	}
+	if err := archive.Write(outputPath, entries); err != nil {
+		fatal(fmt.Errorf("write %s: %w", outputPath, err))
+	}
+	fmt.Printf("wrote %d %s to %s\n", len(entries), kind, outputPath)
+}
 
-	if err := filepath.WalkDir(inputDir, func(path string, d fs.DirEntry, err error) error {
+func collect(root, kind string, blacklist map[string]bool) ([]archive.SourceEntry, error) {
+	var entries []archive.SourceEntry
+	err := filepath.WalkDir(root, func(path string, item fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
+		if item.IsDir() || !allowed(item.Name(), kind) {
 			return nil
 		}
-		if !strings.HasSuffix(d.Name(), ".milk") {
-			return nil
-		}
-		rel, err := filepath.Rel(inputDir, path)
+		rel, err := filepath.Rel(root, path)
 		if err != nil {
 			return err
 		}
-		if blacklist[filepath.ToSlash(rel)] {
+		key := filepath.ToSlash(rel)
+		if blacklist[key] {
 			return nil
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		entries = append(entries, entry{name: rel, data: data})
+		entries = append(entries, archive.SourceEntry{Name: key, Data: data})
 		return nil
-	}); err != nil {
-		fatal(err)
-	}
-
-	if len(entries) == 0 {
-		fmt.Fprintf(os.Stderr, "warning: no .milk files in %s\n", inputDir)
-	}
-
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].name < entries[j].name
 	})
-
-	enc, err := zstd.NewWriter(nil)
-	if err != nil {
-		fatal(fmt.Errorf("zstd encoder: %w", err))
-	}
-
-	type ce struct {
-		name  string
-		cdata []byte
-	}
-	compressed := make([]ce, len(entries))
-	for i, e := range entries {
-		compressed[i] = ce{name: e.name, cdata: enc.EncodeAll(e.data, nil)}
-	}
-
-	f, err := os.Create(outputPath)
-	if err != nil {
-		fatal(fmt.Errorf("create %s: %w", outputPath, err))
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "close %s: %v\n", outputPath, err)
-		}
-	}()
-
-	mustWrite := func(p []byte) {
-		if _, err := f.Write(p); err != nil {
-			fatal(fmt.Errorf("write: %w", err))
-		}
-	}
-	mustBinaryWrite := func(data any) {
-		if err := binary.Write(f, binary.LittleEndian, data); err != nil {
-			fatal(fmt.Errorf("write: %w", err))
-		}
-	}
-
-	mustWrite([]byte("MDP\x00"))
-	mustBinaryWrite(uint32(1))               // version
-	mustBinaryWrite(uint32(len(compressed))) // count
-
-	for _, e := range compressed {
-		nb := []byte(e.name)
-		mustBinaryWrite(uint16(len(nb)))
-		mustWrite(nb)
-		mustBinaryWrite(uint32(len(e.cdata)))
-	}
-
-	for _, e := range compressed {
-		mustWrite(e.cdata)
-	}
-
-	// Sync before close.
-	if err := f.Sync(); err != nil {
-		fmt.Fprintf(os.Stderr, "sync %s: %v\n", outputPath, err)
-	}
-
-	fmt.Printf("wrote %d presets to %s\n", len(compressed), outputPath)
-}
-
-func loadBlacklist(path string, minFPS float64) (map[string]bool, error) {
-	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = f.Close() }()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
+	return entries, nil
+}
 
-	records, err := csv.NewReader(f).ReadAll()
+func allowed(name, kind string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	if kind == presetKind {
+		return ext == ".milk"
+	}
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".dds", ".tga", ".bmp", ".dib":
+		return true
+	default:
+		return false
+	}
+}
+
+func loadBlacklist(path string, minFPS float64) (map[string]bool, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+
+	records, err := csv.NewReader(file).ReadAll()
 	if err != nil {
 		return nil, err
 	}
@@ -167,4 +129,9 @@ func loadBlacklist(path string, minFPS float64) (map[string]bool, error) {
 		}
 	}
 	return blacklist, nil
+}
+
+func fatal(err error) {
+	fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	os.Exit(1)
 }

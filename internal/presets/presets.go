@@ -1,37 +1,32 @@
-// Package presets loads .milk preset files from .mdp archive and presets/ dir.
+// Package presets loads .milk preset files from presets.mdp and presets/ dir.
 package presets
 
 import (
-	"encoding/binary"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/klauspost/compress/zstd"
+	"github.com/dendec/mdpp/internal/archive"
 )
-
-var zstdDec, _ = zstd.NewReader(nil)
 
 type entry struct {
 	name    string
-	zstLen  uint32
 	dataOff int64 // offset in .mdp, -1 = filesystem
 }
 
 type presetStore struct {
 	dir     string
-	mdpFile *os.File
+	mdpFile *archive.Archive
 	entries map[string]entry
 	names   []string
 }
 
 var store *presetStore
 
-// Open loads presets from dir/.mdp and scans dir/*.milk + dir/*/*.milk.
-// User .milk files override same-named entries from .mdp.
+// Open loads presets from dir/presets.mdp and scans dir/*.milk + dir/*/*.milk.
+// User .milk files override same-named entries from presets.mdp.
 func Open(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return err
@@ -42,17 +37,14 @@ func Open(dir string) error {
 		entries: make(map[string]entry),
 	}
 
-	// Load .mdp archive if present.
-	mdpPath := filepath.Join(dir, ".mdp")
-	if f, err := os.Open(mdpPath); err == nil {
-		s.mdpFile = f
-		if err := s.loadMDP(); err != nil {
-			_ = f.Close()
-			s.mdpFile = nil
-		}
+	// Load presets.mdp if present.
+	mdpPath := filepath.Join(dir, "presets.mdp")
+	if mdp, err := archive.Open(mdpPath, 100000); err == nil {
+		s.mdpFile = mdp
+		s.loadMDP()
 	}
 
-	// Scan user .milk files (override same names from .mdp).
+	// Scan user .milk files (override same names from presets.mdp).
 	s.scanUser()
 
 	// Build sorted names list.
@@ -66,65 +58,10 @@ func Open(dir string) error {
 	return nil
 }
 
-func (s *presetStore) loadMDP() error {
-	var magic [4]byte
-	if _, err := io.ReadFull(s.mdpFile, magic[:]); err != nil {
-		return err
+func (s *presetStore) loadMDP() {
+	for _, item := range s.mdpFile.Entries() {
+		s.entries[item.Name] = entry{name: item.Name, dataOff: 0}
 	}
-	if magic != [4]byte{'M', 'D', 'P', 0} {
-		return fmt.Errorf("bad magic: %x", magic)
-	}
-
-	var version uint32
-	if err := binary.Read(s.mdpFile, binary.LittleEndian, &version); err != nil {
-		return err
-	}
-	if version != 1 {
-		return fmt.Errorf("unsupported version: %d", version)
-	}
-
-	var numEntries uint32
-	if err := binary.Read(s.mdpFile, binary.LittleEndian, &numEntries); err != nil {
-		return err
-	}
-	if numEntries > 100000 {
-		return fmt.Errorf("too many entries: %d", numEntries)
-	}
-
-	type rawEntry struct {
-		name   string
-		zstLen uint32
-	}
-	raw := make([]rawEntry, numEntries)
-
-	for i := range raw {
-		var nameLen uint16
-		if err := binary.Read(s.mdpFile, binary.LittleEndian, &nameLen); err != nil {
-			return err
-		}
-		nameBytes := make([]byte, nameLen)
-		if _, err := io.ReadFull(s.mdpFile, nameBytes); err != nil {
-			return err
-		}
-		raw[i].name = string(nameBytes)
-		if err := binary.Read(s.mdpFile, binary.LittleEndian, &raw[i].zstLen); err != nil {
-			return err
-		}
-	}
-
-	// Compute data offsets (data starts at current file position).
-	dataStart, _ := s.mdpFile.Seek(0, io.SeekCurrent)
-	offset := dataStart
-	for _, r := range raw {
-		s.entries[r.name] = entry{
-			name:    r.name,
-			zstLen:  r.zstLen,
-			dataOff: offset,
-		}
-		offset += int64(r.zstLen)
-	}
-
-	return nil
 }
 
 func (s *presetStore) scanUser() {
@@ -163,7 +100,7 @@ func Names() []string {
 }
 
 // Read returns decompressed preset bytes for the given key.
-// User .milk files take priority over .mdp entries.
+// User .milk files take priority over presets.mdp entries.
 func Read(key string) ([]byte, error) {
 	if store == nil {
 		return nil, fmt.Errorf("presets not loaded")
@@ -178,16 +115,8 @@ func Read(key string) ([]byte, error) {
 		return os.ReadFile(filepath.Join(store.dir, key))
 	}
 
-	// Read from .mdp archive.
-	buf := make([]byte, e.zstLen)
-	if _, err := store.mdpFile.ReadAt(buf, e.dataOff); err != nil {
-		return nil, err
-	}
-	dst, err := zstdDec.DecodeAll(buf, nil)
-	if err != nil {
-		return nil, err
-	}
-	return dst, nil
+	// Read from presets.mdp archive.
+	return store.mdpFile.Read(key)
 }
 
 // categoryOf returns the category a preset key belongs to. Presets nested at

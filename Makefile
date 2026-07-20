@@ -29,11 +29,14 @@ PRESETS_DIR   := dist/presets-cream-of-the-crop
 MDP_FILE      := dist/presets.mdp
 FULL_MDP_FILE := dist/presets-all.mdp
 BENCHMARK_CSV := docs/benchmark/render-scale-0.5_mesh-8.csv
+TEXTURES_MDP_FILE := portmaster/presets/textures.mdp
+OPTIMIZED_TEXTURES := dist/optimized-textures
+TEXTURE_REPORT := docs/texture-usage.csv
 
 TEXTURES_REPO := https://github.com/projectM-visualizer/presets-milkdrop-texture-pack.git
 TEXTURES_DIR  := dist/presets-milkdrop-texture-pack
 
-.PHONY: build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures
+.PHONY: build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures optimize-textures texture-archive texture-report
 
 submodules:
 	git submodule update --init --recursive
@@ -70,7 +73,7 @@ $(FONT_SUBSET): $(FONT_RANGES)
 	rm -f /tmp/unifont-full.otf
 
 # Docker build (CI/packaging).  Depends on mdp so the preset archive is ready.
-dist: $(MDP_FILE)
+dist: $(MDP_FILE) $(TEXTURES_MDP_FILE)
 	docker build -t $(DOCKER_IMAGE_X64) -f Dockerfile .
 	@rm -rf $(X64_DIST_DIR)
 	@mkdir -p $(X64_DIST_DIR)
@@ -80,7 +83,9 @@ dist: $(MDP_FILE)
 	docker rm mdpp-extract-x64
 	@# Replace test presets with the real .mdp archive.
 	rm -rf $(X64_DIST_DIR)/presets/*
-	cp $(MDP_FILE) $(X64_DIST_DIR)/presets/.mdp
+	cp $(MDP_FILE) $(X64_DIST_DIR)/presets/presets.mdp
+	rm -rf $(X64_DIST_DIR)/textures
+	cp $(TEXTURES_MDP_FILE) $(X64_DIST_DIR)/presets/textures.mdp
 	@echo "=== Built $(APP) ==="
 	@ls -lhR $(X64_DIST_DIR)/
 
@@ -92,23 +97,22 @@ build: $(FONT_SUBSET) projectm-build
 		$(GO) build -ldflags="-s -w" -o $(LOCAL_DIST_DIR)/$(APP) ./cmd/$(APP)
 
 # Run locally with presets + textures + test music (run `make build` first).
-run-local: mdp textures
-	@mkdir -p dist/presets dist/textures dist/music
-	cp $(MDP_FILE) dist/presets/.mdp
-	cp -r $(TEXTURES_DIR)/textures/* dist/textures/ 2>/dev/null; true
-	cp test_data/music/* dist/music/ 2>/dev/null; true
+run-local: mdp $(TEXTURES_MDP_FILE)
+	@mkdir -p $(LOCAL_DIST_DIR)/presets $(LOCAL_DIST_DIR)/music
+	cp $(MDP_FILE) $(LOCAL_DIST_DIR)/presets/presets.mdp
+	cp $(TEXTURES_MDP_FILE) $(LOCAL_DIST_DIR)/presets/textures.mdp
+	cp -r test_data/. $(LOCAL_DIST_DIR)/music/
 	./$(LOCAL_DIST_DIR)/$(APP)
 
 # Run via Docker with X11 + audio + music mount.
-run: dist textures
+run: dist
 	@mkdir -p music
 	docker run --rm -it \
 		--net=host \
 		-e DISPLAY=$${DISPLAY} \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:ro \
 		-v /dev/snd:/dev/snd:ro \
-		-v "$$(pwd)/music:/build/test_data/music:ro" \
-		-v "$$(pwd)/$(TEXTURES_DIR)/textures:/dist/mdpp/textures:ro" \
+		-v "$$(pwd)/music:/build/test_data:ro" \
 		--group-add audio \
 		$(DOCKER_IMAGE_X64)
 
@@ -146,16 +150,33 @@ textures:
 		echo "=== Downloaded milkdrop texture pack ==="; \
 	fi
 
+optimize-textures: textures
+	./scripts/optimize-textures.sh $(TEXTURES_DIR)/textures $(OPTIMIZED_TEXTURES) docs/texture-optimization.csv
+
+texture-archive: cmd/mdp-pack/main.go
+	@mkdir -p $(dir $(TEXTURES_MDP_FILE))
+	@if [ ! -d "$(OPTIMIZED_TEXTURES)" ]; then \
+		$(MAKE) optimize-textures; \
+	fi
+	go run ./cmd/mdp-pack textures $(OPTIMIZED_TEXTURES) $(TEXTURES_MDP_FILE)
+
+
+$(TEXTURES_MDP_FILE): cmd/mdp-pack/main.go
+	$(MAKE) texture-archive
+
+texture-report: presets cmd/texture-report/main.go
+	go run ./cmd/texture-report $(PRESETS_DIR) $(TEXTURE_REPORT)
+
 # Build presets.mdp archive from cream-of-the-crop dir (only if missing).
 $(FULL_MDP_FILE):
-	$(GO) run ./cmd/mdp-pack $(PRESETS_DIR) $@
+	$(GO) run ./cmd/mdp-pack presets $(PRESETS_DIR) $@
 	@echo "=== Built full preset archive ==="
 	@ls -lh $@
 
 mdp: presets $(FULL_MDP_FILE)
 
 $(MDP_FILE): presets $(BENCHMARK_CSV) cmd/mdp-pack/main.go
-	$(GO) run ./cmd/mdp-pack $(PRESETS_DIR) $@ $(BENCHMARK_CSV)
+	$(GO) run ./cmd/mdp-pack presets $(PRESETS_DIR) $@ $(BENCHMARK_CSV)
 	@echo "=== Built filtered portable preset archive ==="
 	@ls -lh $@
 
@@ -168,7 +189,7 @@ PORTS_DIR    := /userdata/roms/ports
 DEVICE_DIR   := $(PORTS_DIR)/mdpp
 PM_AUTOINSTALL := /userdata/system/.local/share/PortMaster/autoinstall
 
-dist-arm64: textures
+dist-arm64: $(TEXTURES_MDP_FILE)
 	docker build -t $(DOCKER_IMAGE) -f $(DOCKER_FILE) .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)
@@ -176,13 +197,15 @@ dist-arm64: textures
 	docker create --name mdpp-extract $(DOCKER_IMAGE)
 	docker cp mdpp-extract:/dist/. $(ARM64_DIST_DIR)/
 	docker rm mdpp-extract
+	rm -rf $(ARM64_DIST_DIR)/mdpp/textures
+	cp $(TEXTURES_MDP_FILE) $(ARM64_DIST_DIR)/mdpp/presets/textures.mdp
 	@echo "=== $(ARM64_DIST_DIR)/ ==="
 	@ls -lhR $(ARM64_DIST_DIR)/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
-dist-portmaster: dist-arm64 portable-mdp textures
+dist-portmaster: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE)
 	@rm -rf dist/portmaster_build
-	@mkdir -p dist/portmaster_build/mdpp/presets dist/portmaster_build/mdpp/textures dist/portmaster_build/mdpp/licenses
+	@mkdir -p dist/portmaster_build/mdpp/presets dist/portmaster_build/mdpp/licenses
 	cp portmaster/MDPP.sh dist/portmaster_build/
 	cp portmaster/port.json dist/portmaster_build/
 	cp portmaster/README.md dist/portmaster_build/
@@ -191,8 +214,8 @@ dist-portmaster: dist-arm64 portable-mdp textures
 	@RELEASE_DATE=$$(date +%Y%m%d)T000000; \
 	printf '<gameList>\n    <game>\n        <path>./MDPP.sh</path>\n        <name>MDPP</name>\n        <desc>MilkDrop Portable Player — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/mdpp/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./mdpp/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/mdpp/gameinfo.xml
 	cp $(ARM64_DIST_DIR)/mdpp/mdpp dist/portmaster_build/mdpp/
-	cp $(MDP_FILE) dist/portmaster_build/mdpp/presets/.mdp
-	cp $(TEXTURES_DIR)/textures/* dist/portmaster_build/mdpp/textures/ 2>/dev/null; true
+	cp $(MDP_FILE) dist/portmaster_build/mdpp/presets/presets.mdp
+	cp $(TEXTURES_MDP_FILE) dist/portmaster_build/mdpp/presets/textures.mdp
 	cp portmaster/licenses/* dist/portmaster_build/mdpp/licenses/ 2>/dev/null; true
 	cp portmaster/screenshot.png dist/portmaster_build/mdpp/cover.png 2>/dev/null; true
 	@rm -f dist/mdpp.zip
@@ -200,32 +223,25 @@ dist-portmaster: dist-arm64 portable-mdp textures
 	@echo "=== Generated dist/mdpp.zip ==="
 	@ls -lh dist/mdpp.zip
 
-deploy: dist-arm64 portable-mdp textures
+deploy: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE)
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push $(ARM64_DIST_DIR)/mdpp/mdpp $(DEVICE_DIR)/
 	adb push portmaster/MDPP.sh $(PORTS_DIR)/
 	adb shell "mkdir -p $(DEVICE_DIR)/music"
-	adb push test_data/music/* $(DEVICE_DIR)/music/
+	adb push test_data/* $(DEVICE_DIR)/music
 	# Deploy presets as single .mdp archive (fast on FAT32).
 	adb shell "mkdir -p $(DEVICE_DIR)/presets"
-	adb push $(MDP_FILE) $(DEVICE_DIR)/presets/.mdp
-	# Deploy textures for milkdrop presets with user textures.
-	adb shell "mkdir -p $(DEVICE_DIR)/textures"
-	adb push $(TEXTURES_DIR)/textures/* $(DEVICE_DIR)/textures/
+	adb push $(MDP_FILE) $(DEVICE_DIR)/presets/presets.mdp
+	# Deploy the optimized texture archive for MilkDrop presets.
+	adb push $(TEXTURES_MDP_FILE) $(DEVICE_DIR)/presets/textures.mdp
 	adb shell "killall -9 mdpp 2>/dev/null; true"
 	@echo "=== Deployed binary + music + presets + textures ==="
-
-deploy-song:
-	adb shell "mkdir -p $(DEVICE_DIR)/music"
-	adb push test_data/song.mp3 $(DEVICE_DIR)/
-	adb push test_data/music $(DEVICE_DIR)/music
-	@echo "=== Deployed song + music test dirs ==="
 
 deploy-portmaster: dist-portmaster
 	adb push dist/mdpp.zip $(PM_AUTOINSTALL)/
 	@echo "=== Deployed to autoinstall ==="
-	adb shell "mkdir -p $(DEVICE_DIR)"
-	adb push test_data/song.mp3 $(DEVICE_DIR)/song.mp3
+	adb shell "mkdir -p $(DEVICE_DIR)/music"
+	adb push test_data/* $(DEVICE_DIR)/music
 	@echo "=== Song deployed to $(DEVICE_DIR) ==="
 
 kill:

@@ -3,7 +3,6 @@ package app
 import (
 	"log/slog"
 	"math/rand"
-	"time"
 
 	"github.com/dendec/mdpp/internal/config"
 	"github.com/dendec/mdpp/internal/input"
@@ -203,25 +202,14 @@ func (a *App) randPreset() {
 	a.transitionPreset(target)
 }
 
-// transitionPreset loads a preset with a smooth "!" transition when available.
+// transitionPreset loads the selected preset immediately.
 // All preset changes route through here — DRY single path.
 func (a *App) transitionPreset(name string) {
-	if len(a.transitionPresets) > 0 {
-		t := a.transitionPresets[rand.Intn(len(a.transitionPresets))]
-		if d, err := presets.Read(t); err == nil {
-			a.pm.LoadPresetData(string(d), false)
-			slog.Info("transition", "name", t)
-		}
-		a.pending = pendingPreset{name: name, at: time.Now().Add(transitionDelay)}
-		return
-	}
-
-	// No transition presets: load target directly.
 	d, err := presets.Read(name)
 	if err != nil {
 		return
 	}
-	a.pm.LoadPresetData(string(d), true)
+	a.pm.LoadPresetData(string(d), false)
 	a.applyPresetName(name)
 }
 
