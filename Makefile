@@ -10,8 +10,22 @@ FONT_URL := https://unifoundry.com/pub/unifont/unifont-17.0.05/font-builds/unifo
 GO       := go
 GOFLAGS  := CGO_ENABLED=1
 
-SDL_CFLAGS := $(shell pkg-config --cflags sdl2)
-SDL_LIBS   := $(shell pkg-config --libs sdl2)
+PRESETS_REPO       := https://github.com/projectM-visualizer/presets-cream-of-the-crop.git
+PRESETS_DIR        := dist/presets-cream-of-the-crop
+MDP_FILE           := dist/presets.mdp
+FULL_MDP_FILE      := dist/presets-all.mdp
+BENCHMARK_CSV      := docs/benchmark/render-scale-0.5_mesh-8.csv
+TEXTURES_REPO      := https://github.com/projectM-visualizer/presets-milkdrop-texture-pack.git
+TEXTURES_DIR       := dist/presets-milkdrop-texture-pack
+OPTIMIZED_TEXTURES := dist/textures-optimized
+TEXTURES_MDP_FILE  := dist/textures.mdp
+TEXTURE_REPORT     := docs/texture-usage-report.csv
+PORTS_DIR          := /userdata/roms/ports
+DEVICE_DIR         := $(PORTS_DIR)/mdpp
+PM_AUTOINSTALL     := /userdata/system/.local/share/PortMaster/autoinstall
+
+SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
+SDL_LIBS   := $(shell pkg-config --libs sdl2 2>/dev/null)
 
 PROJECTM_DIR      := lib/projectm
 PROJECTM_BUILD    := $(PROJECTM_DIR)/build
@@ -23,62 +37,21 @@ CGO_CXXFLAGS := $(SDL_CFLAGS) -Wno-write-strings
 CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm -lopenmpt
 
 DOCKER_IMAGE_X64 := mdpp-builder
+DOCKER_BUILDER   := mdpp-builder:latest
 
-PRESETS_REPO  := https://github.com/projectM-visualizer/presets-cream-of-the-crop.git
-PRESETS_DIR   := dist/presets-cream-of-the-crop
-MDP_FILE      := dist/presets.mdp
-FULL_MDP_FILE := dist/presets-all.mdp
-BENCHMARK_CSV := docs/benchmark/render-scale-0.5_mesh-8.csv
-TEXTURES_MDP_FILE := portmaster/presets/textures.mdp
-OPTIMIZED_TEXTURES := dist/optimized-textures
-TEXTURE_REPORT := docs/texture-usage.csv
+.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures optimize-textures texture-archive texture-report
 
-TEXTURES_REPO := https://github.com/projectM-visualizer/presets-milkdrop-texture-pack.git
-TEXTURES_DIR  := dist/presets-milkdrop-texture-pack
+# Builder image: C/C++ static dependencies compiled once for amd64 & arm64
+builder:
+	docker build -t $(DOCKER_BUILDER) -f Dockerfile.builder .
 
-.PHONY: build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures optimize-textures texture-archive texture-report
-
-submodules:
-	git submodule update --init --recursive
-
-projectm-build: submodules $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB)
-
-$(PROJECTM_LIB) $(PROJECTM_EVAL_LIB): $(PROJECTM_BUILD)/Makefile
-	cmake --build $(PROJECTM_BUILD) --target projectM -- -j$$(nproc)
-
-$(PROJECTM_BUILD)/Makefile: $(PROJECTM_DIR)/CMakeLists.txt $(PROJECTM_PATCH)
-	@# Apply custom patch for feedback framebuffer injection.
-	cd $(PROJECTM_DIR) && git apply ../../$(PROJECTM_PATCH) 2>/dev/null; true
-	@# Patch config.h.cmake.in — upstream uses git hash but we
-	@# build in detached/submodule mode without full git history.
-	sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
-		$(PROJECTM_DIR)/config.h.cmake.in 2>/dev/null; true
-	mkdir -p $(PROJECTM_BUILD)
-	cd $(PROJECTM_BUILD) && cmake .. \
-		-DBUILD_SHARED_LIBS=OFF \
-		-DENABLE_PLAYLIST=OFF \
-		-DENABLE_SDL_UI=OFF \
-		-DBUILD_TESTING=OFF \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DENABLE_INSTALL=OFF
-
-$(FONT_SUBSET): $(FONT_RANGES)
-	wget -q -O /tmp/unifont-full.otf $(FONT_URL)
-	pyftsubset /tmp/unifont-full.otf \
-		--unicodes=$$(python3 -c "import json; print(','.join(json.load(open('$(FONT_RANGES)'))))") \
-		--no-prune-unicode-ranges \
-		--no-subset-tables+=OS/2 \
-		--output-file=$(FONT_SUBSET) 2>&1
-	python3 -c "from fontTools.ttLib import TTFont; f=TTFont('$(FONT_SUBSET)'); c={cp for t in f['cmap'].tables for cp in t.cmap}; r='$(FONT_REQUIRED)'.split(','); m=[x for x in r if int(x[2:],16) not in c]; assert not m, 'missing UI glyphs: '+','.join(m)"
-	rm -f /tmp/unifont-full.otf
-
-# Docker build (CI/packaging).  Depends on mdp so the preset archive is ready.
-dist: $(MDP_FILE) $(TEXTURES_MDP_FILE)
-	docker build -t $(DOCKER_IMAGE_X64) -f Dockerfile .
+# Docker build (amd64)
+dist: builder $(MDP_FILE) $(TEXTURES_MDP_FILE)
+	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t mdpp:amd64 -f Dockerfile .
 	@rm -rf $(X64_DIST_DIR)
 	@mkdir -p $(X64_DIST_DIR)
 	@docker rm -f mdpp-extract-x64 2>/dev/null || true
-	docker create --name mdpp-extract-x64 $(DOCKER_IMAGE_X64)
+	docker create --name mdpp-extract-x64 mdpp:amd64
 	docker cp mdpp-extract-x64:/dist/mdpp/. $(X64_DIST_DIR)/
 	docker rm mdpp-extract-x64
 	@# Replace test presets with the real .mdp archive.
@@ -86,117 +59,22 @@ dist: $(MDP_FILE) $(TEXTURES_MDP_FILE)
 	cp $(MDP_FILE) $(X64_DIST_DIR)/presets/presets.mdp
 	rm -rf $(X64_DIST_DIR)/textures
 	cp $(TEXTURES_MDP_FILE) $(X64_DIST_DIR)/presets/textures.mdp
-	@echo "=== Built $(APP) ==="
+	@echo "=== Built $(APP) (amd64) ==="
 	@ls -lhR $(X64_DIST_DIR)/
 
-# Local build (default for dev, needs all deps installed).
-build: $(FONT_SUBSET) projectm-build
-	@rm -rf $(LOCAL_DIST_DIR)
-	@mkdir -p $(LOCAL_DIST_DIR)
-	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-		$(GO) build -ldflags="-s -w" -o $(LOCAL_DIST_DIR)/$(APP) ./cmd/$(APP)
+# ARM64 cross-build via Docker
+DOCKER_IMAGE_ARM64 := mdpp:arm64
 
-# Run locally with presets + textures + test music (run `make build` first).
-run-local: mdp $(TEXTURES_MDP_FILE)
-	@mkdir -p $(LOCAL_DIST_DIR)/presets $(LOCAL_DIST_DIR)/music
-	cp $(MDP_FILE) $(LOCAL_DIST_DIR)/presets/presets.mdp
-	cp $(TEXTURES_MDP_FILE) $(LOCAL_DIST_DIR)/presets/textures.mdp
-	cp -r test_data/. $(LOCAL_DIST_DIR)/music/
-	./$(LOCAL_DIST_DIR)/$(APP)
-
-# Run via Docker with X11 + audio + music mount.
-run: dist
-	@mkdir -p music
-	docker run --rm -it \
-		--net=host \
-		-e DISPLAY=$${DISPLAY} \
-		-v /tmp/.X11-unix:/tmp/.X11-unix:ro \
-		-v /dev/snd:/dev/snd:ro \
-		-v "$$(pwd)/music:/build/test_data:ro" \
-		--group-add audio \
-		$(DOCKER_IMAGE_X64)
-
-lint:
-	@which golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-		golangci-lint run ./cmd/... ./internal/...
-
-test:
-	CGO_ENABLED=1 CGO_CFLAGS="$(CGO_CFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" \
-		$(GO) test -count=1 ./cmd/... ./internal/...
-
-tidy:
-	$(GO) mod tidy
-
-clean:
-	rm -f $(APP) go.sum
-	rm -rf dist
-
-# Download cream-of-the-crop presets (9.8K presets, ~160MB).
-presets:
-	@if [ -d "$(PRESETS_DIR)" ]; then \
-		echo "Presets already in $(PRESETS_DIR). Delete and rerun to re-clone."; \
-	else \
-		git clone --depth 1 $(PRESETS_REPO) $(PRESETS_DIR); \
-		echo "=== Downloaded cream-of-the-crop presets ==="; \
-	fi
-
-# Download milkdrop texture pack (~15MB, needed for presets with user textures).
-textures:
-	@if [ -d "$(TEXTURES_DIR)" ]; then \
-		echo "Textures already in $(TEXTURES_DIR). Delete and rerun to re-clone."; \
-	else \
-		git clone --depth 1 $(TEXTURES_REPO) $(TEXTURES_DIR); \
-		echo "=== Downloaded milkdrop texture pack ==="; \
-	fi
-
-optimize-textures: textures
-	./scripts/optimize-textures.sh $(TEXTURES_DIR)/textures $(OPTIMIZED_TEXTURES) docs/texture-optimization.csv
-
-texture-archive: cmd/mdp-pack/main.go
-	@mkdir -p $(dir $(TEXTURES_MDP_FILE))
-	@if [ ! -d "$(OPTIMIZED_TEXTURES)" ]; then \
-		$(MAKE) optimize-textures; \
-	fi
-	go run ./cmd/mdp-pack textures $(OPTIMIZED_TEXTURES) $(TEXTURES_MDP_FILE)
-
-
-$(TEXTURES_MDP_FILE): cmd/mdp-pack/main.go
-	$(MAKE) texture-archive
-
-texture-report: presets cmd/texture-report/main.go
-	go run ./cmd/texture-report $(PRESETS_DIR) $(TEXTURE_REPORT)
-
-# Build presets.mdp archive from cream-of-the-crop dir (only if missing).
-$(FULL_MDP_FILE):
-	$(GO) run ./cmd/mdp-pack presets $(PRESETS_DIR) $@
-	@echo "=== Built full preset archive ==="
-	@ls -lh $@
-
-mdp: presets $(FULL_MDP_FILE)
-
-$(MDP_FILE): presets $(BENCHMARK_CSV) cmd/mdp-pack/main.go
-	$(GO) run ./cmd/mdp-pack presets $(PRESETS_DIR) $@ $(BENCHMARK_CSV)
-	@echo "=== Built filtered portable preset archive ==="
-	@ls -lh $@
-
-portable-mdp: presets $(MDP_FILE)
-
-# ARM64 cross-build via Docker.
-DOCKER_IMAGE := mdpp-arm64
-DOCKER_FILE  := Dockerfile.arm64
-PORTS_DIR    := /userdata/roms/ports
-DEVICE_DIR   := $(PORTS_DIR)/mdpp
-PM_AUTOINSTALL := /userdata/system/.local/share/PortMaster/autoinstall
-
-dist-arm64: $(TEXTURES_MDP_FILE)
-	docker build -t $(DOCKER_IMAGE) -f $(DOCKER_FILE) .
+dist-arm64: builder portable-mdp $(TEXTURES_MDP_FILE)
+	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)
 	@docker rm -f mdpp-extract 2>/dev/null || true
-	docker create --name mdpp-extract $(DOCKER_IMAGE)
+	docker create --name mdpp-extract $(DOCKER_IMAGE_ARM64)
 	docker cp mdpp-extract:/dist/. $(ARM64_DIST_DIR)/
 	docker rm mdpp-extract
+	rm -rf $(ARM64_DIST_DIR)/mdpp/presets/*
+	cp $(MDP_FILE) $(ARM64_DIST_DIR)/mdpp/presets/presets.mdp
 	rm -rf $(ARM64_DIST_DIR)/mdpp/textures
 	cp $(TEXTURES_MDP_FILE) $(ARM64_DIST_DIR)/mdpp/presets/textures.mdp
 	@echo "=== $(ARM64_DIST_DIR)/ ==="
@@ -247,3 +125,70 @@ deploy-portmaster: dist-portmaster
 kill:
 	adb shell "killall -9 mdpp 2>/dev/null || true"
 	@echo "=== Killed mdpp on device ==="
+
+# Download cream-of-the-crop presets (9.8K presets, ~160MB).
+presets:
+	@if [ -d "$(PRESETS_DIR)" ]; then \
+		echo "Presets already in $(PRESETS_DIR). Delete and rerun to re-clone."; \
+	else \
+		git clone --depth 1 $(PRESETS_REPO) $(PRESETS_DIR); \
+		echo "=== Downloaded cream-of-the-crop presets ==="; \
+	fi
+
+# Download milkdrop texture pack (~15MB, needed for presets with user textures).
+textures:
+	@if [ -d "$(TEXTURES_DIR)" ]; then \
+		echo "Textures already in $(TEXTURES_DIR). Delete and rerun to re-clone."; \
+	else \
+		git clone --depth 1 $(TEXTURES_REPO) $(TEXTURES_DIR); \
+		echo "=== Downloaded milkdrop texture pack ==="; \
+	fi
+
+optimize-textures: textures
+	./scripts/optimize-textures.sh $(TEXTURES_DIR)/textures $(OPTIMIZED_TEXTURES) docs/texture-optimization.csv
+
+texture-archive:
+	@rm -f $(TEXTURES_MDP_FILE)
+	$(MAKE) $(TEXTURES_MDP_FILE)
+
+$(TEXTURES_MDP_FILE):
+	@if [ ! -f "$@" ]; then \
+		mkdir -p $(dir $@); \
+		if [ ! -d "$(OPTIMIZED_TEXTURES)" ]; then \
+			$(MAKE) optimize-textures; \
+		fi; \
+		$(GO) run ./cmd/mdp-pack textures $(OPTIMIZED_TEXTURES) $@; \
+		echo "=== Built texture archive $@ ==="; \
+	else \
+		echo "=== Texture archive $@ already exists, skipping ==="; \
+	fi
+
+texture-report: presets cmd/texture-report/main.go
+	go run ./cmd/texture-report $(PRESETS_DIR) $(TEXTURE_REPORT)
+
+# Build presets.mdp archive from cream-of-the-crop dir (only if missing).
+$(FULL_MDP_FILE):
+	@if [ ! -f "$@" ]; then \
+		$(MAKE) presets; \
+		mkdir -p $(dir $@); \
+		$(GO) run ./cmd/mdp-pack presets $(PRESETS_DIR) $@; \
+		echo "=== Built full preset archive $@ ==="; \
+	else \
+		echo "=== Full preset archive $@ already exists, skipping ==="; \
+	fi
+
+mdp: $(FULL_MDP_FILE)
+
+$(MDP_FILE):
+	@if [ ! -f "$@" ]; then \
+		$(MAKE) presets; \
+		mkdir -p $(dir $@); \
+		$(GO) run ./cmd/mdp-pack presets $(PRESETS_DIR) $@ $(BENCHMARK_CSV); \
+		echo "=== Built filtered portable preset archive $@ ==="; \
+	else \
+		echo "=== Preset archive $@ already exists, skipping ==="; \
+	fi
+
+portable-mdp: $(MDP_FILE)
+
+
