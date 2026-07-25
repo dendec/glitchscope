@@ -52,18 +52,18 @@ static void endDraw() {
 }
 
 static void drawText(unsigned int program, unsigned int text, float opacity,
-	float x, float y, float textWidth, float textHeight, int w, int h) {
-	beginDraw(w, h);
+	float x, float y, float textWidth, float textHeight, int winW, int winH, int viewW, int viewH) {
+	beginDraw(viewW, viewH);
 	glUseProgram(program);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, text);
 	glUniform1i(glGetUniformLocation(program, "text"), 0);
 	glUniform1f(glGetUniformLocation(program, "opacity"), opacity);
-	float left = x / (float)w * 2.0f - 1.0f;
-	float right = (x + textWidth) / (float)w * 2.0f - 1.0f;
+	float left = x / (float)winW * 2.0f - 1.0f;
+	float right = (x + textWidth) / (float)winW * 2.0f - 1.0f;
 	// Go layout coordinates use a top-left origin; OpenGL uses bottom-left.
-	float bottom = ((float)h - y - textHeight) / (float)h * 2.0f - 1.0f;
-	float top = ((float)h - y) / (float)h * 2.0f - 1.0f;
+	float bottom = ((float)winH - y - textHeight) / (float)winH * 2.0f - 1.0f;
+	float top = ((float)winH - y) / (float)winH * 2.0f - 1.0f;
 	float verts[] = { left,bottom, right,bottom, left,top, right,top };
 	float uvs[]   = { 0,1, 1,1, 0,0, 1,0 };
 	GLuint pos = (GLuint)glGetAttribLocation(program, "pos");
@@ -81,15 +81,14 @@ static void drawText(unsigned int program, unsigned int text, float opacity,
 }
 
 static void drawOverlayText(unsigned int program, unsigned int text, float opacity,
-	float x, float y, float textWidth, float textHeight, int w, int h) {
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	drawText(program, text, opacity, x, y, textWidth, textHeight, w, h);
+	float x, float y, float textWidth, float textHeight, int winW, int winH, int viewW, int viewH) {
+	drawText(program, text, opacity, x, y, textWidth, textHeight, winW, winH, viewW, viewH);
 }
 
 static void drawFilledRect(unsigned int program,
 	float x, float y, float w, float h, float r, float g, float b, float a,
-	int winW, int winH) {
-	beginDraw(winW, winH);
+	int winW, int winH, int viewW, int viewH) {
+	beginDraw(viewW, viewH);
 	glUseProgram(program);
 	float left = x / (float)winW * 2.0f - 1.0f;
 	float right = (x + w) / (float)winW * 2.0f - 1.0f;
@@ -179,19 +178,19 @@ func glIsTexture(tex uint32) bool {
 	return tex != 0 && C.glIsTexture(C.uint(tex)) != 0
 }
 
-func glDrawFilledRect(program uint32, x, y, w, h, r, g, b, a float32, winW, winH int) {
+func glDrawFilledRect(program uint32, x, y, w, h, r, g, b, a float32, winW, winH, viewW, viewH int) {
 	C.drawFilledRect(C.uint(program), C.float(x), C.float(y), C.float(w), C.float(h),
-		C.float(r), C.float(g), C.float(b), C.float(a), C.int(winW), C.int(winH))
+		C.float(r), C.float(g), C.float(b), C.float(a), C.int(winW), C.int(winH), C.int(viewW), C.int(viewH))
 }
 
-func glDrawOverlayText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH int) {
+func glDrawOverlayText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH, viewW, viewH int) {
 	C.drawOverlayText(C.uint(program), C.uint(tex), C.float(opacity),
-		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH))
+		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH), C.int(viewW), C.int(viewH))
 }
 
-func glDrawText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH int) {
+func glDrawText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH, viewW, viewH int) {
 	C.drawText(C.uint(program), C.uint(tex), C.float(opacity),
-		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH))
+		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH), C.int(viewW), C.int(viewH))
 }
 
 func glDeleteTex(tex uint32) {

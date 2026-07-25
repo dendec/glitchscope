@@ -12,6 +12,17 @@ import (
 	"github.com/dendec/mdpp/internal/soloud"
 )
 
+// pendingLoad is the result of a background file load.
+type pendingLoad struct {
+	path     string
+	wav      *soloud.Wav     // non-nil for WAV/MP3/FLAC etc.
+	mod      *soloud.Openmpt // non-nil for tracker formats
+	bpm      float64         // tracker metadata
+	channels int
+	duration float64
+	err      error
+}
+
 // Player manages audio playback.
 type Player struct {
 	s               *soloud.Soloud
@@ -24,6 +35,9 @@ type Player struct {
 	currentBitrate  float64
 	channels        int
 	isTracker       bool
+
+	Downloader func(path string, expectedSize int64) (string, error) // optional remote downloader (e.g. for modland)
+	pendingCh  chan pendingLoad                  // background load results
 }
 
 // New creates and initializes a Player.
@@ -37,7 +51,7 @@ func New() (*Player, error) {
 		return nil, fmt.Errorf("soloud init: %w", err)
 	}
 	slog.Info("SoLoud initialized")
-	return &Player{s: s}, nil
+	return &Player{s: s, pendingCh: make(chan pendingLoad, 1)}, nil
 }
 
 // PlayFile loads and plays an audio file. Only one file at a time.
@@ -61,6 +75,99 @@ func (p *Player) PlayFile(path string) error {
 	p.isTracker = false
 	slog.Info("playing", "path", path)
 	return nil
+}
+
+// PlayFileAsync starts loading a file in a background goroutine.
+// Call CheckPending() from the main loop to pick up the result.
+// Stops current playback immediately so the UI feels responsive.
+func (p *Player) PlayFileAsync(path string) {
+	// Drain any pending result from a previous load.
+	select {
+	case <-p.pendingCh:
+	default:
+	}
+
+	// Stop current playback immediately.
+	p.s.StopAll()
+	p.voice = 0
+	p.currentPath = path // show path in UI while loading
+
+	// Launch background load.
+	go func() {
+		localPath := path
+		if p.Downloader != nil {
+			dlPath, err := p.Downloader(path, 0) // size unknown at call site
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			localPath = dlPath
+		}
+
+		ext := strings.ToLower(filepath.Ext(localPath))
+		if openmpt.SupportedExts[ext] {
+			fileBuf, err := os.ReadFile(localPath)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			mod, err := soloud.NewOpenmpt(fileBuf)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			bpm, ch, dur, _ := openmpt.GetTrackerMetaFromBytes(fileBuf)
+			p.pendingCh <- pendingLoad{path: path, mod: mod, bpm: bpm, channels: ch, duration: dur}
+			return
+		}
+		w, err := soloud.LoadWav(localPath)
+		p.pendingCh <- pendingLoad{path: path, wav: w, err: err}
+	}()
+}
+
+// CheckPending picks up a completed background load and starts playback.
+// Returns true if a track was started. Call every frame from main loop.
+func (p *Player) CheckPending() bool {
+	select {
+	case res := <-p.pendingCh:
+		if res.path != p.currentPath {
+			// User selected a different track while loading; clean up loaded sources.
+			if res.wav != nil {
+				res.wav.Destroy()
+			}
+			if res.mod != nil {
+				res.mod.Destroy()
+			}
+			return false
+		}
+		if res.err != nil {
+			slog.Error("async load", "path", res.path, "error", res.err)
+			p.currentPath = "" // clear failed path so player state is consistent
+			return false
+		}
+		if res.mod != nil {
+			p.replaceSource(nil, res.mod)
+			p.currentPath = res.path
+			p.currentBPM = res.bpm
+			p.currentBitrate = 0
+			p.channels = res.channels
+			p.isTracker = true
+			p.currentDuration = res.duration
+			slog.Info("tracker (async)", "path", res.path)
+		} else if res.wav != nil {
+			p.replaceSource(res.wav, nil)
+			p.currentPath = res.path
+			p.currentDuration = res.wav.GetLength()
+			p.currentBPM = 0
+			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
+			p.channels = res.wav.GetChannels()
+			p.isTracker = false
+			slog.Info("playing (async)", "path", res.path)
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func (p *Player) playTracker(path string) error {

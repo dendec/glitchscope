@@ -254,7 +254,7 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 		}
 		infos[i] = info
 	}
-	if dirty {
+	if dirty && !strings.HasPrefix(album.Path, ModlandPrefix) {
 		if err := writeMetaCache(album.Path, cache); err != nil {
 			slog.Warn("write meta cache", "album", album.Name, "error", err)
 		}
@@ -264,5 +264,32 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 
 // TrackTitle returns a display-friendly name for a track path.
 func TrackTitle(path string) string {
-	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	// Strip modland: prefix if present.
+	p := strings.TrimPrefix(path, "modland:")
+	return strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
+}
+
+const ModlandPrefix = "modland:"
+
+// IsModland reports whether a track path refers to a modland file.
+func IsModland(path string) bool {
+	return strings.HasPrefix(path, ModlandPrefix)
+}
+
+// RemotePath strips the modland: prefix and returns the remote path.
+func RemotePath(path string) string {
+	return strings.TrimPrefix(path, ModlandPrefix)
+}
+
+// AddVirtualAlbums appends pre-built albums (e.g. from modland) to the library.
+// Albums are inserted after local albums. Tracks in virtual albums should use
+// the ModlandPrefix convention for remote paths.
+func (l *Library) AddVirtualAlbums(albums []Album) {
+	l.Albums = append(l.Albums, albums...)
+	if l.albumIdx < 0 && len(l.Albums) > 0 {
+		l.albumIdx = 0
+		if len(l.Albums[0].Tracks) > 0 {
+			l.trackIdx = 0
+		}
+	}
 }

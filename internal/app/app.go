@@ -12,6 +12,7 @@ import (
 	"github.com/dendec/mdpp/internal/archive"
 	"github.com/dendec/mdpp/internal/config"
 	"github.com/dendec/mdpp/internal/input"
+	"github.com/dendec/mdpp/internal/modland"
 	"github.com/dendec/mdpp/internal/player"
 	"github.com/dendec/mdpp/internal/presets"
 	"github.com/dendec/mdpp/internal/prof"
@@ -23,7 +24,7 @@ import (
 const (
 	fpsWindow       = 30
 	lowFPSThresh    = 30.0
-	transitionDelay = 1500 * time.Millisecond
+	softCutDuration = 2.5 // seconds, for smooth preset transitions
 )
 
 type pendingPreset struct {
@@ -42,6 +43,8 @@ type App struct {
 	overlay *ui.Overlay
 	inp     *input.Input
 	lib     *player.Library
+
+	modlandSizes map[string]int64 // remote path → expected size for downloads
 
 	prof              *prof.Collector
 	settings          *config.Settings
@@ -68,6 +71,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 		settingsPath:        config.SettingsPath(),
 		renderScale:         renderScale,
 		renderScaleExplicit: renderScaleExplicit,
+		modlandSizes:        make(map[string]int64),
 	}
 
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK); err != nil {
@@ -108,6 +112,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 		return nil, fmt.Errorf("projectm init: %w", err)
 	}
 	a.pm = pm
+	a.pm.SetSoftCutDuration(softCutDuration)
 	slog.Info("projectM init", "ms", time.Since(t0).Milliseconds())
 
 	// Keep bundled and user textures in one temporary search directory. User
@@ -221,6 +226,16 @@ func (a *App) initAudio() {
 		return
 	}
 	a.pl = pl
+	a.pl.Downloader = func(path string, expectedSize int64) (string, error) {
+		if player.IsModland(path) {
+			remotePath := player.RemotePath(path)
+			if expectedSize == 0 {
+				expectedSize = a.modlandSizes[remotePath]
+			}
+			return modland.DownloadFile(baseDir(), remotePath, expectedSize)
+		}
+		return path, nil
+	}
 	a.overlay = ui.New()
 	w, h := a.window.GLGetDrawableSize()
 	a.overlay.SetScreenSize(int(w), int(h))
@@ -237,6 +252,40 @@ func (a *App) initLibrary() {
 	}
 	a.lib = lib
 	slog.Info("music scan", "albums", lib.AlbumCount(), "ms", time.Since(t).Milliseconds())
+
+	// Load modland from cache only (no download on startup).
+	a.loadModlandFromCache()
+}
+
+// loadModlandFromCache loads the modland catalog from disk.
+func (a *App) loadModlandFromCache() {
+	cat := modland.LoadCatalog(baseDir())
+	if cat != nil && len(cat.Albums) > 0 {
+		a.addModlandAlbums(cat.Albums)
+		return
+	}
+	slog.Info("modland: catalog not found")
+}
+
+// addModlandAlbums converts modland catalog albums to player.Album and adds them.
+func (a *App) addModlandAlbums(catalogAlbums []modland.Album) {
+	albums := make([]player.Album, len(catalogAlbums))
+	for i, ma := range catalogAlbums {
+		tracks := make([]string, len(ma.Tracks))
+		for j := range ma.Tracks {
+			remotePath := ma.TrackPath(j)
+			tracks[j] = player.ModlandPrefix + remotePath
+			if ma.Tracks[j].Size > 0 {
+				a.modlandSizes[remotePath] = ma.Tracks[j].Size
+			}
+		}
+		albums[i] = player.Album{
+			Name:   "Modland: " + ma.Name,
+			Path:   "modland:" + ma.Name,
+			Tracks: tracks,
+		}
+	}
+	a.lib.AddVirtualAlbums(albums)
 }
 
 func (a *App) initInput() {
@@ -458,16 +507,34 @@ func (a *App) Run() {
 		// Complete pending transition (load target after delay).
 		if a.pending.name != "" && now.After(a.pending.at) {
 			if d, err := presets.Read(a.pending.name); err == nil {
-				a.pm.LoadPresetData(string(d), false)
+				a.pm.LoadPresetData(string(d), true)
 				a.applyPresetName(a.pending.name)
 			}
 			a.pending = pendingPreset{}
+		}
+
+		// Auto-switch preset ticker.
+		if a.presetTicker != nil {
+			select {
+			case <-a.presetTicker.C:
+				a.randPreset()
+			default:
+			}
 		}
 
 		// Feed wave data.
 		if a.pl != nil {
 			if wave := a.pl.GetWave(); wave != nil {
 				a.pm.PCMAddFloat(wave, projectm.Mono)
+			}
+		}
+
+		// Pick up async track load.
+		if a.pl != nil {
+			if !a.pl.CheckPending() {
+				if a.overlay != nil {
+					a.overlay.ShowTrack(" playback error")
+				}
 			}
 		}
 
@@ -630,11 +697,6 @@ func (a *App) startPresetTicker() {
 		return
 	}
 	a.presetTicker = time.NewTicker(time.Duration(interval) * time.Second)
-	go func() {
-		for range a.presetTicker.C {
-			a.randPreset()
-		}
-	}()
 }
 
 // resetPresetTicker recreates the ticker with the current interval.

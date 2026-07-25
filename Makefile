@@ -39,14 +39,18 @@ CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLE
 DOCKER_IMAGE_X64 := mdpp-builder
 DOCKER_BUILDER   := mdpp-builder:latest
 
-.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures optimize-textures texture-archive texture-report
+ALLMODS_URL := https://modland.antarctica.no/allmods.zip
+ALLMODS_ZIP := $(DIST_DIR)/allmods.zip
+CATALOG_GZ  := dist/modland/catalog.json.gz
+
+.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures optimize-textures texture-archive texture-report catalog
 
 # Builder image: C/C++ static dependencies compiled once for amd64 & arm64
 builder:
 	docker build -t $(DOCKER_BUILDER) -f Dockerfile.builder .
 
 # Docker build (amd64)
-dist: builder $(MDP_FILE) $(TEXTURES_MDP_FILE)
+dist: builder $(MDP_FILE) $(TEXTURES_MDP_FILE) $(CATALOG_GZ)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t mdpp:amd64 -f Dockerfile .
 	@rm -rf $(X64_DIST_DIR)
 	@mkdir -p $(X64_DIST_DIR)
@@ -59,13 +63,16 @@ dist: builder $(MDP_FILE) $(TEXTURES_MDP_FILE)
 	cp $(MDP_FILE) $(X64_DIST_DIR)/presets/presets.mdp
 	rm -rf $(X64_DIST_DIR)/textures
 	cp $(TEXTURES_MDP_FILE) $(X64_DIST_DIR)/presets/textures.mdp
+	cp -r test_data/* $(X64_DIST_DIR)/
+	mkdir -p $(X64_DIST_DIR)/modland
+	cp $(CATALOG_GZ) $(X64_DIST_DIR)/modland/
 	@echo "=== Built $(APP) (amd64) ==="
 	@ls -lhR $(X64_DIST_DIR)/
 
 # ARM64 cross-build via Docker
 DOCKER_IMAGE_ARM64 := mdpp:arm64
 
-dist-arm64: builder portable-mdp $(TEXTURES_MDP_FILE)
+dist-arm64: builder portable-mdp $(TEXTURES_MDP_FILE) $(CATALOG_GZ)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)
@@ -77,11 +84,14 @@ dist-arm64: builder portable-mdp $(TEXTURES_MDP_FILE)
 	cp $(MDP_FILE) $(ARM64_DIST_DIR)/mdpp/presets/presets.mdp
 	rm -rf $(ARM64_DIST_DIR)/mdpp/textures
 	cp $(TEXTURES_MDP_FILE) $(ARM64_DIST_DIR)/mdpp/presets/textures.mdp
+	cp -r test_data/* $(ARM64_DIST_DIR)/
+	mkdir -p $(ARM64_DIST_DIR)/mdpp/modland
+	cp $(CATALOG_GZ) $(ARM64_DIST_DIR)/mdpp/modland/
 	@echo "=== $(ARM64_DIST_DIR)/ ==="
 	@ls -lhR $(ARM64_DIST_DIR)/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
-dist-portmaster: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE)
+dist-portmaster: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE) $(CATALOG_GZ)
 	@rm -rf dist/portmaster_build
 	@mkdir -p dist/portmaster_build/mdpp/presets dist/portmaster_build/mdpp/licenses
 	cp portmaster/MDPP.sh dist/portmaster_build/
@@ -94,6 +104,8 @@ dist-portmaster: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE)
 	cp $(ARM64_DIST_DIR)/mdpp/mdpp dist/portmaster_build/mdpp/
 	cp $(MDP_FILE) dist/portmaster_build/mdpp/presets/presets.mdp
 	cp $(TEXTURES_MDP_FILE) dist/portmaster_build/mdpp/presets/textures.mdp
+	mkdir -p dist/portmaster_build/mdpp/modland
+	cp $(CATALOG_GZ) dist/portmaster_build/mdpp/modland/
 	cp portmaster/licenses/* dist/portmaster_build/mdpp/licenses/ 2>/dev/null; true
 	cp portmaster/screenshot.png dist/portmaster_build/mdpp/cover.png 2>/dev/null; true
 	@rm -f dist/mdpp.zip
@@ -112,8 +124,11 @@ deploy: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE)
 	adb push $(MDP_FILE) $(DEVICE_DIR)/presets/presets.mdp
 	# Deploy the optimized texture archive for MilkDrop presets.
 	adb push $(TEXTURES_MDP_FILE) $(DEVICE_DIR)/presets/textures.mdp
+	# Deploy modland catalog.
+	adb shell "mkdir -p $(DEVICE_DIR)/modland"
+	adb push $(CATALOG_GZ) $(DEVICE_DIR)/modland/
 	adb shell "killall -9 mdpp 2>/dev/null; true"
-	@echo "=== Deployed binary + music + presets + textures ==="
+	@echo "=== Deployed binary + music + presets + textures + catalog ==="
 
 deploy-portmaster: dist-portmaster
 	adb push dist/mdpp.zip $(PM_AUTOINSTALL)/
@@ -190,5 +205,24 @@ $(MDP_FILE):
 	fi
 
 portable-mdp: $(MDP_FILE)
+
+# Download allmods.zip listing from modland.com (only if missing).
+$(ALLMODS_ZIP):
+	@mkdir -p $(dir $@)
+	curl -fL -o $@ $(ALLMODS_URL)
+	@echo "=== Downloaded $(ALLMODS_URL) → $@ ==="
+
+# Build modland catalog from allmods.zip.
+$(CATALOG_GZ):
+	@if [ ! -f "$@" ]; then \
+		$(MAKE) $(ALLMODS_ZIP); \
+		mkdir -p $(dir $@); \
+		$(GO) run ./cmd/modland-catalog/ $(ALLMODS_ZIP) $(DIST_DIR); \
+		echo "=== Built catalog $@ ==="; \
+	else \
+		echo "=== Catalog $@ already exists, skipping ==="; \
+	fi
+
+catalog: $(CATALOG_GZ)
 
 

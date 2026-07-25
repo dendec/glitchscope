@@ -150,12 +150,13 @@ type Overlay struct {
 	pageIndicatorDirty bool
 
 	// Dirty flags.
-	albumsDirty     bool
-	tracksDirty     bool
-	statsDirty      bool
-	bottomDirty     bool
-	presetNameDirty bool
-	presetsDirty    bool
+	albumsDirty        bool
+	tracksDirty        bool
+	statsDirty         bool
+	bottomDirty        bool
+	presetNameDirty    bool
+	presetsDirty       bool
+	closeInjectPending bool
 }
 
 // New creates an Overlay.
@@ -193,7 +194,7 @@ func (o *Overlay) Close() {
 // Draw renders either the UI overlay or the notification.
 func (o *Overlay) Draw(width, height int) {
 	if o.uiVisible {
-		o.renderUI(width, height)
+		o.renderUI(width, height, width, height)
 		if o.notif.Visible() && o.notif.Tex() != 0 && !o.notif.Hidden() {
 			o.notif.Render(o.programText, width, height)
 		}
@@ -255,17 +256,21 @@ func (o *Overlay) updateScrollHold(h *scrollHold, held bool, now time.Time, step
 
 // --- Notification (delegates to Notifier) ---
 
-// ShowTrack begins the fade-in animation for the given track path.
+// ShowTrack begins the fade-in animation for the given track path or notification text.
 func (o *Overlay) ShowTrack(path string) {
 	o.notif.ShowTrack(path, o.fontSize)
 }
 
-// Inject stamps the notification text once into projectM's feedback framebuffer.
+// Inject stamps the notification text or closing UI state once into projectM's feedback framebuffer.
 func (o *Overlay) Inject(width, height int) {
+	if o.closeInjectPending {
+		o.closeInjectPending = false
+		o.renderUI(o.screenW, o.screenH, width, height)
+	}
 	if o.uiVisible {
 		return
 	}
-	o.notif.Inject(o.programText, width, height)
+	o.notif.Inject(o.programText, o.screenW, o.screenH, width, height)
 }
 
 // ToggleVisibility shows or hides the notification (B button legacy).
@@ -277,6 +282,9 @@ func (o *Overlay) ToggleVisibility() {
 
 // ToggleUI shows or hides the full UI.
 func (o *Overlay) ToggleUI() {
+	if o.uiVisible {
+		o.closeInjectPending = true
+	}
 	o.uiVisible = !o.uiVisible
 	if o.uiVisible {
 		o.panelEntered = true
@@ -726,6 +734,7 @@ func (o *Overlay) Back() {
 		o.uiVisible = false
 		o.panelEntered = false
 		o.focusPanel = 0
+		o.closeInjectPending = true
 	}
 }
 

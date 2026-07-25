@@ -101,6 +101,9 @@ RUN mkdir -p /opt/font \
 COPY go.mod go.sum* ./
 RUN go mod download
 
+# Install golangci-lint using container Go toolchain
+RUN GOBIN=/usr/local/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
 # Copy SoLoud headers
 RUN mkdir -p /opt/soloud/include && cp -r lib/soloud/include/* /opt/soloud/include/
 

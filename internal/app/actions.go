@@ -209,7 +209,7 @@ func (a *App) transitionPreset(name string) {
 	if err != nil {
 		return
 	}
-	a.pm.LoadPresetData(string(d), false)
+	a.pm.LoadPresetData(string(d), true)
 	a.applyPresetName(name)
 }
 
@@ -281,10 +281,7 @@ func (a *App) applySettings(winW, winH int) {
 
 // playTrack starts playback of a track and shows the notification.
 func (a *App) playTrack(path, album string) {
-	if err := a.pl.PlayFile(path); err != nil {
-		slog.Error("play", "path", path, "error", err)
-		return
-	}
+	// Show track name immediately, then start async load.
 	if a.overlay != nil {
 		label := album
 		if album != "" {
@@ -292,5 +289,7 @@ func (a *App) playTrack(path, album string) {
 		}
 		a.overlay.ShowTrack(label)
 	}
-	slog.Info("now playing", "track", path, "album", album)
+
+	a.pl.PlayFileAsync(path)
+	slog.Info("now loading", "track", path, "album", album)
 }

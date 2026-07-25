@@ -103,4 +103,9 @@ func (h *Handle) BindFeedbackFramebuffer() {
 	C.projectm_opengl_bind_feedback_framebuffer(h.p)
 }
 
+// SetSoftCutDuration sets the transition duration in seconds for smooth preset cuts.
+func (h *Handle) SetSoftCutDuration(seconds float64) {
+	C.projectm_set_soft_cut_duration(h.p, C.double(seconds))
+}
+
 

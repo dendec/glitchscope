@@ -16,13 +16,13 @@ import (
 // text-to-texture rasterization. State mutation and input handling live in
 // overlay.go; GL/cgo calls are isolated behind the wrappers in gl.go.
 
-func (o *Overlay) renderUI(w, h int) {
+func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	if o.programRect == 0 {
 		return
 	}
 
 	// Full screen dim.
-	glDrawFilledRect(o.programRect, 0, 0, float32(w), float32(h), 0, 0, 0, dimAlpha, w, h)
+	glDrawFilledRect(o.programRect, 0, 0, float32(winW), float32(winH), 0, 0, 0, dimAlpha, winW, winH, viewW, viewH)
 
 	// Stats line (FPS, MEM, CPU, GPU).
 	if o.statsDirty {
@@ -30,7 +30,7 @@ func (o *Overlay) renderUI(w, h int) {
 	}
 	if o.statsTex != 0 {
 		glDrawOverlayText(o.programText, o.statsTex, 1,
-			5, 0, float32(o.statsTexW), float32(o.statsTexH), w, h)
+			5, 0, float32(o.statsTexW), float32(o.statsTexH), winW, winH, viewW, viewH)
 	}
 	// Preset name — below stats.
 	if o.presetNameDirty {
@@ -38,68 +38,68 @@ func (o *Overlay) renderUI(w, h int) {
 	}
 	if o.presetNameTex != 0 {
 		glDrawOverlayText(o.programText, o.presetNameTex, 1,
-			5, float32(o.statsTexH+4), float32(o.presetNameTexW), float32(o.presetNameTexH), w, h)
+			5, float32(o.statsTexH+4), float32(o.presetNameTexW), float32(o.presetNameTexH), winW, winH, viewW, viewH)
 	}
 
 	// Page indicator.
-	o.renderPageIndicator(w, h)
+	o.renderPageIndicator(winW, winH, viewW, viewH)
 
 	// Layout constants — proportional to font size.
 	bottomH := int(o.fontSize * 1.35)
 	indicatorH := int(o.fontSize * 1.5)
 	panelY := int(o.fontSize*2) + indicatorH
-	panelH := h - panelY - bottomH - int(o.fontSize*0.7)
+	panelH := winH - panelY - bottomH - int(o.fontSize*0.7)
 	if panelH < 0 {
 		panelH = 0
 	}
-	thirdW := w / 3
+	thirdW := winW / 3
 
 	lh := o.face.Metrics().Height.Ceil()
 
 	switch o.uiPage {
 	case PageSettings:
-		o.renderSettingsPanels(w, h, thirdW, panelY, panelH, lh)
+		o.renderSettingsPanels(winW, winH, viewW, viewH, thirdW, panelY, panelH, lh)
 	case PagePresets:
-		o.renderPresetsPanels(w, h, thirdW, panelY, panelH, lh)
+		o.renderPresetsPanels(winW, winH, viewW, viewH, thirdW, panelY, panelH, lh)
 	default:
-		o.renderLibraryPanels(w, h, thirdW, panelY, panelH, lh)
+		o.renderLibraryPanels(winW, winH, viewW, viewH, thirdW, panelY, panelH, lh)
 	}
 
 	// --- Compact playback status (full width) ---
 	if o.playingTrack != "" && o.bottomDirty {
-		o.rebuildBottomTex(w, bottomH)
+		o.rebuildBottomTex(winW, bottomH)
 	}
 	if o.playingTrack != "" && o.bottomTex != 0 {
-		by := float32(h - bottomH)
-		glDrawFilledRect(o.programRect, 0, by, float32(w), float32(bottomH), 0, 0, 0, 0.5, w, h)
+		by := float32(winH - bottomH)
+		glDrawFilledRect(o.programRect, 0, by, float32(winW), float32(bottomH), 0, 0, 0, 0.5, winW, winH, viewW, viewH)
 		glDrawOverlayText(o.programText, o.bottomTex, 1,
-			0, by, float32(o.bottomTexW), float32(o.bottomTexH), w, h)
+			0, by, float32(o.bottomTexW), float32(o.bottomTexH), winW, winH, viewW, viewH)
 	}
 }
 
 // renderLibraryPanels draws the albums (left) and tracks (right) panels.
-func (o *Overlay) renderLibraryPanels(w, h int, thirdW, panelY, panelH, lh int) {
+func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, thirdW, panelY, panelH, lh int) {
 	// --- Albums panel ---
 	if o.albumsDirty {
 		o.rebuildAlbumsTex(thirdW, panelH)
 	}
 	if o.albumsTex != 0 {
 		px, py := float32(0), float32(panelY)
-		drawPanelBg(o, px, py, float32(thirdW), float32(panelH), w, h)
+		drawPanelBg(o, px, py, float32(thirdW), float32(panelH), winW, winH, viewW, viewH)
 		if o.focusPanel == 0 {
-			drawPanelBorder(o, px, py, float32(thirdW), float32(panelH), w, h)
+			drawPanelBorder(o, px, py, float32(thirdW), float32(panelH), winW, winH, viewW, viewH)
 		}
 		glDrawOverlayText(o.programText, o.albumsTex, 1,
-			px, py, float32(o.albumsTexW), float32(o.albumsTexH), w, h)
+			px, py, float32(o.albumsTexW), float32(o.albumsTexH), winW, winH, viewW, viewH)
 		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
 			hiY := py + float32((o.albumCursor-o.albumsScroll)*lh+2)
-			drawAccentHighlight(o, px+2, hiY, float32(thirdW-4), float32(lh), w, h)
+			drawAccentHighlight(o, px+2, hiY, float32(thirdW-4), float32(lh), winW, winH, viewW, viewH)
 		}
 		am := panelH / lh
 		if am < 1 {
 			am = 1
 		}
-		drawScrollbar(o, px+float32(thirdW-4), py, float32(panelH), len(o.albums), am, o.albumsScroll, w, h)
+		drawScrollbar(o, px+float32(thirdW-4), py, float32(panelH), len(o.albums), am, o.albumsScroll, winW, winH, viewW, viewH)
 	}
 
 	// --- Tracks panel ---
@@ -107,30 +107,30 @@ func (o *Overlay) renderLibraryPanels(w, h int, thirdW, panelY, panelH, lh int) 
 		o.rebuildTracksTex(thirdW, panelH)
 	}
 	if o.tracksTex != 0 {
-		tx, ty := float32(w*2/3), float32(panelY)
-		drawPanelBg(o, tx, ty, float32(thirdW), float32(panelH), w, h)
+		tx, ty := float32(winW*2/3), float32(panelY)
+		drawPanelBg(o, tx, ty, float32(thirdW), float32(panelH), winW, winH, viewW, viewH)
 		if o.focusPanel == 1 {
-			drawPanelBorder(o, tx, ty, float32(thirdW), float32(panelH), w, h)
+			drawPanelBorder(o, tx, ty, float32(thirdW), float32(panelH), winW, winH, viewW, viewH)
 		}
 		glDrawOverlayText(o.programText, o.tracksTex, 1,
-			tx, ty, float32(o.tracksTexW), float32(o.tracksTexH), w, h)
+			tx, ty, float32(o.tracksTexW), float32(o.tracksTexH), winW, winH, viewW, viewH)
 		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
 			hiY := ty + float32((o.trackCursor-o.tracksScroll)*lh+2)
-			drawAccentHighlight(o, tx+2, hiY, float32(thirdW-4), float32(lh), w, h)
+			drawAccentHighlight(o, tx+2, hiY, float32(thirdW-4), float32(lh), winW, winH, viewW, viewH)
 		}
 		tm := panelH / lh
 		if tm < 1 {
 			tm = 1
 		}
-		drawScrollbar(o, tx+float32(thirdW-4), ty, float32(panelH), len(o.trackInfos), tm, o.tracksScroll, w, h)
+		drawScrollbar(o, tx+float32(thirdW-4), ty, float32(panelH), len(o.trackInfos), tm, o.tracksScroll, winW, winH, viewW, viewH)
 	}
 }
 
 // renderSettingsPanels draws the settings labels (left) and values (right).
-func (o *Overlay) renderSettingsPanels(w, h int, thirdW, panelY, panelH, lh int) {
+func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, thirdW, panelY, panelH, lh int) {
 	if !o.settingsDirty {
 		// Still draw textures from cache.
-		o.drawSettingsTextures(w, h, thirdW, panelY, panelH, lh)
+		o.drawSettingsTextures(winW, winH, viewW, viewH, thirdW, panelY, panelH, lh)
 		return
 	}
 	o.settingsDirty = false
@@ -183,12 +183,12 @@ func (o *Overlay) renderSettingsPanels(w, h int, thirdW, panelY, panelH, lh int)
 	}
 	o.rebuildListTex(&o.settingsColR, rightLines)
 
-	o.drawSettingsTextures(w, h, thirdW, panelY, panelH, lh)
+	o.drawSettingsTextures(winW, winH, viewW, viewH, thirdW, panelY, panelH, lh)
 }
 
-func (o *Overlay) drawSettingsTextures(w, h int, thirdW, panelY, panelH, lh int) {
+func (o *Overlay) drawSettingsTextures(winW, winH, viewW, viewH int, thirdW, panelY, panelH, lh int) {
 	lx, ly := float32(0), float32(panelY)
-	rx, ry := float32(w*2/3), float32(panelY)
+	rx, ry := float32(winW*2/3), float32(panelY)
 	colW, colH := float32(thirdW), float32(panelH)
 
 	maxRows := panelH / lh
@@ -198,8 +198,8 @@ func (o *Overlay) drawSettingsTextures(w, h int, thirdW, panelY, panelH, lh int)
 
 	leftHighlight := o.panelEntered && len(o.settingsRows) > 0 && !o.settingsEditing
 	drawListColumn(o, lx, ly, colW, colH, o.settingsColL, o.panelEntered && !o.settingsEditing,
-		o.settingsCursor-o.albumsScroll, leftHighlight, lh, w, h)
-	drawScrollbar(o, lx+colW-3, ly, colH, len(o.settingsRows), maxRows, o.albumsScroll, w, h)
+		o.settingsCursor-o.albumsScroll, leftHighlight, lh, winW, winH, viewW, viewH)
+	drawScrollbar(o, lx+colW-3, ly, colH, len(o.settingsRows), maxRows, o.albumsScroll, winW, winH, viewW, viewH)
 
 	rightHighlight := false
 	rightRow := 0
@@ -213,34 +213,34 @@ func (o *Overlay) drawSettingsTextures(w, h int, thirdW, panelY, panelH, lh int)
 		}
 	}
 	drawListColumn(o, rx, ry, colW, colH, o.settingsColR, o.panelEntered && o.settingsEditing,
-		rightRow, rightHighlight, lh, w, h)
-	drawScrollbar(o, rx+colW-3, ry, colH, rightTotal, maxRows, o.tracksScroll, w, h)
+		rightRow, rightHighlight, lh, winW, winH, viewW, viewH)
+	drawScrollbar(o, rx+colW-3, ry, colH, rightTotal, maxRows, o.tracksScroll, winW, winH, viewW, viewH)
 }
 
 // --- Panel drawing helpers ---
 
-func drawPanelBg(o *Overlay, x, y, w, h float32, winW, winH int) {
-	glDrawFilledRect(o.programRect, x, y, w, h, 0, 0, 0, panelBgAlpha, winW, winH)
+func drawPanelBg(o *Overlay, x, y, w, h float32, winW, winH, viewW, viewH int) {
+	glDrawFilledRect(o.programRect, x, y, w, h, 0, 0, 0, panelBgAlpha, winW, winH, viewW, viewH)
 }
 
-func drawPanelBorder(o *Overlay, x, y, w, h float32, winW, winH int) {
-	glDrawFilledRect(o.programRect, x-1, y-1, w+2, 1, 1, 1, 1, borderAlpha, winW, winH)
-	glDrawFilledRect(o.programRect, x-1, y+h, w+2, 1, 1, 1, 1, borderAlpha, winW, winH)
-	glDrawFilledRect(o.programRect, x-1, y-1, 1, h+2, 1, 1, 1, borderAlpha, winW, winH)
-	glDrawFilledRect(o.programRect, x+w, y-1, 1, h+2, 1, 1, 1, borderAlpha, winW, winH)
+func drawPanelBorder(o *Overlay, x, y, w, h float32, winW, winH, viewW, viewH int) {
+	glDrawFilledRect(o.programRect, x-1, y-1, w+2, 1, 1, 1, 1, borderAlpha, winW, winH, viewW, viewH)
+	glDrawFilledRect(o.programRect, x-1, y+h, w+2, 1, 1, 1, 1, borderAlpha, winW, winH, viewW, viewH)
+	glDrawFilledRect(o.programRect, x-1, y-1, 1, h+2, 1, 1, 1, borderAlpha, winW, winH, viewW, viewH)
+	glDrawFilledRect(o.programRect, x+w, y-1, 1, h+2, 1, 1, 1, borderAlpha, winW, winH, viewW, viewH)
 }
 
-func drawAccentHighlight(o *Overlay, x, y, w, h float32, winW, winH int) {
-	glDrawFilledRect(o.programRect, x, y, w, h, accentR, accentG, accentB, accentA, winW, winH)
+func drawAccentHighlight(o *Overlay, x, y, w, h float32, winW, winH, viewW, viewH int) {
+	glDrawFilledRect(o.programRect, x, y, w, h, accentR, accentG, accentB, accentA, winW, winH, viewW, viewH)
 }
 
-func drawScrollbar(o *Overlay, sbX, panelY, panelH float32, totalItems, visibleItems, scrollPos int, winW, winH int) {
+func drawScrollbar(o *Overlay, sbX, panelY, panelH float32, totalItems, visibleItems, scrollPos int, winW, winH, viewW, viewH int) {
 	if totalItems <= visibleItems {
 		return
 	}
 	thumbW := float32(3)
 	// Track.
-	glDrawFilledRect(o.programRect, sbX, panelY, thumbW, panelH, 1, 1, 1, 0.1, winW, winH)
+	glDrawFilledRect(o.programRect, sbX, panelY, thumbW, panelH, 1, 1, 1, 0.1, winW, winH, viewW, viewH)
 	// Thumb.
 	thumbH := panelH * float32(visibleItems) / float32(totalItems)
 	if thumbH < 8 {
@@ -251,7 +251,7 @@ func drawScrollbar(o *Overlay, sbX, panelY, panelH float32, totalItems, visibleI
 		maxScroll = 1
 	}
 	thumbY := panelY + (panelH-thumbH)*float32(scrollPos)/float32(maxScroll)
-	glDrawFilledRect(o.programRect, sbX, thumbY, thumbW, thumbH, 1, 1, 1, 0.35, winW, winH)
+	glDrawFilledRect(o.programRect, sbX, thumbY, thumbW, thumbH, 1, 1, 1, 0.35, winW, winH, viewW, viewH)
 }
 
 // listTex caches a rendered text texture for one column of a two-column list
@@ -274,18 +274,18 @@ func (o *Overlay) rebuildListTex(t *listTex, lines []string) {
 // Shared by Settings and Presets so their layout/highlight logic stays in
 // one place.
 func drawListColumn(o *Overlay, x, y, w, h float32, t listTex, bordered bool,
-	highlightRow int, showHighlight bool, lh int, winW, winH int) {
-	drawPanelBg(o, x, y, w, h, winW, winH)
+	highlightRow int, showHighlight bool, lh int, winW, winH, viewW, viewH int) {
+	drawPanelBg(o, x, y, w, h, winW, winH, viewW, viewH)
 	if bordered {
-		drawPanelBorder(o, x, y, w, h, winW, winH)
+		drawPanelBorder(o, x, y, w, h, winW, winH, viewW, viewH)
 	}
 	if t.tex == 0 {
 		return
 	}
-	glDrawOverlayText(o.programText, t.tex, 1, x, y, float32(t.w), float32(t.h), winW, winH)
+	glDrawOverlayText(o.programText, t.tex, 1, x, y, float32(t.w), float32(t.h), winW, winH, viewW, viewH)
 	if showHighlight {
 		hiY := y + float32(highlightRow*lh+2)
-		drawAccentHighlight(o, x+2, hiY, w-4, float32(lh), winW, winH)
+		drawAccentHighlight(o, x+2, hiY, w-4, float32(lh), winW, winH, viewW, viewH)
 	}
 }
 
@@ -506,7 +506,7 @@ func formatDuration(sec float64) string {
 
 // --- Page indicator ---
 
-func (o *Overlay) renderPageIndicator(w, h int) {
+func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH int) {
 	if o.pageIndicatorDirty {
 		o.rebuildPageIndicatorTextures()
 	}
@@ -523,18 +523,18 @@ func (o *Overlay) renderPageIndicator(w, h int) {
 		}
 	}
 
-	startX := (w - totalW) / 2
+	startX := (winW - totalW) / 2
 	y := int(o.fontSize * 0.5)
 
 	x := startX
 	for i := range pages {
 		if o.pageIndicatorTex[i] != 0 {
 			glDrawOverlayText(o.programText, o.pageIndicatorTex[i], 1,
-				float32(x), float32(y), float32(o.pageIndicatorTexW[i]), float32(o.pageIndicatorTexH[i]), w, h)
+				float32(x), float32(y), float32(o.pageIndicatorTexW[i]), float32(o.pageIndicatorTexH[i]), winW, winH, viewW, viewH)
 		}
 		// Accent background for active page.
 		if UIPage(i) == o.uiPage {
-			drawAccentHighlight(o, float32(x-4), float32(y-2), float32(o.pageIndicatorTexW[i]+8), float32(lh+4), w, h)
+			drawAccentHighlight(o, float32(x-4), float32(y-2), float32(o.pageIndicatorTexW[i]+8), float32(lh+4), winW, winH, viewW, viewH)
 		}
 		x += o.pageIndicatorTexW[i] + gap
 	}
@@ -556,10 +556,10 @@ func (o *Overlay) rebuildPageIndicatorTextures() {
 
 // --- Presets page ---
 
-func (o *Overlay) renderPresetsPanels(w, h int, thirdW, panelY, panelH, lh int) {
+func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, thirdW, panelY, panelH, lh int) {
 	texturesValid := glIsTexture(o.presetsColL.tex) && glIsTexture(o.presetsColR.tex)
 	if !o.presetsDirty && texturesValid {
-		o.drawPresetsTextures(w, h, thirdW, panelY, panelH, lh)
+		o.drawPresetsTextures(winW, winH, viewW, viewH, thirdW, panelY, panelH, lh)
 		return
 	}
 	o.presetsDirty = false
@@ -620,7 +620,7 @@ func (o *Overlay) renderPresetsPanels(w, h int, thirdW, panelY, panelH, lh int) 
 	}
 	o.rebuildListTex(&o.presetsColR, rightLines)
 
-	o.drawPresetsTextures(w, h, thirdW, panelY, panelH, lh)
+	o.drawPresetsTextures(winW, winH, viewW, viewH, thirdW, panelY, panelH, lh)
 }
 
 // scrollOffset returns the first visible row index for a list of totalRows
@@ -645,9 +645,9 @@ func scrollOffset(current, cursor, totalRows, maxRows int) int {
 	return current
 }
 
-func (o *Overlay) drawPresetsTextures(w, h int, thirdW, panelY, panelH, lh int) {
+func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, thirdW, panelY, panelH, lh int) {
 	lx, ly := float32(0), float32(panelY)
-	rx, ry := float32(w*2/3), float32(panelY)
+	rx, ry := float32(winW*2/3), float32(panelY)
 	colW, colH := float32(thirdW), float32(panelH)
 
 	maxRows := panelH / lh
@@ -657,8 +657,8 @@ func (o *Overlay) drawPresetsTextures(w, h int, thirdW, panelY, panelH, lh int) 
 
 	leftHighlight := o.panelEntered && o.focusPanel == 0 && len(o.presetCategories) > 0
 	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelEntered && o.focusPanel == 0,
-		o.presetCategoryCursor-o.presetsScrollL, leftHighlight, lh, w, h)
-	drawScrollbar(o, lx+colW-3, ly, colH, len(o.presetCategories), maxRows, o.presetsScrollL, w, h)
+		o.presetCategoryCursor-o.presetsScrollL, leftHighlight, lh, winW, winH, viewW, viewH)
+	drawScrollbar(o, lx+colW-3, ly, colH, len(o.presetCategories), maxRows, o.presetsScrollL, winW, winH, viewW, viewH)
 
 	rightHighlight := false
 	rightTotal := 0
@@ -667,6 +667,6 @@ func (o *Overlay) drawPresetsTextures(w, h int, thirdW, panelY, panelH, lh int) 
 		rightTotal = len(cat.Presets)
 	}
 	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, o.panelEntered && o.focusPanel == 1,
-		o.presetCursor-o.presetsScrollR, rightHighlight, lh, w, h)
-	drawScrollbar(o, rx+colW-3, ry, colH, rightTotal, maxRows, o.presetsScrollR, w, h)
+		o.presetCursor-o.presetsScrollR, rightHighlight, lh, winW, winH, viewW, viewH)
+	drawScrollbar(o, rx+colW-3, ry, colH, rightTotal, maxRows, o.presetsScrollR, winW, winH, viewW, viewH)
 }

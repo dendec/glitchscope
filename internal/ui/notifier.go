@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/dendec/mdpp/internal/player"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
@@ -65,12 +64,11 @@ func (n *Notifier) ShowTrack(path string, fontSize float64) {
 	}
 	defer func() { _ = face.Close() }()
 
-	title := player.TrackTitle(path)
-	if title == "" {
+	if path == "" {
 		return
 	}
 
-	bounds, _ := font.BoundString(face, title)
+	bounds, _ := font.BoundString(face, path)
 	const padding = 4
 	n.texW = (bounds.Max.X - bounds.Min.X).Ceil() + padding*2
 	n.texH = (bounds.Max.Y - bounds.Min.Y).Ceil() + padding*2
@@ -85,7 +83,7 @@ func (n *Notifier) ShowTrack(path string, fontSize float64) {
 		Face: face,
 		Dot:  fixed.Point26_6{X: fixed.I(padding) - bounds.Min.X, Y: fixed.I(padding) - bounds.Min.Y},
 	}
-	d.DrawString(title)
+	d.DrawString(path)
 
 	glDeleteTex(n.tex)
 	n.tex = glUploadTexture(rgba)
@@ -93,7 +91,7 @@ func (n *Notifier) ShowTrack(path string, fontSize float64) {
 		return
 	}
 
-	n.text = title
+	n.text = path
 	n.started = time.Now()
 	n.visible = true
 	n.injected = false
@@ -122,19 +120,19 @@ func (n *Notifier) Render(programText uint32, width, height int) {
 		return
 	}
 	x, y, dw, dh := n.Layout(width, height)
-	glDrawOverlayText(programText, n.tex, float32(n.alpha), x, y, dw, dh, width, height)
+	glDrawOverlayText(programText, n.tex, float32(n.alpha), x, y, dw, dh, width, height, width, height)
 }
 
 // Inject stamps the notification text once into projectM's feedback framebuffer.
-func (n *Notifier) Inject(programText uint32, width, height int) {
-	if n.hidden || n.injected || n.tex == 0 || programText == 0 || width <= 0 || height <= 0 {
+func (n *Notifier) Inject(programText uint32, winW, winH, viewW, viewH int) {
+	if n.hidden || n.injected || n.tex == 0 || programText == 0 || winW <= 0 || winH <= 0 || viewW <= 0 || viewH <= 0 {
 		return
 	}
 	if time.Since(n.started) < fadeInDuration+holdDuration {
 		return
 	}
-	x, y, dw, dh := n.Layout(width, height)
-	glDrawText(programText, n.tex, 1, x, y, dw, dh, width, height)
+	x, y, dw, dh := n.Layout(winW, winH)
+	glDrawText(programText, n.tex, 1, x, y, dw, dh, winW, winH, viewW, viewH)
 	n.injected = true
 }
 
