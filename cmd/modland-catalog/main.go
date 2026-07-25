@@ -41,7 +41,7 @@ func main() {
 	for _, a := range cat.Albums {
 		n += len(a.Tracks)
 	}
-	fmt.Printf("%d albums, %d tracks → %s/modland/catalog.json.gz\n", len(cat.Albums), n, baseDir)
+	fmt.Printf("%d albums, %d tracks → %s/modland\n", len(cat.Albums), n, baseDir)
 }
 
 func parseZip(data []byte) (*modland.Catalog, error) {

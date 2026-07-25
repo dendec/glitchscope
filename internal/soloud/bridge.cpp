@@ -3,6 +3,7 @@
 // Uses void* for opaque handles matching the C API convention.
 #include "soloud.h"
 #include "soloud_wav.h"
+#include "soloud_xmp.h"
 #include "soloud_openmpt.h"
 
 using namespace SoLoud;
@@ -41,11 +42,19 @@ void Soloud_stopAll(void * aClassPtr) {
 	}
 
 	float * Soloud_calcFFT(void * aClassPtr) {
-	return ((Soloud *)aClassPtr)->calcFFT();
-}
+		return ((Soloud *)aClassPtr)->calcFFT();
+	}
 
-float * Soloud_getWave(void * aClassPtr) {
-	return ((Soloud *)aClassPtr)->getWave();
+	float * Soloud_getWave(void * aClassPtr) {
+		return ((Soloud *)aClassPtr)->getWave();
+	}
+
+void * Xmp_create() { return (void *)new Xmp; }
+
+void Xmp_destroy(void * aClassPtr) { delete (Xmp *)aClassPtr; }
+
+int Xmp_loadMemEx(void * aClassPtr, const unsigned char * aMem, unsigned int aLength, int aCopy, int aTakeOwnership) {
+	return ((Xmp *)aClassPtr)->loadMem(aMem, aLength, !!aCopy, !!aTakeOwnership);
 }
 
 void * Openmpt_create() { return (void *)new Openmpt; }

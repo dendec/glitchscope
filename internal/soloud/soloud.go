@@ -24,7 +24,12 @@ type Wav struct {
 	p *C.Wav
 }
 
-// Openmpt wraps a SoLoud Openmpt audio source for streaming tracker music.
+// Xmp wraps a SoLoud Xmp audio source for streaming tracker music.
+type Xmp struct {
+	p *C.Xmp
+}
+
+// Openmpt wraps a SoLoud Openmpt audio source (fallback for formats unsupported by libxmp).
 type Openmpt struct {
 	p *C.Openmpt
 }
@@ -67,10 +72,31 @@ func LoadWav(path string) (*Wav, error) {
 	return &Wav{p: p}, nil
 }
 
-// NewOpenmpt creates an Openmpt source from tracker file data (.xm/.mod/.it/…).
+// NewXmp creates an Xmp source from tracker file data (.xm/.mod/.it/…).
 // Data is copied internally — caller may free the buffer after return.
 // aCopy=1 / aTakeOwnership=0: SoLoud copies the (small) file into its own buffer.
 // aTakeOwnership=1 would cause delete[] on Go-allocated memory → UB.
+func NewXmp(data []byte) (*Xmp, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("xmp: empty data")
+	}
+	p := C.Xmp_create()
+	r := int(C.Xmp_loadMemEx(
+		p,
+		(*C.uchar)(unsafe.Pointer(&data[0])),
+		C.uint(len(data)),
+		1, // aCopy = true
+		0, // aTakeOwnership = false
+	))
+	if r != 0 {
+		C.Xmp_destroy(p)
+		return nil, fmt.Errorf("xmp load: %d", r)
+	}
+	return &Xmp{p: p}, nil
+}
+
+// NewOpenmpt creates an Openmpt source from tracker file data.
+// Used as fallback when libxmp cannot load the format.
 func NewOpenmpt(data []byte) (*Openmpt, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("openmpt: empty data")
@@ -98,6 +124,14 @@ func (w *Wav) Destroy() {
 	}
 }
 
+// Destroy frees the Xmp resource.
+func (x *Xmp) Destroy() {
+	if x.p != nil {
+		C.Xmp_destroy(x.p)
+		x.p = nil
+	}
+}
+
 // Destroy frees the Openmpt resource.
 func (o *Openmpt) Destroy() {
 	if o.p != nil {
@@ -109,6 +143,11 @@ func (o *Openmpt) Destroy() {
 // Play starts playing a Wav source. Returns the voice handle.
 func (s *Soloud) Play(w *Wav) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(unsafe.Pointer(w.p))))
+}
+
+// PlayXmp starts playing an Xmp source. Returns the voice handle.
+func (s *Soloud) PlayXmp(x *Xmp) uint {
+	return uint(C.Soloud_play(s.p, (*C.AudioSource)(unsafe.Pointer(x.p))))
 }
 
 // PlayOpenmpt starts playing an Openmpt source. Returns the voice handle.

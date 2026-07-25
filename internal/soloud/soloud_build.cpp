@@ -40,7 +40,8 @@
 // so dr_* headers are fully processed first.
 #include "../../lib/soloud/src/audiosource/wav/stb_vorbis.c"
 #include "../../lib/soloud/src/audiosource/wav/soloud_wav.cpp"
-// Tracker music: streaming decode via libopenmpt (no pre-decode).
+// Tracker music: streaming decode via libxmp (primary) + libopenmpt (fallback).
+#include "../../lib/soloud/src/audiosource/xmp/soloud_xmp.cpp"
 #include "../../lib/soloud/src/audiosource/openmpt/soloud_openmpt.cpp"
 
 // SDL2 backend (upstream path: backend/sdl2_static/ subdir)

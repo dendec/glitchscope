@@ -1,5 +1,5 @@
 // Package modland manages the modland.com module catalog.
-// The catalog is shipped as catalog.json.gz with the application.
+// The catalog is shipped as a file named "modland" next to the binary.
 package modland
 
 import (
@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	catalogFile = "catalog.json.gz"
-	filesDir    = "files"
+	catalogFile = "modland"
+	filesDir    = "modland-cache"
 )
 
 // SupportedExts is the set of file extensions we accept from modland.
@@ -25,12 +25,26 @@ var SupportedExts map[string]bool
 func init() {
 	SupportedExts = map[string]bool{
 		".mp3": true, ".ogg": true, ".flac": true, ".wav": true,
+		// Core tracker formats
 		".mod": true, ".xm": true, ".it": true, ".s3m": true,
+		// Additional tracker formats
 		".mptm": true, ".stm": true, ".nst": true, ".wow": true,
 		".ult": true, ".669": true, ".mtm": true, ".med": true,
 		".far": true, ".mdl": true, ".ams": true, ".dsm": true,
 		".amf": true, ".okt": true, ".dmf": true, ".ptm": true,
 		".psm": true, ".mt2": true, ".dbm": true,
+		// Exotic formats supported by libxmp
+		".abk": true, ".digi": true, ".dtt": true,
+		".flx": true, ".gtk": true, ".imf": true, ".liq": true,
+		".masi": true, ".mgt": true, ".mmd": true, ".mmdc": true,
+		".mmcmp": true, ".muse": true, ".nt": true, ".pmd": true,
+		".ppm": true, ".pru": true, ".pt36": true, ".rh": true,
+		".rtm": true, ".sfx": true, ".sfx2": true, ".stim": true,
+		".stx": true, ".tcb": true, ".tdd": true, ".tp": true,
+		".uni": true, ".xd": true,
+		// libopenmpt fallback formats
+		".mo3": true, ".ktm": true, ".ims": true, ".mdc": true,
+		".spx": true, ".txn": true,
 	}
 }
 
@@ -53,18 +67,20 @@ func (a *Album) TrackPath(i int) string {
 
 // Catalog is the parsed modland module listing.
 type Catalog struct {
-	Albums    []Album
-	UpdatedAt time.Time
+	Albums           []Album
+	ExcludedFormats  []string  // formats that failed validation (e.g. "DefleMask")
+	UpdatedAt        time.Time
 }
 
 type cacheEntry struct {
-	Albums    []Album   `json:"albums"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Albums           []Album   `json:"albums"`
+	ExcludedFormats  []string  `json:"excluded_formats,omitempty"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 // CacheDir returns the modland cache directory next to the binary.
 func CacheDir(baseDir string) (string, error) {
-	dir := filepath.Join(baseDir, "modland")
+	dir := filepath.Join(baseDir, filesDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("modland mkdir: %w", err)
 	}
@@ -86,11 +102,7 @@ func FilesDir(baseDir string) (string, error) {
 
 // LoadCatalog reads the catalog from disk.
 func LoadCatalog(baseDir string) *Catalog {
-	cacheDir, err := CacheDir(baseDir)
-	if err != nil {
-		return nil
-	}
-	path := filepath.Join(cacheDir, catalogFile)
+	path := filepath.Join(baseDir, catalogFile)
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -111,22 +123,26 @@ func LoadCatalog(baseDir string) *Catalog {
 	}
 
 	if !entry.UpdatedAt.IsZero() {
-		slog.Info("modland catalog loaded", "albums", len(entry.Albums), "age", time.Since(entry.UpdatedAt).Round(time.Hour))
+		slog.Info("modland catalog loaded", "albums", len(entry.Albums), "excluded", len(entry.ExcludedFormats), "age", time.Since(entry.UpdatedAt).Round(time.Hour))
 	} else {
-		slog.Info("modland catalog loaded", "albums", len(entry.Albums))
+		slog.Info("modland catalog loaded", "albums", len(entry.Albums), "excluded", len(entry.ExcludedFormats))
 	}
-	return &Catalog{Albums: entry.Albums, UpdatedAt: entry.UpdatedAt}
+	cat := &Catalog{Albums: entry.Albums, ExcludedFormats: entry.ExcludedFormats, UpdatedAt: entry.UpdatedAt}
+	if len(entry.ExcludedFormats) > 0 {
+		cat = cat.FilterExcluded()
+	}
+	return cat
 }
 
 // SaveCatalog writes the catalog to disk as gzipped JSON.
 func SaveCatalog(baseDir string, cat *Catalog) error {
-	cacheDir, err := CacheDir(baseDir)
-	if err != nil {
-		return err
-	}
-	path := filepath.Join(cacheDir, catalogFile)
+	path := filepath.Join(baseDir, catalogFile)
 
-	tmp, err := os.CreateTemp(cacheDir, "catalog*.tmp")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("modland catalog mkdir: %w", err)
+	}
+
+	tmp, err := os.CreateTemp(filepath.Dir(path), "catalog*.tmp")
 	if err != nil {
 		return fmt.Errorf("modland catalog temp: %w", err)
 	}
@@ -134,8 +150,9 @@ func SaveCatalog(baseDir string, cat *Catalog) error {
 
 	gz := gzip.NewWriter(tmp)
 	if err := json.NewEncoder(gz).Encode(cacheEntry{
-		Albums:    cat.Albums,
-		UpdatedAt: cat.UpdatedAt,
+		Albums:          cat.Albums,
+		ExcludedFormats: cat.ExcludedFormats,
+		UpdatedAt:       cat.UpdatedAt,
 	}); err != nil {
 		gz.Close()
 		tmp.Close()
@@ -244,4 +261,36 @@ func extractAlbum(path string) string {
 		return parts[0]
 	}
 	return ""
+}
+
+// FormatName returns the format (first component) from an album name.
+func FormatName(album string) string {
+	if i := strings.IndexByte(album, '/'); i >= 0 {
+		return album[:i]
+	}
+	return album
+}
+
+// IsExcluded reports whether the format is in the excluded list.
+func IsExcluded(excluded []string, format string) bool {
+	for _, e := range excluded {
+		if e == format {
+			return true
+		}
+	}
+	return false
+}
+
+// FilterExcluded returns a new Catalog with excluded format albums removed.
+func (c *Catalog) FilterExcluded() *Catalog {
+	if len(c.ExcludedFormats) == 0 {
+		return c
+	}
+	var filtered []Album
+	for _, a := range c.Albums {
+		if !IsExcluded(c.ExcludedFormats, FormatName(a.Name)) {
+			filtered = append(filtered, a)
+		}
+	}
+	return &Catalog{Albums: filtered, ExcludedFormats: c.ExcludedFormats, UpdatedAt: c.UpdatedAt}
 }

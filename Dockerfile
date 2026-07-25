@@ -19,17 +19,17 @@ RUN mkdir -p internal/ui/assets && cp /opt/font/unifont.otf internal/ui/assets/u
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
         CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ \
-        CGO_CFLAGS="-I/opt/openmpt/arm64/include" \
-        CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/opt/soloud/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/usr/include/SDL2 -D_REENTRANT" \
-        CGO_LDFLAGS="-lSDL2 -lm -lpthread /opt/projectm/arm64/lib/libprojectM-4.a /opt/projectm/arm64/lib/libprojectM_eval.a -lGLESv2 -lm -L/opt/openmpt/arm64/lib -lopenmpt" \
+        CGO_CFLAGS="-I/opt/xmp/arm64/include -I/opt/openmpt/arm64/include" \
+        CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/build/lib/soloud/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/xmp/arm64/include -I/opt/openmpt/arm64/include -I/usr/include/SDL2 -D_REENTRANT" \
+        CGO_LDFLAGS="-lSDL2 -lm -lpthread /opt/projectm/arm64/lib/libprojectM-4.a /opt/projectm/arm64/lib/libprojectM_eval.a -lGLESv2 -lm /opt/xmp/arm64/lib/libxmp.a /opt/openmpt/arm64/lib/libopenmpt.a -lstdc++" \
         go build -ldflags="-s -w" -o mdpp ./cmd/mdpp \
         && aarch64-linux-gnu-strip mdpp \
         && (patchelf --remove-needed libGL.so.1 mdpp 2>/dev/null || true); \
     else \
         CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-        CGO_CFLAGS="-I/usr/include/SDL2 -D_REENTRANT" \
-        CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/opt/soloud/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/usr/include/SDL2 -D_REENTRANT" \
-        CGO_LDFLAGS="-lSDL2 /opt/projectm/amd64/lib/libprojectM-4.a /opt/projectm/amd64/lib/libprojectM_eval.a -lGL -lGLESv2 -lm -lopenmpt" \
+        CGO_CFLAGS="-I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" \
+        CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/build/lib/soloud/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" \
+        CGO_LDFLAGS="-lSDL2 /opt/projectm/amd64/lib/libprojectM-4.a /opt/projectm/amd64/lib/libprojectM_eval.a -lGL -lGLESv2 -lm /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a -lstdc++" \
         go build -ldflags="-s -w" -o mdpp ./cmd/mdpp; \
     fi
 

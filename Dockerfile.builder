@@ -72,11 +72,19 @@ RUN mkdir -p /opt/projectm/arm64/lib \
     && cp lib/projectm/build-arm64/src/libprojectM/libprojectM-4.a /opt/projectm/arm64/lib/ \
     && cp lib/projectm/build-arm64/vendor/projectm-eval/projectm-eval/libprojectM_eval.a /opt/projectm/arm64/lib/
 
-# --- Build libopenmpt static for arm64 ---
+# --- Build libopenmpt static for amd64 + arm64 ---
 RUN wget -q https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.8.7+release.autotools.tar.gz \
     && tar xzf libopenmpt-0.8.7+release.autotools.tar.gz \
     && rm libopenmpt-0.8.7+release.autotools.tar.gz \
     && cd libopenmpt-0.8.7+release.autotools \
+    && ./configure --enable-static --disable-shared \
+        --without-mpg123 --without-ogg --without-vorbis --without-vorbisfile \
+        --without-pulseaudio --without-sdl2 --without-portaudio --without-portaudiocpp --without-dsound \
+        --without-sndfile --without-zlib --without-flac \
+        --prefix=/opt/openmpt/amd64 \
+    && make -j$(nproc) \
+    && make install \
+    && make distclean \
     && ./configure --host=aarch64-linux-gnu --enable-static --disable-shared \
         --without-mpg123 --without-ogg --without-vorbis --without-vorbisfile \
         --without-pulseaudio --without-sdl2 --without-portaudio --without-portaudiocpp --without-dsound \
@@ -96,6 +104,28 @@ RUN mkdir -p /opt/font \
         --no-prune-unicode-ranges \
         --output-file=/opt/font/unifont.otf 2>&1 \
     && rm -f /tmp/unifont-full.otf /tmp/font_ranges.json
+
+# --- Build libxmp static for amd64 ---
+RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-4.7.1/libxmp-4.7.1.tar.gz -O /tmp/libxmp-amd64.tar.gz \
+    && tar xzf /tmp/libxmp-amd64.tar.gz \
+    && rm /tmp/libxmp-amd64.tar.gz \
+    && cd libxmp-4.7.1 \
+    && ./configure --enable-static --disable-shared \
+        --prefix=/opt/xmp/amd64 \
+    && make -j$(nproc) \
+    && make install \
+    && rm -rf /build/libxmp-4.7.1
+
+# --- Build libxmp static for arm64 ---
+RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-4.7.1/libxmp-4.7.1.tar.gz -O /tmp/libxmp.tar.gz \
+    && tar xzf /tmp/libxmp.tar.gz \
+    && rm /tmp/libxmp.tar.gz \
+    && cd libxmp-4.7.1 \
+    && ./configure --host=aarch64-linux-gnu --enable-static --disable-shared \
+        --prefix=/opt/xmp/arm64 \
+    && make -j$(nproc) \
+    && make install \
+    && rm -rf /build/libxmp-4.7.1
 
 # Pre-download Go dependencies
 COPY go.mod go.sum* ./

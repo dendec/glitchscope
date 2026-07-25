@@ -10,14 +10,16 @@ import (
 
 	"github.com/dendec/mdpp/internal/openmpt"
 	"github.com/dendec/mdpp/internal/soloud"
+	"github.com/dendec/mdpp/internal/xmp"
 )
 
 // pendingLoad is the result of a background file load.
 type pendingLoad struct {
 	path     string
-	wav      *soloud.Wav     // non-nil for WAV/MP3/FLAC etc.
-	mod      *soloud.Openmpt // non-nil for tracker formats
-	bpm      float64         // tracker metadata
+	wav      *soloud.Wav    // non-nil for WAV/MP3/FLAC etc.
+	mod      *soloud.Xmp    // non-nil for libxmp-supported formats
+	ompt     *soloud.Openmpt // non-nil for libopenmpt fallback formats
+	bpm      float64        // tracker metadata
 	channels int
 	duration float64
 	err      error
@@ -28,7 +30,8 @@ type Player struct {
 	s               *soloud.Soloud
 	voice           uint
 	currentWav      *soloud.Wav     // non-nil when playing WAV/MP3/FLAC etc.
-	currentMod      *soloud.Openmpt // non-nil when playing tracker module
+	currentMod      *soloud.Xmp     // non-nil when playing via libxmp
+	currentOmpt     *soloud.Openmpt  // non-nil when playing via libopenmpt
 	currentPath     string
 	currentBPM      float64
 	currentDuration float64
@@ -37,7 +40,7 @@ type Player struct {
 	isTracker       bool
 
 	Downloader func(path string, expectedSize int64) (string, error) // optional remote downloader (e.g. for modland)
-	pendingCh  chan pendingLoad                  // background load results
+	pendingCh  chan pendingLoad                                      // background load results
 }
 
 // New creates and initializes a Player.
@@ -54,11 +57,16 @@ func New() (*Player, error) {
 	return &Player{s: s, pendingCh: make(chan pendingLoad, 1)}, nil
 }
 
+// isTrackerExt reports whether the extension is handled by either tracker backend.
+func isTrackerExt(ext string) bool {
+	return xmp.SupportedExts[ext] || openmpt.SupportedExts[ext]
+}
+
 // PlayFile loads and plays an audio file. Only one file at a time.
-// Tracker formats (.mod/.xm/.it/.s3m/…) are streamed via SoLoud's built-in Openmpt.
+// Tracker formats (.mod/.xm/.it/.s3m/…) are streamed via libxmp or libopenmpt.
 func (p *Player) PlayFile(path string) error {
 	ext := strings.ToLower(filepath.Ext(path))
-	if openmpt.SupportedExts[ext] {
+	if isTrackerExt(ext) {
 		return p.playTracker(path)
 	}
 
@@ -66,7 +74,7 @@ func (p *Player) PlayFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("load %s: %w", path, err)
 	}
-	p.replaceSource(w, nil)
+	p.replaceSource(w, nil, nil)
 	p.currentPath = path
 	p.currentDuration = w.GetLength()
 	p.currentBPM = 0
@@ -105,18 +113,28 @@ func (p *Player) PlayFileAsync(path string) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(localPath))
-		if openmpt.SupportedExts[ext] {
+		if isTrackerExt(ext) {
 			fileBuf, err := os.ReadFile(localPath)
 			if err != nil {
 				p.pendingCh <- pendingLoad{path: path, err: err}
 				return
 			}
-			mod, err := soloud.NewOpenmpt(fileBuf)
+			// Try libopenmpt first (broader format support), fallback to libxmp.
+			if openmpt.HasExt(ext) {
+				ompt, err := soloud.NewOpenmpt(fileBuf)
+				if err == nil {
+					bpm, ch, dur, _ := openmpt.GetTrackerMeta(fileBuf)
+					p.pendingCh <- pendingLoad{path: path, ompt: ompt, bpm: bpm, channels: ch, duration: dur}
+					return
+				}
+				slog.Debug("openmpt fallback to xmp", "ext", ext, "err", err)
+			}
+			mod, err := soloud.NewXmp(fileBuf)
 			if err != nil {
 				p.pendingCh <- pendingLoad{path: path, err: err}
 				return
 			}
-			bpm, ch, dur, _ := openmpt.GetTrackerMetaFromBytes(fileBuf)
+			bpm, ch, dur, _ := xmp.GetTrackerMetaFromBytes(fileBuf)
 			p.pendingCh <- pendingLoad{path: path, mod: mod, bpm: bpm, channels: ch, duration: dur}
 			return
 		}
@@ -138,6 +156,9 @@ func (p *Player) CheckPending() bool {
 			if res.mod != nil {
 				res.mod.Destroy()
 			}
+			if res.ompt != nil {
+				res.ompt.Destroy()
+			}
 			return false
 		}
 		if res.err != nil {
@@ -146,16 +167,25 @@ func (p *Player) CheckPending() bool {
 			return false
 		}
 		if res.mod != nil {
-			p.replaceSource(nil, res.mod)
+			p.replaceSource(nil, res.mod, nil)
 			p.currentPath = res.path
 			p.currentBPM = res.bpm
 			p.currentBitrate = 0
 			p.channels = res.channels
 			p.isTracker = true
 			p.currentDuration = res.duration
-			slog.Info("tracker (async)", "path", res.path)
+			slog.Info("tracker xmp (async)", "path", res.path)
+		} else if res.ompt != nil {
+			p.replaceSource(nil, nil, res.ompt)
+			p.currentPath = res.path
+			p.currentBPM = res.bpm
+			p.currentBitrate = 0
+			p.channels = res.channels
+			p.isTracker = true
+			p.currentDuration = res.duration
+			slog.Info("tracker openmpt (async)", "path", res.path)
 		} else if res.wav != nil {
-			p.replaceSource(res.wav, nil)
+			p.replaceSource(res.wav, nil, nil)
 			p.currentPath = res.path
 			p.currentDuration = res.wav.GetLength()
 			p.currentBPM = 0
@@ -175,15 +205,35 @@ func (p *Player) playTracker(path string) error {
 	if err != nil {
 		return fmt.Errorf("tracker read %s: %w", path, err)
 	}
-	mod, err := soloud.NewOpenmpt(fileBuf)
+
+	ext := strings.ToLower(filepath.Ext(path))
+	// Try libopenmpt first (broader format support), fallback to libxmp.
+	if openmpt.HasExt(ext) {
+		ompt, err := soloud.NewOpenmpt(fileBuf)
+		if err == nil {
+			bpm, ch, dur, _ := openmpt.GetTrackerMeta(fileBuf)
+			p.replaceSource(nil, nil, ompt)
+			p.currentPath = path
+			p.currentBPM = bpm
+			p.currentBitrate = 0
+			p.channels = ch
+			p.isTracker = true
+			p.currentDuration = dur
+			slog.Info("tracker openmpt", "path", path, "bpm", bpm, "channels", ch, "duration", dur)
+			return nil
+		}
+		slog.Debug("openmpt fallback to xmp", "ext", ext, "err", err)
+	}
+
+	mod, err := soloud.NewXmp(fileBuf)
 	if err != nil {
 		return fmt.Errorf("tracker %s: %w", path, err)
 	}
-	p.replaceSource(nil, mod)
+	p.replaceSource(nil, mod, nil)
 	p.currentPath = path
 
-	// Metadata via lightweight libopenmpt probe (no decode).
-	bpm, ch, dur, err := openmpt.GetTrackerMetaFromBytes(fileBuf)
+	// Metadata via lightweight libxmp probe (no decode).
+	bpm, ch, dur, err := xmp.GetTrackerMetaFromBytes(fileBuf)
 	if err != nil {
 		slog.Warn("tracker meta", "path", path, "err", err)
 	}
@@ -192,12 +242,12 @@ func (p *Player) playTracker(path string) error {
 	p.channels = ch
 	p.isTracker = true
 	p.currentDuration = dur
-	slog.Info("tracker", "path", path, "bpm", bpm, "channels", ch, "duration", dur)
+	slog.Info("tracker xmp", "path", path, "bpm", bpm, "channels", ch, "duration", dur)
 	return nil
 }
 
 // replaceSource stops current playback and swaps in a new audio source.
-func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Openmpt) {
+func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Openmpt) {
 	p.s.StopAll()
 	if p.currentWav != nil {
 		p.currentWav.Destroy()
@@ -207,12 +257,19 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Openmpt) {
 		p.currentMod.Destroy()
 		p.currentMod = nil
 	}
+	if p.currentOmpt != nil {
+		p.currentOmpt.Destroy()
+		p.currentOmpt = nil
+	}
 	if w != nil {
 		p.currentWav = w
 		p.voice = p.s.Play(w)
 	} else if mod != nil {
 		p.currentMod = mod
-		p.voice = p.s.PlayOpenmpt(mod)
+		p.voice = p.s.PlayXmp(mod)
+	} else if ompt != nil {
+		p.currentOmpt = ompt
+		p.voice = p.s.PlayOpenmpt(ompt)
 	}
 }
 

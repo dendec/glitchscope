@@ -1,46 +1,47 @@
-// Package openmpt provides tracker music metadata via libopenmpt.
-// Audio playback uses SoLoud's built-in Openmpt streaming instead.
+// Package openmpt provides tracker format support via libopenmpt (fallback).
+// Primary playback uses libxmp; libopenmpt handles formats libxmp cannot load.
 package openmpt
 
 /*
-#cgo LDFLAGS: -lopenmpt
-#include <libopenmpt/libopenmpt.h>
-#include <stdlib.h>
+#include <stddef.h>
 
-// Suppress deprecated warning for create_from_memory.
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+void * openmpt_module_create_from_memory(const void * filedata, size_t filesize, void *logfunc, void * user, void * ctls);
+void openmpt_module_destroy(void * mod);
+size_t openmpt_module_read_float_stereo(void * mod, int samplerate, size_t count, float * left, float * right);
+void openmpt_module_set_repeat_count(void * mod, int repeat_count);
+
+double openmpt_module_get_duration_seconds(void * mod);
+int openmpt_module_get_num_channels(void * mod);
+const char * openmpt_module_get_format_name(void * mod);
+const char * openmpt_module_get_metadata(void * mod, const char * key);
 */
 import "C"
 import (
 	"fmt"
-	"os"
 	"unsafe"
 )
 
-// SupportedExts lists extensions handled by libopenmpt.
+// SupportedExts lists extensions handled by libopenmpt that libxmp does NOT support.
+// Used as fallback — these are tried only if libxmp fails to load the file.
 var SupportedExts = map[string]bool{
-	".mod": true, ".xm": true, ".it": true, ".s3m": true,
-	".mptm": true, ".stm": true, ".nst": true, ".wow": true,
-	".ult": true, ".669": true, ".mtm": true, ".med": true,
-	".far": true, ".mdl": true, ".ams": true, ".dsm": true,
-	".amf": true, ".okt": true, ".dmf": true, ".ptm": true,
-	".psm": true, ".mt2": true, ".dbm": true,
+	".dmf": true, // DefleMask (Digital Tracker DMF is handled by libxmp)
+	".mo3": true, // OggMO3 compressed modules
+	".ktm": true, // Karate
+	".ims": true, // Velvet Studio
+	".mdc": true, // Megadrive
+	".spx": true, // Spectra
+	".txn": true, // MadTracker 2
 }
 
-// GetTrackerMeta reads a tracker file and returns BPM, channel count, and duration.
-func GetTrackerMeta(path string) (bpm float64, channels int, duration float64, err error) {
-	fileBuf, err := os.ReadFile(path)
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	return GetTrackerMetaFromBytes(fileBuf)
+// HasExt reports whether the extension is handled by libopenmpt (as fallback).
+func HasExt(ext string) bool {
+	return SupportedExts[ext]
 }
 
-// GetTrackerMetaFromBytes returns BPM, channel count, and duration from in-memory
-// tracker file data. Caller owns the buffer.
-func GetTrackerMetaFromBytes(data []byte) (bpm float64, channels int, duration float64, err error) {
+// TryLoad attempts to create an openmpt module from data. Returns error if unsupported.
+func TryLoad(data []byte) error {
 	if len(data) == 0 {
-		return 0, 0, 0, fmt.Errorf("openmpt: empty data")
+		return fmt.Errorf("openmpt: empty data")
 	}
 	mod := C.openmpt_module_create_from_memory(
 		unsafe.Pointer(&data[0]),
@@ -48,11 +49,30 @@ func GetTrackerMetaFromBytes(data []byte) (bpm float64, channels int, duration f
 		nil, nil, nil,
 	)
 	if mod == nil {
-		return 0, 0, 0, fmt.Errorf("openmpt: create module failed")
+		return fmt.Errorf("openmpt: unsupported format")
+	}
+	C.openmpt_module_destroy(mod)
+	return nil
+}
+
+// GetTrackerMeta reads tracker metadata via libopenmpt.
+func GetTrackerMeta(data []byte) (bpm float64, channels int, duration float64, err error) {
+	if len(data) == 0 {
+		return 0, 0, 0, fmt.Errorf("openmpt: empty data")
+	}
+
+	mod := C.openmpt_module_create_from_memory(
+		unsafe.Pointer(&data[0]),
+		C.size_t(len(data)),
+		nil, nil, nil,
+	)
+	if mod == nil {
+		return 0, 0, 0, fmt.Errorf("openmpt: unsupported format")
 	}
 	defer C.openmpt_module_destroy(mod)
-	bpm = float64(C.openmpt_module_get_current_estimated_bpm(mod))
-	channels = int(C.openmpt_module_get_num_channels(mod))
+
 	duration = float64(C.openmpt_module_get_duration_seconds(mod))
+	channels = int(C.openmpt_module_get_num_channels(mod))
+
 	return bpm, channels, duration, nil
 }

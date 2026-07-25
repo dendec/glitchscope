@@ -33,24 +33,24 @@ PROJECTM_LIB      := $(PROJECTM_BUILD)/src/libprojectM/libprojectM-4.a
 PROJECTM_EVAL_LIB := $(PROJECTM_BUILD)/vendor/projectm-eval/projectm-eval/libprojectM_eval.a
 PROJECTM_PATCH    := patches/projectm-feedback.patch
 
-CGO_CXXFLAGS := $(SDL_CFLAGS) -Wno-write-strings
-CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm -lopenmpt
+CGO_CXXFLAGS := $(SDL_CFLAGS) -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/build/lib/soloud/include -Wno-write-strings
+CGO_LDFLAGS  := $(SDL_LIBS) $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a -lstdc++
 
 DOCKER_IMAGE_X64 := mdpp-builder
 DOCKER_BUILDER   := mdpp-builder:latest
 
 ALLMODS_URL := https://modland.antarctica.no/allmods.zip
 ALLMODS_ZIP := $(DIST_DIR)/allmods.zip
-CATALOG_GZ  := dist/modland/catalog.json.gz
+CATALOG     := dist/modland
 
-.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures optimize-textures texture-archive texture-report catalog
+.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures optimize-textures texture-archive texture-report catalog catalog-validate
 
 # Builder image: C/C++ static dependencies compiled once for amd64 & arm64
 builder:
 	docker build -t $(DOCKER_BUILDER) -f Dockerfile.builder .
 
 # Docker build (amd64)
-dist: builder $(MDP_FILE) $(TEXTURES_MDP_FILE) $(CATALOG_GZ)
+dist: builder $(MDP_FILE) $(TEXTURES_MDP_FILE) $(CATALOG)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t mdpp:amd64 -f Dockerfile .
 	@rm -rf $(X64_DIST_DIR)
 	@mkdir -p $(X64_DIST_DIR)
@@ -64,15 +64,14 @@ dist: builder $(MDP_FILE) $(TEXTURES_MDP_FILE) $(CATALOG_GZ)
 	rm -rf $(X64_DIST_DIR)/textures
 	cp $(TEXTURES_MDP_FILE) $(X64_DIST_DIR)/presets/textures.mdp
 	cp -r test_data/* $(X64_DIST_DIR)/
-	mkdir -p $(X64_DIST_DIR)/modland
-	cp $(CATALOG_GZ) $(X64_DIST_DIR)/modland/
+	cp $(CATALOG) $(X64_DIST_DIR)/modland
 	@echo "=== Built $(APP) (amd64) ==="
 	@ls -lhR $(X64_DIST_DIR)/
 
 # ARM64 cross-build via Docker
 DOCKER_IMAGE_ARM64 := mdpp:arm64
 
-dist-arm64: builder portable-mdp $(TEXTURES_MDP_FILE) $(CATALOG_GZ)
+dist-arm64: builder portable-mdp $(TEXTURES_MDP_FILE) $(CATALOG)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)
@@ -85,13 +84,12 @@ dist-arm64: builder portable-mdp $(TEXTURES_MDP_FILE) $(CATALOG_GZ)
 	rm -rf $(ARM64_DIST_DIR)/mdpp/textures
 	cp $(TEXTURES_MDP_FILE) $(ARM64_DIST_DIR)/mdpp/presets/textures.mdp
 	cp -r test_data/* $(ARM64_DIST_DIR)/
-	mkdir -p $(ARM64_DIST_DIR)/mdpp/modland
-	cp $(CATALOG_GZ) $(ARM64_DIST_DIR)/mdpp/modland/
+	cp $(CATALOG) $(ARM64_DIST_DIR)/mdpp/modland
 	@echo "=== $(ARM64_DIST_DIR)/ ==="
 	@ls -lhR $(ARM64_DIST_DIR)/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
-dist-portmaster: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE) $(CATALOG_GZ)
+dist-portmaster: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE) $(CATALOG)
 	@rm -rf dist/portmaster_build
 	@mkdir -p dist/portmaster_build/mdpp/presets dist/portmaster_build/mdpp/licenses
 	cp portmaster/MDPP.sh dist/portmaster_build/
@@ -104,8 +102,7 @@ dist-portmaster: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE) $(CATALOG_GZ)
 	cp $(ARM64_DIST_DIR)/mdpp/mdpp dist/portmaster_build/mdpp/
 	cp $(MDP_FILE) dist/portmaster_build/mdpp/presets/presets.mdp
 	cp $(TEXTURES_MDP_FILE) dist/portmaster_build/mdpp/presets/textures.mdp
-	mkdir -p dist/portmaster_build/mdpp/modland
-	cp $(CATALOG_GZ) dist/portmaster_build/mdpp/modland/
+	cp $(CATALOG) dist/portmaster_build/mdpp/modland
 	cp portmaster/licenses/* dist/portmaster_build/mdpp/licenses/ 2>/dev/null; true
 	cp portmaster/screenshot.png dist/portmaster_build/mdpp/cover.png 2>/dev/null; true
 	@rm -f dist/mdpp.zip
@@ -126,7 +123,7 @@ deploy: dist-arm64 portable-mdp $(TEXTURES_MDP_FILE)
 	adb push $(TEXTURES_MDP_FILE) $(DEVICE_DIR)/presets/textures.mdp
 	# Deploy modland catalog.
 	adb shell "mkdir -p $(DEVICE_DIR)/modland"
-	adb push $(CATALOG_GZ) $(DEVICE_DIR)/modland/
+	adb push $(CATALOG) $(DEVICE_DIR)/modland/
 	adb shell "killall -9 mdpp 2>/dev/null; true"
 	@echo "=== Deployed binary + music + presets + textures + catalog ==="
 
@@ -213,7 +210,7 @@ $(ALLMODS_ZIP):
 	@echo "=== Downloaded $(ALLMODS_URL) → $@ ==="
 
 # Build modland catalog from allmods.zip.
-$(CATALOG_GZ):
+$(CATALOG):
 	@if [ ! -f "$@" ]; then \
 		$(MAKE) $(ALLMODS_ZIP); \
 		mkdir -p $(dir $@); \
@@ -223,6 +220,25 @@ $(CATALOG_GZ):
 		echo "=== Catalog $@ already exists, skipping ==="; \
 	fi
 
-catalog: $(CATALOG_GZ)
+# Validate catalog: build validator in Docker, run with network to test each format.
+catalog-validate: $(CATALOG) builder
+	@docker rm -f mdpp-catalog 2>/dev/null || true
+	docker create --name mdpp-catalog -v $(PWD):/build -w /build \
+		$(DOCKER_BUILDER) bash -c '\
+		CGO_ENABLED=1 \
+		CGO_CFLAGS="-I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include" \
+		CGO_CXXFLAGS="-std=c++11 -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include" \
+		CGO_LDFLAGS="/opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a -lstdc++ -lm" \
+		go build -o /tmp/validate-catalog \
+			-ldflags="-s -w" -buildvcs=false \
+			./cmd/validate-catalog/ && \
+		/tmp/validate-catalog /build/$(DIST_DIR) && \
+		cp /build/$(DIST_DIR)/modland /tmp/modland-catalog'
+	docker start -a mdpp-catalog
+	@mkdir -p $(dir $(CATALOG))
+	docker cp mdpp-catalog:/tmp/modland-catalog $(CATALOG)
+	docker rm -f mdpp-catalog
+
+catalog: $(CATALOG) catalog-validate
 
 

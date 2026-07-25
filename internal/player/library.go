@@ -9,6 +9,7 @@ import (
 
 	"github.com/dendec/mdpp/internal/openmpt"
 	"github.com/dendec/mdpp/internal/soloud"
+	"github.com/dendec/mdpp/internal/xmp"
 )
 
 // Album represents a directory containing audio files.
@@ -236,11 +237,21 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 		} else {
 			m := TrackMeta{}
 			ext := strings.ToLower(filepath.Ext(tp))
-			if openmpt.SupportedExts[ext] {
-				if bpm, ch, dur, err := openmpt.GetTrackerMeta(tp); err == nil {
+			if isTrackerExt(ext) {
+				// Try libxmp first for metadata
+				if bpm, ch, dur, err := xmp.GetTrackerMeta(tp); err == nil {
 					m.Duration = dur
 					m.BPM = bpm
 					m.Channels = ch
+				} else if openmpt.HasExt(ext) {
+					// Fallback to libopenmpt for metadata
+					if fileBuf, err := os.ReadFile(tp); err == nil {
+						if bpm, ch, dur, err := openmpt.GetTrackerMeta(fileBuf); err == nil {
+							m.Duration = dur
+							m.BPM = bpm
+							m.Channels = ch
+						}
+					}
 				}
 			} else if w, err := soloud.LoadWav(tp); err == nil {
 				m.Duration = w.GetLength()
