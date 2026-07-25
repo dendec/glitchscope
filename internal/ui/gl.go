@@ -85,6 +85,17 @@ static void drawOverlayText(unsigned int program, unsigned int text, float opaci
 	drawText(program, text, opacity, x, y, textWidth, textHeight, winW, winH, viewW, viewH);
 }
 
+static void drawOverlayTextClipped(unsigned int program, unsigned int text, float opacity,
+	float x, float y, float textWidth, float textHeight,
+	float clipX, float clipY, float clipW, float clipH,
+	int winW, int winH, int viewW, int viewH) {
+	glEnable(GL_SCISSOR_TEST);
+	// scissor uses bottom-left origin; clipX/clipY are top-left screen coords
+	glScissor((GLint)clipX, (GLint)((float)winH - clipY - clipH), (GLsizei)clipW, (GLsizei)clipH);
+	drawText(program, text, opacity, x, y, textWidth, textHeight, winW, winH, viewW, viewH);
+	glDisable(GL_SCISSOR_TEST);
+}
+
 static void drawFilledRect(unsigned int program,
 	float x, float y, float w, float h, float r, float g, float b, float a,
 	int winW, int winH, int viewW, int viewH) {
@@ -186,6 +197,13 @@ func glDrawFilledRect(program uint32, x, y, w, h, r, g, b, a float32, winW, winH
 func glDrawOverlayText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH, viewW, viewH int) {
 	C.drawOverlayText(C.uint(program), C.uint(tex), C.float(opacity),
 		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH), C.int(viewW), C.int(viewH))
+}
+
+func glDrawOverlayTextClipped(program, tex uint32, opacity float32, x, y, w, h, clipX, clipY, clipW, clipH float32, winW, winH, viewW, viewH int) {
+	C.drawOverlayTextClipped(C.uint(program), C.uint(tex), C.float(opacity),
+		C.float(x), C.float(y), C.float(w), C.float(h),
+		C.float(clipX), C.float(clipY), C.float(clipW), C.float(clipH),
+		C.int(winW), C.int(winH), C.int(viewW), C.int(viewH))
 }
 
 func glDrawText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH, viewW, viewH int) {

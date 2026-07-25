@@ -67,6 +67,28 @@ type scrollHold struct {
 	focusPanel int
 }
 
+// marqueeState tracks the scrolling animation for a single line that doesn't
+// fit its panel. One instance per column (left/right); the active page reuses them.
+type marqueeState struct {
+	tex    uint32
+	texW   int
+	texH   int
+	offset float32
+	start  time.Time
+}
+
+func (m *marqueeState) reset() {
+	m.offset = 0
+	m.start = time.Time{}
+}
+
+func (m *marqueeState) invalidate(o *Overlay) {
+	o.deleteTex(&m.tex)
+	m.tex = 0
+	m.offset = 0
+	m.start = time.Time{}
+}
+
 // Overlay manages UI and notification rendering.
 type Overlay struct {
 	programText uint32
@@ -131,6 +153,10 @@ type Overlay struct {
 	albumsScroll int
 	tracksScroll int
 
+	// Marquee state for left and right columns (shared across pages).
+	marqueeL marqueeState
+	marqueeR marqueeState
+
 	// Cached UI textures.
 	albumsTex                      uint32
 	albumsTexW, albumsTexH         int
@@ -179,6 +205,8 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.settingsColR.tex)
 	o.deleteTex(&o.presetsColL.tex)
 	o.deleteTex(&o.presetsColR.tex)
+	o.marqueeL.invalidate(o)
+	o.marqueeR.invalidate(o)
 	for i := range o.pageIndicatorTex {
 		o.deleteTex(&o.pageIndicatorTex[i])
 	}
@@ -219,6 +247,7 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 
 	o.updateScrollHold(&o.scrollUp, state[sdl.SCANCODE_UP] != 0 || gamepadUp, now, o.cursorUp1)
 	o.updateScrollHold(&o.scrollDown, state[sdl.SCANCODE_DOWN] != 0 || gamepadDown, now, o.cursorDown1)
+	o.updateMarquee(now)
 }
 
 // updateScrollHold drives held-key scroll acceleration for a single direction:
@@ -310,6 +339,8 @@ func (o *Overlay) FocusPlayingTrack(albumIdx, trackIdx int) {
 // NextScreen cycles Library → Settings → Presets → Library.
 func (o *Overlay) NextScreen() {
 	o.focusPanel = 0
+	o.marqueeL.invalidate(o)
+	o.marqueeR.invalidate(o)
 	switch o.uiPage {
 	case PageLibrary:
 		o.uiPage = PageSettings
@@ -327,6 +358,8 @@ func (o *Overlay) NextScreen() {
 // PrevScreen cycles Library → Presets → Settings → Library.
 func (o *Overlay) PrevScreen() {
 	o.focusPanel = 0
+	o.marqueeL.invalidate(o)
+	o.marqueeR.invalidate(o)
 	switch o.uiPage {
 	case PageLibrary:
 		o.uiPage = PagePresets
@@ -421,6 +454,8 @@ func (o *Overlay) markAllDirty() {
 	o.settingsDirty = true
 	o.presetsDirty = true
 	o.pageIndicatorDirty = true
+	o.marqueeL.invalidate(o)
+	o.marqueeR.invalidate(o)
 }
 
 // SetScreenSize updates screen dimensions and recomputes font size.
@@ -429,6 +464,8 @@ func (o *Overlay) SetScreenSize(w, h int) {
 	if o.screenW == w && o.screenH == h {
 		return
 	}
+	// The panel width and row clipping width depend on w even when the font
+	// size (which depends only on h) is unchanged.
 	o.screenW = w
 	o.screenH = h
 	newSize := float64(h) * refFontSize / float64(refHeight)
@@ -438,8 +475,8 @@ func (o *Overlay) SetScreenSize(w, h int) {
 	if o.fontSize != newSize {
 		o.fontSize = newSize
 		o.rebuildFace()
-		o.markAllDirty()
 	}
+	o.markAllDirty()
 }
 
 func (o *Overlay) rebuildFace() {
@@ -474,6 +511,7 @@ func (o *Overlay) CursorUp() {
 
 // cursorUp1 moves the cursor up by one item.
 func (o *Overlay) cursorUp1() {
+	o.invalidateActiveMarquee()
 	if o.uiPage == PageSettings {
 		if o.settingsEditing {
 			if o.settingsValueCursor > 0 {
@@ -530,6 +568,7 @@ func (o *Overlay) CursorDown() {
 
 // cursorDown1 moves the cursor down by one item.
 func (o *Overlay) cursorDown1() {
+	o.invalidateActiveMarquee()
 	if o.uiPage == PageSettings {
 		if o.settingsEditing {
 			vals := o.settingsRows[o.settingsCursor].Values
@@ -586,6 +625,7 @@ func (o *Overlay) focusPanelBy(delta int, markDirty func()) {
 		return
 	}
 	o.focusPanel = next
+	o.invalidateActiveMarquee()
 	markDirty()
 }
 
@@ -852,4 +892,42 @@ func (o *Overlay) currentCategory() *PresetCat {
 		return nil
 	}
 	return &o.presetCategories[o.presetCategoryCursor]
+}
+
+const (
+	marqueeDelay   = 1 * time.Second // pause before scrolling starts
+	marqueeSpeed   = 60.0            // pixels per second
+	marqueePauseAt = 1 * time.Second // pause at end before resetting
+)
+
+// updateMarquee advances the marquee scroll offset for both columns.
+func (o *Overlay) updateMarquee(now time.Time) {
+	o.updateMarqueeCol(&o.marqueeL, now)
+	o.updateMarqueeCol(&o.marqueeR, now)
+}
+
+func (o *Overlay) updateMarqueeCol(m *marqueeState, now time.Time) {
+	if m.tex == 0 || m.texW <= 0 {
+		return
+	}
+	if m.start.IsZero() {
+		m.start = now
+		return
+	}
+	elapsed := now.Sub(m.start)
+	if elapsed < marqueeDelay {
+		return
+	}
+	scrollTime := elapsed - marqueeDelay
+	// drawMarqueeCol clamps this phase to the active panel width.
+	m.offset = float32(scrollTime.Seconds()) * marqueeSpeed
+}
+
+// invalidateActiveMarquee resets the marquee for the currently focused column.
+func (o *Overlay) invalidateActiveMarquee() {
+	if o.focusPanel == 0 {
+		o.marqueeL.reset()
+	} else {
+		o.marqueeR.reset()
+	}
 }

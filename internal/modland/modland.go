@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -67,15 +68,15 @@ func (a *Album) TrackPath(i int) string {
 
 // Catalog is the parsed modland module listing.
 type Catalog struct {
-	Albums           []Album
-	ExcludedFormats  []string  // formats that failed validation (e.g. "DefleMask")
-	UpdatedAt        time.Time
+	Albums          []Album
+	ExcludedFormats []string // formats that failed validation (e.g. "DefleMask")
+	UpdatedAt       time.Time
 }
 
 type cacheEntry struct {
-	Albums           []Album   `json:"albums"`
-	ExcludedFormats  []string  `json:"excluded_formats,omitempty"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	Albums          []Album   `json:"albums"`
+	ExcludedFormats []string  `json:"excluded_formats,omitempty"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // CacheDir returns the modland cache directory next to the binary.
@@ -205,7 +206,9 @@ func ParseListing(data []byte) (*Catalog, error) {
 
 		// Tab-separated "size\tpath"
 		if idx := strings.IndexByte(line, '\t'); idx >= 0 {
-			fmt.Sscanf(line[:idx], "%d", &size)
+			if parsed, err := strconv.ParseInt(line[:idx], 10, 64); err == nil {
+				size = parsed
+			}
 			path = line[idx+1:]
 		}
 

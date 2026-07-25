@@ -45,9 +45,17 @@ CATALOG     := dist/modland
 
 .PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets mdp portable-mdp textures optimize-textures texture-archive texture-report catalog catalog-validate
 
+DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -w /build $(DOCKER_BUILDER) bash -c
+
 # Builder image: C/C++ static dependencies compiled once for amd64 & arm64
 builder:
 	docker build -t $(DOCKER_BUILDER) -f Dockerfile.builder .
+
+lint: builder
+	$(DOCKER_DEV_RUN) 'GOFLAGS=-buildvcs=false CGO_ENABLED=1 CGO_CFLAGS="-I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/opt/soloud/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" CGO_LDFLAGS="-lSDL2 /opt/projectm/amd64/lib/libprojectM-4.a /opt/projectm/amd64/lib/libprojectM_eval.a -lGL -lGLESv2 -lm /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a -lstdc++" golangci-lint run --timeout=5m ./cmd/... ./internal/...'
+
+test: builder
+	$(DOCKER_DEV_RUN) 'GOFLAGS=-buildvcs=false CGO_ENABLED=1 CGO_CFLAGS="-I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/opt/soloud/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" CGO_LDFLAGS="-lSDL2 /opt/projectm/amd64/lib/libprojectM-4.a /opt/projectm/amd64/lib/libprojectM_eval.a -lGL -lGLESv2 -lm /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a -lstdc++" go test -count=1 ./cmd/... ./internal/...'
 
 # Docker build (amd64)
 dist: builder $(MDP_FILE) $(TEXTURES_MDP_FILE) $(CATALOG)
