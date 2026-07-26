@@ -72,23 +72,31 @@ RUN mkdir -p /opt/projectm/arm64/lib \
     && cp lib/projectm/build-arm64/src/libprojectM/libprojectM-4.a /opt/projectm/arm64/lib/ \
     && cp lib/projectm/build-arm64/vendor/projectm-eval/projectm-eval/libprojectM_eval.a /opt/projectm/arm64/lib/
 
+# Add arm64 dependencies for libopenmpt and libxmp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libogg-dev libogg-dev:arm64 libvorbis-dev libvorbis-dev:arm64 \
+        libflac-dev libflac-dev:arm64 libmpg123-dev libmpg123-dev:arm64 \
+        zlib1g-dev zlib1g-dev:arm64 \
+    && rm -rf /var/lib/apt/lists/*
+
 # --- Build libopenmpt static for amd64 + arm64 ---
 RUN wget -q https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.8.7+release.autotools.tar.gz \
     && tar xzf libopenmpt-0.8.7+release.autotools.tar.gz \
     && rm libopenmpt-0.8.7+release.autotools.tar.gz \
     && cd libopenmpt-0.8.7+release.autotools \
     && ./configure --enable-static --disable-shared \
-        --without-mpg123 --without-ogg --without-vorbis --without-vorbisfile \
+        --with-mpg123 --with-ogg --with-vorbis --with-vorbisfile --with-flac --with-zlib \
         --without-pulseaudio --without-sdl2 --without-portaudio --without-portaudiocpp --without-dsound \
-        --without-sndfile --without-zlib --without-flac \
+        --without-sndfile \
         --prefix=/opt/openmpt/amd64 \
     && make -j$(nproc) \
     && make install \
     && make distclean \
-    && ./configure --host=aarch64-linux-gnu --enable-static --disable-shared \
-        --without-mpg123 --without-ogg --without-vorbis --without-vorbisfile \
+    && PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig \
+       ./configure --host=aarch64-linux-gnu --enable-static --disable-shared \
+        --with-mpg123 --with-ogg --with-vorbis --with-vorbisfile --with-flac --with-zlib \
         --without-pulseaudio --without-sdl2 --without-portaudio --without-portaudiocpp --without-dsound \
-        --without-sndfile --without-zlib --without-flac \
+        --without-sndfile \
         --prefix=/opt/openmpt/arm64 \
     && make -j$(nproc) \
     && make install \
