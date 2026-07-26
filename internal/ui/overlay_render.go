@@ -130,7 +130,11 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		if tm < 1 {
 			tm = 1
 		}
-		drawScrollbar(o, tx+float32(panelW-4), ty, float32(panelH), len(o.trackInfos), tm, o.tracksScroll, winW, winH, viewW, viewH)
+		tracksCount := len(o.trackInfos)
+		if o.previewActive {
+			tracksCount = len(o.previewEntries)
+		}
+		drawScrollbar(o, tx+float32(panelW-4), ty, float32(panelH), tracksCount, tm, o.tracksScroll, winW, winH, viewW, viewH)
 		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
 			rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
 			if !o.drawMarqueeCol(&o.marqueeR, tx, ty, float32(textW), float32(panelH), lh, rowY, tx+2, float32(panelW-4), winW, winH, viewW, viewH) {
@@ -411,6 +415,11 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.deleteTex(&o.tracksTex)
 	o.marqueeR.invalidate(o)
 
+	if o.previewActive {
+		o.rebuildPreviewTex(maxW, maxH)
+		return
+	}
+
 	if len(o.trackInfos) == 0 {
 		return
 	}
@@ -445,6 +454,34 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 		if i == o.trackCursor && o.focusPanel == 1 {
 			o.rebuildMarqueeLine(&o.marqueeR, line, maxTextPx)
 		}
+	}
+	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
+}
+
+// rebuildPreviewTex renders the right-panel preview of a non-leaf left-panel
+// entry: the modland format list (when "Modland" is highlighted) or the
+// album list within a format (when a format is highlighted). Read-only —
+// there is no cursor/selection inside this panel; the user drills in by
+// pressing Select on the left-panel entry instead.
+func (o *Overlay) rebuildPreviewTex(maxW, maxH int) {
+	if len(o.previewEntries) == 0 {
+		return
+	}
+
+	lh := o.face.Metrics().Height.Ceil()
+	maxRows := maxH / lh
+	if maxRows < 1 {
+		maxRows = 1
+	}
+	maxTextPx := availableRowTextWidth(maxW)
+
+	end := len(o.previewEntries)
+	if end > maxRows {
+		end = maxRows
+	}
+	rows := make([]listRow, end)
+	for i := 0; i < end; i++ {
+		rows[i] = listRow{text: o.previewEntries[i].label}
 	}
 	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
 }

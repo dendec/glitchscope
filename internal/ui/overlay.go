@@ -4,6 +4,8 @@ package ui
 import (
 	"log/slog"
 	"math"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/dendec/mdpp/internal/player"
@@ -11,6 +13,54 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 )
+
+// modlandNamePrefix is prepended to modland album names by app.addModlandAlbums
+// ("Modland: Format/Author"). Stripped when splitting into format/author for
+// hierarchical browsing.
+const modlandNamePrefix = "Modland: "
+
+// navEntryKind classifies a row in the library navigation panel.
+type navEntryKind int
+
+const (
+	entryLocalAlbum   navEntryKind = iota // real album/folder — leaf, has tracks
+	entryModlandRoot                      // "Modland" pseudo-folder at the library root
+	entryFormat                           // modland format bucket (e.g. "Protracker")
+	entryModlandAlbum                     // modland author/album within a format — leaf, has tracks
+)
+
+// navEntry is one row shown in the library's left (navigation) panel.
+type navEntry struct {
+	label    string
+	kind     navEntryKind
+	albumIdx int    // index into Overlay.allAlbums when kind is a leaf album, else -1
+	format   string // set when kind == entryFormat
+}
+
+// navLevel is a pushed navigation level (everything below the library root).
+type navLevel struct {
+	entries []navEntry
+	cursor  int
+	scroll  int
+}
+
+// splitModlandName splits a modland album's display name ("Modland:
+// Format/Author") into its format and author parts.
+func splitModlandName(name string) (format, author string) {
+	n := strings.TrimPrefix(name, modlandNamePrefix)
+	if idx := strings.IndexByte(n, '/'); idx >= 0 {
+		return n[:idx], n[idx+1:]
+	}
+	return n, ""
+}
+
+func labelsOf(entries []navEntry) []string {
+	labels := make([]string, len(entries))
+	for i, e := range entries {
+		labels[i] = e.label
+	}
+	return labels
+}
 
 // This file owns Overlay's state, lifecycle and input handling (cursor
 // movement, panel focus, page switching). Rendering lives in
@@ -108,23 +158,31 @@ type Overlay struct {
 	fontSize         float64
 
 	// UI data (updated each frame from main loop).
-	albums       []string
-	albumCursor  int
-	trackInfos   []player.TrackInfo
-	trackCursor  int
-	statsLine    string
-	position     float64
-	duration     float64
-	sampleRate   float32
-	bitrate      float64
-	bpm          float64
-	channels     int
-	paused       bool
-	isTracker    bool
-	presetName   string
-	playingAlbum string
-	playingTrack string
-	focusPanel   int // 0=albums, 1=tracks
+	allAlbums      []player.Album // raw flat album list as received from SetAlbums
+	rootEntries    []navEntry     // library-root navigation rows, built from allAlbums
+	rootCursor     int            // saved cursor for the root level while drilled in
+	rootScroll     int            // saved scroll for the root level while drilled in
+	navStack       []navLevel     // pushed navigation levels (modland format/album drill-down)
+	albumEntries   []navEntry     // rows currently shown in the left panel (root or top of navStack)
+	albums         []string       // display labels for albumEntries (kept for rendering)
+	albumCursor    int
+	trackInfos     []player.TrackInfo
+	previewEntries []navEntry // right-panel preview rows when the left cursor is on a non-leaf entry
+	previewActive  bool       // true when the right panel shows previewEntries instead of trackInfos
+	trackCursor    int
+	statsLine      string
+	position       float64
+	duration       float64
+	sampleRate     float32
+	bitrate        float64
+	bpm            float64
+	channels       int
+	paused         bool
+	isTracker      bool
+	presetName     string
+	playingAlbum   string
+	playingTrack   string
+	focusPanel     int // 0=albums, 1=tracks
 
 	// Settings page state.
 	settingsRows        []SettingRow
@@ -326,14 +384,84 @@ func (o *Overlay) ToggleUI() {
 
 // FocusPlayingTrack points the library page cursor at the given album/track
 // and focuses the tracks (right) panel. Called when the playlist screen is
-// opened so the cursor starts on the currently playing file.
+// opened so the cursor starts on the currently playing file — including
+// deep-linking into the modland format/album drill-down when the playing
+// track lives there, so reopening the UI always lands back on it.
 func (o *Overlay) FocusPlayingTrack(albumIdx, trackIdx int) {
-	o.albumCursor = albumIdx
+	o.navStack = nil
+	o.refreshAlbumLabels()
 	o.trackCursor = trackIdx
-	o.focusPanel = 1
+
+	if albumIdx >= 0 && albumIdx < len(o.allAlbums) && strings.HasPrefix(o.allAlbums[albumIdx].Path, player.ModlandPrefix) {
+		o.focusModlandAlbum(albumIdx)
+	} else {
+		o.albumCursor = o.rootIndexOf(albumIdx)
+		o.refreshPreview()
+	}
+
+	if e := o.currentEntry(); e != nil && (e.kind == entryLocalAlbum || e.kind == entryModlandAlbum) {
+		o.focusPanel = 1
+	} else {
+		o.focusPanel = 0
+	}
 	o.panelEntered = true
 	o.albumsDirty = true
 	o.tracksDirty = true
+}
+
+// focusModlandAlbum drills the navigation stack down to the format and
+// author/album containing allAlbums[albumIdx] (format level, then album
+// level), positioning the cursor on the playing album at the bottom. The
+// root level is left parked on the "Modland" entry, so popping back out
+// lands on it rather than at row 0.
+func (o *Overlay) focusModlandAlbum(albumIdx int) {
+	o.rootCursor = o.rootModlandIndex()
+	o.rootScroll = 0
+
+	format, _ := splitModlandName(o.allAlbums[albumIdx].Name)
+
+	formats := o.buildFormatEntries()
+	o.navStack = append(o.navStack, navLevel{entries: formats, cursor: indexOfFormat(formats, format)})
+
+	albums := o.buildAlbumsInFormatEntries(format)
+	albumCursor := indexOfAlbumIdx(albums, albumIdx)
+	o.navStack = append(o.navStack, navLevel{entries: albums, cursor: albumCursor})
+
+	o.albumCursor = albumCursor
+	o.albumsScroll = 0
+	o.refreshAlbumLabels()
+	o.refreshPreview()
+}
+
+// rootModlandIndex returns the root-level row index of the "Modland" entry,
+// or 0 if there isn't one.
+func (o *Overlay) rootModlandIndex() int {
+	for i, e := range o.rootEntries {
+		if e.kind == entryModlandRoot {
+			return i
+		}
+	}
+	return 0
+}
+
+// indexOfFormat finds a format entry's row index by format name.
+func indexOfFormat(entries []navEntry, format string) int {
+	for i, e := range entries {
+		if e.format == format {
+			return i
+		}
+	}
+	return 0
+}
+
+// indexOfAlbumIdx finds a leaf album entry's row index by its allAlbums index.
+func indexOfAlbumIdx(entries []navEntry, albumIdx int) int {
+	for i, e := range entries {
+		if e.albumIdx == albumIdx {
+			return i
+		}
+	}
+	return 0
 }
 
 // NextScreen cycles Library → Settings → Presets → Library.
@@ -549,6 +677,7 @@ func (o *Overlay) cursorUp1() {
 			o.trackCursor = 0
 			o.tracksDirty = true
 			o.albumsDirty = true
+			o.refreshPreview()
 		}
 	case 1:
 		if o.trackCursor > 0 {
@@ -607,6 +736,7 @@ func (o *Overlay) cursorDown1() {
 			o.trackCursor = 0
 			o.tracksDirty = true
 			o.albumsDirty = true
+			o.refreshPreview()
 		}
 	case 1:
 		if o.trackCursor < len(o.trackInfos)-1 {
@@ -715,8 +845,19 @@ func (o *Overlay) Select() bool {
 		return o.currentCategory() != nil && len(o.currentCategory().Presets) > 0
 	}
 
-	// Album panel selected — switch to tracks panel, let user pick a track.
+	// Album panel selected: drill into a non-leaf entry (Modland root or a
+	// format bucket), or switch to the tracks panel for a leaf album.
 	if o.focusPanel == 0 {
+		if e := o.currentEntry(); e != nil {
+			switch e.kind {
+			case entryModlandRoot:
+				o.pushLevel(o.buildFormatEntries())
+				return false
+			case entryFormat:
+				o.pushLevel(o.buildAlbumsInFormatEntries(e.format))
+				return false
+			}
+		}
 		o.focusPanel = 1
 		o.tracksDirty = true
 		return false
@@ -769,6 +910,11 @@ func (o *Overlay) Back() {
 	if o.backToLeftPanel(func() { o.albumsDirty = true; o.tracksDirty = true }) {
 		return
 	}
+	// Already on the left panel: go up one navigation level (e.g. out of a
+	// modland format/album drill-down) before closing the UI.
+	if o.popLevel() {
+		return
+	}
 	// Close UI.
 	if o.uiVisible {
 		o.uiVisible = false
@@ -780,24 +926,203 @@ func (o *Overlay) Back() {
 
 // --- Data setters ---
 
-// SetAlbums updates the album list and marks dirty.
-func (o *Overlay) SetAlbums(names []string, cursor int) {
-	listChanged := len(o.albums) != len(names)
+// SetAlbums updates the flat album list (local + modland) and rebuilds the
+// library-root navigation rows: local albums are shown directly, modland
+// albums are collapsed behind a single "Modland" entry that drills into
+// formats, then albums, then tracks. Marks dirty as needed.
+func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
+	listChanged := len(o.allAlbums) != len(albums)
 	if !listChanged {
-		for i := range names {
-			if o.albums[i] != names[i] {
+		for i := range albums {
+			if o.allAlbums[i].Name != albums[i].Name || o.allAlbums[i].Path != albums[i].Path {
 				listChanged = true
 				break
 			}
 		}
 	}
-	o.albums = names
+	if listChanged {
+		o.allAlbums = albums
+		o.rootEntries = o.buildRootEntries()
+		// Library rescanned — any drill-down position is now stale.
+		o.navStack = nil
+	}
 	// While the UI is open, the overlay cursor is independent of the
 	// library's currently playing album. When hidden, keep it synchronized.
-	if listChanged || !o.uiVisible {
-		o.albumCursor = cursor
+	// Only meaningful at the root level; a cursor deep in a modland
+	// drill-down is left untouched.
+	if (listChanged || !o.uiVisible) && len(o.navStack) == 0 {
+		o.albumCursor = o.rootIndexOf(cursor)
 	}
+	if listChanged {
+		o.refreshAlbumLabels()
+	}
+	o.refreshPreview()
 	o.albumsDirty = true
+}
+
+// buildRootEntries builds the library-root navigation rows from allAlbums:
+// local albums verbatim, plus a single "Modland" entry when any modland
+// albums are present.
+func (o *Overlay) buildRootEntries() []navEntry {
+	var entries []navEntry
+	hasModland := false
+	for i, a := range o.allAlbums {
+		if strings.HasPrefix(a.Path, player.ModlandPrefix) {
+			hasModland = true
+			continue
+		}
+		entries = append(entries, navEntry{label: a.Name, kind: entryLocalAlbum, albumIdx: i})
+	}
+	if hasModland {
+		entries = append(entries, navEntry{label: "Modland", kind: entryModlandRoot, albumIdx: -1})
+	}
+	return entries
+}
+
+// buildFormatEntries lists the distinct modland formats (e.g. "Protracker").
+func (o *Overlay) buildFormatEntries() []navEntry {
+	seen := map[string]bool{}
+	var formats []string
+	for _, a := range o.allAlbums {
+		if !strings.HasPrefix(a.Path, player.ModlandPrefix) {
+			continue
+		}
+		format, _ := splitModlandName(a.Name)
+		if !seen[format] {
+			seen[format] = true
+			formats = append(formats, format)
+		}
+	}
+	sort.Strings(formats)
+	entries := make([]navEntry, len(formats))
+	for i, f := range formats {
+		entries[i] = navEntry{label: f, kind: entryFormat, format: f, albumIdx: -1}
+	}
+	return entries
+}
+
+// buildAlbumsInFormatEntries lists the modland albums (authors) within a
+// single format. Each is a leaf with its own tracks.
+func (o *Overlay) buildAlbumsInFormatEntries(format string) []navEntry {
+	var entries []navEntry
+	for i, a := range o.allAlbums {
+		if !strings.HasPrefix(a.Path, player.ModlandPrefix) {
+			continue
+		}
+		f, author := splitModlandName(a.Name)
+		if f != format {
+			continue
+		}
+		label := author
+		if label == "" {
+			label = f
+		}
+		entries = append(entries, navEntry{label: label, kind: entryModlandAlbum, albumIdx: i})
+	}
+	return entries
+}
+
+// rootIndexOf finds the root-level row for a real allAlbums index (only
+// local albums are addressable this way — modland leaves live behind the
+// "Modland" entry and fall back to root position 0).
+func (o *Overlay) rootIndexOf(albumIdx int) int {
+	for i, e := range o.rootEntries {
+		if e.kind == entryLocalAlbum && e.albumIdx == albumIdx {
+			return i
+		}
+	}
+	return 0
+}
+
+// currentLevelEntries returns the rows for whichever level is currently
+// displayed in the left panel: the root, or the top of navStack.
+func (o *Overlay) currentLevelEntries() []navEntry {
+	if len(o.navStack) == 0 {
+		return o.rootEntries
+	}
+	return o.navStack[len(o.navStack)-1].entries
+}
+
+// currentEntry returns the row under the left-panel cursor, or nil.
+func (o *Overlay) currentEntry() *navEntry {
+	if o.albumCursor < 0 || o.albumCursor >= len(o.albumEntries) {
+		return nil
+	}
+	return &o.albumEntries[o.albumCursor]
+}
+
+// refreshAlbumLabels recomputes albumEntries/albums from the current level.
+func (o *Overlay) refreshAlbumLabels() {
+	o.albumEntries = o.currentLevelEntries()
+	o.albums = labelsOf(o.albumEntries)
+}
+
+// refreshPreview recomputes the right-panel preview for a non-leaf entry
+// under the cursor (formats list, or albums-in-format list). For a leaf
+// entry, previewActive is false and the right panel falls back to the
+// externally supplied trackInfos, as before.
+func (o *Overlay) refreshPreview() {
+	e := o.currentEntry()
+	if e == nil {
+		o.previewEntries = nil
+		o.previewActive = false
+		return
+	}
+	switch e.kind {
+	case entryModlandRoot:
+		o.previewEntries = o.buildFormatEntries()
+		o.previewActive = true
+	case entryFormat:
+		o.previewEntries = o.buildAlbumsInFormatEntries(e.format)
+		o.previewActive = true
+	default:
+		o.previewEntries = nil
+		o.previewActive = false
+	}
+	o.tracksDirty = true
+}
+
+// pushLevel drills into a non-leaf entry, saving the current level's
+// cursor/scroll so popLevel can restore it.
+func (o *Overlay) pushLevel(entries []navEntry) {
+	if len(o.navStack) == 0 {
+		o.rootCursor, o.rootScroll = o.albumCursor, o.albumsScroll
+	} else {
+		top := &o.navStack[len(o.navStack)-1]
+		top.cursor, top.scroll = o.albumCursor, o.albumsScroll
+	}
+	o.navStack = append(o.navStack, navLevel{entries: entries})
+	o.albumCursor = 0
+	o.albumsScroll = 0
+	o.trackCursor = 0
+	o.marqueeL.invalidate(o)
+	o.refreshAlbumLabels()
+	o.refreshPreview()
+	o.albumsDirty = true
+	o.tracksDirty = true
+}
+
+// popLevel goes up one navigation level, restoring the parent's cursor and
+// scroll position. Returns false if already at the root (caller should
+// treat this as "back"/exit instead).
+func (o *Overlay) popLevel() bool {
+	if len(o.navStack) == 0 {
+		return false
+	}
+	o.navStack = o.navStack[:len(o.navStack)-1]
+	if len(o.navStack) == 0 {
+		o.albumCursor, o.albumsScroll = o.rootCursor, o.rootScroll
+	} else {
+		top := o.navStack[len(o.navStack)-1]
+		o.albumCursor, o.albumsScroll = top.cursor, top.scroll
+	}
+	o.trackCursor = 0
+	o.marqueeL.invalidate(o)
+	o.refreshAlbumLabels()
+	o.refreshPreview()
+	o.albumsDirty = true
+	o.tracksDirty = true
+	return true
 }
 
 // SetTrackInfos updates the track list and marks dirty.
@@ -852,8 +1177,22 @@ func (o *Overlay) SetPresetName(name string) {
 	o.presetNameDirty = true
 }
 
-// AlbumCursor returns the current album cursor index.
-func (o *Overlay) AlbumCursor() int { return o.albumCursor }
+// AlbumCursor returns the real allAlbums index of the leaf album currently
+// previewed/selected, or -1 when the cursor is on a non-leaf row (the
+// "Modland" entry or a format bucket) — callers must not fetch tracks or
+// play in that case, since there is no single album yet.
+func (o *Overlay) AlbumCursor() int {
+	e := o.currentEntry()
+	if e == nil {
+		return -1
+	}
+	switch e.kind {
+	case entryLocalAlbum, entryModlandAlbum:
+		return e.albumIdx
+	default:
+		return -1
+	}
+}
 
 // TrackCursor returns the current track cursor index.
 func (o *Overlay) TrackCursor() int { return o.trackCursor }

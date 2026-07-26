@@ -461,11 +461,7 @@ func (a *App) Run() {
 				a.overlay.SetPlayback(a.pl.Position(), a.pl.Duration(), a.pl.SampleRate(), a.pl.Bitrate(), a.pl.BPM(), a.pl.Channels(), a.pl.IsPaused(), a.pl.IsTracker())
 			}
 			if a.lib != nil {
-				albumNames := make([]string, a.lib.AlbumCount())
-				for i := 0; i < a.lib.AlbumCount(); i++ {
-					albumNames[i] = a.lib.Albums[i].Name
-				}
-				a.overlay.SetAlbums(albumNames, a.lib.CurrentAlbumIndex())
+				a.overlay.SetAlbums(a.lib.Albums, a.lib.CurrentAlbumIndex())
 
 				trackAlbumIdx := a.lib.CurrentAlbumIndex()
 				if a.overlay.UIVisible() {
