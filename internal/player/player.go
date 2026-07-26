@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/dendec/mdpp/internal/openmpt"
 	"github.com/dendec/mdpp/internal/soloud"
@@ -16,10 +17,10 @@ import (
 // pendingLoad is the result of a background file load.
 type pendingLoad struct {
 	path     string
-	wav      *soloud.Wav    // non-nil for WAV/MP3/FLAC etc.
-	mod      *soloud.Xmp    // non-nil for libxmp-supported formats
+	wav      *soloud.Wav     // non-nil for WAV/MP3/FLAC etc.
+	mod      *soloud.Xmp     // non-nil for libxmp-supported formats
 	ompt     *soloud.Openmpt // non-nil for libopenmpt fallback formats
-	bpm      float64        // tracker metadata
+	bpm      float64         // tracker metadata
 	channels int
 	duration float64
 	err      error
@@ -31,7 +32,7 @@ type Player struct {
 	voice           uint
 	currentWav      *soloud.Wav     // non-nil when playing WAV/MP3/FLAC etc.
 	currentMod      *soloud.Xmp     // non-nil when playing via libxmp
-	currentOmpt     *soloud.Openmpt  // non-nil when playing via libopenmpt
+	currentOmpt     *soloud.Openmpt // non-nil when playing via libopenmpt
 	currentPath     string
 	currentBPM      float64
 	currentDuration float64
@@ -39,8 +40,13 @@ type Player struct {
 	channels        int
 	isTracker       bool
 
-	Downloader func(path string, expectedSize int64) (string, error) // optional remote downloader (e.g. for modland)
-	pendingCh  chan pendingLoad                                      // background load results
+	// Downloader optionally fetches a remote file to a local path (e.g. for modland).
+	// onProgress, if non-nil, should be called with (bytesRead, totalBytes) as the
+	// download progresses; totalBytes may be 0 if unknown.
+	Downloader  func(path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
+	pendingCh   chan pendingLoad // background load results
+	loading     atomic.Bool      // true while an async load is in flight
+	loadPercent atomic.Int64     // download progress percent [0..100], -1 if unknown
 }
 
 // New creates and initializes a Player.
@@ -99,18 +105,35 @@ func (p *Player) PlayFileAsync(path string) {
 	p.s.StopAll()
 	p.voice = 0
 	p.currentPath = path // show path in UI while loading
+	p.loading.Store(true)
+	p.loadPercent.Store(-1)
 
 	// Launch background load.
+	// loading is cleared by CheckPending when the matching result is consumed,
+	// NOT here — a newer goroutine may already be running when this one ends.
 	go func() {
 		localPath := path
 		if p.Downloader != nil {
-			dlPath, err := p.Downloader(path, 0) // size unknown at call site
+			onProgress := func(read, total int64) {
+				if total <= 0 {
+					return
+				}
+				pct := read * 100 / total
+				if pct < 0 {
+					pct = 0
+				} else if pct > 100 {
+					pct = 100
+				}
+				p.loadPercent.Store(pct)
+			}
+			dlPath, err := p.Downloader(path, 0, onProgress) // size unknown at call site
 			if err != nil {
 				p.pendingCh <- pendingLoad{path: path, err: err}
 				return
 			}
 			localPath = dlPath
 		}
+		p.loadPercent.Store(-1) // decode phase: unknown progress
 
 		ext := strings.ToLower(filepath.Ext(localPath))
 		if isTrackerExt(ext) {
@@ -143,9 +166,24 @@ func (p *Player) PlayFileAsync(path string) {
 	}()
 }
 
+// Loading reports whether an async load is currently in flight.
+func (p *Player) Loading() bool {
+	return p.loading.Load()
+}
+
+// LoadProgress reports whether an async load is in flight and, if it is a
+// download, the download progress percent [0..100]. When the percent is
+// unknown (download hasn't reported yet, or decoding rather than downloading)
+// percent is -1.
+func (p *Player) LoadProgress() (active bool, percent int64) {
+	return p.loading.Load(), p.loadPercent.Load()
+}
+
 // CheckPending picks up a completed background load and starts playback.
-// Returns true if a track was started. Call every frame from main loop.
-func (p *Player) CheckPending() bool {
+// Returns (true, false) if a track was started, (false, false) if a load is
+// still in flight (or nothing pending), and (false, true) if the load failed.
+// Call every frame from main loop.
+func (p *Player) CheckPending() (started bool, failed bool) {
 	select {
 	case res := <-p.pendingCh:
 		if res.path != p.currentPath {
@@ -159,12 +197,14 @@ func (p *Player) CheckPending() bool {
 			if res.ompt != nil {
 				res.ompt.Destroy()
 			}
-			return false
+			return false, false
 		}
+		// Result matches current path — loading is done regardless of outcome.
+		p.loading.Store(false)
 		if res.err != nil {
 			slog.Error("async load", "path", res.path, "error", res.err)
 			p.currentPath = "" // clear failed path so player state is consistent
-			return false
+			return false, true
 		}
 		if res.mod != nil {
 			p.replaceSource(nil, res.mod, nil)
@@ -194,9 +234,9 @@ func (p *Player) CheckPending() bool {
 			p.isTracker = false
 			slog.Info("playing (async)", "path", res.path)
 		}
-		return true
+		return true, false
 	default:
-		return false
+		return false, false
 	}
 }
 

@@ -69,10 +69,11 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	}
 
 	// --- Compact playback status (full width) ---
-	if o.playingTrack != "" && o.bottomDirty {
+	showBar := o.playingTrack != "" || o.loading
+	if showBar && o.bottomDirty {
 		o.rebuildBottomTex(winW, bottomH)
 	}
-	if o.playingTrack != "" && o.bottomTex != 0 {
+	if showBar && o.bottomTex != 0 {
 		by := float32(winH - bottomH)
 		glDrawFilledRect(o.programRect, 0, by, float32(winW), float32(bottomH), 0, 0, 0, 0.5, winW, winH, viewW, viewH)
 		glDrawOverlayText(o.programText, o.bottomTex, 1,
@@ -490,10 +491,31 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	o.bottomDirty = false
 	o.deleteTex(&o.bottomTex)
 
-	if o.playingTrack == "" {
+	if o.playingTrack == "" && !o.loading {
 		return
 	}
 
+	title := ""
+	if o.playingTrack != "" {
+		title = player.TrackTitle(o.playingTrack)
+		maxTitleW := w - int(o.fontSize*14)
+		title = o.truncateMiddle(title, maxTitleW)
+	}
+
+	// Loading indicator — shown while a background load is in flight.
+	if o.loading {
+		text := "⏳ " + title
+		if title == "" {
+			text = "⏳ loading…"
+		}
+		if o.loadPercent >= 0 {
+			text += fmt.Sprintf("  %d%%", o.loadPercent)
+		}
+		o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(text, 255, 255, 255, 255)
+		return
+	}
+
+	// Normal playback status.
 	pos := formatDuration(o.position)
 	dur := formatDuration(o.duration)
 	status := "▶"
@@ -501,9 +523,6 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 		status = "⏸"
 	}
 
-	title := player.TrackTitle(o.playingTrack)
-	maxTitleW := w - int(o.fontSize*14)
-	title = o.truncateMiddle(title, maxTitleW)
 	info := ""
 	if !o.isTracker && o.sampleRate > 0 {
 		info = fmt.Sprintf("%.0fkHz", o.sampleRate/1000)

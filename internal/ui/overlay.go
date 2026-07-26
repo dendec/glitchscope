@@ -182,6 +182,8 @@ type Overlay struct {
 	presetName     string
 	playingAlbum   string
 	playingTrack   string
+	loading        bool   // true while async track load is in progress
+	loadPercent    int64  // download progress percent [0..100], -1 = unknown
 	focusPanel     int // 0=albums, 1=tracks
 
 	// Settings page state.
@@ -1144,6 +1146,17 @@ func (o *Overlay) SetPlaying(album, track string) {
 		o.playingTrack = track
 		o.albumsDirty = true
 		o.tracksDirty = true
+		o.bottomDirty = true
+	}
+}
+
+// SetLoading updates the async-load indicator. active is true while a
+// background load is in flight; percent is the download progress [0..100]
+// or -1 when unknown (decode phase, or no download).
+func (o *Overlay) SetLoading(active bool, percent int64) {
+	if o.loading != active || o.loadPercent != percent {
+		o.loading = active
+		o.loadPercent = percent
 		o.bottomDirty = true
 	}
 }

@@ -235,13 +235,13 @@ func (a *App) initAudio() {
 		return
 	}
 	a.pl = pl
-	a.pl.Downloader = func(path string, expectedSize int64) (string, error) {
+	a.pl.Downloader = func(path string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
 		if player.IsModland(path) {
 			remotePath := player.RemotePath(path)
 			if expectedSize == 0 {
 				expectedSize = a.modlandSizes[remotePath]
 			}
-			return modland.DownloadFile(baseDir(), remotePath, expectedSize)
+			return modland.DownloadFile(baseDir(), remotePath, expectedSize, onProgress)
 		}
 		return path, nil
 	}
@@ -487,11 +487,12 @@ func (a *App) Run() {
 
 				if a.pl != nil {
 					curTrack := a.pl.TrackPath()
-					if !a.pl.IsValidVoice() {
+					if !a.pl.IsValidVoice() && !a.pl.Loading() {
 						curTrack = ""
 					}
 					curAlbum := a.lib.CurrentAlbum().Name
 					a.overlay.SetPlaying(curAlbum, curTrack)
+					a.overlay.SetLoading(a.pl.LoadProgress())
 				}
 			}
 		}
@@ -536,7 +537,7 @@ func (a *App) Run() {
 
 		// Pick up async track load.
 		if a.pl != nil {
-			if !a.pl.CheckPending() {
+			if _, failed := a.pl.CheckPending(); failed {
 				if a.overlay != nil {
 					a.overlay.ShowTrack(" playback error")
 				}

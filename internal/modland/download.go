@@ -12,10 +12,29 @@ import (
 
 const downloadTimeout = 60 * time.Second
 
+// progressReader wraps an io.Reader and reports cumulative bytes read.
+type progressReader struct {
+	r          io.Reader
+	read       int64
+	total      int64
+	onProgress func(read, total int64)
+}
+
+func (pr *progressReader) Read(p []byte) (int, error) {
+	n, err := pr.r.Read(p)
+	if n > 0 {
+		pr.read += int64(n)
+		pr.onProgress(pr.read, pr.total)
+	}
+	return n, err
+}
+
 // DownloadFile downloads a single module file from modland to the local cache.
 // Returns the local file path. Skips download if already cached and size matches.
 // If expectedSize > 0 and cached file has different size, re-downloads.
-func DownloadFile(baseDir, remotePath string, expectedSize int64) (string, error) {
+// onProgress, if non-nil, is called periodically with (bytesRead, totalBytes);
+// totalBytes is 0 if the server didn't report Content-Length.
+func DownloadFile(baseDir, remotePath string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
 	filesDir, err := FilesDir(baseDir)
 	if err != nil {
 		return "", err
@@ -61,6 +80,11 @@ func DownloadFile(baseDir, remotePath string, expectedSize int64) (string, error
 	}
 	defer resp.Body.Close()
 
+	total := expectedSize
+	if total <= 0 && resp.ContentLength > 0 {
+		total = resp.ContentLength
+	}
+
 	// Write to temp file, then rename for atomicity.
 	tmp, err := os.CreateTemp(filesDir, "mod*.tmp")
 	if err != nil {
@@ -68,7 +92,11 @@ func DownloadFile(baseDir, remotePath string, expectedSize int64) (string, error
 	}
 	tmpPath := tmp.Name()
 
-	if _, err := io.Copy(tmp, resp.Body); err != nil {
+	var reader io.Reader = resp.Body
+	if onProgress != nil {
+		reader = &progressReader{r: resp.Body, total: total, onProgress: onProgress}
+	}
+	if _, err := io.Copy(tmp, reader); err != nil {
 		tmp.Close()
 		os.Remove(tmpPath)
 		return "", fmt.Errorf("modland write: %w", err)
