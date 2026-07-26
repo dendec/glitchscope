@@ -230,7 +230,7 @@ func (a *App) applyPresetName(name string) {
 // applySettings reads confirmed settings rows and applies changes.
 func (a *App) applySettings(winW, winH int) {
 	rows := a.overlay.SettingsRows()
-	if len(rows) < 5 {
+	if len(rows) < 7 {
 		return
 	}
 
@@ -272,6 +272,20 @@ func (a *App) applySettings(winW, winH int) {
 		a.settings.PresetInterval = presetIntervals[rows[4].Index]
 		a.resetPresetTicker()
 	}
+
+	// Row 5: Theme.
+	themes := config.AllThemes()
+	if rows[5].Index >= 0 && rows[5].Index < len(themes) {
+		a.settings.UI.Theme = themes[rows[5].Index]
+	}
+
+	// Row 6: Transparency.
+	transparencies := config.AllTransparencies()
+	if rows[6].Index >= 0 && rows[6].Index < len(transparencies) {
+		a.settings.UI.Transparency = transparencies[rows[6].Index]
+	}
+
+	a.overlay.SetTheme(a.settings.UI.Theme, int(a.settings.UI.Transparency))
 
 	if err := config.SaveSettings(a.settingsPath, *a.settings); err != nil {
 		slog.Warn("settings save", "error", err)

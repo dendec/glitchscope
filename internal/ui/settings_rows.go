@@ -63,11 +63,31 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 		}
 	}
 
+	themeValues := make([]string, len(config.AllThemes()))
+	themeIndex := 0
+	for i, t := range config.AllThemes() {
+		themeValues[i] = t.String()
+		if t == s.UI.Theme {
+			themeIndex = i
+		}
+	}
+
+	transValues := make([]string, len(config.AllTransparencies()))
+	transIndex := 0
+	for i, t := range config.AllTransparencies() {
+		transValues[i] = t.String()
+		if t == s.UI.Transparency {
+			transIndex = i
+		}
+	}
+
 	return []SettingRow{
 		{Label: "Render resolution", Values: resValues, Index: resIndex},
 		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
 		{Label: "Shuffle", Values: shuffleValues, Index: shuffleIndex},
 		{Label: "Repeat", Values: repeatValues, Index: repeatIndex},
 		{Label: "Preset auto-switch", Values: presetValues, Index: presetIndex},
+		{Label: "Theme", Values: themeValues, Index: themeIndex},
+		{Label: "Transparency", Values: transValues, Index: transIndex},
 	}
 }

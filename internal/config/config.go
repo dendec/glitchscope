@@ -21,7 +21,7 @@ type UpscaleFilter int
 
 const (
 	FilterSmooth UpscaleFilter = iota // GL_LINEAR
-	FilterPixel                        // GL_NEAREST
+	FilterPixel                       // GL_NEAREST
 )
 
 func (f UpscaleFilter) String() string {
@@ -104,9 +104,9 @@ func (g *GraphicsSettings) Validate() error {
 type RepeatMode int
 
 const (
-	RepeatOff    RepeatMode = iota // stop after last track
-	RepeatOne                      // restart current track
-	RepeatAll                      // loop to first track of next/first album
+	RepeatOff RepeatMode = iota // stop after last track
+	RepeatOne                   // restart current track
+	RepeatAll                   // loop to first track of next/first album
 )
 
 func (m RepeatMode) String() string {
@@ -130,9 +130,9 @@ type ShuffleMode int
 
 const (
 	ShuffleOff   ShuffleMode = iota // sequential
-	ShuffleAlbum                     // random within current album
-	ShuffleLocal                     // random across local albums only
-	ShuffleAll                       // random across all tracks (local + modland)
+	ShuffleAlbum                    // random within current album
+	ShuffleLocal                    // random across local albums only
+	ShuffleAll                      // random across all tracks (local + modland)
 )
 
 func (m ShuffleMode) String() string {
@@ -151,7 +151,9 @@ func (m ShuffleMode) String() string {
 }
 
 // AllShuffleModes returns every valid ShuffleMode in display order.
-func AllShuffleModes() []ShuffleMode { return []ShuffleMode{ShuffleOff, ShuffleAlbum, ShuffleLocal, ShuffleAll} }
+func AllShuffleModes() []ShuffleMode {
+	return []ShuffleMode{ShuffleOff, ShuffleAlbum, ShuffleLocal, ShuffleAll}
+}
 
 // PlaybackSettings holds shuffle/repeat configuration.
 type PlaybackSettings struct {
@@ -169,11 +171,11 @@ func DefaultPlayback() PlaybackSettings {
 type PresetInterval int
 
 const (
-	PresetOff   PresetInterval = 0
-	Preset15s   PresetInterval = 15
-	Preset30s   PresetInterval = 30
-	Preset60s   PresetInterval = 60
-	Preset2m    PresetInterval = 120
+	PresetOff PresetInterval = 0
+	Preset15s PresetInterval = 15
+	Preset30s PresetInterval = 30
+	Preset60s PresetInterval = 60
+	Preset2m  PresetInterval = 120
 )
 
 func (p PresetInterval) String() string {
@@ -198,11 +200,94 @@ func AllPresetIntervals() []PresetInterval {
 	return []PresetInterval{PresetOff, Preset15s, Preset30s, Preset60s, Preset2m}
 }
 
+// Theme selects the UI color scheme.
+type Theme int
+
+const (
+	ThemeDark  Theme = iota // dark background, light text (default)
+	ThemeLight              // light background, dark text
+)
+
+func (t Theme) String() string {
+	switch t {
+	case ThemeDark:
+		return "Dark"
+	case ThemeLight:
+		return "Light"
+	default:
+		return "Unknown"
+	}
+}
+
+// AllThemes returns every valid Theme in display order.
+func AllThemes() []Theme { return []Theme{ThemeDark, ThemeLight} }
+
+// MarshalJSON outputs the lower-case label used in settings.json.
+func (t Theme) MarshalJSON() ([]byte, error) {
+	var s string
+	switch t {
+	case ThemeDark:
+		s = "dark"
+	case ThemeLight:
+		s = "light"
+	default:
+		s = "unknown"
+	}
+	return json.Marshal(s)
+}
+
+// UnmarshalJSON reads the lower-case label from settings.json.
+func (t *Theme) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch s {
+	case "dark":
+		*t = ThemeDark
+	case "light":
+		*t = ThemeLight
+	default:
+		return fmt.Errorf("unknown theme: %s", s)
+	}
+	return nil
+}
+
+// Transparency sets UI overlay opacity (0–100).
+type Transparency int
+
+func (t Transparency) String() string { return fmt.Sprintf("%d%%", int(t)) }
+
+// AllTransparencies returns every valid Transparency in display order.
+func AllTransparencies() []Transparency {
+	return []Transparency{0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100}
+}
+
+// Validate returns an error if the value is out of range.
+func (t Transparency) Validate() error {
+	if t < 0 || t > 100 {
+		return fmt.Errorf("transparency must be 0..100, got %d", int(t))
+	}
+	return nil
+}
+
+// UISettings holds theme and transparency configuration.
+type UISettings struct {
+	Theme        Theme        `json:"theme"`
+	Transparency Transparency `json:"transparency"`
+}
+
+// DefaultUI returns sensible UI defaults.
+func DefaultUI() UISettings {
+	return UISettings{Theme: ThemeDark, Transparency: 0}
+}
+
 // Settings is the full persisted settings envelope.
 type Settings struct {
-	Graphics      GraphicsSettings  `json:"graphics"`
-	Playback      PlaybackSettings  `json:"playback"`
+	Graphics       GraphicsSettings `json:"graphics"`
+	Playback       PlaybackSettings `json:"playback"`
 	PresetInterval PresetInterval   `json:"preset_interval"`
+	UI             UISettings       `json:"ui"`
 }
 
 // DefaultSettings returns the full default settings.
@@ -211,5 +296,6 @@ func DefaultSettings() Settings {
 		Graphics:       DefaultGraphics(),
 		Playback:       DefaultPlayback(),
 		PresetInterval: PresetOff,
+		UI:             DefaultUI(),
 	}
 }

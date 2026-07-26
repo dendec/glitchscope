@@ -225,6 +225,9 @@ func (a *App) Init() {
 	a.initPreset()
 	a.playFirst()
 	a.startPresetTicker()
+	if a.overlay != nil {
+		a.overlay.SetTheme(a.settings.UI.Theme, int(a.settings.UI.Transparency))
+	}
 }
 
 func (a *App) initAudio() {

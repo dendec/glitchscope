@@ -43,6 +43,10 @@ func LoadSettings(path string) (Settings, error) {
 			Repeat      *RepeatMode  `json:"repeat"`
 		} `json:"playback"`
 		PresetInterval *PresetInterval `json:"preset_interval"`
+		UI             *struct {
+			Theme        *Theme        `json:"theme"`
+			Transparency *Transparency `json:"transparency"`
+		} `json:"ui"`
 	}
 	if err := json.NewDecoder(f).Decode(&raw); err != nil {
 		slog.Warn("settings: malformed JSON, using defaults", "path", path, "error", err)
@@ -73,6 +77,14 @@ func LoadSettings(path string) (Settings, error) {
 	if raw.PresetInterval != nil {
 		s.PresetInterval = *raw.PresetInterval
 	}
+	if raw.UI != nil {
+		if raw.UI.Theme != nil {
+			s.UI.Theme = *raw.UI.Theme
+		}
+		if raw.UI.Transparency != nil {
+			s.UI.Transparency = *raw.UI.Transparency
+		}
+	}
 
 	if err := s.Graphics.Validate(); err != nil {
 		return DefaultSettings(), nil // fallback on invalid data
@@ -87,6 +99,9 @@ func SaveSettings(path string, s Settings) error {
 	}
 
 	if err := s.Graphics.Validate(); err != nil {
+		return fmt.Errorf("settings validate: %w", err)
+	}
+	if err := s.UI.Transparency.Validate(); err != nil {
 		return fmt.Errorf("settings validate: %w", err)
 	}
 
@@ -111,5 +126,3 @@ func SaveSettings(path string, s Settings) error {
 	}
 	return nil
 }
-
-
