@@ -32,6 +32,13 @@ type pendingPreset struct {
 	at   time.Time
 }
 
+// shuffleState tracks the current random playback order for shuffle modes.
+type shuffleState struct {
+	order    []trackRef
+	idx      int
+	albumIdx int // tracks which album the order covers (ShuffleAlbum only)
+}
+
 // App holds the full application state.
 type App struct {
 	window *sdl.Window
@@ -60,6 +67,8 @@ type App struct {
 
 	pending      pendingPreset // pending preset name + scheduled load time
 	presetTicker *time.Ticker
+
+	shuffle shuffleState
 }
 
 // New creates an App with display initialised (SDL, window, GL, projectM,
@@ -624,26 +633,25 @@ func (a *App) autoAdvance() {
 		return
 	}
 
-	// Shuffle: pick a random track from all albums.
-	if ps.Shuffle {
-		tracks := a.allTracks()
-		if len(tracks) == 0 {
+	// Shuffle modes: consume from the shuffled order.
+	if ps.ShuffleMode != config.ShuffleOff {
+		// Regenerate for ShuffleAlbum when the album has changed, or
+		// when the order is empty (first call, or exhausted with RepeatAll).
+		needsRegen := len(a.shuffle.order) == 0
+		if ps.ShuffleMode == config.ShuffleAlbum && a.shuffle.albumIdx != a.lib.CurrentAlbumIndex() {
+			needsRegen = true
+		}
+		if a.shuffle.idx >= len(a.shuffle.order) && ps.Repeat == config.RepeatAll {
+			needsRegen = true
+		}
+		if needsRegen {
+			a.regenerateShuffleOrder()
+		}
+		if len(a.shuffle.order) == 0 || a.shuffle.idx >= len(a.shuffle.order) {
 			return
 		}
-		// Avoid replaying the same track if possible.
-		cur := a.pl.TrackPath()
-		if len(tracks) > 1 {
-			for {
-				t := tracks[rand.Intn(len(tracks))]
-				if t.path != cur {
-					a.lib.SelectAlbum(t.albumIdx)
-					a.lib.SelectTrack(t.trackIdx)
-					a.playTrack(t.path, t.album)
-					return
-				}
-			}
-		}
-		t := tracks[0]
+		t := a.shuffle.order[a.shuffle.idx]
+		a.shuffle.idx++
 		a.lib.SelectAlbum(t.albumIdx)
 		a.lib.SelectTrack(t.trackIdx)
 		a.playTrack(t.path, t.album)
@@ -684,6 +692,78 @@ func (a *App) allTracks() []trackRef {
 		}
 	}
 	return all
+}
+
+// localTracks returns tracks from local (non-modland) albums only.
+func (a *App) localTracks() []trackRef {
+	var all []trackRef
+	for ai, album := range a.lib.Albums {
+		if player.IsModland(album.Path) {
+			continue
+		}
+		for ti, path := range album.Tracks {
+			all = append(all, trackRef{path: path, album: album.Name, albumIdx: ai, trackIdx: ti})
+		}
+	}
+	return all
+}
+
+// currentAlbumTracks returns tracks from the current album only.
+func (a *App) currentAlbumTracks() []trackRef {
+	ai := a.lib.CurrentAlbumIndex()
+	if ai < 0 || ai >= len(a.lib.Albums) {
+		return nil
+	}
+	album := a.lib.Albums[ai]
+	tracks := make([]trackRef, len(album.Tracks))
+	for ti, path := range album.Tracks {
+		tracks[ti] = trackRef{path: path, album: album.Name, albumIdx: ai, trackIdx: ti}
+	}
+	return tracks
+}
+
+// regenerateShuffleOrder builds a new shuffled playback order from scratch
+// based on the current ShuffleMode and current album. The currently playing
+// track is excluded so it doesn't repeat immediately.
+func (a *App) regenerateShuffleOrder() {
+	if a.lib == nil {
+		a.shuffle = shuffleState{}
+		return
+	}
+
+	var pool []trackRef
+	switch a.settings.Playback.ShuffleMode {
+	case config.ShuffleAlbum:
+		pool = a.currentAlbumTracks()
+		a.shuffle.albumIdx = a.lib.CurrentAlbumIndex()
+	case config.ShuffleLocal:
+		pool = a.localTracks()
+	case config.ShuffleAll:
+		pool = a.allTracks()
+	default:
+		a.shuffle = shuffleState{}
+		return
+	}
+
+	// Exclude the current track so it doesn't replay immediately in
+	// the shuffled order (RepeatOff should truly mean no repeat).
+	cur := ""
+	if a.pl != nil {
+		cur = a.pl.TrackPath()
+	}
+	if cur != "" {
+		filtered := pool[:0]
+		for _, t := range pool {
+			if t.path != cur {
+				filtered = append(filtered, t)
+			}
+		}
+		pool = filtered
+	}
+
+	rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
+	a.shuffle.order = pool
+	a.shuffle.idx = 0
 }
 
 // startPresetTicker starts the auto-preset-switch ticker if configured.

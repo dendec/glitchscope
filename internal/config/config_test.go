@@ -169,7 +169,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 
 	orig := Settings{
 		Graphics:       GraphicsSettings{RenderWidth: 480, RenderHeight: 360, UpscaleFilter: FilterSmooth},
-		Playback:       PlaybackSettings{Shuffle: true, Repeat: RepeatAll},
+		Playback:       PlaybackSettings{ShuffleMode: ShuffleAll, Repeat: RepeatAll},
 		PresetInterval: Preset30s,
 	}
 	if err := SaveSettings(p, orig); err != nil {

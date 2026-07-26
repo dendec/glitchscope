@@ -54,10 +54,13 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 		}
 	}
 
-	shuffleValues := []string{"Off", "On"}
+	shuffleValues := make([]string, len(config.AllShuffleModes()))
 	shuffleIndex := 0
-	if s.Playback.Shuffle {
-		shuffleIndex = 1
+	for i, m := range config.AllShuffleModes() {
+		shuffleValues[i] = m.String()
+		if m == s.Playback.ShuffleMode {
+			shuffleIndex = i
+		}
 	}
 
 	return []SettingRow{

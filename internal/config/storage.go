@@ -39,8 +39,8 @@ func LoadSettings(path string) (Settings, error) {
 			UpscaleFilter *UpscaleFilter `json:"upscale_filter"`
 		} `json:"graphics"`
 		Playback *struct {
-			Shuffle *bool       `json:"shuffle"`
-			Repeat  *RepeatMode `json:"repeat"`
+			ShuffleMode *ShuffleMode `json:"shuffle_mode"`
+			Repeat      *RepeatMode  `json:"repeat"`
 		} `json:"playback"`
 		PresetInterval *PresetInterval `json:"preset_interval"`
 	}
@@ -63,8 +63,8 @@ func LoadSettings(path string) (Settings, error) {
 		}
 	}
 	if raw.Playback != nil {
-		if raw.Playback.Shuffle != nil {
-			s.Playback.Shuffle = *raw.Playback.Shuffle
+		if raw.Playback.ShuffleMode != nil {
+			s.Playback.ShuffleMode = *raw.Playback.ShuffleMode
 		}
 		if raw.Playback.Repeat != nil {
 			s.Playback.Repeat = *raw.Playback.Repeat

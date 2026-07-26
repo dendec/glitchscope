@@ -421,43 +421,28 @@ func (o *Overlay) focusModlandAlbum(albumIdx int) {
 	format, _ := splitModlandName(o.allAlbums[albumIdx].Name)
 
 	formats := o.buildFormatEntries()
-	o.navStack = append(o.navStack, navLevel{entries: formats, cursor: indexOfFormat(formats, format)})
+	o.navStack = append(o.navStack, navLevel{entries: formats, cursor: indexOfEntry(formats, func(e navEntry) bool { return e.format == format })})
 
 	albums := o.buildAlbumsInFormatEntries(format)
-	albumCursor := indexOfAlbumIdx(albums, albumIdx)
+	albumCursor := indexOfEntry(albums, func(e navEntry) bool { return e.albumIdx == albumIdx })
 	o.navStack = append(o.navStack, navLevel{entries: albums, cursor: albumCursor})
 
 	o.albumCursor = albumCursor
 	o.albumsScroll = 0
-	o.refreshAlbumLabels()
-	o.refreshPreview()
+	o.syncPanels()
 }
 
 // rootModlandIndex returns the root-level row index of the "Modland" entry,
 // or 0 if there isn't one.
 func (o *Overlay) rootModlandIndex() int {
-	for i, e := range o.rootEntries {
-		if e.kind == entryModlandRoot {
-			return i
-		}
-	}
-	return 0
+	return indexOfEntry(o.rootEntries, func(e navEntry) bool { return e.kind == entryModlandRoot })
 }
 
-// indexOfFormat finds a format entry's row index by format name.
-func indexOfFormat(entries []navEntry, format string) int {
+// indexOfEntry returns the index of the first entry matching pred, or 0 if
+// none matches (row 0 is a safe fallback cursor position in every level).
+func indexOfEntry(entries []navEntry, pred func(navEntry) bool) int {
 	for i, e := range entries {
-		if e.format == format {
-			return i
-		}
-	}
-	return 0
-}
-
-// indexOfAlbumIdx finds a leaf album entry's row index by its allAlbums index.
-func indexOfAlbumIdx(entries []navEntry, albumIdx int) int {
-	for i, e := range entries {
-		if e.albumIdx == albumIdx {
+		if pred(e) {
 			return i
 		}
 	}
@@ -1057,6 +1042,16 @@ func (o *Overlay) refreshAlbumLabels() {
 	o.albums = labelsOf(o.albumEntries)
 }
 
+// syncPanels refreshes both left-panel labels and the right-panel preview
+// for the current cursor position, then marks both panels dirty. Common
+// tail shared by pushLevel, popLevel and focusModlandAlbum.
+func (o *Overlay) syncPanels() {
+	o.refreshAlbumLabels()
+	o.refreshPreview()
+	o.albumsDirty = true
+	o.tracksDirty = true
+}
+
 // refreshPreview recomputes the right-panel preview for a non-leaf entry
 // under the cursor (formats list, or albums-in-format list). For a leaf
 // entry, previewActive is false and the right panel falls back to the
@@ -1096,10 +1091,7 @@ func (o *Overlay) pushLevel(entries []navEntry) {
 	o.albumsScroll = 0
 	o.trackCursor = 0
 	o.marqueeL.invalidate(o)
-	o.refreshAlbumLabels()
-	o.refreshPreview()
-	o.albumsDirty = true
-	o.tracksDirty = true
+	o.syncPanels()
 }
 
 // popLevel goes up one navigation level, restoring the parent's cursor and
@@ -1118,10 +1110,7 @@ func (o *Overlay) popLevel() bool {
 	}
 	o.trackCursor = 0
 	o.marqueeL.invalidate(o)
-	o.refreshAlbumLabels()
-	o.refreshPreview()
-	o.albumsDirty = true
-	o.tracksDirty = true
+	o.syncPanels()
 	return true
 }
 

@@ -125,15 +125,43 @@ func (m RepeatMode) String() string {
 // AllRepeatModes returns every valid RepeatMode in display order.
 func AllRepeatModes() []RepeatMode { return []RepeatMode{RepeatOff, RepeatOne, RepeatAll} }
 
+// ShuffleMode controls the scope of random track selection.
+type ShuffleMode int
+
+const (
+	ShuffleOff   ShuffleMode = iota // sequential
+	ShuffleAlbum                     // random within current album
+	ShuffleLocal                     // random across local albums only
+	ShuffleAll                       // random across all tracks (local + modland)
+)
+
+func (m ShuffleMode) String() string {
+	switch m {
+	case ShuffleOff:
+		return "Off"
+	case ShuffleAlbum:
+		return "Shuffle Album"
+	case ShuffleLocal:
+		return "Shuffle Local"
+	case ShuffleAll:
+		return "Shuffle All"
+	default:
+		return "Unknown"
+	}
+}
+
+// AllShuffleModes returns every valid ShuffleMode in display order.
+func AllShuffleModes() []ShuffleMode { return []ShuffleMode{ShuffleOff, ShuffleAlbum, ShuffleLocal, ShuffleAll} }
+
 // PlaybackSettings holds shuffle/repeat configuration.
 type PlaybackSettings struct {
-	Shuffle bool       `json:"shuffle"`
-	Repeat  RepeatMode `json:"repeat"`
+	ShuffleMode ShuffleMode `json:"shuffle_mode"`
+	Repeat      RepeatMode  `json:"repeat"`
 }
 
 // DefaultPlayback returns sensible playback defaults.
 func DefaultPlayback() PlaybackSettings {
-	return PlaybackSettings{Shuffle: false, Repeat: RepeatOff}
+	return PlaybackSettings{ShuffleMode: ShuffleOff, Repeat: RepeatOff}
 }
 
 // PresetInterval returns the auto-switch interval in seconds.
