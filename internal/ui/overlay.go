@@ -69,8 +69,6 @@ func labelsOf(entries []navEntry) []string {
 const (
 	fadeInDuration = 400 * time.Millisecond
 	holdDuration   = 3 * time.Second
-	refFontSize    = 26.0
-	refHeight      = 720
 )
 
 // Accent colour — light blue, used for the playing-track indicator,
@@ -583,7 +581,7 @@ func (o *Overlay) SetScreenSize(w, h int) {
 	// size (which depends only on h) is unchanged.
 	o.screenW = w
 	o.screenH = h
-	newSize := float64(h) * refFontSize / float64(refHeight)
+	newSize := math.Round(float64(h) / 30)
 	if newSize < 10 {
 		newSize = 10
 	}

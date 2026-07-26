@@ -89,7 +89,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 
 	winFlags := uint32(sdl.WINDOW_OPENGL | sdl.WINDOW_SHOWN | sdl.WINDOW_RESIZABLE)
 	if fullscreen {
-		winFlags |= sdl.WINDOW_FULLSCREEN_DESKTOP
+		winFlags |= sdl.WINDOW_FULLSCREEN
 	}
 	win, err := sdl.CreateWindow("MDPP — MilkDrop Portable Player",
 		sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
