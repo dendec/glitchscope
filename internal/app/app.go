@@ -548,7 +548,7 @@ func (a *App) Run() {
 		}
 
 		// Auto-advance track.
-		if a.pl != nil && a.lib != nil && a.pl.Voice() != 0 && !a.pl.IsValidVoice() {
+		if a.pl != nil && a.lib != nil && a.pl.Voice() != 0 && a.pl.TrackFinished() {
 			a.autoAdvance()
 		}
 
@@ -663,15 +663,21 @@ func (a *App) autoAdvance() {
 	}
 
 	// Sequential: try next track in album, then next album.
-	path := a.lib.TrackNext()
-	if path != "" {
-		a.playTrack(path, a.lib.CurrentAlbum().Name)
+	// TrackNext() always wraps and returns a non-empty path, so we must
+	// detect "last track of album" ourselves before calling it, otherwise
+	// we'd loop the current album forever and never advance/stop.
+	album := a.lib.CurrentAlbum()
+	if a.lib.CurrentTrackIndex() < len(album.Tracks)-1 {
+		path := a.lib.TrackNext()
+		if path != "" {
+			a.playTrack(path, a.lib.CurrentAlbum().Name)
+		}
 		return
 	}
 
-	// TrackNext wrapped to first track — in RepeatAll, advance album.
+	// At the end of the album — in RepeatAll, advance to the next album.
 	if ps.Repeat == config.RepeatAll {
-		path = a.lib.AlbumNext()
+		path := a.lib.AlbumNext()
 		if path != "" {
 			a.playTrack(path, a.lib.CurrentAlbum().Name)
 		}
@@ -750,12 +756,14 @@ func (a *App) regenerateShuffleOrder() {
 	}
 
 	// Exclude the current track so it doesn't replay immediately in
-	// the shuffled order (RepeatOff should truly mean no repeat).
+	// the shuffled order (RepeatOff should truly mean no repeat). Skip the
+	// exclusion if it would empty the pool (e.g. a single-track pool) —
+	// otherwise RepeatAll + Shuffle would silently stop instead of looping.
 	cur := ""
 	if a.pl != nil {
 		cur = a.pl.TrackPath()
 	}
-	if cur != "" {
+	if cur != "" && len(pool) > 1 {
 		filtered := pool[:0]
 		for _, t := range pool {
 			if t.path != cur {

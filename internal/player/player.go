@@ -362,6 +362,27 @@ func (p *Player) IsValidVoice() bool {
 	return p.s.IsValidVoiceHandle(p.voice)
 }
 
+// TrackFinished reports whether playback of the current track should be
+// considered over, for the purposes of auto-advance.
+//
+// For plain audio files this is just !IsValidVoice(). Tracker modules
+// (.mod/.xm/.it/.s3m/…) are a special case: many of them contain an
+// internal loop (a pattern-order jump back to an earlier position) as part
+// of the song itself, so the underlying decoder may never signal
+// end-of-stream — IsValidVoice() would stay true forever even though the
+// estimated track duration has long passed. For trackers we additionally
+// treat the track as finished once playback position reaches the
+// estimated duration.
+func (p *Player) TrackFinished() bool {
+	if !p.IsValidVoice() {
+		return true
+	}
+	if p.isTracker && p.currentDuration > 0 && p.Position() >= p.currentDuration {
+		return true
+	}
+	return false
+}
+
 // Stop stops all playback.
 func (p *Player) Stop() {
 	p.s.StopAll()
