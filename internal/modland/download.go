@@ -57,26 +57,39 @@ func DownloadFile(baseDir, remotePath string, expectedSize int64, onProgress fun
 		return "", fmt.Errorf("modland mkdir: %w", err)
 	}
 
-	url := FileURL(remotePath)
-	slog.Debug("modland: downloading", "url", url)
-
 	client := &http.Client{Timeout: downloadTimeout}
-	resp, err := client.Get(url)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		if resp != nil {
-			resp.Body.Close()
+
+	// Try primary mirror (original case), then lowercase filename,
+	// then official mirror, then its lowercase variant.
+	urls := []struct {
+		label string
+		url   string
+	}{
+		{"mirror", FileURL(remotePath)},
+		{"mirror (lowercase)", FileURLLower(remotePath)},
+		{"fallback", FileFallbackURL(remotePath)},
+		{"fallback (lowercase)", FileFallbackURLLower(remotePath)},
+	}
+
+	var resp *http.Response
+	for i, u := range urls {
+		slog.Debug("modland: trying", "url", u.url)
+		resp, err = client.Get(u.url)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			slog.Warn("modland: "+u.label+" failed", "url", u.url, "status", statusCode(resp))
+			continue
 		}
-		// Fallback to official mirror.
-		fallback := FileFallbackURL(remotePath)
-		slog.Warn("modland: mirror failed, trying fallback", "mirror", url, "fallback", fallback)
-		resp, err = client.Get(fallback)
-		if err != nil {
-			return "", fmt.Errorf("modland download %s: %w", remotePath, err)
+		if i > 0 {
+			slog.Warn("modland: succeeded via "+u.label, "url", u.url)
 		}
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			return "", fmt.Errorf("modland download %s: status %d", remotePath, resp.StatusCode)
-		}
+		break
+	}
+	if resp == nil || resp.StatusCode != http.StatusOK {
+		status := statusCode(resp)
+		return "", fmt.Errorf("modland download %s: all mirrors failed (last status %d)", remotePath, status)
 	}
 	defer resp.Body.Close()
 
@@ -129,4 +142,11 @@ func ClearFiles(baseDir string) error {
 		return err
 	}
 	return os.RemoveAll(filesDir)
+}
+
+func statusCode(resp *http.Response) int {
+	if resp != nil {
+		return resp.StatusCode
+	}
+	return 0
 }

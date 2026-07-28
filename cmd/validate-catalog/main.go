@@ -124,12 +124,23 @@ func main() {
 }
 
 func download(client *http.Client, remotePath string) ([]byte, error) {
-	url := modland.FileURL(remotePath)
-	resp, err := client.Get(url)
-	if err != nil || resp.StatusCode != 200 {
-		// fallback
-		url = modland.FileFallbackURL(remotePath)
+	urls := []string{
+		modland.FileURL(remotePath),
+		modland.FileURLLower(remotePath),
+		modland.FileFallbackURL(remotePath),
+		modland.FileFallbackURLLower(remotePath),
+	}
+	var resp *http.Response
+	var err error
+	for _, url := range urls {
 		resp, err = client.Get(url)
+		if err != nil || resp.StatusCode != 200 {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			continue
+		}
+		break
 	}
 	if err != nil {
 		return nil, err

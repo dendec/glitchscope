@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -178,12 +179,47 @@ func SaveCatalog(baseDir string, cat *Catalog) error {
 
 // FileURL returns the primary (fast mirror) download URL for a modland file.
 func FileURL(remotePath string) string {
-	return "https://modland.antarctica.no/pub/modules/" + strings.TrimPrefix(remotePath, "/")
+	return (&url.URL{
+		Scheme: "https",
+		Host:   "modland.antarctica.no",
+		Path:   "/pub/modules/" + strings.TrimPrefix(remotePath, "/"),
+	}).String()
 }
 
 // FileFallbackURL returns the official modland.com fallback URL.
 func FileFallbackURL(remotePath string) string {
-	return "https://modland.com/pub/modules/" + strings.TrimPrefix(remotePath, "/")
+	return (&url.URL{
+		Scheme: "https",
+		Host:   "modland.com",
+		Path:   "/pub/modules/" + strings.TrimPrefix(remotePath, "/"),
+	}).String()
+}
+
+// FileURLLower returns the primary download URL with the filename lowercased.
+func FileURLLower(remotePath string) string {
+	return (&url.URL{
+		Scheme: "https",
+		Host:   "modland.antarctica.no",
+		Path:   "/pub/modules/" + lowerFilename(strings.TrimPrefix(remotePath, "/")),
+	}).String()
+}
+
+// FileFallbackURLLower returns the fallback download URL with the filename lowercased.
+func FileFallbackURLLower(remotePath string) string {
+	return (&url.URL{
+		Scheme: "https",
+		Host:   "modland.com",
+		Path:   "/pub/modules/" + lowerFilename(strings.TrimPrefix(remotePath, "/")),
+	}).String()
+}
+
+// lowerFilename lowercases only the filename part of a modland path,
+// keeping the format/author directory prefix intact.
+func lowerFilename(remotePath string) string {
+	if i := strings.LastIndex(remotePath, "/"); i >= 0 {
+		return remotePath[:i+1] + strings.ToLower(remotePath[i+1:])
+	}
+	return strings.ToLower(remotePath)
 }
 
 // ParseListing parses a tab-separated text listing: "size\tpath".
