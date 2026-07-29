@@ -1,4 +1,4 @@
-module github.com/dendec/mdpp
+module github.com/dendec/pmv
 
 go 1.25.0
 

@@ -183,7 +183,7 @@ settingsEditing bool
 
 ### Main и конфигурация
 
-`cmd/mdpp/main.go` должен получать от Overlay подтверждённое изменение настройки через небольшие методы или событие, например:
+`cmd/pmv/main.go` должен получать от Overlay подтверждённое изменение настройки через небольшие методы или событие, например:
 
 ```go
 changed := overlay.ConfirmSetting()
@@ -261,7 +261,7 @@ overlay renderer     — layout, panels, textures, colors
 main/controller      — применение подтверждённых изменений к player/projectM
 ```
 
-`Overlay` не должен читать `settings.json`, вычислять OpenGL enum или напрямую менять render target. `cmd/mdpp/main.go` не должен форматировать строки UI или знать детали текстур панелей.
+`Overlay` не должен читать `settings.json`, вычислять OpenGL enum или напрямую менять render target. `cmd/pmv/main.go` не должен форматировать строки UI или знать детали текстур панелей.
 
 ### Устранение магических индексов и дублированного состояния
 
@@ -360,7 +360,7 @@ main/controller      — применение подтверждённых из�
 | `internal/ui/panels.go` | новый общий renderer двухпанельного списка, если выделение оправдано |
 | `internal/config/config.go` | загрузка, валидация и сохранение настроек |
 | `internal/input/input.go` | только если текущих действий недостаточно |
-| `cmd/mdpp/main.go` | загрузка настроек, применение изменений, открытие страницы |
+| `cmd/pmv/main.go` | загрузка настроек, применение изменений, открытие страницы |
 | `internal/projectm/rendertarget.go` | только если для смены размера без перезапуска потребуется новый API |
 | `internal/ui/settings_test.go` | тесты модели и навигации |
 | `internal/config/config_test.go` | тесты JSON и приоритетов |

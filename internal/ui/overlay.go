@@ -6,8 +6,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/dendec/mdpp/internal/config"
-	"github.com/dendec/mdpp/internal/player"
+	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/pmv/internal/player"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 )

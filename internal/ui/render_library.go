@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/dendec/mdpp/internal/player"
+import "github.com/dendec/pmv/internal/player"
 
 // This file owns rendering for the Library page: albums/tracks panels.
 // Shared primitives in overlay_render.go.

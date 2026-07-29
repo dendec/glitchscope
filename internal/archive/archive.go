@@ -1,4 +1,4 @@
-// Package archive reads indexed zstd-compressed archives used by MDPP.
+// Package archive reads indexed zstd-compressed archives used by PMV.
 package archive
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	magic       = "MDP\x00"
+	magic       = "PMV\x00"
 	maxNameSize = 4096
 )
 

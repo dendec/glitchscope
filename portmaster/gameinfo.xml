@@ -1,10 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
 <gameList>
   <game>
-    <path>./MDPP.sh</path>
-    <name>MDPP</name>
-    <desc>MilkDrop Portable Player — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/mdpp/music/.</desc>
-    <image>./mdpp/cover.png</image>
+    <path>./PMV.sh</path>
+    <name>PMV</name>
+    <desc>Portable Music Visualizer — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/pmv/music/.</desc>
+    <image>./pmv/cover.png</image>
     <developer>dendec</developer>
     <publisher>dendec</publisher>
     <genre>Music</genre>

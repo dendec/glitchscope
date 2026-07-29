@@ -4,11 +4,11 @@ import (
 	"log/slog"
 	"math/rand"
 
-	"github.com/dendec/mdpp/internal/config"
-	"github.com/dendec/mdpp/internal/input"
-	"github.com/dendec/mdpp/internal/player"
-	"github.com/dendec/mdpp/internal/presets"
-	"github.com/dendec/mdpp/internal/ui"
+	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/pmv/internal/input"
+	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/pmv/internal/presets"
+	"github.com/dendec/pmv/internal/ui"
 )
 
 func (a *App) handleAction(act input.Action, winW, winH int) {

@@ -17,7 +17,7 @@ type albumMeta struct {
 	Tracks  map[string]TrackMeta `json:"t"`
 }
 
-const metaFileName = ".mdpp_meta.json"
+const metaFileName = ".pmv_meta.json"
 const metaVersion = 1
 
 // readMetaCache reads the metadata cache for an album directory.

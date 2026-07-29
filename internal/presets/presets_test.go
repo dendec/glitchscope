@@ -61,7 +61,7 @@ func TestCategories_and_PresetsInCategory(t *testing.T) {
 }
 
 func TestCategories_nestedSubcategory(t *testing.T) {
-	// scanUser only walks two directory levels, but presets.mdp can
+	// scanUser only walks two directory levels, but presets.pmv can
 	// contain deeper keys, so set up the store directly to exercise that.
 	names := []string{
 		"Particles/Blobby/royal.milk",

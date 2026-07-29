@@ -11,13 +11,13 @@ import (
 	"sort"
 	"time"
 
-	"github.com/dendec/mdpp/internal/modland"
-	"github.com/dendec/mdpp/internal/openmpt"
-	"github.com/dendec/mdpp/internal/xmp"
+	"github.com/dendec/pmv/internal/modland"
+	"github.com/dendec/pmv/internal/openmpt"
+	"github.com/dendec/pmv/internal/xmp"
 )
 
 func main() {
-	baseDir := filepath.Join(os.ExpandEnv("$HOME"), ".config", "mdpp")
+	baseDir := filepath.Join(os.ExpandEnv("$HOME"), ".config", "pmv")
 	if len(os.Args) > 1 {
 		baseDir = os.Args[1]
 	}

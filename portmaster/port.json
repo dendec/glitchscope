@@ -1,15 +1,15 @@
 {
   "version": 4,
-  "name": "mdpp.zip",
+  "name": "pmv.zip",
   "items": [
-    "MDPP.sh",
-    "mdpp/"
+    "PMV.sh",
+    "pmv/"
   ],
   "items_opt": null,
   "attr": {
-    "title": "MDPP",
-    "desc": "MilkDrop Portable Player — plays MP3/FLAC/Ogg with real-time MilkDrop visualizations. Drop your music files into /roms/ports/mdpp/ and enjoy a psychedelic audio experience on your handheld.",
-    "inst": "Copy song.mp3 (or any MP3/FLAC/Ogg) to /roms/ports/mdpp/. Presets are in /roms/ports/mdpp/presets/.",
+    "title": "PMV",
+    "desc": "Portable Music Visualizer — plays MP3/FLAC/Ogg with real-time MilkDrop visualizations. Drop your music files into /roms/ports/pmv/ and enjoy a psychedelic audio experience on your handheld.",
+    "inst": "Copy song.mp3 (or any MP3/FLAC/Ogg) to /roms/ports/pmv/. Presets are in /roms/ports/pmv/presets/.",
     "genres": ["music"],
     "porter": ["dendec"],
     "image": {

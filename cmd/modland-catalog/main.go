@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dendec/mdpp/internal/modland"
+	"github.com/dendec/pmv/internal/modland"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 		zipPath = os.Args[1]
 	}
 
-	baseDir := filepath.Join(os.ExpandEnv("$HOME"), ".config", "mdpp")
+	baseDir := filepath.Join(os.ExpandEnv("$HOME"), ".config", "pmv")
 	if len(os.Args) > 2 {
 		baseDir = os.Args[2]
 	}

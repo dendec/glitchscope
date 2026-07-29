@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestOpenAndExtractMDP(t *testing.T) {
-	archivePath := filepath.Join("..", "..", "portmaster", "presets", "textures.mdp")
+func TestOpenAndExtractPMV(t *testing.T) {
+	archivePath := filepath.Join("..", "..", "portmaster", "presets", "textures.pmv")
 
 	a, err := Open(archivePath, 10000)
 	if err != nil {

@@ -9,15 +9,15 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dendec/mdpp/internal/archive"
-	"github.com/dendec/mdpp/internal/config"
-	"github.com/dendec/mdpp/internal/input"
-	"github.com/dendec/mdpp/internal/modland"
-	"github.com/dendec/mdpp/internal/player"
-	"github.com/dendec/mdpp/internal/presets"
-	"github.com/dendec/mdpp/internal/prof"
-	"github.com/dendec/mdpp/internal/projectm"
-	"github.com/dendec/mdpp/internal/ui"
+	"github.com/dendec/pmv/internal/archive"
+	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/pmv/internal/input"
+	"github.com/dendec/pmv/internal/modland"
+	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/pmv/internal/presets"
+	"github.com/dendec/pmv/internal/prof"
+	"github.com/dendec/pmv/internal/projectm"
+	"github.com/dendec/pmv/internal/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -88,7 +88,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	if fullscreen {
 		winFlags |= sdl.WINDOW_FULLSCREEN
 	}
-	win, err := sdl.CreateWindow("MDPP — MilkDrop Portable Player",
+	win, err := sdl.CreateWindow("PMV — Portable Music Visualizer",
 		sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		int32(width), int32(height), winFlags)
 	if err != nil {
@@ -123,10 +123,10 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 
 	// Keep bundled and user textures in one temporary search directory. User
 	// files are copied last so they override matching bundled textures.
-	extractedDir, extractErr := os.MkdirTemp("", "mdpp-textures-")
+	extractedDir, extractErr := os.MkdirTemp("", "pmv-textures-")
 	if extractErr == nil {
 		a.textureDir = extractedDir
-		textureArchive, archiveErr := archive.Open(filepath.Join(presetDirPath(), "textures.mdp"), 10000)
+		textureArchive, archiveErr := archive.Open(filepath.Join(presetDirPath(), "textures.pmv"), 10000)
 		if archiveErr == nil {
 			_, extractErr = textureArchive.Extract(extractedDir)
 			_ = textureArchive.Close()

@@ -7,7 +7,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/dendec/mdpp/internal/player"
+	"github.com/dendec/pmv/internal/player"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )

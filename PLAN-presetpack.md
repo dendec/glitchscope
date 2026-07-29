@@ -1,11 +1,11 @@
-# MDP — MilkDrop Package format
+# PMV — Portable Music Visualizer archive
 
-## 1. Формат файла `.mdp`
+## 1. Формат файла `.pmv`
 
 Бинарный контейнер. Little-endian.
 
 ```
-[4]byte  magic  "MDP\x00"
+[4]byte  magic  "PMV\x00"
 [4]byte  version (1)
 [4]byte  num_entries
 ── index ──
@@ -20,26 +20,26 @@
 
 **Размер:** ~17MB (заголовок 12B + индекс ~660KB + zstd ~16MB).
 
-## 2. Сборка — `cmd/mdp-pack/main.go`
+## 2. Сборка — `cmd/pmv-pack/main.go`
 
 Go-тулза, без CGo, чистая реиспользуемая зависимость `github.com/klauspost/compress/zstd`.
 
 ```
-Usage: mdp-pack <presets|textures> <input-dir> <output.mdp>
+Usage: pmv-pack <presets|textures> <input-dir> <output.pmv>
 ```
 
 Логика:
 1. `filepath.WalkDir` собирает `.milk` или texture-файлы в зависимости от режима
 2. Сортировка по ключу (детерминизм)
 3. `zstd.EncodeAll` — каждый файл независимо
-4. Запись `.mdp`: header → index → data blocks
+4. Запись `.pmv`: header → index → data blocks
 
 ### Makefile
 
 ```makefile
-MDP_FILE := dist/presets.mdp
-mdp: presets
-    go run ./cmd/mdp-pack presets $(PRESETS_DIR) $(MDP_FILE)
+PMV_FILE := dist/presets.pmv
+pmv: presets
+    go run ./cmd/pmv-pack presets $(PRESETS_DIR) $(PMV_FILE)
 ```
 
 ## 3. Загрузка — `internal/presets/presets.go`
@@ -48,9 +48,9 @@ mdp: presets
 
 | Функция | Назначение |
 |---------|-----------|
-| `Open(dir string) error` | Читает `presets.mdp` из `dir`, сканирует `dir/*.milk` + `dir/*/*.milk`. User-файлы перезаписывают архив. |
+| `Open(dir string) error` | Читает `presets.pmv` из `dir`, сканирует `dir/*.milk` + `dir/*/*.milk`. User-файлы перезаписывают архив. |
 | `Names() []string` | Отсортированный список ключей (merged). |
-| `Read(key string) ([]byte, error)` | User-файл приоритетнее, иначе из presets.mdp. |
+| `Read(key string) ([]byte, error)` | User-файл приоритетнее, иначе из presets.pmv. |
 | `DefaultPreset() []byte` | Хардкод `wave_r=1`. |
 
 ### Структура
@@ -58,7 +58,7 @@ mdp: presets
 ```go
 type presetStore struct {
     dir     string
-    mdpFile *archive.Archive  // presets.mdp
+    pmvFile *archive.Archive  // presets.pmv
     entries map[string]entry  // ключ → filesystem или archive
     names   []string
 }
@@ -68,14 +68,14 @@ type presetStore struct {
 
 1. Ищем `key` в `entries` map
 2. `dataOff < 0` → `os.ReadFile(dir/key)`
-3. Иначе → `mdpFile.Read(key)`
+3. Иначе → `pmvFile.Read(key)`
 
 ## 4. Интеграция в main.go & deploy
 
 - `presets.Open(presetDir)` заменил старый `presets.SetExternalDir()` + ReadDir loop
 - Старое поле `externalDir` удалено
-- `deploy` пушит `presets/presets.mdp` и `presets/textures.mdp` на устройство
-- `dist-portmaster` копирует оба `.mdp` в zip-архив
+- `deploy` пушит `presets/presets.pmv` и `presets/textures.pmv` на устройство
+- `dist-portmaster` копирует оба `.pmv` в zip-архив
 
 ## 5. Edge cases
 
@@ -83,18 +83,18 @@ type presetStore struct {
 |----------|-----------|
 | Нет `presets/` | Open вернёт ошибку, Names() nil → DefaultPreset |
 | `presets/` пустая | Open успех, Names() nil → DefaultPreset |
-| Только `presets.mdp` | Open загружает архив |
+| Только `presets.pmv` | Open загружает архив |
 | Только `.milk` | Open сканирует файлы |
-| `presets.mdp` + `.milk` | User-файлы перезаписывают архив |
-| Битый `presets.mdp` | Закрываем файл, работаем только с user-файлами |
+| `presets.pmv` + `.milk` | User-файлы перезаписывают архив |
+| Битый `presets.pmv` | Закрываем файл, работаем только с user-файлами |
 
-## 6. Архив текстур `textures.mdp`
+## 6. Архив текстур `textures.pmv`
 
 Текстуры bundled отдельно от пресетов, потому что projectM принимает для них
 каталог поиска, а не поток байтов:
 
 ```
-[4]byte  magic  "MDP\x00"
+[4]byte  magic  "PMV\x00"
 [4]byte  version (1)
 [4]byte  num_entries
 ── index ──
@@ -107,11 +107,11 @@ type presetStore struct {
   [zst_len]byte raw         // zstd-сжатые байты изображения
 ```
 
-`portmaster/presets/textures.mdp` собирается целью `make texture-archive`. При запуске
+`portmaster/presets/textures.pmv` собирается целью `make texture-archive`. При запуске
 приложение распаковывает его во временный каталог и передаёт этот каталог
 projectM. Изображения пользователя ищутся в каталоге `presets/` и копируются
 в тот же временный каталог после распаковки архива. Архив поставляется в
-каталоге `presets/` рядом с `presets.mdp`, а не встраивается в бинарник.
+каталоге `presets/` рядом с `presets.pmv`, а не встраивается в бинарник.
 
 Перед упаковкой `scripts/optimize-textures.sh` удаляет metadata и проверяет
 каждое изображение с палитрами 256, 128, 64, 32, 16, 8, 4 и 2 цвета. Каждый

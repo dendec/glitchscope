@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dendec/mdpp/internal/player"
+	"github.com/dendec/pmv/internal/player"
 )
 
 // This file owns the library navigation model: local-album / modland

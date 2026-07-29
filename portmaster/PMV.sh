@@ -16,7 +16,7 @@ source $controlfolder/control.txt
 [ -f "${controlfolder}/mod_${CFW_NAME}.txt" ] && source "${controlfolder}/mod_${CFW_NAME}.txt"
 get_controls
 
-GAMEDIR="/$directory/ports/mdpp"
+GAMEDIR="/$directory/ports/pmv"
 CONFDIR="$GAMEDIR/conf/"
 
 mkdir -p "$GAMEDIR/conf"
@@ -31,12 +31,12 @@ export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 export SDL_AUDIODRIVER="alsa"
 
 # Display standard PortMaster loading text
-pm_message "Loading MDPP... (Compiling shaders)"
+pm_message "Loading PMV... (Compiling shaders)"
 
-# gptokeyb handles START+SELECT quit combo; kills mdpp on combo press
-$GPTOKEYB "mdpp" &
+# gptokeyb handles START+SELECT quit combo; kills pmv on combo press
+$GPTOKEYB "pmv" &
 
-pm_platform_helper "$GAMEDIR/mdpp"
-./mdpp -render-scale 0.5
+pm_platform_helper "$GAMEDIR/pmv"
+./pmv -render-scale 0.5
 
 pm_finish

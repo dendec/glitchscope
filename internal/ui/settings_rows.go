@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/dendec/mdpp/internal/config"
+import "github.com/dendec/pmv/internal/config"
 
 // BuildSettingsRows creates SettingRow entries from the current config.
 func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {

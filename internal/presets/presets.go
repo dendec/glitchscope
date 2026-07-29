@@ -1,4 +1,4 @@
-// Package presets loads .milk preset files from presets.mdp and presets/ dir.
+// Package presets loads .milk preset files from presets.pmv and presets/ dir.
 package presets
 
 import (
@@ -8,25 +8,25 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dendec/mdpp/internal/archive"
+	"github.com/dendec/pmv/internal/archive"
 )
 
 type entry struct {
 	name    string
-	dataOff int64 // offset in .mdp, -1 = filesystem
+	dataOff int64 // offset in .pmv, -1 = filesystem
 }
 
 type presetStore struct {
 	dir     string
-	mdpFile *archive.Archive
+	pmvFile *archive.Archive
 	entries map[string]entry
 	names   []string
 }
 
 var store *presetStore
 
-// Open loads presets from dir/presets.mdp and scans dir/*.milk + dir/*/*.milk.
-// User .milk files override same-named entries from presets.mdp.
+// Open loads presets from dir/presets.pmv and scans dir/*.milk + dir/*/*.milk.
+// User .milk files override same-named entries from presets.pmv.
 func Open(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return err
@@ -37,14 +37,14 @@ func Open(dir string) error {
 		entries: make(map[string]entry),
 	}
 
-	// Load presets.mdp if present.
-	mdpPath := filepath.Join(dir, "presets.mdp")
-	if mdp, err := archive.Open(mdpPath, 100000); err == nil {
-		s.mdpFile = mdp
-		s.loadMDP()
+	// Load presets.pmv if present.
+	pmvPath := filepath.Join(dir, "presets.pmv")
+	if a, err := archive.Open(pmvPath, 100000); err == nil {
+		s.pmvFile = a
+		s.loadPMV()
 	}
 
-	// Scan user .milk files (override same names from presets.mdp).
+	// Scan user .milk files (override same names from presets.pmv).
 	s.scanUser()
 
 	// Build sorted names list.
@@ -58,8 +58,8 @@ func Open(dir string) error {
 	return nil
 }
 
-func (s *presetStore) loadMDP() {
-	for _, item := range s.mdpFile.Entries() {
+func (s *presetStore) loadPMV() {
+	for _, item := range s.pmvFile.Entries() {
 		s.entries[item.Name] = entry{name: item.Name, dataOff: 0}
 	}
 }
@@ -100,7 +100,7 @@ func Names() []string {
 }
 
 // Read returns decompressed preset bytes for the given key.
-// User .milk files take priority over presets.mdp entries.
+// User .milk files take priority over presets.pmv entries.
 func Read(key string) ([]byte, error) {
 	if store == nil {
 		return nil, fmt.Errorf("presets not loaded")
@@ -114,8 +114,8 @@ func Read(key string) ([]byte, error) {
 		return os.ReadFile(filepath.Join(store.dir, key))
 	}
 
-	// Read from presets.mdp archive.
-	return store.mdpFile.Read(key)
+	// Read from presets.pmv archive.
+	return store.pmvFile.Read(key)
 }
 
 // categoryOf returns the category a preset key belongs to.

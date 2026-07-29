@@ -1,9 +1,9 @@
-# MDPP — MilkDrop Portable Player
+# PMV — Portable Music Visualizer
 
 Аудиоплеер с MilkDrop-совместимой визуализацией для портативных игровых
 консолей (PortMaster: TrimUI Smart Pro, Anbernic и др.).
 
-**mdpp** = **M**ilk**D**rop **P**ortable **P**layer.
+**pmv** = **P**ortable **M**usic **V**isualizer.
 
 Воспроизведение аудио (MP3/FLAC/WAV/Ogg) + трекерной музыки (MOD/XM/IT/S3M/...)
 + визуализация через projectM (MilkDrop-совместимый движок) поверх OpenGL.
@@ -29,7 +29,7 @@ config, i18n, input обработка, Makefile, Dockerfile, Menu/UI, верд�
 
 | Компонент | Технология | Интеграция |
 |-----------|-----------|------------|
-| Язык | Go 1.25 | cmd/mdpp/main.go |
+| Язык | Go 1.25 | cmd/pmv/main.go |
 | Окно + ввод | SDL2 (go-sdl2) | renderer/, ui/ |
 | OpenGL контекст | через SDL2 | renderer/ (совместно с go-sdl2) |
 | Аудио | SoLoud (vendored C++) | cgo-мост в internal/soloud/ |
@@ -43,8 +43,8 @@ config, i18n, input обработка, Makefile, Dockerfile, Menu/UI, верд�
 ## Структура репозитория
 
 ```
-mdpp/
-├── cmd/mdpp/main.go              # Точка входа
+pmv/
+├── cmd/pmv/main.go              # Точка входа
 ├── Makefile                       # build/test/lint/dist/deploy
 ├── Dockerfile.arm64               # ARM64 кросс-сборка для портативок
 ├── Dockerfile.windows             # Windows кросс-сборка (Zig)
@@ -93,11 +93,11 @@ mdpp/
 │       └── string.go
 │
 ├── portmaster/                    # Упаковка для PortMaster
-│   ├── Mdpp.sh                    # Лаунчер с LD_LIBRARY_PATH
+│   ├── Pmv.sh                    # Лаунчер с LD_LIBRARY_PATH
 │   └── port.json                  # Метаданные
 │
 ├── scripts/
-│   └── mdpp.sh                    # Деплой на устройство
+│   └── pmv.sh                    # Деплой на устройство
 │
 ├── assets/
 │   └── presets/                   # 100+ .milk пресетов (//go:embed)

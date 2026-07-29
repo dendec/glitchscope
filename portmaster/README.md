@@ -1,4 +1,4 @@
-## MDPP — MilkDrop Portable Player
+## PMV — Portable Music Visualizer
 
 Plays MP3/FLAC/Ogg with real-time MilkDrop visualizations on your handheld.
 

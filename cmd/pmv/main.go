@@ -6,7 +6,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/dendec/mdpp/internal/app"
+	"github.com/dendec/pmv/internal/app"
 )
 
 var (

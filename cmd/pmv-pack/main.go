@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dendec/mdpp/internal/archive"
+	"github.com/dendec/pmv/internal/archive"
 )
 
 const (
@@ -20,7 +20,7 @@ const (
 
 func main() {
 	if len(os.Args) != 4 && len(os.Args) != 5 {
-		fmt.Fprintln(os.Stderr, "Usage: mdp-pack <presets|textures> <input-dir> <output.mdp> [benchmark.csv]")
+		fmt.Fprintln(os.Stderr, "Usage: pmv-pack <presets|textures> <input-dir> <output.pmv> [benchmark.csv]")
 		os.Exit(1)
 	}
 	kind, inputDir, outputPath := os.Args[1], os.Args[2], os.Args[3]

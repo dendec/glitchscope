@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/dendec/mdpp/internal/openmpt"
-	"github.com/dendec/mdpp/internal/soloud"
-	"github.com/dendec/mdpp/internal/xmp"
+	"github.com/dendec/pmv/internal/openmpt"
+	"github.com/dendec/pmv/internal/soloud"
+	"github.com/dendec/pmv/internal/xmp"
 )
 
 type pendingLoad struct {

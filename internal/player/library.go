@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dendec/mdpp/internal/openmpt"
-	"github.com/dendec/mdpp/internal/soloud"
-	"github.com/dendec/mdpp/internal/xmp"
+	"github.com/dendec/pmv/internal/openmpt"
+	"github.com/dendec/pmv/internal/soloud"
+	"github.com/dendec/pmv/internal/xmp"
 )
 
 // Album represents a directory containing audio files.
