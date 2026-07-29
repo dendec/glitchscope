@@ -19,6 +19,7 @@ type pendingLoad struct {
 	wav      *soloud.Wav     // non-nil for WAV/MP3/FLAC etc.
 	mod      *soloud.Xmp     // non-nil for libxmp-supported formats
 	ompt     *soloud.Openmpt // non-nil for libopenmpt fallback formats
+	gme      *soloud.Gme     // non-nil for Game Music Emu formats
 	bpm      float64         // tracker metadata
 	channels int
 	duration float64
@@ -31,6 +32,7 @@ type Player struct {
 	currentWav      *soloud.Wav     // non-nil when playing WAV/MP3/FLAC etc.
 	currentMod      *soloud.Xmp     // non-nil when playing via libxmp
 	currentOmpt     *soloud.Openmpt // non-nil when playing via libopenmpt
+	currentGme      *soloud.Gme     // non-nil when playing via Game Music Emu
 	currentPath     string
 	currentBPM      float64
 	currentDuration float64
@@ -65,18 +67,46 @@ func isTrackerExt(ext string) bool {
 	return xmp.SupportedExts[ext] || openmpt.SupportedExts[ext]
 }
 
+func isGmeExt(ext string) bool {
+	switch ext {
+	case ".nsf", ".nsfe", ".spc", ".gbs", ".hes", ".kss", ".sgc", ".sap", ".vgm", ".vgz":
+		return true
+	default:
+		return false
+	}
+}
+
 // PlayFile loads and plays an audio file. Only one file at a time.
 func (p *Player) PlayFile(path string) error {
 	ext := strings.ToLower(filepath.Ext(path))
 	if isTrackerExt(ext) {
 		return p.playTracker(path)
 	}
+	if isGmeExt(ext) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("gme read %s: %w", path, err)
+		}
+		gme, err := soloud.NewGme(data)
+		if err != nil {
+			return fmt.Errorf("gme %s: %w", path, err)
+		}
+		p.replaceSource(nil, nil, nil, gme)
+		p.currentPath = path
+		p.currentDuration = gme.GetLength()
+		p.currentBPM = 0
+		p.currentBitrate = fileBitrate(path, p.currentDuration)
+		p.channels = 2
+		p.isTracker = true
+		slog.Info("playing gme", "path", path, "tracks", gme.GetTrackCount())
+		return nil
+	}
 
 	w, err := soloud.LoadWav(path)
 	if err != nil {
 		return fmt.Errorf("load %s: %w", path, err)
 	}
-	p.replaceSource(w, nil, nil)
+	p.replaceSource(w, nil, nil, nil)
 	p.currentPath = path
 	p.currentDuration = w.GetLength()
 	p.currentBPM = 0
@@ -153,6 +183,20 @@ func (p *Player) PlayFileAsync(path string) {
 			p.pendingCh <- pendingLoad{path: path, mod: mod, bpm: bpm, channels: ch, duration: dur}
 			return
 		}
+		if isGmeExt(ext) {
+			fileBuf, err := os.ReadFile(localPath)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			gme, err := soloud.NewGme(fileBuf)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			p.pendingCh <- pendingLoad{path: path, gme: gme}
+			return
+		}
 		w, err := soloud.LoadWav(localPath)
 		p.pendingCh <- pendingLoad{path: path, wav: w, err: err}
 	}()
@@ -183,6 +227,9 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			if res.ompt != nil {
 				res.ompt.Destroy()
 			}
+			if res.gme != nil {
+				res.gme.Destroy()
+			}
 			return false, false
 		}
 		p.loading.Store(false)
@@ -192,7 +239,7 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			return false, true
 		}
 		if res.mod != nil {
-			p.replaceSource(nil, res.mod, nil)
+			p.replaceSource(nil, res.mod, nil, nil)
 			p.currentPath = res.path
 			p.currentBPM = res.bpm
 			p.currentBitrate = 0
@@ -201,7 +248,7 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			p.currentDuration = res.duration
 			slog.Info("tracker xmp (async)", "path", res.path)
 		} else if res.ompt != nil {
-			p.replaceSource(nil, nil, res.ompt)
+			p.replaceSource(nil, nil, res.ompt, nil)
 			p.currentPath = res.path
 			p.currentBPM = res.bpm
 			p.currentBitrate = 0
@@ -210,7 +257,7 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			p.currentDuration = res.duration
 			slog.Info("tracker openmpt (async)", "path", res.path)
 		} else if res.wav != nil {
-			p.replaceSource(res.wav, nil, nil)
+			p.replaceSource(res.wav, nil, nil, nil)
 			p.currentPath = res.path
 			p.currentDuration = res.wav.GetLength()
 			p.currentBPM = 0
@@ -218,6 +265,15 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			p.channels = res.wav.GetChannels()
 			p.isTracker = false
 			slog.Info("playing (async)", "path", res.path)
+		} else if res.gme != nil {
+			p.replaceSource(nil, nil, nil, res.gme)
+			p.currentPath = res.path
+			p.currentDuration = res.gme.GetLength()
+			p.currentBPM = 0
+			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
+			p.channels = 2
+			p.isTracker = true
+			slog.Info("playing gme (async)", "path", res.path, "tracks", res.gme.GetTrackCount())
 		}
 		return true, false
 	default:
@@ -237,7 +293,7 @@ func (p *Player) playTracker(path string) error {
 		ompt, err := soloud.NewOpenmpt(fileBuf)
 		if err == nil {
 			bpm, ch, dur, _ := openmpt.GetTrackerMeta(fileBuf)
-			p.replaceSource(nil, nil, ompt)
+			p.replaceSource(nil, nil, ompt, nil)
 			p.currentPath = path
 			p.currentBPM = bpm
 			p.currentBitrate = 0
@@ -254,7 +310,7 @@ func (p *Player) playTracker(path string) error {
 	if err != nil {
 		return fmt.Errorf("tracker %s: %w", path, err)
 	}
-	p.replaceSource(nil, mod, nil)
+	p.replaceSource(nil, mod, nil, nil)
 	p.currentPath = path
 
 	// Metadata via lightweight libxmp probe (no decode).
@@ -272,7 +328,7 @@ func (p *Player) playTracker(path string) error {
 }
 
 // replaceSource stops current playback and swaps in a new audio source.
-func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Openmpt) {
+func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Openmpt, gme *soloud.Gme) {
 	p.s.StopAll()
 	if p.currentWav != nil {
 		p.currentWav.Destroy()
@@ -286,6 +342,10 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 		p.currentOmpt.Destroy()
 		p.currentOmpt = nil
 	}
+	if p.currentGme != nil {
+		p.currentGme.Destroy()
+		p.currentGme = nil
+	}
 	if w != nil {
 		p.currentWav = w
 		p.voice = p.s.Play(w)
@@ -295,6 +355,9 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 	} else if ompt != nil {
 		p.currentOmpt = ompt
 		p.voice = p.s.PlayOpenmpt(ompt)
+	} else if gme != nil {
+		p.currentGme = gme
+		p.voice = p.s.PlayGme(gme)
 	}
 }
 
@@ -365,6 +428,14 @@ func (p *Player) Stop() {
 		p.currentMod.Destroy()
 		p.currentMod = nil
 	}
+	if p.currentOmpt != nil {
+		p.currentOmpt.Destroy()
+		p.currentOmpt = nil
+	}
+	if p.currentGme != nil {
+		p.currentGme.Destroy()
+		p.currentGme = nil
+	}
 	p.currentPath = ""
 }
 
@@ -379,6 +450,14 @@ func (p *Player) Position() float64 {
 		return 0
 	}
 	return p.s.GetStreamTime(p.voice)
+}
+
+// Seek moves the current track position in seconds.
+func (p *Player) Seek(seconds float64) error {
+	if !p.IsValidVoice() {
+		return fmt.Errorf("no active voice")
+	}
+	return p.s.Seek(p.voice, seconds)
 }
 
 func (p *Player) Duration() float64 {

@@ -5,6 +5,7 @@
 #include "soloud_wav.h"
 #include "soloud_xmp.h"
 #include "soloud_openmpt.h"
+#include "gme_source.h"
 
 using namespace SoLoud;
 
@@ -23,6 +24,10 @@ void Soloud_deinit(void * aClassPtr) {
 
 unsigned int Soloud_play(void * aClassPtr, void * aSound) {
 	return ((Soloud *)aClassPtr)->play(*(AudioSource *)aSound);
+}
+
+int Soloud_seek(void * aClassPtr, unsigned int aVoiceHandle, double aSeconds) {
+	return ((Soloud *)aClassPtr)->seek(aVoiceHandle, aSeconds);
 }
 
 void Soloud_stopAll(void * aClassPtr) {

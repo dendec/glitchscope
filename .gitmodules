@@ -4,3 +4,6 @@
 [submodule "lib/soloud"]
 	path = lib/soloud
 	url = https://github.com/jarikomppa/soloud.git
+[submodule "lib/game-music-emu"]
+	path = lib/game-music-emu
+	url = https://github.com/libgme/game-music-emu.git

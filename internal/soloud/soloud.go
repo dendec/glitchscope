@@ -3,10 +3,18 @@ package soloud
 
 /*
 #cgo CFLAGS: -I ../../lib/soloud/include
-#cgo CXXFLAGS: -std=c++11 -DWITH_SDL2_STATIC -I ../../lib/soloud/include
+#cgo CXXFLAGS: -std=c++11 -DWITH_SDL2_STATIC -I ../../lib/soloud/include -I ../../lib/game-music-emu/gme
 #include <stdlib.h>
 #include "soloud_c.h"
 unsigned int Wav_getChannels(Wav * aClassPtr);
+void *Gme_create(void);
+void Gme_destroy(void *source);
+int Gme_loadMem(void *source, const unsigned char *data, unsigned int length);
+unsigned int Gme_getLengthMs(void *source);
+unsigned int Gme_getTrackCount(void *source);
+const char *Gme_getTitle(void *source);
+const char *Gme_getAuthor(void *source);
+unsigned int Gme_getSampleRate(void *source);
 */
 import "C"
 import (
@@ -32,6 +40,11 @@ type Xmp struct {
 // Openmpt wraps a SoLoud Openmpt audio source (fallback for unsupported formats).
 type Openmpt struct {
 	p *C.Openmpt
+}
+
+// Gme wraps a Game Music Emu SoLoud source.
+type Gme struct {
+	p unsafe.Pointer
 }
 
 // New creates a SoLoud engine instance.
@@ -113,6 +126,23 @@ func NewOpenmpt(data []byte) (*Openmpt, error) {
 	return &Openmpt{p: p}, nil
 }
 
+// NewGme creates a Game Music Emu source from game music data.
+func NewGme(data []byte) (*Gme, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("gme: empty data")
+	}
+	p := C.Gme_create()
+	if p == nil {
+		return nil, fmt.Errorf("gme: create failed")
+	}
+	r := int(C.Gme_loadMem(p, (*C.uchar)(unsafe.Pointer(&data[0])), C.uint(len(data))))
+	if r != 0 {
+		C.Gme_destroy(p)
+		return nil, fmt.Errorf("gme load: %d", r)
+	}
+	return &Gme{p: p}, nil
+}
+
 // Destroy frees the Wav resource.
 func (w *Wav) Destroy() {
 	if w.p != nil {
@@ -137,6 +167,14 @@ func (o *Openmpt) Destroy() {
 	}
 }
 
+// Destroy frees the GME resource.
+func (g *Gme) Destroy() {
+	if g.p != nil {
+		C.Gme_destroy(g.p)
+		g.p = nil
+	}
+}
+
 // Play starts playing a Wav source. Returns the voice handle.
 func (s *Soloud) Play(w *Wav) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(unsafe.Pointer(w.p))))
@@ -151,6 +189,18 @@ func (s *Soloud) PlayXmp(x *Xmp) uint {
 func (s *Soloud) PlayOpenmpt(o *Openmpt) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(unsafe.Pointer(o.p))))
 }
+
+// PlayGme starts playing a Game Music Emu source.
+func (s *Soloud) PlayGme(g *Gme) uint {
+	return uint(C.Soloud_play(s.p, (*C.AudioSource)(g.p)))
+}
+
+func (g *Gme) GetLength() float64 {
+	return float64(C.Gme_getLengthMs(g.p)) / 1000
+}
+
+func (g *Gme) GetTrackCount() int { return int(C.Gme_getTrackCount(g.p)) }
+func (g *Gme) GetSampleRate() int { return int(C.Gme_getSampleRate(g.p)) }
 
 // GetWave returns the current waveform data (256 float32 samples).
 // Visualization must be enabled. The slice references SoLoud's internal buffer.
@@ -190,6 +240,14 @@ func (s *Soloud) GetPause(voice uint) bool {
 
 func (s *Soloud) GetStreamTime(voice uint) float64 {
 	return float64(C.Soloud_getStreamTime(s.p, C.uint(voice)))
+}
+
+// Seek moves a voice to the requested position in seconds.
+func (s *Soloud) Seek(voice uint, seconds float64) error {
+	if C.Soloud_seek(s.p, C.uint(voice), C.double(seconds)) != 0 {
+		return fmt.Errorf("seek voice %d to %.3f seconds failed", voice, seconds)
+	}
+	return nil
 }
 
 // GetLength returns the total length in seconds of a Wav.

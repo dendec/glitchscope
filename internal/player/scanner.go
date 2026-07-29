@@ -31,6 +31,10 @@ var SupportedExts = map[string]bool{
 	".rtm": true, ".sfx": true, ".sfx2": true, ".stim": true,
 	".stx": true, ".tcb": true, ".tdd": true, ".tp": true,
 	".uni": true, ".xd": true,
+	// Game Music Emu formats
+	".nsf": true, ".nsfe": true, ".spc": true, ".gbs": true,
+	".hes": true, ".kss": true, ".sgc": true, ".sap": true,
+	".vgm": true, ".vgz": true,
 	// libopenmpt fallback formats
 	".mo3": true, ".ktm": true, ".ims": true, ".mdc": true,
 	".spx": true, ".txn": true,

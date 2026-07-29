@@ -24,6 +24,7 @@ WORKDIR /build
 # Copy local C/C++ libraries and patches from workspace
 COPY lib/soloud lib/soloud
 COPY lib/projectm lib/projectm
+COPY lib/game-music-emu lib/game-music-emu
 COPY patches patches
 
 # Apply patch & prepare projectM
@@ -71,6 +72,24 @@ RUN mkdir -p lib/projectm/build-arm64 && cd lib/projectm/build-arm64 && \
 RUN mkdir -p /opt/projectm/arm64/lib \
     && cp lib/projectm/build-arm64/src/libprojectM/libprojectM-4.a /opt/projectm/arm64/lib/ \
     && cp lib/projectm/build-arm64/vendor/projectm-eval/projectm-eval/libprojectM_eval.a /opt/projectm/arm64/lib/
+
+# --- Build libgme static for amd64 ---
+RUN mkdir -p lib/game-music-emu/build-amd64 && cd lib/game-music-emu/build-amd64 && \
+    cmake .. -DGME_BUILD_SHARED=OFF -DGME_BUILD_STATIC=ON \
+             -DGME_BUILD_TESTING=OFF -DGME_BUILD_EXAMPLES=OFF \
+             -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/gme/amd64 && \
+    cmake --build . --target gme_static -- -j$(nproc) && \
+    cmake --install .
+
+# --- Build libgme static for arm64 ---
+RUN mkdir -p lib/game-music-emu/build-arm64 && cd lib/game-music-emu/build-arm64 && \
+    PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig \
+    cmake .. -DGME_BUILD_SHARED=OFF -DGME_BUILD_STATIC=ON \
+             -DGME_BUILD_TESTING=OFF -DGME_BUILD_EXAMPLES=OFF \
+             -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/gme/arm64 \
+             -DCMAKE_TOOLCHAIN_FILE=/build/toolchain-arm64.cmake && \
+    cmake --build . --target gme_static -- -j$(nproc) && \
+    cmake --install .
 
 # Add arm64 dependencies for libopenmpt and libxmp
 RUN apt-get update && apt-get install -y --no-install-recommends \
