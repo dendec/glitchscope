@@ -156,6 +156,17 @@ RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-4.7.1/libx
 
 
 COPY lib/ayumi lib/ayumi
+COPY lib/pt3player lib/pt3player
+# --- Build PT3 player core for amd64 and arm64 ---
+RUN cd lib/pt3player \
+    && git apply /build/patches/pt3player-build.patch \
+    && mkdir -p /opt/pt3player/amd64/lib /opt/pt3player/arm64/lib \
+    && cc -std=c99 -O2 -Wno-unused-variable -Wno-parentheses -Wno-dangling-else -I. -c pt3player.c -o /tmp/pt3player-amd64.o \
+    && ar rcs /opt/pt3player/amd64/lib/libpt3player.a /tmp/pt3player-amd64.o \
+    && aarch64-linux-gnu-gcc -std=c99 -O2 -Wno-unused-variable -Wno-parentheses -Wno-dangling-else -I. -c pt3player.c -o /tmp/pt3player-arm64.o \
+    && aarch64-linux-gnu-ar rcs /opt/pt3player/arm64/lib/libpt3player.a /tmp/pt3player-arm64.o \
+    && mkdir -p /opt/pt3player/include \
+    && cp pt3player.h /opt/pt3player/include/
 # --- Build libayumi static for amd64 and arm64 ---
 RUN mkdir -p /opt/ayumi/amd64/lib /opt/ayumi/arm64/lib \
     && cc -std=c99 -O2 -Ilib/ayumi -c lib/ayumi/ayumi.c -o /tmp/ayumi-amd64.o \

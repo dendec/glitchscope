@@ -1,0 +1,7 @@
+diff --git a/pt3player.c b/pt3player.c
+index 0db3756..0000000 100644
+--- a/pt3player.c
++++ b/pt3player.c
+@@ -693,0 +694,2 @@ int func_restart_music(int ch) {
++
++	return 1;

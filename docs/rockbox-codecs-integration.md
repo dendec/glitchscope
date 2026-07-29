@@ -253,12 +253,22 @@ be added before considering VTX coverage complete.
 
 **File count:** .pt2: 6,284, .pt3: 6,868
 
-Need separate parsers. Options:
-1. https://github.com/alexanderbautro/pt2-player (C, minimal)
-2. https://github.com/alexanderbautro/pt3-player (C, minimal)
-3. Write own parser based on format spec
+PT3 currently uses the MIT-licensed `https://github.com/Volutar/pt3player`
+core as a Git submodule at `lib/pt3player/`. Its parser/player state is global,
+so the adapter serializes decoder operations and supports one active PT3 voice.
+The renderer reuses the project `lib/ayumi` static library rather than the
+upstream demo's private ayumi copy. Seek is implemented by restart and replay.
 
-**Action:** Evaluate pt2-player and pt3-player repos.
+PT2 and the remaining format-specific parser work are intentionally deferred.
+Rather than adding one player core per extension, the proposed long-term path
+is a separate Spectrum emulator backend that runs a compatible loader/player,
+intercepts timed AY/YM register writes, and renders them through `ayumi`.
+See [Spectrum Emulator Backend](spectrum-emulator-backend.md) for the
+architecture, prototype scope, and the reasons this is not being embedded in
+the main player yet.
+
+**Action:** Keep direct PT3/VTX integrations stable and prototype the emulator
+backend separately before adding PT2 support.
 
 ### 2c. Other Spectrum Formats
 
@@ -270,7 +280,10 @@ Need separate parsers. Options:
 | .stp | 632 | Sound Tracker Pro parser |
 | .vt2 | 550 | Vortex Tracker II parser |
 
-**Action:** Prioritize PT2/PT3 first. Others deferred.
+**Action:** Defer these format-specific parsers pending the
+[Spectrum Emulator Backend](spectrum-emulator-backend.md). This avoids
+committing to a separate parser/player integration for every AY tracker
+extension before a shared execution path has been evaluated.
 
 ---
 

@@ -22,6 +22,10 @@ This file contains license information for all third-party libraries used in mdp
 **License:** MIT
 **Source:** https://github.com/true-grue/ayumi
 
+## pt3player
+**License:** MIT
+**Source:** https://github.com/Volutar/pt3player
+
 ## cRSID
 **License:** GPL-2.0+
 **Source:** Rockbox project (https://www.rockbox.org/)

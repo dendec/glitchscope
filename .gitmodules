@@ -10,3 +10,6 @@
 [submodule "lib/ayumi"]
 	path = lib/ayumi
 	url = https://github.com/true-grue/ayumi.git
+[submodule "lib/pt3player"]
+	path = lib/pt3player
+	url = https://github.com/Volutar/pt3player.git
