@@ -91,7 +91,7 @@ func (s *presetStore) scanUser() {
 	}
 }
 
-// Names returns sorted preset keys. Returns nil if no presets loaded.
+// Names returns sorted preset keys.
 func Names() []string {
 	if store == nil {
 		return nil
@@ -111,7 +111,6 @@ func Read(key string) ([]byte, error) {
 	}
 
 	if e.dataOff < 0 {
-		// User file on disk.
 		return os.ReadFile(filepath.Join(store.dir, key))
 	}
 
@@ -119,11 +118,7 @@ func Read(key string) ([]byte, error) {
 	return store.mdpFile.Read(key)
 }
 
-// categoryOf returns the category a preset key belongs to. Presets nested at
-// least two directories deep (top/sub/.../file.milk) are grouped by their
-// first two path segments (top/sub) so large top-level folders split into
-// smaller, more specific categories. Presets one directory deep (top/file.milk)
-// use just that directory, and root-level presets belong to "Default".
+// categoryOf returns the category a preset key belongs to.
 func categoryOf(name string) string {
 	parts := strings.Split(name, "/")
 	switch {
@@ -136,8 +131,7 @@ func categoryOf(name string) string {
 	}
 }
 
-// Categories returns sorted category names derived from subdirectory structure.
-// Root-level presets belong to "Default".
+// Categories returns sorted category names from subdirectory structure.
 func Categories() []string {
 	if store == nil {
 		return nil
@@ -168,7 +162,7 @@ func PresetsInCategory(cat string) []string {
 	return out
 }
 
-// DefaultPreset returns a minimal built-in preset (fallback).
+// DefaultPreset returns a minimal built-in preset.
 func DefaultPreset() []byte {
 	return []byte(`[preset00]
 wave_r=1

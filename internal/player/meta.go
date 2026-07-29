@@ -6,14 +6,12 @@ import (
 	"path/filepath"
 )
 
-// TrackMeta holds cached metadata for one track.
 type TrackMeta struct {
 	Duration float64 `json:"d"`
 	BPM      float64 `json:"b,omitempty"`
 	Channels int     `json:"c,omitempty"`
 }
 
-// albumMeta is the on-disk cache format.
 type albumMeta struct {
 	Version int                  `json:"v"`
 	Tracks  map[string]TrackMeta `json:"t"`
@@ -22,8 +20,7 @@ type albumMeta struct {
 const metaFileName = ".mdpp_meta.json"
 const metaVersion = 1
 
-// readMetaCache reads the metadata cache file for an album directory.
-// Returns nil if file doesn't exist or is invalid.
+// readMetaCache reads the metadata cache for an album directory.
 func readMetaCache(albumPath string) *albumMeta {
 	fpath := filepath.Join(albumPath, metaFileName)
 	f, err := os.Open(fpath)
@@ -41,7 +38,7 @@ func readMetaCache(albumPath string) *albumMeta {
 	return &m
 }
 
-// writeMetaCache writes the metadata cache file for an album directory.
+// writeMetaCache writes the metadata cache for an album directory.
 func writeMetaCache(albumPath string, m *albumMeta) error {
 	m.Version = metaVersion
 	fpath := filepath.Join(albumPath, metaFileName)

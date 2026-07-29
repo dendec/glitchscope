@@ -8,20 +8,16 @@ import (
 	"path/filepath"
 )
 
-// SettingsPath returns the location of the JSON settings file.
-// On PortMaster XDG_DATA_HOME points to /roms/ports/mdpp/conf/,
-// so settings.json lands next to the binary by default.
+// SettingsPath returns the settings file location.
+// On PortMaster, XDG_DATA_HOME points to /roms/ports/mdpp/conf/.
 func SettingsPath() string {
 	if p := os.Getenv("XDG_DATA_HOME"); p != "" {
 		return filepath.Join(p, "settings.json")
 	}
-	// Fallback: next to the config package (unlikely to be right,
-	// but callers override via CLI or env).
 	return "settings.json"
 }
 
-// LoadSettings reads and validates a settings file. Missing or malformed
-// files silently return defaults.
+// LoadSettings reads and validates a settings file. Missing files return defaults.
 func LoadSettings(path string) (Settings, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -92,7 +88,7 @@ func LoadSettings(path string) (Settings, error) {
 	return s, nil
 }
 
-// SaveSettings writes settings atomically (write to temp, rename).
+// SaveSettings writes settings atomically (temp + rename).
 func SaveSettings(path string, s Settings) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("settings mkdir: %w", err)

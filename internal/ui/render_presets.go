@@ -5,9 +5,8 @@ import (
 	"strings"
 )
 
-// This file owns rendering for the Presets page: two columns (categories /
-// presets in the focused category). Shared panel/list drawing primitives
-// live in overlay_render.go; presets model lives in overlay_presets.go.
+// This file owns rendering for the Presets page: two columns.
+// Shared primitives in overlay_render.go; model in overlay_presets.go.
 
 func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	texturesValid := glIsTexture(o.presetsColL.tex) && glIsTexture(o.presetsColR.tex)
@@ -17,15 +16,10 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	}
 	o.presetsDirty = false
 
-	// Leave room for the texture's horizontal padding, the scrollbar and the
-	// clipped row edges. Prefixes and status icons are part of the measured
-	// line, so they consume this same budget.
+	// Leave room for texture padding, scrollbar, and clipped row edges.
 	maxTextPx := availableRowTextWidth(panelW)
 
-	// Only render as many rows as fit in the panel: with hundreds/thousands
-	// of presets, rendering every line into one texture can exceed the
-	// GPU's max texture size, silently failing and leaving the panel a
-	// solid black square. Scroll the window instead of rendering it all.
+	// Only render rows that fit — avoid exceeding GPU max texture size.
 	maxRows := panelH / lh
 	if maxRows < 1 {
 		maxRows = 1

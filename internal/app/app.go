@@ -32,14 +32,12 @@ type pendingPreset struct {
 	at   time.Time
 }
 
-// shuffleState tracks the current random playback order for shuffle modes.
 type shuffleState struct {
 	order    []trackRef
 	idx      int
 	albumIdx int // tracks which album the order covers (ShuffleAlbum only)
 }
 
-// App holds the full application state.
 type App struct {
 	window *sdl.Window
 	glCtx  sdl.GLContext
@@ -71,8 +69,7 @@ type App struct {
 	shuffle shuffleState
 }
 
-// New creates an App with display initialised (SDL, window, GL, projectM,
-// settings, render target, presets).  The player / overlay / input / library
+// New creates an App with display initialised. Player/overlay/input/library
 // are created later by Init().
 func New(fullscreen bool, width, height int, renderScale float64, renderNearest bool, renderScaleExplicit, renderNearestSet bool) (*App, error) {
 	a := &App{
@@ -184,7 +181,6 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	return a, nil
 }
 
-// Close releases all resources in reverse order.
 func (a *App) Close() {
 	if a.presetTicker != nil {
 		a.presetTicker.Stop()
@@ -216,8 +212,6 @@ func (a *App) Close() {
 	sdl.Quit()
 }
 
-// Init completes initialisation for normal mode: audio, overlay, library,
-// input, preset, and the first track.
 func (a *App) Init() {
 	a.initAudio()
 	a.initLibrary()
@@ -269,7 +263,6 @@ func (a *App) initLibrary() {
 	a.loadModlandFromCache()
 }
 
-// loadModlandFromCache loads the modland catalog from disk.
 func (a *App) loadModlandFromCache() {
 	cat := modland.LoadCatalog(baseDir())
 	if cat != nil && len(cat.Albums) > 0 {
@@ -279,7 +272,6 @@ func (a *App) loadModlandFromCache() {
 	slog.Info("modland: catalog not found")
 }
 
-// addModlandAlbums converts modland catalog albums to player.Album and adds them.
 func (a *App) addModlandAlbums(catalogAlbums []modland.Album) {
 	albums := make([]player.Album, len(catalogAlbums))
 	for i, ma := range catalogAlbums {
@@ -311,14 +303,14 @@ func (a *App) initPreset() {
 		return
 	}
 
-	// Cache transition presets ("!" prefix) for smooth preset changes.
+	// Cache transition presets ("!" prefix).
 	for _, n := range a.presetNames {
 		if n[0] == '!' {
 			a.transitionPresets = append(a.transitionPresets, n)
 		}
 	}
 
-	// Pick a random non-transition (! prefix) preset for startup.
+	// Pick a random non-transition preset for startup.
 	var normals []string
 	for _, n := range a.presetNames {
 		if n[0] != '!' {
@@ -368,7 +360,6 @@ func (a *App) playFirst() {
 	}
 }
 
-// baseDir returns the directory containing the running executable.
 func baseDir() string {
 	if binDir, err := os.Executable(); err == nil && binDir != "" {
 		return filepath.Dir(binDir)
@@ -376,7 +367,6 @@ func baseDir() string {
 	return "."
 }
 
-// findMusicDir locates the music directory relative to the binary.
 func (a *App) findMusicDir() string {
 	for _, candidate := range []string{baseDir() + "/music", baseDir() + "/test_data/music", baseDir()} {
 		if _, err := os.Stat(candidate); err == nil {
@@ -386,7 +376,7 @@ func (a *App) findMusicDir() string {
 	return baseDir()
 }
 
-// Run enters the main loop.  Must be called after Init().
+// Run enters the main loop. Must be called after Init().
 func (a *App) Run() {
 	ticker := time.NewTicker(time.Second / 60)
 	defer ticker.Stop()
@@ -403,7 +393,6 @@ func (a *App) Run() {
 		dt := now.Sub(lastFrame).Seconds()
 		lastFrame = now
 
-		// FPS sliding window.
 		if dt > 0 {
 			fpsBuf = append(fpsBuf, 1.0/dt)
 			if len(fpsBuf) > fpsWindow {
@@ -461,7 +450,6 @@ func (a *App) Run() {
 			a.overlay.SetScreenSize(w, h)
 		}
 
-		// Push UI data each frame.
 		if a.overlay != nil {
 			s := a.prof.ReadStats()
 			line := fmt.Sprintf("FPS:%.0f MEM:%.0fM CPU:%.0f%%", fpsAvg, s.MemKB/1024, s.CPUPct)
@@ -500,7 +488,6 @@ func (a *App) Run() {
 			}
 		}
 
-		// Process events.
 		for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 			act := a.inp.ProcessEvent(e)
 			if act == input.ActionQuit {
@@ -513,7 +500,6 @@ func (a *App) Run() {
 			}
 		}
 
-		// Complete pending transition (load target after delay).
 		if a.pending.name != "" && now.After(a.pending.at) {
 			if d, err := presets.Read(a.pending.name); err == nil {
 				a.pm.LoadPresetData(string(d), true)
@@ -522,7 +508,6 @@ func (a *App) Run() {
 			a.pending = pendingPreset{}
 		}
 
-		// Auto-switch preset ticker.
 		if a.presetTicker != nil {
 			select {
 			case <-a.presetTicker.C:
@@ -531,14 +516,12 @@ func (a *App) Run() {
 			}
 		}
 
-		// Feed wave data.
 		if a.pl != nil {
 			if wave := a.pl.GetWave(); wave != nil {
 				a.pm.PCMAddFloat(wave, projectm.Mono)
 			}
 		}
 
-		// Pick up async track load.
 		if a.pl != nil {
 			if _, failed := a.pl.CheckPending(); failed {
 				if a.overlay != nil {
@@ -547,7 +530,6 @@ func (a *App) Run() {
 			}
 		}
 
-		// Auto-advance track.
 		if a.pl != nil && a.lib != nil && a.pl.Voice() != 0 && a.pl.TrackFinished() {
 			a.autoAdvance()
 		}
@@ -570,7 +552,6 @@ func (a *App) Run() {
 	}
 }
 
-// scaledDim scales a dimension by factor, clamping to sane bounds.
 func scaledDim(v int, scale float64) int {
 	if scale >= 1.0 {
 		return v
@@ -585,7 +566,6 @@ func scaledDim(v int, scale float64) int {
 	return d
 }
 
-// presetDirPath returns the presets/ directory next to the running binary.
 func presetDirPath() string {
 	return baseDir() + "/presets"
 }
@@ -628,7 +608,6 @@ func (a *App) autoAdvance() {
 
 	ps := a.settings.Playback
 
-	// Repeat One: restart the same track.
 	if ps.Repeat == config.RepeatOne {
 		path := a.lib.CurrentTrack()
 		if path != "" {
@@ -637,10 +616,8 @@ func (a *App) autoAdvance() {
 		return
 	}
 
-	// Shuffle modes: consume from the shuffled order.
 	if ps.ShuffleMode != config.ShuffleOff {
-		// Regenerate for ShuffleAlbum when the album has changed, or
-		// when the order is empty (first call, or exhausted with RepeatAll).
+		// Regenerate when album changed, order empty, or exhausted with RepeatAll.
 		needsRegen := len(a.shuffle.order) == 0
 		if ps.ShuffleMode == config.ShuffleAlbum && a.shuffle.albumIdx != a.lib.CurrentAlbumIndex() {
 			needsRegen = true
@@ -662,10 +639,7 @@ func (a *App) autoAdvance() {
 		return
 	}
 
-	// Sequential: try next track in album, then next album.
-	// TrackNext() always wraps and returns a non-empty path, so we must
-	// detect "last track of album" ourselves before calling it, otherwise
-	// we'd loop the current album forever and never advance/stop.
+	// Sequential: detect "last track" before TrackNext() (it wraps).
 	album := a.lib.CurrentAlbum()
 	if a.lib.CurrentTrackIndex() < len(album.Tracks)-1 {
 		path := a.lib.TrackNext()
@@ -675,7 +649,6 @@ func (a *App) autoAdvance() {
 		return
 	}
 
-	// At the end of the album — in RepeatAll, advance to the next album.
 	if ps.Repeat == config.RepeatAll {
 		path := a.lib.AlbumNext()
 		if path != "" {
@@ -685,7 +658,6 @@ func (a *App) autoAdvance() {
 	// RepeatOff + end of album: stop (no next track played).
 }
 
-// trackRef is a lightweight reference to a track across all albums.
 type trackRef struct {
 	path     string
 	album    string
@@ -693,7 +665,6 @@ type trackRef struct {
 	trackIdx int
 }
 
-// allTracks flattens the library into a list of all tracks.
 func (a *App) allTracks() []trackRef {
 	var all []trackRef
 	for ai, album := range a.lib.Albums {
@@ -704,7 +675,6 @@ func (a *App) allTracks() []trackRef {
 	return all
 }
 
-// localTracks returns tracks from local (non-modland) albums only.
 func (a *App) localTracks() []trackRef {
 	var all []trackRef
 	for ai, album := range a.lib.Albums {
@@ -718,7 +688,6 @@ func (a *App) localTracks() []trackRef {
 	return all
 }
 
-// currentAlbumTracks returns tracks from the current album only.
 func (a *App) currentAlbumTracks() []trackRef {
 	ai := a.lib.CurrentAlbumIndex()
 	if ai < 0 || ai >= len(a.lib.Albums) {
@@ -732,9 +701,8 @@ func (a *App) currentAlbumTracks() []trackRef {
 	return tracks
 }
 
-// regenerateShuffleOrder builds a new shuffled playback order from scratch
-// based on the current ShuffleMode and current album. The currently playing
-// track is excluded so it doesn't repeat immediately.
+// regenerateShuffleOrder builds a new shuffled order. Current track is
+// excluded so it doesn't replay immediately (unless single-track pool).
 func (a *App) regenerateShuffleOrder() {
 	if a.lib == nil {
 		a.shuffle = shuffleState{}
@@ -755,10 +723,6 @@ func (a *App) regenerateShuffleOrder() {
 		return
 	}
 
-	// Exclude the current track so it doesn't replay immediately in
-	// the shuffled order (RepeatOff should truly mean no repeat). Skip the
-	// exclusion if it would empty the pool (e.g. a single-track pool) —
-	// otherwise RepeatAll + Shuffle would silently stop instead of looping.
 	cur := ""
 	if a.pl != nil {
 		cur = a.pl.TrackPath()
@@ -778,7 +742,6 @@ func (a *App) regenerateShuffleOrder() {
 	a.shuffle.idx = 0
 }
 
-// startPresetTicker starts the auto-preset-switch ticker if configured.
 func (a *App) startPresetTicker() {
 	interval := a.settings.PresetInterval
 	if interval == config.PresetOff {
@@ -787,7 +750,6 @@ func (a *App) startPresetTicker() {
 	a.presetTicker = time.NewTicker(time.Duration(interval) * time.Second)
 }
 
-// resetPresetTicker recreates the ticker with the current interval.
 func (a *App) resetPresetTicker() {
 	if a.presetTicker != nil {
 		a.presetTicker.Stop()

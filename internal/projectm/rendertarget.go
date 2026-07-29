@@ -106,31 +106,16 @@ static void rtBlit(GLuint program, GLuint tex, GLsizei dstW, GLsizei dstH) {
 */
 import "C"
 
-// RenderTarget upscales projectM's reduced-resolution output to fill the
-// real screen.
+// RenderTarget upscales projectM's reduced-resolution output to fill the screen.
 //
-// libprojectM's C API always draws its final composite directly into
-// framebuffer 0 (the real window framebuffer), at a viewport sized to
-// whatever was passed to SetWindowSize — there is no hook to redirect
-// rendering into an arbitrary FBO. So instead of rendering off-screen, we
-// let projectM render into the bottom-left corner of the screen at reduced
-// size, capture that corner into a texture with glCopyTexImage2D right
-// after RenderFrame, and then blit/upscale that texture over the whole
-// window.
-//
-// Rendering at a lower resolution cuts per-pixel shader cost (blur, video
-// echo, composite/warp color equations) roughly quadratically with the
-// linear scale factor. This is the dominant cost for heavy presets — the
-// per-pixel mesh (SetMeshSize) only controls the coarse warp vertex grid,
-// not the full-screen fragment passes, so lowering it below the library's
-// floor of 8x8 has no further effect.
+// libprojectM always draws into framebuffer 0 at SetWindowSize dimensions.
+// We capture that corner with glCopyTexImage2D and blit/upscale to the full window.
 type RenderTarget struct {
 	tex, program C.GLuint
 	w, h         int
 }
 
 // NewRenderTarget creates the capture texture and blit shader.
-// Must be called with a current OpenGL context.
 func NewRenderTarget(width, height int) *RenderTarget {
 	rt := &RenderTarget{program: C.rtCreateBlitProgram()}
 	C.rtCreateTexture(&rt.tex)
@@ -139,7 +124,6 @@ func NewRenderTarget(width, height int) *RenderTarget {
 }
 
 // SetNearest selects nearest-neighbour filtering for the upscale pass.
-// Linear filtering remains the default when nearest is false.
 func (rt *RenderTarget) SetNearest(nearest bool) {
 	value := C.GLboolean(0)
 	if nearest {
@@ -148,9 +132,7 @@ func (rt *RenderTarget) SetNearest(nearest bool) {
 	C.rtSetNearest(rt.tex, value)
 }
 
-// Resize updates the dimensions used for the next Capture call.
-// glCopyTexImage2D reallocates texture storage as needed, so no GL work is
-// required here.
+// Resize updates the dimensions for the next Capture call.
 func (rt *RenderTarget) Resize(width, height int) {
 	rt.w, rt.h = width, height
 }
@@ -160,15 +142,13 @@ func (rt *RenderTarget) Size() (int, int) {
 	return rt.w, rt.h
 }
 
-// Capture copies projectM's just-rendered output (bottom-left corner of the
-// currently bound framebuffer, sized rt.w x rt.h) into the internal texture.
+// Capture copies projectM's just-rendered output into the internal texture.
 // Call right after pm.RenderFrame().
 func (rt *RenderTarget) Capture() {
 	C.rtCapture(rt.tex, C.GLsizei(rt.w), C.GLsizei(rt.h))
 }
 
-// BlitToScreen draws the captured texture scaled up to fill a
-// dstW x dstH viewport on framebuffer 0.
+// BlitToScreen draws the captured texture scaled up to fill the viewport.
 func (rt *RenderTarget) BlitToScreen(dstW, dstH int) {
 	C.rtBlit(rt.program, rt.tex, C.GLsizei(dstW), C.GLsizei(dstH))
 }

@@ -21,8 +21,7 @@ import (
 	"unsafe"
 )
 
-// SupportedExts lists extensions handled by libopenmpt that libxmp does NOT support.
-// Used as fallback — these are tried only if libxmp fails to load the file.
+// SupportedExts lists extensions handled by libopenmpt (fallback only).
 var SupportedExts = map[string]bool{
 	".dmf": true, // DefleMask (Digital Tracker DMF is handled by libxmp)
 	".mo3": true, // OggMO3 compressed modules
@@ -33,12 +32,12 @@ var SupportedExts = map[string]bool{
 	".txn": true, // MadTracker 2
 }
 
-// HasExt reports whether the extension is handled by libopenmpt (as fallback).
+// HasExt reports whether the extension is handled by libopenmpt.
 func HasExt(ext string) bool {
 	return SupportedExts[ext]
 }
 
-// TryLoad attempts to create an openmpt module from data. Returns error if unsupported.
+// TryLoad attempts to create an openmpt module from data.
 func TryLoad(data []byte) error {
 	if len(data) == 0 {
 		return fmt.Errorf("openmpt: empty data")

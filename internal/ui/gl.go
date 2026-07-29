@@ -172,9 +172,7 @@ import (
 )
 
 // This file is the single point of contact with cgo/GLES. Every other file
-// in the package calls these Go-typed wrappers instead of touching the "C"
-// pseudo-package directly, so GL/cgo concerns stay isolated from UI state
-// and layout logic (single responsibility).
+// calls these Go wrappers instead of touching "C" directly.
 
 func glCreateTextProgram() uint32 { return uint32(C.createTextProgram()) }
 func glCreateRectProgram() uint32 { return uint32(C.createRectProgram()) }
@@ -217,7 +215,7 @@ func glDeleteTex(tex uint32) {
 	}
 }
 
-// glUploadTexture uploads an RGBA image as a GL texture and returns its handle.
+// glUploadTexture uploads an RGBA image as a GL texture.
 func glUploadTexture(rgba *image.RGBA) uint32 {
 	if len(rgba.Pix) == 0 {
 		return 0

@@ -1,13 +1,12 @@
 package ui
 
-// This file owns rendering for the Settings page: two columns (setting
-// names / values of the focused setting) built from settingsRows. Shared
-// panel/list drawing primitives live in overlay_render.go.
+// This file owns rendering for the Settings page: two columns.
+// Shared primitives in overlay_render.go.
 
 // renderSettingsPanels draws the settings labels (left) and values (right).
 func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	if !o.settingsDirty {
-		// Still draw textures from cache.
+		// Still draw from cache.
 		o.drawSettingsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 		return
 	}
@@ -18,7 +17,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 		maxRows = 1
 	}
 
-	// Rebuild left column texture (setting names) with scroll window.
+	// Rebuild left column (setting names) with scroll window.
 	leftTotal := len(o.settingsRows)
 	o.albumsScroll = scrollOffset(o.albumsScroll, o.settingsCursor, leftTotal, maxRows)
 	maxTextPx := availableRowTextWidth(panelW)
@@ -41,7 +40,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 		o.rebuildMarqueeLine(&o.marqueeL, row.Label, maxTextPx)
 	}
 
-	// Rebuild right column texture (values for the focused setting) with scroll window.
+	// Rebuild right column (values) with scroll window.
 	var rightRows []listRow
 	rightTotal := 0
 	rightEnd := 0

@@ -1,5 +1,5 @@
 // Package xmp provides tracker music metadata via libxmp.
-// Audio playback uses SoLoud's built-in Xmp streaming instead.
+// Audio playback uses SoLoud's built-in Xmp streaming.
 package xmp
 
 /*
@@ -34,7 +34,7 @@ var SupportedExts = map[string]bool{
 	".uni": true, ".xd": true,
 }
 
-// GetTrackerMeta reads a tracker file and returns BPM, channel count, and duration.
+// GetTrackerMeta reads a tracker file and returns BPM, channels, and duration.
 func GetTrackerMeta(path string) (bpm float64, channels int, duration float64, err error) {
 	fileBuf, err := os.ReadFile(path)
 	if err != nil {
@@ -43,8 +43,7 @@ func GetTrackerMeta(path string) (bpm float64, channels int, duration float64, e
 	return GetTrackerMetaFromBytes(fileBuf)
 }
 
-// GetTrackerMetaFromBytes returns BPM, channel count, and duration from in-memory
-// tracker file data. Caller owns the buffer.
+// GetTrackerMetaFromBytes returns BPM, channels, and duration from in-memory data.
 func GetTrackerMetaFromBytes(data []byte) (bpm float64, channels int, duration float64, err error) {
 	if len(data) == 0 {
 		return 0, 0, 0, fmt.Errorf("xmp: empty data")
@@ -65,7 +64,7 @@ func GetTrackerMetaFromBytes(data []byte) (bpm float64, channels int, duration f
 	var mi C.struct_xmp_module_info
 	C.xmp_get_module_info(ctx, &mi)
 
-	// Get frame info for duration
+	// Get frame info for duration.
 	if C.xmp_start_player(ctx, 44100, 0) == 0 {
 		var fi C.struct_xmp_frame_info
 		C.xmp_get_frame_info(ctx, &fi)
@@ -74,7 +73,7 @@ func GetTrackerMetaFromBytes(data []byte) (bpm float64, channels int, duration f
 	}
 
 	channels = int(mi.mod.chn)
-	// BPM from module info (if available)
+	// BPM from module info.
 	if mi.mod.bpm > 0 {
 		bpm = float64(mi.mod.bpm)
 	}
@@ -82,7 +81,7 @@ func GetTrackerMetaFromBytes(data []byte) (bpm float64, channels int, duration f
 	return bpm, channels, duration, nil
 }
 
-// TryLoad attempts to load tracker data with libxmp. Returns error if unsupported.
+// TryLoad attempts to load tracker data with libxmp.
 func TryLoad(data []byte) error {
 	if len(data) == 0 {
 		return fmt.Errorf("xmp: empty data")

@@ -8,11 +8,9 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-// This file owns cursor/panel input handling and page switching: cursor
-// movement (with held-key scroll acceleration), focus-panel switching,
-// Select/Back semantics per page, and Library/Settings/Presets page
-// transitions. Navigation-tree construction lives in overlay_nav.go;
-// rendering lives in overlay_render.go; struct fields live in overlay.go.
+// This file owns cursor/panel input handling and page switching.
+// Navigation-tree construction lives in overlay_nav.go; rendering in
+// overlay_render.go; struct fields in overlay.go.
 
 // scrollHold tracks key-hold timing for scroll acceleration.
 type scrollHold struct {
@@ -24,9 +22,7 @@ type scrollHold struct {
 }
 
 // Update advances animations and handles scroll acceleration. Call every frame.
-// gamepadUp/gamepadDown report whether the controller D-Pad up/down button is
-// currently held (SDL controller button events don't auto-repeat, unlike
-// keyboard events, so this must be polled explicitly).
+// gamepadUp/gamepadDown report D-Pad state (SDL button events don't auto-repeat).
 func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	o.notif.Update(o.uiVisible)
 
@@ -42,16 +38,15 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	o.updateMarquee(now)
 }
 
-// updateScrollHold drives held-key scroll acceleration for a single direction:
-// after held is true for 0.2s, step repeatedly at a rate that doubles every
-// second (starting at 5 steps/sec), invoking step for each advance.
+// updateScrollHold drives held-key scroll acceleration: after held for 0.2s,
+// steps at a rate that doubles every second (starting at 5 steps/sec).
 func (o *Overlay) updateScrollHold(h *scrollHold, held bool, now time.Time, step func()) {
 	if !held {
 		h.active = false
 		return
 	}
 	if !h.active || h.uiPage != o.uiPage || h.focusPanel != o.focusPanel {
-		// New hold — start tracking (initial move already done by CursorUp/Down).
+		// New hold — start tracking.
 		*h = scrollHold{holdStart: now, lastStep: now, active: true, uiPage: o.uiPage, focusPanel: o.focusPanel}
 		return
 	}
@@ -75,7 +70,6 @@ func (o *Overlay) updateScrollHold(h *scrollHold, held bool, now time.Time, step
 	h.lastStep = now
 }
 
-// ToggleUI shows or hides the full UI.
 func (o *Overlay) ToggleUI() {
 	if o.uiVisible {
 		o.closeInjectPending = true
@@ -130,7 +124,6 @@ func (o *Overlay) PrevScreen() {
 
 // --- Cursor & panel navigation ---
 
-// CursorUp moves the cursor up by one item. Acceleration is driven by Update().
 func (o *Overlay) CursorUp() {
 	if !o.panelEntered {
 		return
@@ -138,7 +131,6 @@ func (o *Overlay) CursorUp() {
 	o.cursorUp1()
 }
 
-// cursorUp1 moves the cursor up by one item.
 func (o *Overlay) cursorUp1() {
 	o.invalidateActiveMarquee()
 	if o.uiPage == PageSettings {
@@ -188,7 +180,6 @@ func (o *Overlay) cursorUp1() {
 	}
 }
 
-// CursorDown moves the cursor down by one item. Acceleration is driven by Update().
 func (o *Overlay) CursorDown() {
 	if !o.panelEntered {
 		return
@@ -196,7 +187,6 @@ func (o *Overlay) CursorDown() {
 	o.cursorDown1()
 }
 
-// cursorDown1 moves the cursor down by one item.
 func (o *Overlay) cursorDown1() {
 	o.invalidateActiveMarquee()
 	if o.uiPage == PageSettings {
@@ -247,9 +237,7 @@ func (o *Overlay) cursorDown1() {
 	}
 }
 
-// focusPanelBy shifts focusPanel by delta (-1 or +1), clamped to the valid
-// [0,1] range, and marks dirty if it actually changed. Shared by every page
-// with a two-panel (left/right) layout.
+// focusPanelBy shifts focusPanel by delta, clamped to [0,1].
 func (o *Overlay) focusPanelBy(delta int, markDirty func()) {
 	next := o.focusPanel + delta
 	if next < 0 || next > 1 {
@@ -260,7 +248,6 @@ func (o *Overlay) focusPanelBy(delta int, markDirty func()) {
 	markDirty()
 }
 
-// FocusLeft switches focus to the previous panel.
 func (o *Overlay) FocusLeft() {
 	switch o.uiPage {
 	case PageSettings:
@@ -275,7 +262,6 @@ func (o *Overlay) FocusLeft() {
 	}
 }
 
-// FocusRight switches focus to the next panel.
 func (o *Overlay) FocusRight() {
 	switch o.uiPage {
 	case PageSettings:
@@ -293,9 +279,8 @@ func (o *Overlay) FocusRight() {
 	}
 }
 
-// backToLeftPanel moves focus from the right panel back to the left one.
-// Returns true if it handled the back action (focus was on the right panel),
-// false if focus was already on the left panel (caller should exit/close).
+// backToLeftPanel moves focus from right to left panel.
+// Returns true if it handled the action.
 func (o *Overlay) backToLeftPanel(markDirty func()) bool {
 	if o.focusPanel != 1 {
 		return false
@@ -306,7 +291,7 @@ func (o *Overlay) backToLeftPanel(markDirty func()) bool {
 }
 
 // Select enters the focused panel or confirms item selection.
-// Returns true when an item was selected (caller should play / apply).
+// Returns true when an item was selected.
 func (o *Overlay) Select() bool {
 	if o.uiPage == PageSettings {
 		if !o.panelEntered {
@@ -366,7 +351,6 @@ func (o *Overlay) Select() bool {
 	return true // track panel — play the track
 }
 
-// Back exits item mode or closes UI.
 func (o *Overlay) Back() {
 	if o.uiPage == PageSettings {
 		if o.settingsEditing {
@@ -425,8 +409,6 @@ func (o *Overlay) Back() {
 	}
 }
 
-// TrackCursor returns the current track cursor index.
 func (o *Overlay) TrackCursor() int { return o.trackCursor }
 
-// FocusPanel returns the focused panel (0=albums, 1=tracks).
 func (o *Overlay) FocusPanel() int { return o.focusPanel }

@@ -4,8 +4,7 @@ import "sort"
 
 type scale struct{ num, den int }
 
-// scaleCandidates is the fixed set of render scale fractions, tried in
-// descending order so the first valid result is the highest resolution.
+// scaleCandidates are render scale fractions, tried descending (highest res first).
 var scaleCandidates = []scale{
 	{1, 1},   // 1.0
 	{3, 4},   // 0.75
@@ -18,10 +17,8 @@ var scaleCandidates = []scale{
 	{1, 8},   // 0.125
 }
 
-// ComputeResolutions generates all valid RenderResolutions for a given base
-// window/framebuffer size. A candidate is included only when base×scale
-// is an exact integer for both dimensions. Duplicates are removed and
-// results are sorted descending by area (largest first).
+// ComputeResolutions generates valid RenderResolutions for a base window size.
+// A candidate is included only when base×scale is an exact integer.
 func ComputeResolutions(baseW, baseH int) []RenderResolution {
 	seen := make(map[RenderResolution]bool)
 	for _, s := range scaleCandidates {
@@ -48,8 +45,6 @@ func ComputeResolutions(baseW, baseH int) []RenderResolution {
 }
 
 // ClosestResolution returns the resolution nearest to target by area.
-// If target itself is in the list it is returned first. The list is
-// assumed to be sorted descending by area (as produced by ComputeResolutions).
 func ClosestResolution(list []RenderResolution, target RenderResolution) RenderResolution {
 	if len(list) == 0 {
 		return target

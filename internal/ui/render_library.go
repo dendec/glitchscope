@@ -2,18 +2,12 @@ package ui
 
 import "github.com/dendec/mdpp/internal/player"
 
-// This file owns rendering for the Library page: the two-panel
-// albums/tracks layout and the textures backing it (including the
-// non-leaf preview panel used while browsing the modland format/album
-// drill-down). Shared panel/list drawing primitives live in
-// overlay_render.go; Settings/Presets rendering live in their own files.
+// This file owns rendering for the Library page: albums/tracks panels.
+// Shared primitives in overlay_render.go.
 
 // renderLibraryPanels draws the albums (left) and tracks (right) panels.
 func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
-	// Text clip width must match the width truncateEnd/rebuildMarqueeLine
-	// used to decide whether a row needs a marquee; otherwise a row can be
-	// flagged as "too wide" yet have maxOffset <= 0 in drawMarqueeCol and
-	// render blank instead of scrolling.
+	// Text clip width must match truncateEnd/rebuildMarqueeLine.
 	textW := availableRowTextWidth(panelW)
 	sbW := float32(o.scrollbarWidthPx())
 
@@ -165,11 +159,7 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
 }
 
-// rebuildPreviewTex renders the right-panel preview of a non-leaf left-panel
-// entry: the modland format list (when "Modland" is highlighted) or the
-// album list within a format (when a format is highlighted). Read-only —
-// there is no cursor/selection inside this panel; the user drills in by
-// pressing Select on the left-panel entry instead.
+// rebuildPreviewTex renders the right-panel preview for a non-leaf entry.
 func (o *Overlay) rebuildPreviewTex(maxW, maxH int) {
 	if len(o.previewEntries) == 0 {
 		return

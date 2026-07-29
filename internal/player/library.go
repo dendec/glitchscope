@@ -19,7 +19,6 @@ type Album struct {
 	Tracks []string // full paths to audio files
 }
 
-// TrackInfo holds metadata for a single track.
 type TrackInfo struct {
 	Path     string
 	Duration float64
@@ -35,11 +34,10 @@ type Library struct {
 	trackIdx int // -1 = no track loaded, 0+ = index within current album
 }
 
-// NewLibrary scans rootDir for albums (leaf dirs containing audio files).
+// NewLibrary scans rootDir for leaf dirs containing audio files.
 func NewLibrary(rootDir string) (*Library, error) {
 	lib := &Library{albumIdx: -1, trackIdx: -1}
 
-	// Map each parent dir to audio files inside it.
 	dirTracks := map[string][]string{}
 	err := filepath.Walk(rootDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
@@ -62,7 +60,6 @@ func NewLibrary(rootDir string) (*Library, error) {
 		return nil, err
 	}
 
-	// Sort dirs then tracks within each dir.
 	var dirs []string
 	for d := range dirTracks {
 		dirs = append(dirs, d)
@@ -87,7 +84,6 @@ func NewLibrary(rootDir string) (*Library, error) {
 	return lib, nil
 }
 
-// AlbumNext advances to the next album. Returns the new track path or "".
 func (l *Library) AlbumNext() string {
 	if len(l.Albums) == 0 {
 		return ""
@@ -103,7 +99,6 @@ func (l *Library) AlbumNext() string {
 	return ""
 }
 
-// AlbumPrev goes to the previous album. Returns the new track path or "".
 func (l *Library) AlbumPrev() string {
 	if len(l.Albums) == 0 {
 		return ""
@@ -119,7 +114,6 @@ func (l *Library) AlbumPrev() string {
 	return ""
 }
 
-// TrackNext advances to the next track in the current album. Returns path or "".
 func (l *Library) TrackNext() string {
 	if l.albumIdx < 0 || l.albumIdx >= len(l.Albums) {
 		return ""
@@ -135,7 +129,6 @@ func (l *Library) TrackNext() string {
 	return album.Tracks[l.trackIdx]
 }
 
-// TrackPrev goes to the previous track in current album. Returns path or "".
 func (l *Library) TrackPrev() string {
 	if l.albumIdx < 0 || l.albumIdx >= len(l.Albums) {
 		return ""
@@ -151,7 +144,6 @@ func (l *Library) TrackPrev() string {
 	return album.Tracks[l.trackIdx]
 }
 
-// CurrentTrack returns the full path of the current track, or "".
 func (l *Library) CurrentTrack() string {
 	if l.albumIdx < 0 || l.albumIdx >= len(l.Albums) {
 		return ""
@@ -163,7 +155,6 @@ func (l *Library) CurrentTrack() string {
 	return album.Tracks[l.trackIdx]
 }
 
-// CurrentAlbum returns a copy of the current album. Empty if none.
 func (l *Library) CurrentAlbum() Album {
 	if l.albumIdx >= 0 && l.albumIdx < len(l.Albums) {
 		return l.Albums[l.albumIdx]
@@ -171,18 +162,14 @@ func (l *Library) CurrentAlbum() Album {
 	return Album{}
 }
 
-// AlbumCount returns the number of albums.
 func (l *Library) AlbumCount() int {
 	return len(l.Albums)
 }
 
-// CurrentAlbumIndex returns the current album index.
 func (l *Library) CurrentAlbumIndex() int { return l.albumIdx }
 
-// CurrentTrackIndex returns the current track index.
 func (l *Library) CurrentTrackIndex() int { return l.trackIdx }
 
-// SelectAlbum sets the album index and returns the first track path.
 func (l *Library) SelectAlbum(idx int) string {
 	if idx < 0 || idx >= len(l.Albums) {
 		return ""
@@ -195,7 +182,6 @@ func (l *Library) SelectAlbum(idx int) string {
 	return ""
 }
 
-// SelectTrack sets the track index within the current album and returns its path.
 func (l *Library) SelectTrack(idx int) string {
 	if l.albumIdx < 0 || l.albumIdx >= len(l.Albums) {
 		return ""
@@ -207,14 +193,13 @@ func (l *Library) SelectTrack(idx int) string {
 	return l.Albums[l.albumIdx].Tracks[idx]
 }
 
-// PlayCurrent returns the current track path to be played.
-// Returns "" if nothing to play.
+// PlayCurrent returns the current track path, or "".
 func (l *Library) PlayCurrent() string {
 	return l.CurrentTrack()
 }
 
-// GetAlbumTracks returns TrackInfo for each track in the given album index.
-// Reads metadata cache first; computes missing entries on demand.
+// GetAlbumTracks returns TrackInfo for each track. Reads cache first;
+// computes missing entries on demand.
 func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 	if idx < 0 || idx >= len(l.Albums) {
 		return nil
@@ -238,13 +223,11 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 			m := TrackMeta{}
 			ext := strings.ToLower(filepath.Ext(tp))
 			if isTrackerExt(ext) {
-				// Try libxmp first for metadata
 				if bpm, ch, dur, err := xmp.GetTrackerMeta(tp); err == nil {
 					m.Duration = dur
 					m.BPM = bpm
 					m.Channels = ch
 				} else if openmpt.HasExt(ext) {
-					// Fallback to libopenmpt for metadata
 					if fileBuf, err := os.ReadFile(tp); err == nil {
 						if bpm, ch, dur, err := openmpt.GetTrackerMeta(fileBuf); err == nil {
 							m.Duration = dur
@@ -275,26 +258,21 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 
 // TrackTitle returns a display-friendly name for a track path.
 func TrackTitle(path string) string {
-	// Strip modland: prefix if present.
 	p := strings.TrimPrefix(path, "modland:")
 	return strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
 }
 
 const ModlandPrefix = "modland:"
 
-// IsModland reports whether a track path refers to a modland file.
 func IsModland(path string) bool {
 	return strings.HasPrefix(path, ModlandPrefix)
 }
 
-// RemotePath strips the modland: prefix and returns the remote path.
 func RemotePath(path string) string {
 	return strings.TrimPrefix(path, ModlandPrefix)
 }
 
 // AddVirtualAlbums appends pre-built albums (e.g. from modland) to the library.
-// Albums are inserted after local albums. Tracks in virtual albums should use
-// the ModlandPrefix convention for remote paths.
 func (l *Library) AddVirtualAlbums(albums []Album) {
 	l.Albums = append(l.Albums, albums...)
 	if l.albumIdx < 0 && len(l.Albums) > 0 {

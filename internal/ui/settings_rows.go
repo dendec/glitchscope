@@ -2,8 +2,7 @@ package ui
 
 import "github.com/dendec/mdpp/internal/config"
 
-// BuildSettingsRows creates SettingRow entries from the current
-// config and window dimensions. Call on page open and on window resize.
+// BuildSettingsRows creates SettingRow entries from the current config.
 func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 	resolutions := config.ComputeResolutions(winW, winH)
 	resValues := make([]string, len(resolutions))

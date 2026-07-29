@@ -35,10 +35,8 @@ func (f UpscaleFilter) String() string {
 	}
 }
 
-// IsNearest returns true when the filter requires GL_NEAREST.
 func (f UpscaleFilter) IsNearest() bool { return f == FilterPixel }
 
-// MarshalJSON outputs the lower-case label used in settings.json.
 func (f UpscaleFilter) MarshalJSON() ([]byte, error) {
 	var s string
 	switch f {
@@ -52,7 +50,6 @@ func (f UpscaleFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-// UnmarshalJSON reads the lower-case label from settings.json.
 func (f *UpscaleFilter) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
@@ -69,18 +66,16 @@ func (f *UpscaleFilter) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// AllFilters returns every valid UpscaleFilter in display order.
 func AllFilters() []UpscaleFilter { return []UpscaleFilter{FilterSmooth, FilterPixel} }
 
-// GraphicsSettings is the persisted set of user-tunable graphics parameters.
+// GraphicsSettings is the persisted user-tunable graphics parameters.
 type GraphicsSettings struct {
 	RenderWidth   int           `json:"render_width"`
 	RenderHeight  int           `json:"render_height"`
 	UpscaleFilter UpscaleFilter `json:"upscale_filter"`
 }
 
-// DefaultGraphics returns sensible defaults, matching the current
-// projectM preset domain and the smallest commonly valid resolution.
+// DefaultGraphics returns sensible defaults.
 func DefaultGraphics() GraphicsSettings {
 	return GraphicsSettings{
 		RenderWidth:   320,
@@ -89,7 +84,6 @@ func DefaultGraphics() GraphicsSettings {
 	}
 }
 
-// Validate returns an error if any field is out of range.
 func (g *GraphicsSettings) Validate() error {
 	if g.RenderWidth < 1 || g.RenderHeight < 1 {
 		return fmt.Errorf("render dimensions must be positive, got %dx%d", g.RenderWidth, g.RenderHeight)
@@ -122,7 +116,6 @@ func (m RepeatMode) String() string {
 	}
 }
 
-// AllRepeatModes returns every valid RepeatMode in display order.
 func AllRepeatModes() []RepeatMode { return []RepeatMode{RepeatOff, RepeatOne, RepeatAll} }
 
 // ShuffleMode controls the scope of random track selection.
@@ -150,7 +143,6 @@ func (m ShuffleMode) String() string {
 	}
 }
 
-// AllShuffleModes returns every valid ShuffleMode in display order.
 func AllShuffleModes() []ShuffleMode {
 	return []ShuffleMode{ShuffleOff, ShuffleAlbum, ShuffleLocal, ShuffleAll}
 }
@@ -161,13 +153,11 @@ type PlaybackSettings struct {
 	Repeat      RepeatMode  `json:"repeat"`
 }
 
-// DefaultPlayback returns sensible playback defaults.
 func DefaultPlayback() PlaybackSettings {
 	return PlaybackSettings{ShuffleMode: ShuffleOff, Repeat: RepeatOff}
 }
 
-// PresetInterval returns the auto-switch interval in seconds.
-// 0 means off.
+// PresetInterval returns the auto-switch interval in seconds (0 = off).
 type PresetInterval int
 
 const (
@@ -195,7 +185,6 @@ func (p PresetInterval) String() string {
 	}
 }
 
-// AllPresetIntervals returns every valid PresetInterval in display order.
 func AllPresetIntervals() []PresetInterval {
 	return []PresetInterval{PresetOff, Preset15s, Preset30s, Preset60s, Preset2m}
 }
@@ -219,10 +208,8 @@ func (t Theme) String() string {
 	}
 }
 
-// AllThemes returns every valid Theme in display order.
 func AllThemes() []Theme { return []Theme{ThemeDark, ThemeLight} }
 
-// MarshalJSON outputs the lower-case label used in settings.json.
 func (t Theme) MarshalJSON() ([]byte, error) {
 	var s string
 	switch t {
@@ -236,7 +223,6 @@ func (t Theme) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-// UnmarshalJSON reads the lower-case label from settings.json.
 func (t *Theme) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
@@ -263,7 +249,6 @@ func AllTransparencies() []Transparency {
 	return []Transparency{0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100}
 }
 
-// Validate returns an error if the value is out of range.
 func (t Transparency) Validate() error {
 	if t < 0 || t > 100 {
 		return fmt.Errorf("transparency must be 0..100, got %d", int(t))
@@ -271,13 +256,12 @@ func (t Transparency) Validate() error {
 	return nil
 }
 
-// UISettings holds theme and transparency configuration.
+// UISettings holds theme and transparency.
 type UISettings struct {
 	Theme        Theme        `json:"theme"`
 	Transparency Transparency `json:"transparency"`
 }
 
-// DefaultUI returns sensible UI defaults.
 func DefaultUI() UISettings {
 	return UISettings{Theme: ThemeDark, Transparency: 0}
 }
@@ -290,7 +274,6 @@ type Settings struct {
 	UI             UISettings       `json:"ui"`
 }
 
-// DefaultSettings returns the full default settings.
 func DefaultSettings() Settings {
 	return Settings{
 		Graphics:       DefaultGraphics(),

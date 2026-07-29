@@ -31,9 +31,6 @@ func (pr *progressReader) Read(p []byte) (int, error) {
 
 // DownloadFile downloads a single module file from modland to the local cache.
 // Returns the local file path. Skips download if already cached and size matches.
-// If expectedSize > 0 and cached file has different size, re-downloads.
-// onProgress, if non-nil, is called periodically with (bytesRead, totalBytes);
-// totalBytes is 0 if the server didn't report Content-Length.
 func DownloadFile(baseDir, remotePath string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
 	filesDir, err := FilesDir(baseDir)
 	if err != nil {
@@ -59,8 +56,7 @@ func DownloadFile(baseDir, remotePath string, expectedSize int64, onProgress fun
 
 	client := &http.Client{Timeout: downloadTimeout}
 
-	// Try primary mirror (original case), then lowercase filename,
-	// then official mirror, then its lowercase variant.
+	// Try primary mirror (original case), then lowercase, then official mirror.
 	urls := []struct {
 		label string
 		url   string

@@ -1,4 +1,4 @@
-// Package input handles SDL gamepad and keyboard events, mapping them to actions.
+// Package input handles SDL gamepad and keyboard events.
 package input
 
 import (
@@ -7,7 +7,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-// Action represents a high-level operation triggered by input.
+// Action represents a high-level input operation.
 type Action int
 
 const (
@@ -44,7 +44,7 @@ type Input struct {
 	lAxisX int16
 }
 
-// New creates an Input handler and attempts to open the first game controller.
+// New creates an Input handler and opens the first game controller.
 func New() *Input {
 	in := &Input{joyIdx: -1}
 	in.tryOpenController()
@@ -71,9 +71,8 @@ func (in *Input) ProcessEvent(event sdl.Event) Action {
 			return ActionNone
 		}
 		if e.Repeat != 0 {
-			// Ignore OS key-repeat events: held-key acceleration (fast
-			// scrolling) is driven by polling GetKeyboardState in
-			// Overlay.Update, not by repeated KEYDOWN events.
+			// Ignore OS key-repeat: held-key acceleration is driven by
+			// polling GetKeyboardState in Overlay.Update.
 			return ActionNone
 		}
 		return keyToAction(e.Keysym.Sym)
@@ -104,9 +103,7 @@ func (in *Input) ProcessEvent(event sdl.Event) Action {
 	return ActionNone
 }
 
-// DPadUpHeld reports whether the controller's D-Pad up button is currently
-// held down. Used to drive scroll acceleration (SDL controller button events
-// don't auto-repeat like keyboard events do).
+// DPadUpHeld reports whether the D-Pad up button is held.
 func (in *Input) DPadUpHeld() bool {
 	if in.controller == nil {
 		return false
@@ -114,8 +111,7 @@ func (in *Input) DPadUpHeld() bool {
 	return in.controller.Button(sdl.CONTROLLER_BUTTON_DPAD_UP) != 0
 }
 
-// DPadDownHeld reports whether the controller's D-Pad down button is
-// currently held down.
+// DPadDownHeld reports whether the D-Pad down button is held.
 func (in *Input) DPadDownHeld() bool {
 	if in.controller == nil {
 		return false
@@ -123,7 +119,7 @@ func (in *Input) DPadDownHeld() bool {
 	return in.controller.Button(sdl.CONTROLLER_BUTTON_DPAD_DOWN) != 0
 }
 
-// tryOpenController attempts to open the first available game controller.
+// tryOpenController opens the first available game controller.
 func (in *Input) tryOpenController() {
 	if sdl.NumJoysticks() > 0 {
 		c := sdl.GameControllerOpen(0)

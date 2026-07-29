@@ -14,7 +14,6 @@ import (
 	"github.com/dendec/mdpp/internal/xmp"
 )
 
-// pendingLoad is the result of a background file load.
 type pendingLoad struct {
 	path     string
 	wav      *soloud.Wav     // non-nil for WAV/MP3/FLAC etc.
@@ -26,7 +25,6 @@ type pendingLoad struct {
 	err      error
 }
 
-// Player manages audio playback.
 type Player struct {
 	s               *soloud.Soloud
 	voice           uint
@@ -63,13 +61,11 @@ func New() (*Player, error) {
 	return &Player{s: s, pendingCh: make(chan pendingLoad, 1)}, nil
 }
 
-// isTrackerExt reports whether the extension is handled by either tracker backend.
 func isTrackerExt(ext string) bool {
 	return xmp.SupportedExts[ext] || openmpt.SupportedExts[ext]
 }
 
 // PlayFile loads and plays an audio file. Only one file at a time.
-// Tracker formats (.mod/.xm/.it/.s3m/…) are streamed via libxmp or libopenmpt.
 func (p *Player) PlayFile(path string) error {
 	ext := strings.ToLower(filepath.Ext(path))
 	if isTrackerExt(ext) {
@@ -91,26 +87,22 @@ func (p *Player) PlayFile(path string) error {
 	return nil
 }
 
-// PlayFileAsync starts loading a file in a background goroutine.
+// PlayFileAsync starts loading in a background goroutine.
 // Call CheckPending() from the main loop to pick up the result.
-// Stops current playback immediately so the UI feels responsive.
 func (p *Player) PlayFileAsync(path string) {
-	// Drain any pending result from a previous load.
 	select {
 	case <-p.pendingCh:
 	default:
 	}
 
-	// Stop current playback immediately.
 	p.s.StopAll()
 	p.voice = 0
 	p.currentPath = path // show path in UI while loading
 	p.loading.Store(true)
 	p.loadPercent.Store(-1)
 
-	// Launch background load.
-	// loading is cleared by CheckPending when the matching result is consumed,
-	// NOT here — a newer goroutine may already be running when this one ends.
+	// loading is cleared by CheckPending, NOT here — a newer goroutine
+	// may already be running when this one ends.
 	go func() {
 		localPath := path
 		if p.Downloader != nil {
@@ -166,28 +158,22 @@ func (p *Player) PlayFileAsync(path string) {
 	}()
 }
 
-// Loading reports whether an async load is currently in flight.
 func (p *Player) Loading() bool {
 	return p.loading.Load()
 }
 
-// LoadProgress reports whether an async load is in flight and, if it is a
-// download, the download progress percent [0..100]. When the percent is
-// unknown (download hasn't reported yet, or decoding rather than downloading)
-// percent is -1.
+// LoadProgress returns whether an async load is in flight and download
+// progress percent [0..100], or -1 when unknown (decode phase or no download).
 func (p *Player) LoadProgress() (active bool, percent int64) {
 	return p.loading.Load(), p.loadPercent.Load()
 }
 
-// CheckPending picks up a completed background load and starts playback.
-// Returns (true, false) if a track was started, (false, false) if a load is
-// still in flight (or nothing pending), and (false, true) if the load failed.
-// Call every frame from main loop.
+// CheckPending picks up a completed background load.
+// Returns (started, failed). Call every frame.
 func (p *Player) CheckPending() (started bool, failed bool) {
 	select {
 	case res := <-p.pendingCh:
 		if res.path != p.currentPath {
-			// User selected a different track while loading; clean up loaded sources.
 			if res.wav != nil {
 				res.wav.Destroy()
 			}
@@ -199,7 +185,6 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			}
 			return false, false
 		}
-		// Result matches current path — loading is done regardless of outcome.
 		p.loading.Store(false)
 		if res.err != nil {
 			slog.Error("async load", "path", res.path, "error", res.err)
@@ -314,12 +299,10 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 }
 
 // GetWave returns the current SoLoud waveform data (256 float32 samples).
-// Returns nil if visualization is not enabled.
 func (p *Player) GetWave() []float32 {
 	return p.s.GetWave()
 }
 
-// Pause pauses playback. No-op if nothing playing.
 func (p *Player) Pause() {
 	if p.voice == 0 {
 		return
@@ -327,7 +310,6 @@ func (p *Player) Pause() {
 	p.s.SetPause(p.voice, true)
 }
 
-// Resume resumes playback. No-op if nothing playing.
 func (p *Player) Resume() {
 	if p.voice == 0 {
 		return
@@ -335,7 +317,6 @@ func (p *Player) Resume() {
 	p.s.SetPause(p.voice, false)
 }
 
-// TogglePause switches between paused and playing. No-op if nothing playing.
 func (p *Player) TogglePause() {
 	if p.voice == 0 {
 		return
@@ -349,12 +330,10 @@ func (p *Player) TogglePause() {
 	}
 }
 
-// Voice returns the current SoLoud voice handle. 0 = nothing playing.
 func (p *Player) Voice() uint {
 	return p.voice
 }
 
-// IsValidVoice returns true if the current voice is still playing.
 func (p *Player) IsValidVoice() bool {
 	if p.voice == 0 {
 		return false
@@ -362,17 +341,9 @@ func (p *Player) IsValidVoice() bool {
 	return p.s.IsValidVoiceHandle(p.voice)
 }
 
-// TrackFinished reports whether playback of the current track should be
-// considered over, for the purposes of auto-advance.
-//
-// For plain audio files this is just !IsValidVoice(). Tracker modules
-// (.mod/.xm/.it/.s3m/…) are a special case: many of them contain an
-// internal loop (a pattern-order jump back to an earlier position) as part
-// of the song itself, so the underlying decoder may never signal
-// end-of-stream — IsValidVoice() would stay true forever even though the
-// estimated track duration has long passed. For trackers we additionally
-// treat the track as finished once playback position reaches the
-// estimated duration.
+// TrackFinished reports whether playback should be considered over.
+// For trackers, also checks estimated duration since many contain internal
+// loops that never signal end-of-stream.
 func (p *Player) TrackFinished() bool {
 	if !p.IsValidVoice() {
 		return true
@@ -383,7 +354,6 @@ func (p *Player) TrackFinished() bool {
 	return false
 }
 
-// Stop stops all playback.
 func (p *Player) Stop() {
 	p.s.StopAll()
 	p.voice = 0
@@ -398,14 +368,12 @@ func (p *Player) Stop() {
 	p.currentPath = ""
 }
 
-// Close shuts down the player.
 func (p *Player) Close() {
 	p.Stop()
 	p.s.Destroy()
 	slog.Info("SoLoud shut down")
 }
 
-// Position returns the current playback position in seconds.
 func (p *Player) Position() float64 {
 	if p.voice == 0 {
 		return 0
@@ -413,7 +381,6 @@ func (p *Player) Position() float64 {
 	return p.s.GetStreamTime(p.voice)
 }
 
-// Duration returns the total duration of the current track in seconds.
 func (p *Player) Duration() float64 {
 	if p.currentWav != nil {
 		return p.currentWav.GetLength()
@@ -421,7 +388,6 @@ func (p *Player) Duration() float64 {
 	return p.currentDuration
 }
 
-// SampleRate returns the sample rate of the current voice.
 func (p *Player) SampleRate() float32 {
 	if p.voice == 0 {
 		return 0
@@ -429,22 +395,18 @@ func (p *Player) SampleRate() float32 {
 	return p.s.GetSamplerate(p.voice)
 }
 
-// Channels returns the source channel count or tracker channel count.
 func (p *Player) Channels() int {
 	return p.channels
 }
 
-// IsTracker reports whether the current source is a tracker module.
 func (p *Player) IsTracker() bool {
 	return p.isTracker
 }
 
-// BPM returns the current track's BPM (0 for non-tracker).
 func (p *Player) BPM() float64 {
 	return p.currentBPM
 }
 
-// IsPaused returns true if the current voice is paused.
 func (p *Player) IsPaused() bool {
 	if p.voice == 0 {
 		return false
@@ -452,12 +414,10 @@ func (p *Player) IsPaused() bool {
 	return p.s.GetPause(p.voice)
 }
 
-// TrackPath returns the path of the currently playing track.
 func (p *Player) TrackPath() string {
 	return p.currentPath
 }
 
-// Bitrate returns the approximate encoded bitrate in kilobits per second.
 func (p *Player) Bitrate() float64 {
 	return p.currentBitrate
 }

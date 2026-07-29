@@ -11,7 +11,6 @@ import (
 	"github.com/dendec/mdpp/internal/ui"
 )
 
-// handleAction dispatches an input action.
 func (a *App) handleAction(act input.Action, winW, winH int) {
 	// Common actions — same regardless of UI mode.
 	switch act {
@@ -95,8 +94,8 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 	}
 }
 
-// switchScreen moves the overlay to the next/previous page and, when landing
-// on the settings page, (re)builds its rows from the current config.
+// switchScreen moves the overlay to the next/previous page and rebuilds
+// settings rows when landing on the settings page.
 func (a *App) switchScreen(winW, winH int, forward bool) {
 	if forward {
 		a.overlay.NextScreen()
@@ -174,7 +173,7 @@ func (a *App) loadPresetByKey(key string) {
 	a.transitionPreset(key)
 }
 
-// randPreset picks a random non-transition preset and loads it via transition.
+// randPreset picks a random non-transition preset.
 func (a *App) randPreset() {
 	if len(a.presetNames) == 0 {
 		return
@@ -202,8 +201,8 @@ func (a *App) randPreset() {
 	a.transitionPreset(target)
 }
 
-// transitionPreset loads the selected preset immediately.
-// All preset changes route through here — DRY single path.
+// transitionPreset loads a preset immediately — single entry point for all
+// preset changes (DRY).
 func (a *App) transitionPreset(name string) {
 	d, err := presets.Read(name)
 	if err != nil {
@@ -213,7 +212,7 @@ func (a *App) transitionPreset(name string) {
 	a.applyPresetName(name)
 }
 
-// applyPresetName updates the preset index and overlay after a preset is loaded.
+// applyPresetName updates the preset index and overlay after a load.
 func (a *App) applyPresetName(name string) {
 	for i, n := range a.presetNames {
 		if n == name {
@@ -234,7 +233,6 @@ func (a *App) applySettings(winW, winH int) {
 		return
 	}
 
-	// Row 0: Render resolution.
 	resIndex := rows[0].Index
 	resolutions := config.ComputeResolutions(winW, winH)
 	if resIndex >= 0 && resIndex < len(resolutions) {
@@ -245,7 +243,6 @@ func (a *App) applySettings(winW, winH int) {
 		a.pm.SetWindowSize(r.Width, r.Height)
 	}
 
-	// Row 1: Upscale filter.
 	filterIndex := rows[1].Index
 	filters := config.AllFilters()
 	if filterIndex >= 0 && filterIndex < len(filters) {
@@ -253,33 +250,28 @@ func (a *App) applySettings(winW, winH int) {
 		a.rt.SetNearest(a.settings.Graphics.UpscaleFilter.IsNearest())
 	}
 
-	// Row 2: Shuffle.
 	shuffleModes := config.AllShuffleModes()
 	if rows[2].Index >= 0 && rows[2].Index < len(shuffleModes) {
 		a.settings.Playback.ShuffleMode = shuffleModes[rows[2].Index]
 	}
 	a.regenerateShuffleOrder()
 
-	// Row 3: Repeat.
 	repeatModes := config.AllRepeatModes()
 	if rows[3].Index >= 0 && rows[3].Index < len(repeatModes) {
 		a.settings.Playback.Repeat = repeatModes[rows[3].Index]
 	}
 
-	// Row 4: Preset auto-switch.
 	presetIntervals := config.AllPresetIntervals()
 	if rows[4].Index >= 0 && rows[4].Index < len(presetIntervals) {
 		a.settings.PresetInterval = presetIntervals[rows[4].Index]
 		a.resetPresetTicker()
 	}
 
-	// Row 5: Theme.
 	themes := config.AllThemes()
 	if rows[5].Index >= 0 && rows[5].Index < len(themes) {
 		a.settings.UI.Theme = themes[rows[5].Index]
 	}
 
-	// Row 6: Transparency.
 	transparencies := config.AllTransparencies()
 	if rows[6].Index >= 0 && rows[6].Index < len(transparencies) {
 		a.settings.UI.Transparency = transparencies[rows[6].Index]
@@ -299,7 +291,6 @@ func (a *App) applySettings(winW, winH int) {
 
 // playTrack starts playback of a track and shows the notification.
 func (a *App) playTrack(path, album string) {
-	// Show track name immediately, then start async load.
 	if a.overlay != nil {
 		label := album
 		if album != "" {

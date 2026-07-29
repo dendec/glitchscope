@@ -19,8 +19,7 @@ type Handle struct {
 	p C.projectm_handle
 }
 
-// Create creates a new projectM instance with default settings.
-// OpenGL context must be current before calling this.
+// Create creates a new projectM instance. OpenGL context must be current.
 func Create() (*Handle, error) {
 	h := C.projectm_create()
 	if h == nil {
@@ -37,14 +36,14 @@ func (h *Handle) Destroy() {
 	}
 }
 
-// LoadPresetData loads a preset from an in-memory .milk string content.
+// LoadPresetData loads a preset from an in-memory .milk string.
 func (h *Handle) LoadPresetData(data string, smooth bool) {
 	cdata := C.CString(data)
 	defer C.free(unsafe.Pointer(cdata))
 	C.projectm_load_preset_data(h.p, cdata, C.bool(smooth))
 }
 
-// PCMAddFloat feeds PCM audio samples to projectM (float32, mono or stereo).
+// PCMAddFloat feeds PCM audio samples (float32, mono or stereo).
 func (h *Handle) PCMAddFloat(samples []float32, channels int) {
 	if len(samples) == 0 {
 		return
@@ -57,13 +56,12 @@ func (h *Handle) SetWindowSize(width, height int) {
 	C.projectm_set_window_size(h.p, C.size_t(width), C.size_t(height))
 }
 
-// RenderFrame renders a single visualizer frame.
-// OpenGL context must be current.
+// RenderFrame renders a single visualizer frame. OpenGL context must be current.
 func (h *Handle) RenderFrame() {
 	C.projectm_opengl_render_frame(h.p)
 }
 
-// SetMeshSize sets per-pixel equation mesh resolution. Clamped [8,400], snapped even.
+// SetMeshSize sets per-pixel equation mesh resolution. Clamped [8,400].
 func (h *Handle) SetMeshSize(width, height int) {
 	C.projectm_set_mesh_size(h.p, C.size_t(width), C.size_t(height))
 }
@@ -80,7 +78,7 @@ func (h *Handle) SetFPS(fps int32) {
 	C.projectm_set_fps(h.p, C.int32_t(fps))
 }
 
-// SetTextureSearchPaths tells projectM where to look for user textures (jpg/png).
+// SetTextureSearchPaths tells projectM where to look for user textures.
 func (h *Handle) SetTextureSearchPaths(paths []string) {
 	if len(paths) == 0 {
 		return
@@ -98,12 +96,11 @@ func (h *Handle) SetTextureSearchPaths(paths []string) {
 }
 
 // BindFeedbackFramebuffer binds the internal image consumed by the next frame.
-// OpenGL drawing performed after this call becomes part of projectM's feedback.
 func (h *Handle) BindFeedbackFramebuffer() {
 	C.projectm_opengl_bind_feedback_framebuffer(h.p)
 }
 
-// SetSoftCutDuration sets the transition duration in seconds for smooth preset cuts.
+// SetSoftCutDuration sets the transition duration for smooth preset cuts.
 func (h *Handle) SetSoftCutDuration(seconds float64) {
 	C.projectm_set_soft_cut_duration(h.p, C.double(seconds))
 }

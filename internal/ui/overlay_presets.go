@@ -2,9 +2,8 @@ package ui
 
 import "time"
 
-// This file owns the presets-page model (categories/cursors, equality check
-// for change detection) and the marquee scroll animation shared by the
-// left/right list columns across pages. Struct fields live in overlay.go.
+// This file owns the presets-page model and marquee scroll animation.
+// Struct fields in overlay.go.
 
 // marqueeState tracks the scrolling animation for a single line that doesn't
 // fit its panel. One instance per column (left/right); the active page reuses them.
@@ -57,7 +56,7 @@ func (o *Overlay) updateMarqueeCol(m *marqueeState, now time.Time) {
 	m.offset = float32(scrollTime.Seconds()) * marqueeSpeed
 }
 
-// invalidateActiveMarquee resets the marquee for the currently focused column.
+// invalidateActiveMarquee resets the marquee for the focused column.
 func (o *Overlay) invalidateActiveMarquee() {
 	if o.focusPanel == 0 {
 		o.marqueeL.reset()
@@ -66,9 +65,7 @@ func (o *Overlay) invalidateActiveMarquee() {
 	}
 }
 
-// SetPresetCategories updates the presets model for the presets page.
-// Only marks textures dirty if the content actually changed, since this may
-// be called repeatedly (e.g. once at startup) with the same static data.
+// SetPresetCategories updates the presets model. Only marks dirty if changed.
 func (o *Overlay) SetPresetCategories(cats []PresetCat) {
 	if presetCatsEqual(o.presetCategories, cats) {
 		return
@@ -94,14 +91,11 @@ func presetCatsEqual(a, b []PresetCat) bool {
 	return true
 }
 
-// PresetCategoryCursor returns the current category cursor index.
 func (o *Overlay) PresetCategoryCursor() int { return o.presetCategoryCursor }
 
-// PresetCursor returns the current preset cursor index.
 func (o *Overlay) PresetCursor() int { return o.presetCursor }
 
-// SelectedPresetKey returns the full key of the preset the user selected on the presets page.
-// Returns empty string if nothing valid is selected.
+// SelectedPresetKey returns the full key of the selected preset.
 func (o *Overlay) SelectedPresetKey() string {
 	if o.presetCategoryCursor >= len(o.presetCategories) {
 		return ""
@@ -113,10 +107,7 @@ func (o *Overlay) SelectedPresetKey() string {
 	return cat.Presets[o.presetCursor]
 }
 
-// syncPresetCursors positions category/preset cursors on the currently
-// playing preset and focuses the presets (right) panel, so the Presets page
-// opens with the cursor on the active preset — mirroring FocusPlayingTrack
-// on the Library page.
+// syncPresetCursors positions cursors on the currently playing preset.
 func (o *Overlay) syncPresetCursors() {
 	key := o.presetName
 	if key == "" {
@@ -135,7 +126,6 @@ func (o *Overlay) syncPresetCursors() {
 	}
 }
 
-// currentCategory returns the currently focused preset category, or nil.
 func (o *Overlay) currentCategory() *PresetCat {
 	if o.presetCategoryCursor >= len(o.presetCategories) {
 		return nil

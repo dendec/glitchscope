@@ -11,12 +11,12 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// Notifier manages the notification fade-in/out overlay.
 type Notifier struct {
 	tex      uint32
 	texW     int
 	texH     int
 	text     string
+	fontSize float64
 	alpha    float64
 	started  time.Time
 	visible  bool
@@ -24,26 +24,47 @@ type Notifier struct {
 	hidden   bool
 }
 
-// Visible reports whether the notification is currently shown.
 func (n *Notifier) Visible() bool { return n.visible }
 
-// Hidden reports whether the notification is suppressed.
 func (n *Notifier) Hidden() bool { return n.hidden }
 
-// Injected reports whether the notification was stamped into the feedback FBO.
 func (n *Notifier) Injected() bool { return n.injected }
 
-// Tex returns the notification texture ID (0 if none).
 func (n *Notifier) Tex() uint32 { return n.tex }
 
-// Alpha returns the current notification opacity [0..1].
 func (n *Notifier) Alpha() float64 { return n.alpha }
 
 // ShowTrack begins the fade-in animation for the given track path.
-func (n *Notifier) ShowTrack(path string, fontSize float64) {
+func (n *Notifier) ShowTrack(path string, fontSize float64, textColor color.RGBA) {
 	if n.hidden {
 		return
 	}
+	if path == "" {
+		return
+	}
+	if !n.rebuildTexture(path, fontSize, textColor) {
+		return
+	}
+
+	n.text = path
+	n.fontSize = fontSize
+	n.started = time.Now()
+	n.visible = true
+	n.injected = false
+	n.alpha = 0
+}
+
+// Retheme rebuilds the cached texture with a new text color.
+func (n *Notifier) Retheme(textColor color.RGBA) {
+	if n.text == "" {
+		return
+	}
+	n.rebuildTexture(n.text, n.fontSize, textColor)
+}
+
+// rebuildTexture rasterizes path into a shadowed texture and uploads it.
+// Returns false if rendering fails. Does not touch animation state.
+func (n *Notifier) rebuildTexture(path string, fontSize float64, textColor color.RGBA) bool {
 	notifSize := fontSize * 3.5
 	if notifSize < 20 {
 		notifSize = 20
@@ -51,7 +72,7 @@ func (n *Notifier) ShowTrack(path string, fontSize float64) {
 	f, err := opentype.Parse(unifontData)
 	if err != nil {
 		slog.Error("font parse", "error", err)
-		return
+		return false
 	}
 	face, err := opentype.NewFace(f, &opentype.FaceOptions{
 		Size:    notifSize,
@@ -60,45 +81,38 @@ func (n *Notifier) ShowTrack(path string, fontSize float64) {
 	})
 	if err != nil {
 		slog.Error("font face", "error", err)
-		return
+		return false
 	}
 	defer func() { _ = face.Close() }()
 
-	if path == "" {
-		return
-	}
-
 	bounds, _ := font.BoundString(face, path)
-	const padding = 4
-	n.texW = (bounds.Max.X - bounds.Min.X).Ceil() + padding*2
-	n.texH = (bounds.Max.Y - bounds.Min.Y).Ceil() + padding*2
-	if n.texW == 0 || n.texH == 0 {
-		return
+	contentW := (bounds.Max.X - bounds.Min.X).Ceil()
+	contentH := (bounds.Max.Y - bounds.Min.Y).Ceil()
+	if contentW == 0 || contentH == 0 {
+		return false
 	}
 
-	rgba := image.NewRGBA(image.Rect(0, 0, n.texW, n.texH))
-	d := &font.Drawer{
-		Dst:  rgba,
-		Src:  image.NewUniform(color.RGBA{255, 255, 255, 255}),
-		Face: face,
-		Dot:  fixed.Point26_6{X: fixed.I(padding) - bounds.Min.X, Y: fixed.I(padding) - bounds.Min.Y},
-	}
-	d.DrawString(path)
+	rgba, texW, texH, _ := newShadowedTextRGBA(contentW, contentH, notifSize, textColor, func(rgba *image.RGBA, originX, originY int) {
+		d := &font.Drawer{
+			Dst:  rgba,
+			Src:  image.NewUniform(textColor),
+			Face: face,
+			Dot:  fixed.Point26_6{X: fixed.I(originX) - bounds.Min.X, Y: fixed.I(originY) - bounds.Min.Y},
+		}
+		d.DrawString(path)
+	})
 
+	tex := glUploadTexture(rgba)
+	if tex == 0 {
+		return false
+	}
 	glDeleteTex(n.tex)
-	n.tex = glUploadTexture(rgba)
-	if n.tex == 0 {
-		return
-	}
-
-	n.text = path
-	n.started = time.Now()
-	n.visible = true
-	n.injected = false
-	n.alpha = 0
+	n.tex = tex
+	n.texW = texW
+	n.texH = texH
+	return true
 }
 
-// Layout returns the centered draw coordinates for the notification texture.
 func (n *Notifier) Layout(width, height int) (x, y, drawWidth, drawHeight float32) {
 	drawHeight = float32(height) * 0.12
 	scale := drawHeight / float32(n.texH)
@@ -114,7 +128,6 @@ func (n *Notifier) Layout(width, height int) (x, y, drawWidth, drawHeight float3
 	return
 }
 
-// Render draws the notification to the screen (FBO 0).
 func (n *Notifier) Render(programText uint32, width, height int) {
 	if n.tex == 0 || programText == 0 || width <= 0 || height <= 0 {
 		return
@@ -123,7 +136,6 @@ func (n *Notifier) Render(programText uint32, width, height int) {
 	glDrawOverlayText(programText, n.tex, float32(n.alpha), x, y, dw, dh, width, height, width, height)
 }
 
-// Inject stamps the notification text once into projectM's feedback framebuffer.
 func (n *Notifier) Inject(programText uint32, winW, winH, viewW, viewH int) {
 	if n.hidden || n.injected || n.tex == 0 || programText == 0 || winW <= 0 || winH <= 0 || viewW <= 0 || viewH <= 0 {
 		return
@@ -136,7 +148,7 @@ func (n *Notifier) Inject(programText uint32, winW, winH, viewW, viewH int) {
 	n.injected = true
 }
 
-// Update advances the fade animation. Call every frame.
+// Update advances the fade animation.
 func (n *Notifier) Update(uiVisible bool) {
 	if !n.visible {
 		return
@@ -160,7 +172,6 @@ func (n *Notifier) Update(uiVisible bool) {
 	}
 }
 
-// Toggle shows or hides the notification (B button legacy).
 func (n *Notifier) Toggle() {
 	n.hidden = !n.hidden
 	if !n.hidden && n.text != "" {
@@ -171,7 +182,6 @@ func (n *Notifier) Toggle() {
 	}
 }
 
-// Hide removes the notification texture and resets state.
 func (n *Notifier) Hide() {
 	glDeleteTex(n.tex)
 	n.tex = 0

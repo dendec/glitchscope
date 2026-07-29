@@ -1,5 +1,4 @@
 // Package modland manages the modland.com module catalog.
-// The catalog is shipped as a file named "modland" next to the binary.
 package modland
 
 import (
@@ -21,7 +20,7 @@ const (
 	filesDir    = "modland-cache"
 )
 
-// SupportedExts is the set of file extensions we accept from modland.
+// SupportedExts is the set of file extensions accepted from modland.
 var SupportedExts map[string]bool
 
 func init() {
@@ -50,13 +49,13 @@ func init() {
 	}
 }
 
-// Track holds a module filename and its expected size from the listing.
+// Track holds a module filename and its expected size.
 type Track struct {
 	Name string `json:"name"` // filename (e.g. "song.mod")
 	Size int64  `json:"size"` // expected size in bytes (0 if unknown)
 }
 
-// Album represents a modland format/author folder with its module paths.
+// Album represents a modland format/author folder.
 type Album struct {
 	Name   string  // display name (e.g. "Protracker/Curt Cool")
 	Tracks []Track // tracks with sizes
@@ -80,7 +79,7 @@ type cacheEntry struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
-// CacheDir returns the modland cache directory next to the binary.
+// CacheDir returns the modland cache directory.
 func CacheDir(baseDir string) (string, error) {
 	dir := filepath.Join(baseDir, filesDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -177,7 +176,7 @@ func SaveCatalog(baseDir string, cat *Catalog) error {
 	return nil
 }
 
-// FileURL returns the primary (fast mirror) download URL for a modland file.
+// FileURL returns the primary (fast mirror) download URL.
 func FileURL(remotePath string) string {
 	return (&url.URL{
 		Scheme: "https",
@@ -195,7 +194,7 @@ func FileFallbackURL(remotePath string) string {
 	}).String()
 }
 
-// FileURLLower returns the primary download URL with the filename lowercased.
+// FileURLLower returns the primary URL with lowercased filename.
 func FileURLLower(remotePath string) string {
 	return (&url.URL{
 		Scheme: "https",
@@ -204,7 +203,7 @@ func FileURLLower(remotePath string) string {
 	}).String()
 }
 
-// FileFallbackURLLower returns the fallback download URL with the filename lowercased.
+// FileFallbackURLLower returns the fallback URL with lowercased filename.
 func FileFallbackURLLower(remotePath string) string {
 	return (&url.URL{
 		Scheme: "https",
@@ -213,8 +212,7 @@ func FileFallbackURLLower(remotePath string) string {
 	}).String()
 }
 
-// lowerFilename lowercases only the filename part of a modland path,
-// keeping the format/author directory prefix intact.
+// lowerFilename lowercases only the filename part, keeping directory prefix.
 func lowerFilename(remotePath string) string {
 	if i := strings.LastIndex(remotePath, "/"); i >= 0 {
 		return remotePath[:i+1] + strings.ToLower(remotePath[i+1:])
@@ -223,7 +221,6 @@ func lowerFilename(remotePath string) string {
 }
 
 // ParseListing parses a tab-separated text listing: "size\tpath".
-// Used by cmd/modland-catalog to build the catalog from allmods.zip.
 func ParseListing(data []byte) (*Catalog, error) {
 	type trackEntry struct {
 		name string
@@ -240,7 +237,7 @@ func ParseListing(data []byte) (*Catalog, error) {
 		var size int64
 		path := line
 
-		// Tab-separated "size\tpath"
+	// Tab-separated "size\tpath".
 		if idx := strings.IndexByte(line, '\t'); idx >= 0 {
 			if parsed, err := strconv.ParseInt(line[:idx], 10, 64); err == nil {
 				size = parsed
@@ -302,7 +299,7 @@ func extractAlbum(path string) string {
 	return ""
 }
 
-// FormatName returns the format (first component) from an album name.
+// FormatName returns the format from an album name.
 func FormatName(album string) string {
 	if i := strings.IndexByte(album, '/'); i >= 0 {
 		return album[:i]
@@ -310,7 +307,6 @@ func FormatName(album string) string {
 	return album
 }
 
-// IsExcluded reports whether the format is in the excluded list.
 func IsExcluded(excluded []string, format string) bool {
 	for _, e := range excluded {
 		if e == format {

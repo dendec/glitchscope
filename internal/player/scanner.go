@@ -4,14 +4,14 @@ import (
 	"strings"
 )
 
-// skipPrefixes — directories whose prefix causes the walk to skip.
+// skipPrefixes lists directories to skip during music scan.
 var skipPrefixes = []string{
 	"/usr", "/opt", "/etc", "/var", "/tmp",
 	"/sys", "/proc", "/dev", "/boot",
 	"/lib", "/bin", "/sbin",
 }
 
-// SupportedExts maps lower-case file extensions that the scanner looks for.
+// SupportedExts maps file extensions the scanner looks for.
 var SupportedExts = map[string]bool{
 	".mp3": true, ".ogg": true, ".flac": true, ".wav": true,
 	// Tracker formats via libxmp (core)
