@@ -238,10 +238,16 @@ const char* GmeCodec_author(GmeCodec* c);
 
 **Source:** https://github.com/true-grue/ayumi
 **License:** MIT
-**File count:** 878
+**Integration:** Git submodule at `lib/ayumi/`
 
-Clone upstream ayumi to `lib/ayumi/`.
-Use `AyumiRender_LoadFile` → `AyumiRender_AyInit` → `AyumiRender_AySynth`.
+Upstream ayumi provides AY-3-8910/YM2149 chip emulation through
+`ayumi_configure` and `ayumi_process`; it does not provide a VTX file loader.
+Implement the VTX container parser, LZH unpacking, frame timing, metadata, and
+seek layer in the project, then drive the submodule's chip renderer from that
+adapter. The `AyumiRender_*` API belongs to Rockbox's codec wrapper and is only
+a reference for the behavior to reproduce, not an upstream ayumi API. The
+initial adapter may accept uncompressed register data first; LZH support must
+be added before considering VTX coverage complete.
 
 ### 2b. PT2/PT3 Parsers
 
@@ -418,11 +424,8 @@ lib/
 ```
 internal/soloud/
 ├── soloud_build.cpp        # SoLoud C++ unity build (existing)
-├── codecs_build.c          # New: pure C codec sources only
 ├── gme_source.cpp/h         # SoLoud adapter; libgme is a separate static library
-├── codec_source.cpp/h       # SoLoud AudioSource/AudioSourceInstance adapter
-├── bridge_gme.c/h          # libgme wrapper
-├── bridge_ayumi.c/h        # libayumi wrapper
+├── ayumi_source.cpp/h       # VTX SoLoud adapter; libayumi is a separate static library
 ├── bridge_sid.c/h          # cRSID wrapper
 ├── bridge_aac.c/h          # libfaad + libm4a wrapper
 ├── bridge_wma.c/h          # libwma + libasf wrapper
@@ -433,20 +436,20 @@ internal/soloud/
 └── ... (other bridges)
 ```
 
-`codecs_build.c` must contain only compatible C translation units. If Rockbox
-sources have conflicting file-local symbols or incompatible runtime macros,
-they must be compiled as separate translation units instead of being included
-in one unity file. `extern "C"` is used only at C/C++ ABI boundaries; it does
-not resolve conflicts inside a C unity build.
+Third-party C libraries are compiled as separate static libraries by
+`Dockerfile.builder` and linked through the target-specific CGO flags. If
+Rockbox sources have conflicting file-local symbols or incompatible runtime
+macros, they must be compiled as separate translation units instead of being
+included in one unity file. `extern "C"` is used only at C/C++ ABI boundaries;
+it does not resolve conflicts inside a C unity build.
 
 ### Makefile Changes
 ```makefile
 # Existing C++ build
 CGO_CXXFLAGS += -I$(PWD)/lib/soloud/include
 
-# New C build
-CGO_CFLAGS += -I$(PWD)/lib/game-music-emu/gme
-CGO_CFLAGS += -I$(PWD)/lib/ayumi
+# New static codec libraries are built by Dockerfile.builder.
+CGO_LDFLAGS += /opt/ayumi/amd64/lib/libayumi.a
 CGO_CFLAGS += -I$(PWD)/lib/cRSID
 CGO_CFLAGS += -I$(PWD)/lib/libfaad
 CGO_CFLAGS += -I$(PWD)/lib/libm4a

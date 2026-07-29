@@ -154,6 +154,17 @@ RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-4.7.1/libx
     && make install \
     && rm -rf /build/libxmp-4.7.1
 
+
+COPY lib/ayumi lib/ayumi
+# --- Build libayumi static for amd64 and arm64 ---
+RUN mkdir -p /opt/ayumi/amd64/lib /opt/ayumi/arm64/lib \
+    && cc -std=c99 -O2 -Ilib/ayumi -c lib/ayumi/ayumi.c -o /tmp/ayumi-amd64.o \
+    && ar rcs /opt/ayumi/amd64/lib/libayumi.a /tmp/ayumi-amd64.o \
+    && aarch64-linux-gnu-gcc -std=c99 -O2 -Ilib/ayumi -c lib/ayumi/ayumi.c -o /tmp/ayumi-arm64.o \
+    && aarch64-linux-gnu-ar rcs /opt/ayumi/arm64/lib/libayumi.a /tmp/ayumi-arm64.o \
+    && mkdir -p /opt/ayumi/include \
+    && cp lib/ayumi/ayumi.h /opt/ayumi/include/
+
 # Pre-download Go dependencies
 COPY go.mod go.sum* ./
 RUN go mod download

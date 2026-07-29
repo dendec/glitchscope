@@ -15,6 +15,11 @@ unsigned int Gme_getTrackCount(void *source);
 const char *Gme_getTitle(void *source);
 const char *Gme_getAuthor(void *source);
 unsigned int Gme_getSampleRate(void *source);
+void *Ayumi_create(void);
+void Ayumi_destroy(void *source);
+int Ayumi_loadMem(void *source, const unsigned char *data, unsigned int length);
+unsigned int Ayumi_getLengthMs(void *source);
+unsigned int Ayumi_getSampleRate(void *source);
 */
 import "C"
 import (
@@ -44,6 +49,11 @@ type Openmpt struct {
 
 // Gme wraps a Game Music Emu SoLoud source.
 type Gme struct {
+	p unsafe.Pointer
+}
+
+// Ayumi wraps the AY/YM VTX source adapter.
+type Ayumi struct {
 	p unsafe.Pointer
 }
 
@@ -143,6 +153,23 @@ func NewGme(data []byte) (*Gme, error) {
 	return &Gme{p: p}, nil
 }
 
+// NewAyumi creates an AY/YM source from a raw-register VTX file.
+func NewAyumi(data []byte) (*Ayumi, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("ayumi: empty data")
+	}
+	p := C.Ayumi_create()
+	if p == nil {
+		return nil, fmt.Errorf("ayumi: create failed")
+	}
+	r := int(C.Ayumi_loadMem(p, (*C.uchar)(unsafe.Pointer(&data[0])), C.uint(len(data))))
+	if r != 0 {
+		C.Ayumi_destroy(p)
+		return nil, fmt.Errorf("ayumi: load failed")
+	}
+	return &Ayumi{p: p}, nil
+}
+
 // Destroy frees the Wav resource.
 func (w *Wav) Destroy() {
 	if w.p != nil {
@@ -175,6 +202,14 @@ func (g *Gme) Destroy() {
 	}
 }
 
+// Destroy frees the Ayumi resource.
+func (a *Ayumi) Destroy() {
+	if a.p != nil {
+		C.Ayumi_destroy(a.p)
+		a.p = nil
+	}
+}
+
 // Play starts playing a Wav source. Returns the voice handle.
 func (s *Soloud) Play(w *Wav) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(unsafe.Pointer(w.p))))
@@ -195,12 +230,20 @@ func (s *Soloud) PlayGme(g *Gme) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(g.p)))
 }
 
+// PlayAyumi starts playing an AY/YM source.
+func (s *Soloud) PlayAyumi(a *Ayumi) uint {
+	return uint(C.Soloud_play(s.p, (*C.AudioSource)(a.p)))
+}
+
 func (g *Gme) GetLength() float64 {
 	return float64(C.Gme_getLengthMs(g.p)) / 1000
 }
 
 func (g *Gme) GetTrackCount() int { return int(C.Gme_getTrackCount(g.p)) }
 func (g *Gme) GetSampleRate() int { return int(C.Gme_getSampleRate(g.p)) }
+
+func (a *Ayumi) GetLength() float64 { return float64(C.Ayumi_getLengthMs(a.p)) / 1000 }
+func (a *Ayumi) GetSampleRate() int { return int(C.Ayumi_getSampleRate(a.p)) }
 
 // GetWave returns the current waveform data (256 float32 samples).
 // Visualization must be enabled. The slice references SoLoud's internal buffer.

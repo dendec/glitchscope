@@ -7,3 +7,6 @@
 [submodule "lib/game-music-emu"]
 	path = lib/game-music-emu
 	url = https://github.com/libgme/game-music-emu.git
+[submodule "lib/ayumi"]
+	path = lib/ayumi
+	url = https://github.com/true-grue/ayumi.git

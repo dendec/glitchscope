@@ -20,6 +20,7 @@ type pendingLoad struct {
 	mod      *soloud.Xmp     // non-nil for libxmp-supported formats
 	ompt     *soloud.Openmpt // non-nil for libopenmpt fallback formats
 	gme      *soloud.Gme     // non-nil for Game Music Emu formats
+	ayumi    *soloud.Ayumi   // non-nil for AY/YM VTX formats
 	bpm      float64         // tracker metadata
 	channels int
 	duration float64
@@ -33,6 +34,7 @@ type Player struct {
 	currentMod      *soloud.Xmp     // non-nil when playing via libxmp
 	currentOmpt     *soloud.Openmpt // non-nil when playing via libopenmpt
 	currentGme      *soloud.Gme     // non-nil when playing via Game Music Emu
+	currentAyumi    *soloud.Ayumi   // non-nil when playing via AY/YM VTX
 	currentPath     string
 	currentBPM      float64
 	currentDuration float64
@@ -76,6 +78,8 @@ func isGmeExt(ext string) bool {
 	}
 }
 
+func isAyumiExt(ext string) bool { return ext == ".vtx" }
+
 // PlayFile loads and plays an audio file. Only one file at a time.
 func (p *Player) PlayFile(path string) error {
 	ext := strings.ToLower(filepath.Ext(path))
@@ -99,6 +103,22 @@ func (p *Player) PlayFile(path string) error {
 		p.channels = 2
 		p.isTracker = true
 		slog.Info("playing gme", "path", path, "tracks", gme.GetTrackCount())
+		return nil
+	}
+	if isAyumiExt(ext) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("vtx read %s: %w", path, err)
+		}
+		ayumi, err := soloud.NewAyumi(data)
+		if err != nil {
+			return fmt.Errorf("vtx %s: %w", path, err)
+		}
+		p.replaceSource(nil, nil, nil, nil, ayumi)
+		p.currentPath = path
+		p.currentDuration = ayumi.GetLength()
+		p.channels = 2
+		p.isTracker = true
 		return nil
 	}
 
@@ -197,6 +217,20 @@ func (p *Player) PlayFileAsync(path string) {
 			p.pendingCh <- pendingLoad{path: path, gme: gme}
 			return
 		}
+		if isAyumiExt(ext) {
+			fileBuf, err := os.ReadFile(localPath)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			ayumi, err := soloud.NewAyumi(fileBuf)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			p.pendingCh <- pendingLoad{path: path, ayumi: ayumi}
+			return
+		}
 		w, err := soloud.LoadWav(localPath)
 		p.pendingCh <- pendingLoad{path: path, wav: w, err: err}
 	}()
@@ -229,6 +263,9 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			}
 			if res.gme != nil {
 				res.gme.Destroy()
+			}
+			if res.ayumi != nil {
+				res.ayumi.Destroy()
 			}
 			return false, false
 		}
@@ -274,6 +311,15 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			p.channels = 2
 			p.isTracker = true
 			slog.Info("playing gme (async)", "path", res.path, "tracks", res.gme.GetTrackCount())
+		} else if res.ayumi != nil {
+			p.replaceSource(nil, nil, nil, nil, res.ayumi)
+			p.currentPath = res.path
+			p.currentDuration = res.ayumi.GetLength()
+			p.currentBPM = 0
+			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
+			p.channels = 2
+			p.isTracker = true
+			slog.Info("playing vtx (async)", "path", res.path)
 		}
 		return true, false
 	default:
@@ -328,7 +374,7 @@ func (p *Player) playTracker(path string) error {
 }
 
 // replaceSource stops current playback and swaps in a new audio source.
-func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Openmpt, gme *soloud.Gme) {
+func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Openmpt, gme *soloud.Gme, ayumi ...*soloud.Ayumi) {
 	p.s.StopAll()
 	if p.currentWav != nil {
 		p.currentWav.Destroy()
@@ -346,6 +392,10 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 		p.currentGme.Destroy()
 		p.currentGme = nil
 	}
+	if p.currentAyumi != nil {
+		p.currentAyumi.Destroy()
+		p.currentAyumi = nil
+	}
 	if w != nil {
 		p.currentWav = w
 		p.voice = p.s.Play(w)
@@ -358,6 +408,9 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 	} else if gme != nil {
 		p.currentGme = gme
 		p.voice = p.s.PlayGme(gme)
+	} else if len(ayumi) > 0 && ayumi[0] != nil {
+		p.currentAyumi = ayumi[0]
+		p.voice = p.s.PlayAyumi(ayumi[0])
 	}
 }
 
