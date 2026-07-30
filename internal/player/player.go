@@ -100,7 +100,8 @@ func isFfmpegExt(ext string) bool {
 		".ogg", ".oga", ".opus", ".spx", ".flac",
 		".wav", ".rf64", ".aiff", ".aif", ".aifc", ".caf",
 		".m4a", ".m4b", ".mp4", ".mov", ".mka", ".mkv", ".webm",
-		".wma", ".asf", ".amr", ".ape", ".tta", ".ts", ".m2ts", ".ra", ".rm":
+		".wma", ".asf", ".amr", ".ape", ".tta", ".wv", ".mpc",
+		".ts", ".m2ts", ".ra", ".rm":
 		return true
 	default:
 		return false

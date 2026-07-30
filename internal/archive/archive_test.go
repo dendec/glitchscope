@@ -6,7 +6,13 @@ import (
 )
 
 func TestOpenAndExtractPMV(t *testing.T) {
-	archivePath := filepath.Join("..", "..", "portmaster", "presets", "textures.pmv")
+	archivePath := filepath.Join(t.TempDir(), "textures.pmv")
+	entries := []SourceEntry{
+		{Name: "textures/example.png", Data: []byte("fixture")},
+	}
+	if err := Write(archivePath, entries); err != nil {
+		t.Fatal(err)
+	}
 
 	a, err := Open(archivePath, 10000)
 	if err != nil {

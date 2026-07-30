@@ -28,7 +28,6 @@ var SupportedExts = map[string]bool{
 	".ktm": true, // Karate
 	".ims": true, // Velvet Studio
 	".mdc": true, // Megadrive
-	".spx": true, // Spectra
 	".txn": true, // MadTracker 2
 }
 

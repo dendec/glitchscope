@@ -221,7 +221,8 @@ RUN cd lib/ffmpeg \
         --enable-decoder=ape --enable-decoder=amrnb --enable-decoder=amrwb \
         --enable-decoder=flac --enable-decoder=g723_1 --enable-decoder=gsm \
         --enable-decoder=mp1 --enable-decoder=mp2 --enable-decoder=mp3 \
-        --enable-decoder=opus --enable-decoder=speex --enable-decoder=tta \
+        --enable-decoder=mpc7 --enable-decoder=mpc8 --enable-decoder=opus \
+        --enable-decoder=speex --enable-decoder=tta --enable-decoder=wavpack \
         --enable-decoder=vorbis --enable-decoder=wmalossless \
         --enable-decoder=wmapro --enable-decoder=wmav1 --enable-decoder=wmav2 \
         --enable-decoder=pcm_s8 --enable-decoder=pcm_u8 \
@@ -237,7 +238,8 @@ RUN cd lib/ffmpeg \
         --enable-demuxer=caf --enable-demuxer=eac3 --enable-demuxer=flac \
         --enable-demuxer=matroska --enable-demuxer=mov --enable-demuxer=mp3 \
         --enable-demuxer=mpegts --enable-demuxer=ogg --enable-demuxer=rm \
-        --enable-demuxer=tta --enable-demuxer=wav \
+        --enable-demuxer=mpc --enable-demuxer=mpc8 --enable-demuxer=tta \
+        --enable-demuxer=wv --enable-demuxer=wav \
         --disable-x86asm \
     && make -j$(nproc) \
     && make install \
@@ -257,7 +259,8 @@ RUN cd lib/ffmpeg \
         --enable-decoder=ape --enable-decoder=amrnb --enable-decoder=amrwb \
         --enable-decoder=flac --enable-decoder=g723_1 --enable-decoder=gsm \
         --enable-decoder=mp1 --enable-decoder=mp2 --enable-decoder=mp3 \
-        --enable-decoder=opus --enable-decoder=speex --enable-decoder=tta \
+        --enable-decoder=mpc7 --enable-decoder=mpc8 --enable-decoder=opus \
+        --enable-decoder=speex --enable-decoder=tta --enable-decoder=wavpack \
         --enable-decoder=vorbis --enable-decoder=wmalossless \
         --enable-decoder=wmapro --enable-decoder=wmav1 --enable-decoder=wmav2 \
         --enable-decoder=pcm_s8 --enable-decoder=pcm_u8 \
@@ -273,7 +276,8 @@ RUN cd lib/ffmpeg \
         --enable-demuxer=caf --enable-demuxer=eac3 --enable-demuxer=flac \
         --enable-demuxer=matroska --enable-demuxer=mov --enable-demuxer=mp3 \
         --enable-demuxer=mpegts --enable-demuxer=ogg --enable-demuxer=rm \
-        --enable-demuxer=tta --enable-demuxer=wav \
+        --enable-demuxer=mpc --enable-demuxer=mpc8 --enable-demuxer=tta \
+        --enable-demuxer=wv --enable-demuxer=wav \
         --disable-x86asm \
     && make -j$(nproc) \
     && make install

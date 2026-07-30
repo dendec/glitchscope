@@ -21,7 +21,8 @@ var SupportedExts = map[string]bool{
 	".m4a": true, ".m4b": true, ".mp4": true, ".mov": true,
 	".mka": true, ".mkv": true, ".webm": true,
 	".wma": true, ".asf": true, ".amr": true,
-	".ape": true, ".tta": true, ".ts": true, ".m2ts": true,
+	".ape": true, ".tta": true, ".wv": true, ".mpc": true,
+	".ts": true, ".m2ts": true,
 	".ra": true, ".rm": true,
 	// Tracker formats via libxmp (core)
 	".mod": true, ".xm": true, ".it": true, ".s3m": true,
@@ -49,9 +50,11 @@ var SupportedExts = map[string]bool{
 	".vtx": true,
 	".pt3": true,
 	".ym":  true, ".lh": true, ".lha": true,
+	// Speex via FFmpeg; kept here for discovery alongside fallback formats.
+	".spx": true,
 	// libopenmpt fallback formats
 	".mo3": true, ".ktm": true, ".ims": true, ".mdc": true,
-	".spx": true, ".txn": true,
+	".txn": true,
 }
 
 func shouldSkipDir(path string) bool {
