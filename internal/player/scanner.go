@@ -35,6 +35,7 @@ var SupportedExts = map[string]bool{
 	".ay": true, ".nsf": true, ".nsfe": true, ".spc": true, ".gbs": true,
 	".hes": true, ".kss": true, ".sap": true,
 	".vgm": true, ".vgz": true,
+	".sid": true, ".rsid": true,
 	// AY/YM VTX via libayumi
 	".vtx": true,
 	".pt3": true,

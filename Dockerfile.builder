@@ -25,6 +25,7 @@ WORKDIR /build
 COPY lib/soloud lib/soloud
 COPY lib/projectm lib/projectm
 COPY lib/game-music-emu lib/game-music-emu
+COPY lib/cRSID lib/cRSID
 COPY patches patches
 
 # Apply patch & prepare projectM
@@ -195,6 +196,15 @@ RUN mkdir -p /opt/libstsound/amd64/lib /opt/libstsound/arm64/lib \
     && aarch64-linux-gnu-ar rcs /opt/libstsound/arm64/lib/libstsound.a /tmp/libstsound-arm64-*.o \
     && mkdir -p /opt/libstsound/include \
     && cp lib/libstsound/StSoundLibrary.h lib/libstsound/YmTypes.h /opt/libstsound/include/
+
+# --- Build cRSID static for amd64 and arm64 ---
+RUN mkdir -p /opt/crsid/amd64/lib /opt/crsid/arm64/lib \
+    && cc -std=c99 -O2 -Ilib/cRSID -c lib/cRSID/libcRSID.c -o /tmp/libcrsid-amd64.o \
+    && ar rcs /opt/crsid/amd64/lib/libcrsid.a /tmp/libcrsid-amd64.o \
+    && aarch64-linux-gnu-gcc -std=c99 -O2 -Ilib/cRSID -c lib/cRSID/libcRSID.c -o /tmp/libcrsid-arm64.o \
+    && aarch64-linux-gnu-ar rcs /opt/crsid/arm64/lib/libcrsid.a /tmp/libcrsid-arm64.o \
+    && mkdir -p /opt/crsid/include \
+    && cp lib/cRSID/libcRSID.h /opt/crsid/include/
 
 # Pre-download Go dependencies
 COPY go.mod go.sum* ./

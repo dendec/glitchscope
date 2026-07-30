@@ -31,7 +31,7 @@ This file contains license information for all third-party libraries used in mdp
 **Source:** https://github.com/cpcsdk/libstsound
 
 ## cRSID
-**License:** GPL-2.0+
+**License:** WTFPL-style permission as stated by the upstream author; attribution requested
 **Source:** Rockbox project (https://www.rockbox.org/)
 
 ## libfaad (FAAD2)

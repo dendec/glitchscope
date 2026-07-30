@@ -104,10 +104,10 @@ Current `soloud_build.cpp` is C++. Adding C sources may cause:
 Source: `dist/allmods.zip` → `allmods.txt` (514656 entries)
 
 ```
-libgme formats:        61,435 files
+libgme formats:        61,049 files
   .nsf: 5,015  .spc: 36,903  .vgz: 14,169
   .sap: 3,230  .gbs: 918  .hes: 421
-  .kss: 393  .sgc: 386
+  .kss: 393
 
 Spectrum formats:      22,073 files
   .pt3: 6,868  .pt2: 6,284  .stc: 3,639
@@ -193,8 +193,12 @@ type Codec interface {
 
 **Source:** https://github.com/libgme/game-music-emu (upstream)
 **License:** LGPL-2.1
-**Formats:** NSF, NSFE, SPC, GBS, HES, KSS, SGC, SAP, VGM, VGZ
-**File count:** 61,435
+**Formats:** AY, NSF, NSFE, SPC, GBS, HES, KSS, SAP, VGM, VGZ
+**File count:** 61,049
+
+The AY format is libgme's ZX Spectrum emulator format (`ZXAYEMUL`). It is
+separate from VTX: `.ay` files use libgme, while `.vtx` files use the existing
+ayumi-based adapter.
 
 ### Files
 Clone entire `gme/` directory from upstream.
@@ -497,7 +501,7 @@ separately as a sub-stage inside the Spectrum phase.
 
 | Priority | Phase | Formats | Files | Effort |
 |----------|-------|---------|-------|--------|
-| 1 | libgme | NSF, SPC, GBS, HES, KSS, SGC, SAP, VGM | 61,435 | Medium |
+| 1 | libgme | NSF, NSFE, SPC, GBS, HES, KSS, SAP, VGM, VGZ | 61,049 | Medium |
 | 2 | cRSID | SID, RSID | 64,174 | Medium |
 | 3 | libayumi (VTX) | VTX | 878 | Low |
 | 4 | PT2/PT3 parsers | PT2, PT3 | 13,152 | Medium |

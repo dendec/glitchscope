@@ -19,17 +19,17 @@ RUN mkdir -p internal/ui/assets && cp /opt/font/unifont.otf internal/ui/assets/u
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
         CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ \
-        CGO_CFLAGS="-I/opt/xmp/arm64/include -I/opt/openmpt/arm64/include -I/opt/gme/arm64/include" \
-        CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/build/lib/soloud/include -I/opt/ayumi/include -I/opt/pt3player/include -I/opt/libstsound/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/gme/arm64/include -I/opt/xmp/arm64/include -I/opt/openmpt/arm64/include -I/usr/include/SDL2 -D_REENTRANT" \
-        CGO_LDFLAGS="-lSDL2 -lm -lpthread /opt/pt3player/arm64/lib/libpt3player.a /opt/ayumi/arm64/lib/libayumi.a /opt/libstsound/arm64/lib/libstsound.a /opt/projectm/arm64/lib/libprojectM-4.a /opt/projectm/arm64/lib/libprojectM_eval.a -lGLESv2 -lm /opt/xmp/arm64/lib/libxmp.a /opt/openmpt/arm64/lib/libopenmpt.a /opt/gme/arm64/lib/libgme.a -lvorbisfile -lvorbis -lFLAC -logg -lmpg123 -lz -lstdc++" \
+        CGO_CFLAGS="-I/opt/xmp/arm64/include -I/opt/openmpt/arm64/include -I/opt/gme/arm64/include -I/opt/crsid/include" \
+        CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/build/lib/soloud/include -I/opt/ayumi/include -I/opt/pt3player/include -I/opt/libstsound/include -I/opt/crsid/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/gme/arm64/include -I/opt/xmp/arm64/include -I/opt/openmpt/arm64/include -I/usr/include/SDL2 -D_REENTRANT" \
+        CGO_LDFLAGS="-lSDL2 -lm -lpthread /opt/pt3player/arm64/lib/libpt3player.a /opt/ayumi/arm64/lib/libayumi.a /opt/libstsound/arm64/lib/libstsound.a /opt/crsid/arm64/lib/libcrsid.a /opt/projectm/arm64/lib/libprojectM-4.a /opt/projectm/arm64/lib/libprojectM_eval.a -lGLESv2 -lm /opt/xmp/arm64/lib/libxmp.a /opt/openmpt/arm64/lib/libopenmpt.a /opt/gme/arm64/lib/libgme.a -lvorbisfile -lvorbis -lFLAC -logg -lmpg123 -lz -lstdc++" \
         go build -ldflags="-s -w" -o pmv ./cmd/pmv \
         && aarch64-linux-gnu-strip pmv \
         && (patchelf --remove-needed libGL.so.1 pmv 2>/dev/null || true); \
     else \
         CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-        CGO_CFLAGS="-I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" \
-        CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/build/lib/soloud/include -I/opt/ayumi/include -I/opt/pt3player/include -I/opt/libstsound/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/gme/amd64/include -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" \
-        CGO_LDFLAGS="-lSDL2 /opt/pt3player/amd64/lib/libpt3player.a /opt/ayumi/amd64/lib/libayumi.a /opt/libstsound/amd64/lib/libstsound.a /opt/projectm/amd64/lib/libprojectM-4.a /opt/projectm/amd64/lib/libprojectM_eval.a -lGL -lGLESv2 -lm /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a /opt/gme/amd64/lib/libgme.a -lvorbisfile -lvorbis -lFLAC -logg -lmpg123 -lz -lstdc++" \
+        CGO_CFLAGS="-I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/opt/crsid/include -I/usr/include/SDL2 -D_REENTRANT" \
+        CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/build/lib/soloud/include -I/opt/ayumi/include -I/opt/pt3player/include -I/opt/libstsound/include -I/opt/crsid/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/gme/amd64/include -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" \
+        CGO_LDFLAGS="-lSDL2 /opt/pt3player/amd64/lib/libpt3player.a /opt/ayumi/amd64/lib/libayumi.a /opt/libstsound/amd64/lib/libstsound.a /opt/crsid/amd64/lib/libcrsid.a /opt/projectm/amd64/lib/libprojectM-4.a /opt/projectm/amd64/lib/libprojectM_eval.a -lGL -lGLESv2 -lm -pthread /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a /opt/gme/amd64/lib/libgme.a -lvorbisfile -lvorbis -lFLAC -logg -lmpg123 -lz -lstdc++" \
         go build -ldflags="-s -w" -o pmv ./cmd/pmv; \
     fi
 

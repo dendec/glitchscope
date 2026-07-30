@@ -47,6 +47,7 @@ func init() {
 		".ay": true, ".nsf": true, ".nsfe": true, ".spc": true, ".gbs": true,
 		".hes": true, ".kss": true, ".sap": true,
 		".vgm": true, ".vgz": true,
+		".sid": true, ".rsid": true,
 		// libopenmpt fallback formats
 		".mo3": true, ".ktm": true, ".ims": true, ".mdc": true,
 		".spx": true, ".txn": true,

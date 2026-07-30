@@ -4,6 +4,7 @@ package soloud
 /*
 #cgo CFLAGS: -I ../../lib/soloud/include
 #cgo CXXFLAGS: -std=c++11 -DWITH_SDL2_STATIC -I ../../lib/soloud/include -I ../../lib/game-music-emu/gme
+#include "bridge_sid.h"
 #include <stdlib.h>
 #include "soloud_c.h"
 unsigned int Wav_getChannels(Wav * aClassPtr);
@@ -15,6 +16,12 @@ unsigned int Gme_getTrackCount(void *source);
 const char *Gme_getTitle(void *source);
 const char *Gme_getAuthor(void *source);
 unsigned int Gme_getSampleRate(void *source);
+void *SidSource_create(void);
+void SidSource_destroy(void *source);
+int SidSource_loadMem(void *source, const unsigned char *data, unsigned int length);
+unsigned int SidSource_getLengthMs(void *source);
+unsigned int SidSource_getTrackCount(void *source);
+unsigned int SidSource_getSampleRate(void *source);
 void *Ayumi_create(void);
 void Ayumi_destroy(void *source);
 int Ayumi_loadMem(void *source, const unsigned char *data, unsigned int length);
@@ -59,6 +66,11 @@ type Openmpt struct {
 
 // Gme wraps a Game Music Emu SoLoud source.
 type Gme struct {
+	p unsafe.Pointer
+}
+
+// Sid wraps a cRSID SID source.
+type Sid struct {
 	p unsafe.Pointer
 }
 
@@ -173,6 +185,22 @@ func NewGme(data []byte) (*Gme, error) {
 	return &Gme{p: p}, nil
 }
 
+// NewSid creates a cRSID source from SID or RSID data.
+func NewSid(data []byte) (*Sid, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("sid: empty data")
+	}
+	p := C.SidSource_create()
+	if p == nil {
+		return nil, fmt.Errorf("sid: create failed")
+	}
+	if C.SidSource_loadMem(p, (*C.uchar)(unsafe.Pointer(&data[0])), C.uint(len(data))) != 0 {
+		C.SidSource_destroy(p)
+		return nil, fmt.Errorf("sid: load failed")
+	}
+	return &Sid{p: p}, nil
+}
+
 // NewAyumi creates an AY/YM source from a raw-register VTX file.
 func NewAyumi(data []byte) (*Ayumi, error) {
 	if len(data) == 0 {
@@ -254,6 +282,14 @@ func (g *Gme) Destroy() {
 	}
 }
 
+// Destroy frees the SID resource.
+func (s *Sid) Destroy() {
+	if s.p != nil {
+		C.SidSource_destroy(s.p)
+		s.p = nil
+	}
+}
+
 // Destroy frees the Ayumi resource.
 func (a *Ayumi) Destroy() {
 	if a.p != nil {
@@ -298,6 +334,11 @@ func (s *Soloud) PlayGme(g *Gme) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(g.p)))
 }
 
+// PlaySid starts playing a SID source.
+func (s *Soloud) PlaySid(sid *Sid) uint {
+	return uint(C.Soloud_play(s.p, (*C.AudioSource)(sid.p)))
+}
+
 // PlayAyumi starts playing an AY/YM source.
 func (s *Soloud) PlayAyumi(a *Ayumi) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(a.p)))
@@ -319,6 +360,10 @@ func (g *Gme) GetLength() float64 {
 
 func (g *Gme) GetTrackCount() int { return int(C.Gme_getTrackCount(g.p)) }
 func (g *Gme) GetSampleRate() int { return int(C.Gme_getSampleRate(g.p)) }
+
+func (s *Sid) GetLength() float64 { return float64(C.SidSource_getLengthMs(s.p)) / 1000 }
+func (s *Sid) GetTrackCount() int { return int(C.SidSource_getTrackCount(s.p)) }
+func (s *Sid) GetSampleRate() int { return int(C.SidSource_getSampleRate(s.p)) }
 
 func (a *Ayumi) GetLength() float64 { return float64(C.Ayumi_getLengthMs(a.p)) / 1000 }
 func (a *Ayumi) GetSampleRate() int { return int(C.Ayumi_getSampleRate(a.p)) }

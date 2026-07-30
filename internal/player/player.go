@@ -20,6 +20,7 @@ type pendingLoad struct {
 	mod      *soloud.Xmp     // non-nil for libxmp-supported formats
 	ompt     *soloud.Openmpt // non-nil for libopenmpt fallback formats
 	gme      *soloud.Gme     // non-nil for Game Music Emu formats
+	sid      *soloud.Sid     // non-nil for SID/RSID formats
 	ayumi    *soloud.Ayumi   // non-nil for AY/YM VTX formats
 	pt3      *soloud.Pt3     // non-nil for PT3 formats
 	ym       *soloud.Ym      // non-nil for YM/LHA formats
@@ -36,6 +37,7 @@ type Player struct {
 	currentMod      *soloud.Xmp     // non-nil when playing via libxmp
 	currentOmpt     *soloud.Openmpt // non-nil when playing via libopenmpt
 	currentGme      *soloud.Gme     // non-nil when playing via Game Music Emu
+	currentSid      *soloud.Sid     // non-nil when playing via SID/RSID
 	currentAyumi    *soloud.Ayumi   // non-nil when playing via AY/YM VTX
 	currentPt3      *soloud.Pt3     // non-nil when playing via PT3
 	currentYm       *soloud.Ym      // non-nil when playing via YM/LHA
@@ -82,6 +84,8 @@ func isGmeExt(ext string) bool {
 	}
 }
 
+func isSidExt(ext string) bool { return ext == ".sid" || ext == ".rsid" }
+
 func isAyumiExt(ext string) bool { return ext == ".vtx" }
 
 func isPt3Ext(ext string) bool { return ext == ".pt3" }
@@ -111,6 +115,25 @@ func (p *Player) PlayFile(path string) error {
 		p.channels = 2
 		p.isTracker = true
 		slog.Info("playing gme", "path", path, "tracks", gme.GetTrackCount())
+		return nil
+	}
+	if isSidExt(ext) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("sid read %s: %w", path, err)
+		}
+		sid, err := soloud.NewSid(data)
+		if err != nil {
+			return fmt.Errorf("sid %s: %w", path, err)
+		}
+		p.replaceSidSource(sid)
+		p.currentPath = path
+		p.currentDuration = sid.GetLength()
+		p.currentBPM = 0
+		p.currentBitrate = fileBitrate(path, p.currentDuration)
+		p.channels = 1
+		p.isTracker = true
+		slog.Info("playing sid", "path", path, "tracks", sid.GetTrackCount())
 		return nil
 	}
 	if isAyumiExt(ext) {
@@ -257,6 +280,20 @@ func (p *Player) PlayFileAsync(path string) {
 			p.pendingCh <- pendingLoad{path: path, gme: gme}
 			return
 		}
+		if isSidExt(ext) {
+			fileBuf, err := os.ReadFile(localPath)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			sid, err := soloud.NewSid(fileBuf)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			p.pendingCh <- pendingLoad{path: path, sid: sid}
+			return
+		}
 		if isAyumiExt(ext) {
 			fileBuf, err := os.ReadFile(localPath)
 			if err != nil {
@@ -332,6 +369,9 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			if res.gme != nil {
 				res.gme.Destroy()
 			}
+			if res.sid != nil {
+				res.sid.Destroy()
+			}
 			if res.ayumi != nil {
 				res.ayumi.Destroy()
 			}
@@ -385,6 +425,15 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			p.channels = 2
 			p.isTracker = true
 			slog.Info("playing gme (async)", "path", res.path, "tracks", res.gme.GetTrackCount())
+		} else if res.sid != nil {
+			p.replaceSidSource(res.sid)
+			p.currentPath = res.path
+			p.currentDuration = res.sid.GetLength()
+			p.currentBPM = 0
+			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
+			p.channels = 1
+			p.isTracker = true
+			slog.Info("playing sid (async)", "path", res.path, "tracks", res.sid.GetTrackCount())
 		} else if res.ayumi != nil {
 			p.replaceSource(nil, nil, nil, nil, res.ayumi)
 			p.currentPath = res.path
@@ -484,6 +533,10 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 		p.currentGme.Destroy()
 		p.currentGme = nil
 	}
+	if p.currentSid != nil {
+		p.currentSid.Destroy()
+		p.currentSid = nil
+	}
 	if p.currentAyumi != nil {
 		p.currentAyumi.Destroy()
 		p.currentAyumi = nil
@@ -508,10 +561,18 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 	} else if gme != nil {
 		p.currentGme = gme
 		p.voice = p.s.PlayGme(gme)
+	} else if p.currentSid != nil {
+		p.voice = p.s.PlaySid(p.currentSid)
 	} else if len(ayumi) > 0 && ayumi[0] != nil {
 		p.currentAyumi = ayumi[0]
 		p.voice = p.s.PlayAyumi(ayumi[0])
 	}
+}
+
+func (p *Player) replaceSidSource(sid *soloud.Sid) {
+	p.replaceSource(nil, nil, nil, nil)
+	p.currentSid = sid
+	p.voice = p.s.PlaySid(sid)
 }
 
 func (p *Player) replacePt3Source(pt3 *soloud.Pt3) {
@@ -600,6 +661,10 @@ func (p *Player) Stop() {
 	if p.currentGme != nil {
 		p.currentGme.Destroy()
 		p.currentGme = nil
+	}
+	if p.currentSid != nil {
+		p.currentSid.Destroy()
+		p.currentSid = nil
 	}
 	p.currentPath = ""
 }
