@@ -32,8 +32,8 @@ var SupportedExts = map[string]bool{
 	".stx": true, ".tcb": true, ".tdd": true, ".tp": true,
 	".uni": true, ".xd": true,
 	// Game Music Emu formats
-	".nsf": true, ".nsfe": true, ".spc": true, ".gbs": true,
-	".hes": true, ".kss": true, ".sgc": true, ".sap": true,
+	".ay": true, ".nsf": true, ".nsfe": true, ".spc": true, ".gbs": true,
+	".hes": true, ".kss": true, ".sap": true,
 	".vgm": true, ".vgz": true,
 	// AY/YM VTX via libayumi
 	".vtx": true,

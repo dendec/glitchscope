@@ -75,7 +75,7 @@ func isTrackerExt(ext string) bool {
 
 func isGmeExt(ext string) bool {
 	switch ext {
-	case ".nsf", ".nsfe", ".spc", ".gbs", ".hes", ".kss", ".sgc", ".sap", ".vgm", ".vgz":
+	case ".ay", ".nsf", ".nsfe", ".spc", ".gbs", ".hes", ".kss", ".sap", ".vgm", ".vgz":
 		return true
 	default:
 		return false
