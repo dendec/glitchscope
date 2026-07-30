@@ -16,3 +16,6 @@
 [submodule "lib/libstsound"]
 	path = lib/libstsound
 	url = https://github.com/cpcsdk/libstsound.git
+[submodule "lib/ffmpeg"]
+	path = lib/ffmpeg
+	url = https://github.com/FFmpeg/FFmpeg.git

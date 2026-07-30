@@ -18,7 +18,7 @@ type albumMeta struct {
 }
 
 const metaFileName = ".pmv_meta.json"
-const metaVersion = 1
+const metaVersion = 2
 
 // readMetaCache reads the metadata cache for an album directory.
 func readMetaCache(albumPath string) *albumMeta {

@@ -33,8 +33,8 @@ PROJECTM_LIB      := $(PROJECTM_BUILD)/src/libprojectM/libprojectM-4.a
 PROJECTM_EVAL_LIB := $(PROJECTM_BUILD)/vendor/projectm-eval/projectm-eval/libprojectM_eval.a
 PROJECTM_PATCH    := patches/projectm-feedback.patch
 
-CGO_CXXFLAGS := $(SDL_CFLAGS) -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/opt/gme/amd64/include -I/opt/ayumi/include -I/opt/pt3player/include -I/opt/libstsound/include -I/opt/crsid/include -I/build/lib/soloud/include -I/build/lib/game-music-emu/gme -Wno-write-strings
-CGO_LDFLAGS  := $(SDL_LIBS) /opt/pt3player/amd64/lib/libpt3player.a /opt/ayumi/amd64/lib/libayumi.a /opt/libstsound/amd64/lib/libstsound.a /opt/crsid/amd64/lib/libcrsid.a $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm -pthread /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a /opt/gme/amd64/lib/libgme.a -lvorbisfile -lvorbis -lFLAC -logg -lmpg123 -lz -lstdc++
+CGO_CXXFLAGS := $(SDL_CFLAGS) -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/opt/gme/amd64/include -I/opt/ayumi/include -I/opt/pt3player/include -I/opt/libstsound/include -I/opt/crsid/include -I/opt/ffmpeg/amd64/include -I/build/lib/soloud/include -I/build/lib/game-music-emu/gme -Wno-write-strings
+CGO_LDFLAGS  := $(SDL_LIBS) /opt/pt3player/amd64/lib/libpt3player.a /opt/ayumi/amd64/lib/libayumi.a /opt/libstsound/amd64/lib/libstsound.a /opt/crsid/amd64/lib/libcrsid.a /opt/ffmpeg/amd64/lib/libavformat.a /opt/ffmpeg/amd64/lib/libavcodec.a /opt/ffmpeg/amd64/lib/libswresample.a /opt/ffmpeg/amd64/lib/libavutil.a $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm -pthread /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a /opt/gme/amd64/lib/libgme.a -lvorbisfile -lvorbis -lFLAC -logg -lmpg123 -lz -lstdc++
 
 DOCKER_IMAGE_X64 := pmv-builder
 DOCKER_BUILDER   := pmv-builder:latest

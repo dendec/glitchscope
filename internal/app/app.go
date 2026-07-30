@@ -62,6 +62,7 @@ type App struct {
 
 	renderScale         float64
 	renderScaleExplicit bool
+	startupFile         string
 
 	pending      pendingPreset // pending preset name + scheduled load time
 	presetTicker *time.Ticker
@@ -71,12 +72,13 @@ type App struct {
 
 // New creates an App with display initialised. Player/overlay/input/library
 // are created later by Init().
-func New(fullscreen bool, width, height int, renderScale float64, renderNearest bool, renderScaleExplicit, renderNearestSet bool) (*App, error) {
+func New(fullscreen bool, width, height int, renderScale float64, renderNearest bool, renderScaleExplicit, renderNearestSet bool, startupFile string) (*App, error) {
 	a := &App{
 		prof:                prof.NewCollector(),
 		settingsPath:        config.SettingsPath(),
 		renderScale:         renderScale,
 		renderScaleExplicit: renderScaleExplicit,
+		startupFile:         startupFile,
 		modlandSizes:        make(map[string]int64),
 	}
 
@@ -217,7 +219,13 @@ func (a *App) Init() {
 	a.initLibrary()
 	a.initInput()
 	a.initPreset()
-	a.playFirst()
+	if a.startupFile != "" && a.pl != nil {
+		a.playTrack(a.startupFile, "command line")
+	} else if a.startupFile != "" {
+		slog.Warn("startup file skipped, audio unavailable", "path", a.startupFile)
+	} else {
+		a.playFirst()
+	}
 	a.startPresetTicker()
 	if a.overlay != nil {
 		a.overlay.SetTheme(a.settings.UI.Theme, int(a.settings.UI.Transparency))

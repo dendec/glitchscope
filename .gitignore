@@ -13,6 +13,10 @@ Thumbs.db
 
 # local test data (too large, dev only)
 test_data
+!test_data/
+test_data/*
+!test_data/ffmpeg/
+!test_data/ffmpeg/**
 
 # runtime-generated settings
 settings.json

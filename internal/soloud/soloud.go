@@ -7,6 +7,12 @@ package soloud
 #include "bridge_sid.h"
 #include <stdlib.h>
 #include "soloud_c.h"
+void *Ffmpeg_create(void);
+void Ffmpeg_destroy(void *source);
+int Ffmpeg_loadMem(void *source, const unsigned char *data, unsigned int length);
+unsigned int Ffmpeg_getLengthMs(void *source);
+unsigned int Ffmpeg_getChannels(void *source);
+unsigned int Ffmpeg_getSampleRate(void *source);
 unsigned int Wav_getChannels(Wav * aClassPtr);
 void *Gme_create(void);
 void Gme_destroy(void *source);
@@ -86,6 +92,11 @@ type Pt3 struct {
 
 // Ym wraps the libstsound YM/LHARC source adapter.
 type Ym struct {
+	p unsafe.Pointer
+}
+
+// Ffmpeg wraps the FFmpeg audio source adapter.
+type Ffmpeg struct {
 	p unsafe.Pointer
 }
 
@@ -250,6 +261,22 @@ func NewYm(data []byte) (*Ym, error) {
 	return &Ym{p: p}, nil
 }
 
+// NewFfmpeg creates an FFmpeg source from audio data.
+func NewFfmpeg(data []byte) (*Ffmpeg, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("ffmpeg: empty data")
+	}
+	p := C.Ffmpeg_create()
+	if p == nil {
+		return nil, fmt.Errorf("ffmpeg: create failed")
+	}
+	if C.Ffmpeg_loadMem(p, (*C.uchar)(unsafe.Pointer(&data[0])), C.uint(len(data))) != 0 {
+		C.Ffmpeg_destroy(p)
+		return nil, fmt.Errorf("ffmpeg: load failed")
+	}
+	return &Ffmpeg{p: p}, nil
+}
+
 // Destroy frees the Wav resource.
 func (w *Wav) Destroy() {
 	if w.p != nil {
@@ -314,6 +341,14 @@ func (y *Ym) Destroy() {
 	}
 }
 
+// Destroy frees the FFmpeg resource.
+func (f *Ffmpeg) Destroy() {
+	if f.p != nil {
+		C.Ffmpeg_destroy(f.p)
+		f.p = nil
+	}
+}
+
 // Play starts playing a Wav source. Returns the voice handle.
 func (s *Soloud) Play(w *Wav) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(unsafe.Pointer(w.p))))
@@ -354,6 +389,11 @@ func (s *Soloud) PlayYm(y *Ym) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(y.p)))
 }
 
+// PlayFfmpeg starts playing an FFmpeg source.
+func (s *Soloud) PlayFfmpeg(f *Ffmpeg) uint {
+	return uint(C.Soloud_play(s.p, (*C.AudioSource)(f.p)))
+}
+
 func (g *Gme) GetLength() float64 {
 	return float64(C.Gme_getLengthMs(g.p)) / 1000
 }
@@ -365,12 +405,15 @@ func (s *Sid) GetLength() float64 { return float64(C.SidSource_getLengthMs(s.p))
 func (s *Sid) GetTrackCount() int { return int(C.SidSource_getTrackCount(s.p)) }
 func (s *Sid) GetSampleRate() int { return int(C.SidSource_getSampleRate(s.p)) }
 
-func (a *Ayumi) GetLength() float64 { return float64(C.Ayumi_getLengthMs(a.p)) / 1000 }
-func (a *Ayumi) GetSampleRate() int { return int(C.Ayumi_getSampleRate(a.p)) }
-func (p *Pt3) GetLength() float64   { return float64(C.Pt3_getLengthMs(p.p)) / 1000 }
-func (p *Pt3) GetSampleRate() int   { return int(C.Pt3_getSampleRate(p.p)) }
-func (y *Ym) GetLength() float64    { return float64(C.Ym_getLengthMs(y.p)) / 1000 }
-func (y *Ym) GetSampleRate() int    { return int(C.Ym_getSampleRate(y.p)) }
+func (a *Ayumi) GetLength() float64  { return float64(C.Ayumi_getLengthMs(a.p)) / 1000 }
+func (a *Ayumi) GetSampleRate() int  { return int(C.Ayumi_getSampleRate(a.p)) }
+func (p *Pt3) GetLength() float64    { return float64(C.Pt3_getLengthMs(p.p)) / 1000 }
+func (p *Pt3) GetSampleRate() int    { return int(C.Pt3_getSampleRate(p.p)) }
+func (y *Ym) GetLength() float64     { return float64(C.Ym_getLengthMs(y.p)) / 1000 }
+func (y *Ym) GetSampleRate() int     { return int(C.Ym_getSampleRate(y.p)) }
+func (f *Ffmpeg) GetLength() float64 { return float64(C.Ffmpeg_getLengthMs(f.p)) / 1000 }
+func (f *Ffmpeg) GetChannels() int   { return int(C.Ffmpeg_getChannels(f.p)) }
+func (f *Ffmpeg) GetSampleRate() int { return int(C.Ffmpeg_getSampleRate(f.p)) }
 
 // GetWave returns the current waveform data (256 float32 samples).
 // Visualization must be enabled. The slice references SoLoud's internal buffer.

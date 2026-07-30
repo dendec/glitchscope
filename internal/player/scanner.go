@@ -13,7 +13,16 @@ var skipPrefixes = []string{
 
 // SupportedExts maps file extensions the scanner looks for.
 var SupportedExts = map[string]bool{
-	".mp3": true, ".ogg": true, ".flac": true, ".wav": true,
+	".aac": true, ".ac3": true, ".eac3": true,
+	".mp1": true, ".mp2": true, ".mp3": true,
+	".ogg": true, ".oga": true, ".opus": true,
+	".flac": true, ".wav": true, ".rf64": true,
+	".aiff": true, ".aif": true, ".aifc": true, ".caf": true,
+	".m4a": true, ".m4b": true, ".mp4": true, ".mov": true,
+	".mka": true, ".mkv": true, ".webm": true,
+	".wma": true, ".asf": true, ".amr": true,
+	".ape": true, ".tta": true, ".ts": true, ".m2ts": true,
+	".ra": true, ".rm": true,
 	// Tracker formats via libxmp (core)
 	".mod": true, ".xm": true, ".it": true, ".s3m": true,
 	// Additional tracker formats

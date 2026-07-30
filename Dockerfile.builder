@@ -206,6 +206,78 @@ RUN mkdir -p /opt/crsid/amd64/lib /opt/crsid/arm64/lib \
     && mkdir -p /opt/crsid/include \
     && cp lib/cRSID/libcRSID.h /opt/crsid/include/
 
+# --- Build the audio-only FFmpeg stack for amd64 and arm64 ---
+COPY lib/ffmpeg lib/ffmpeg
+RUN cd lib/ffmpeg \
+    && ./configure --prefix=/opt/ffmpeg/amd64 \
+        --disable-programs --disable-doc --disable-debug --disable-autodetect \
+        --disable-network --disable-iconv --disable-zlib --disable-bzlib --disable-lzma \
+        --disable-avdevice --disable-avfilter --disable-swscale \
+        --disable-everything --disable-gpl --disable-nonfree \
+        --enable-static --disable-shared \
+        --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
+        --enable-decoder=aac --enable-decoder=aac_latm \
+        --enable-decoder=ac3 --enable-decoder=eac3 --enable-decoder=alac \
+        --enable-decoder=ape --enable-decoder=amrnb --enable-decoder=amrwb \
+        --enable-decoder=flac --enable-decoder=g723_1 --enable-decoder=gsm \
+        --enable-decoder=mp1 --enable-decoder=mp2 --enable-decoder=mp3 \
+        --enable-decoder=opus --enable-decoder=speex --enable-decoder=tta \
+        --enable-decoder=vorbis --enable-decoder=wmalossless \
+        --enable-decoder=wmapro --enable-decoder=wmav1 --enable-decoder=wmav2 \
+        --enable-decoder=pcm_s8 --enable-decoder=pcm_u8 \
+        --enable-decoder=pcm_s16le --enable-decoder=pcm_s16be \
+        --enable-decoder=pcm_s24le --enable-decoder=pcm_s24be \
+        --enable-decoder=pcm_s32le --enable-decoder=pcm_s32be \
+        --enable-decoder=pcm_f32le --enable-decoder=pcm_f32be \
+        --enable-decoder=pcm_f64le --enable-decoder=pcm_f64be \
+        --enable-parser=aac --enable-parser=ac3 --enable-parser=flac \
+        --enable-parser=mpegaudio --enable-parser=opus --enable-parser=vorbis \
+        --enable-demuxer=aac --enable-demuxer=ac3 --enable-demuxer=amr \
+        --enable-demuxer=ape --enable-demuxer=asf --enable-demuxer=aiff \
+        --enable-demuxer=caf --enable-demuxer=eac3 --enable-demuxer=flac \
+        --enable-demuxer=matroska --enable-demuxer=mov --enable-demuxer=mp3 \
+        --enable-demuxer=mpegts --enable-demuxer=ogg --enable-demuxer=rm \
+        --enable-demuxer=tta --enable-demuxer=wav \
+        --disable-x86asm \
+    && make -j$(nproc) \
+    && make install \
+    && make distclean \
+    && ./configure --prefix=/opt/ffmpeg/arm64 \
+        --arch=aarch64 --target-os=linux --cross-prefix=aarch64-linux-gnu- \
+        --cc=aarch64-linux-gnu-gcc --cxx=aarch64-linux-gnu-g++ \
+        --ar=aarch64-linux-gnu-ar --ranlib=aarch64-linux-gnu-ranlib \
+        --disable-programs --disable-doc --disable-debug --disable-autodetect \
+        --disable-network --disable-iconv --disable-zlib --disable-bzlib --disable-lzma \
+        --disable-avdevice --disable-avfilter --disable-swscale \
+        --disable-everything --disable-gpl --disable-nonfree \
+        --enable-static --disable-shared \
+        --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
+        --enable-decoder=aac --enable-decoder=aac_latm \
+        --enable-decoder=ac3 --enable-decoder=eac3 --enable-decoder=alac \
+        --enable-decoder=ape --enable-decoder=amrnb --enable-decoder=amrwb \
+        --enable-decoder=flac --enable-decoder=g723_1 --enable-decoder=gsm \
+        --enable-decoder=mp1 --enable-decoder=mp2 --enable-decoder=mp3 \
+        --enable-decoder=opus --enable-decoder=speex --enable-decoder=tta \
+        --enable-decoder=vorbis --enable-decoder=wmalossless \
+        --enable-decoder=wmapro --enable-decoder=wmav1 --enable-decoder=wmav2 \
+        --enable-decoder=pcm_s8 --enable-decoder=pcm_u8 \
+        --enable-decoder=pcm_s16le --enable-decoder=pcm_s16be \
+        --enable-decoder=pcm_s24le --enable-decoder=pcm_s24be \
+        --enable-decoder=pcm_s32le --enable-decoder=pcm_s32be \
+        --enable-decoder=pcm_f32le --enable-decoder=pcm_f32be \
+        --enable-decoder=pcm_f64le --enable-decoder=pcm_f64be \
+        --enable-parser=aac --enable-parser=ac3 --enable-parser=flac \
+        --enable-parser=mpegaudio --enable-parser=opus --enable-parser=vorbis \
+        --enable-demuxer=aac --enable-demuxer=ac3 --enable-demuxer=amr \
+        --enable-demuxer=ape --enable-demuxer=asf --enable-demuxer=aiff \
+        --enable-demuxer=caf --enable-demuxer=eac3 --enable-demuxer=flac \
+        --enable-demuxer=matroska --enable-demuxer=mov --enable-demuxer=mp3 \
+        --enable-demuxer=mpegts --enable-demuxer=ogg --enable-demuxer=rm \
+        --enable-demuxer=tta --enable-demuxer=wav \
+        --disable-x86asm \
+    && make -j$(nproc) \
+    && make install
+
 # Pre-download Go dependencies
 COPY go.mod go.sum* ./
 RUN go mod download

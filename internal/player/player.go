@@ -24,6 +24,7 @@ type pendingLoad struct {
 	ayumi    *soloud.Ayumi   // non-nil for AY/YM VTX formats
 	pt3      *soloud.Pt3     // non-nil for PT3 formats
 	ym       *soloud.Ym      // non-nil for YM/LHA formats
+	ffmpeg   *soloud.Ffmpeg  // non-nil for FFmpeg-supported audio formats
 	bpm      float64         // tracker metadata
 	channels int
 	duration float64
@@ -41,6 +42,7 @@ type Player struct {
 	currentAyumi    *soloud.Ayumi   // non-nil when playing via AY/YM VTX
 	currentPt3      *soloud.Pt3     // non-nil when playing via PT3
 	currentYm       *soloud.Ym      // non-nil when playing via YM/LHA
+	currentFfmpeg   *soloud.Ffmpeg  // non-nil when playing via FFmpeg
 	currentPath     string
 	currentBPM      float64
 	currentDuration float64
@@ -91,6 +93,19 @@ func isAyumiExt(ext string) bool { return ext == ".vtx" }
 func isPt3Ext(ext string) bool { return ext == ".pt3" }
 
 func isYmExt(ext string) bool { return ext == ".ym" || ext == ".lh" || ext == ".lha" }
+
+func isFfmpegExt(ext string) bool {
+	switch ext {
+	case ".aac", ".ac3", ".eac3", ".mp1", ".mp2", ".mp3",
+		".ogg", ".oga", ".opus", ".spx", ".flac",
+		".wav", ".rf64", ".aiff", ".aif", ".aifc", ".caf",
+		".m4a", ".m4b", ".mp4", ".mov", ".mka", ".mkv", ".webm",
+		".wma", ".asf", ".amr", ".ape", ".tta", ".ts", ".m2ts", ".ra", ".rm":
+		return true
+	default:
+		return false
+	}
+}
 
 // PlayFile loads and plays an audio file. Only one file at a time.
 func (p *Player) PlayFile(path string) error {
@@ -182,6 +197,24 @@ func (p *Player) PlayFile(path string) error {
 		p.currentDuration = ym.GetLength()
 		p.channels = 2
 		p.isTracker = true
+		return nil
+	}
+	if isFfmpegExt(ext) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("ffmpeg read %s: %w", path, err)
+		}
+		ffmpeg, err := soloud.NewFfmpeg(data)
+		if err != nil {
+			return fmt.Errorf("ffmpeg %s: %w", path, err)
+		}
+		p.replaceFfmpegSource(ffmpeg)
+		p.currentPath = path
+		p.currentDuration = ffmpeg.GetLength()
+		p.currentBPM = 0
+		p.currentBitrate = fileBitrate(path, p.currentDuration)
+		p.channels = ffmpeg.GetChannels()
+		p.isTracker = false
 		return nil
 	}
 
@@ -336,6 +369,20 @@ func (p *Player) PlayFileAsync(path string) {
 			p.pendingCh <- pendingLoad{path: path, ym: ym}
 			return
 		}
+		if isFfmpegExt(ext) {
+			fileBuf, err := os.ReadFile(localPath)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			ffmpeg, err := soloud.NewFfmpeg(fileBuf)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			p.pendingCh <- pendingLoad{path: path, ffmpeg: ffmpeg}
+			return
+		}
 		w, err := soloud.LoadWav(localPath)
 		p.pendingCh <- pendingLoad{path: path, wav: w, err: err}
 	}()
@@ -380,6 +427,9 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			}
 			if res.ym != nil {
 				res.ym.Destroy()
+			}
+			if res.ffmpeg != nil {
+				res.ffmpeg.Destroy()
 			}
 			return false, false
 		}
@@ -461,6 +511,15 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			p.channels = 2
 			p.isTracker = true
 			slog.Info("playing ym (async)", "path", res.path)
+		} else if res.ffmpeg != nil {
+			p.replaceFfmpegSource(res.ffmpeg)
+			p.currentPath = res.path
+			p.currentDuration = res.ffmpeg.GetLength()
+			p.currentBPM = 0
+			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
+			p.channels = res.ffmpeg.GetChannels()
+			p.isTracker = false
+			slog.Info("playing ffmpeg (async)", "path", res.path)
 		}
 		return true, false
 	default:
@@ -549,6 +608,10 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 		p.currentYm.Destroy()
 		p.currentYm = nil
 	}
+	if p.currentFfmpeg != nil {
+		p.currentFfmpeg.Destroy()
+		p.currentFfmpeg = nil
+	}
 	if w != nil {
 		p.currentWav = w
 		p.voice = p.s.Play(w)
@@ -585,6 +648,12 @@ func (p *Player) replaceYmSource(ym *soloud.Ym) {
 	p.replaceSource(nil, nil, nil, nil)
 	p.currentYm = ym
 	p.voice = p.s.PlayYm(ym)
+}
+
+func (p *Player) replaceFfmpegSource(ffmpeg *soloud.Ffmpeg) {
+	p.replaceSource(nil, nil, nil, nil)
+	p.currentFfmpeg = ffmpeg
+	p.voice = p.s.PlayFfmpeg(ffmpeg)
 }
 
 // GetWave returns the current SoLoud waveform data (256 float32 samples).
@@ -661,6 +730,10 @@ func (p *Player) Stop() {
 	if p.currentGme != nil {
 		p.currentGme.Destroy()
 		p.currentGme = nil
+	}
+	if p.currentFfmpeg != nil {
+		p.currentFfmpeg.Destroy()
+		p.currentFfmpeg = nil
 	}
 	if p.currentSid != nil {
 		p.currentSid.Destroy()

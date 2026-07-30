@@ -236,6 +236,14 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 						}
 					}
 				}
+			} else if isFfmpegExt(ext) {
+				if fileBuf, err := os.ReadFile(tp); err == nil {
+					if source, err := soloud.NewFfmpeg(fileBuf); err == nil {
+						m.Duration = source.GetLength()
+						m.Channels = source.GetChannels()
+						source.Destroy()
+					}
+				}
 			} else if w, err := soloud.LoadWav(tp); err == nil {
 				m.Duration = w.GetLength()
 				w.Destroy()

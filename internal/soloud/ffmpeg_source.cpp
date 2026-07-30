@@ -1,0 +1,358 @@
+#include "ffmpeg_source.h"
+
+#include <algorithm>
+#include <cstring>
+#include <new>
+#include <vector>
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/channel_layout.h>
+#include <libavutil/error.h>
+#include <libavutil/mem.h>
+#include <libswresample/swresample.h>
+}
+
+namespace {
+constexpr int kOutputRate = 44100;
+constexpr int kIOBufferSize = 32 * 1024;
+
+struct MemoryReader {
+    const unsigned char *data;
+    size_t size;
+    size_t position;
+};
+
+int readPacket(void *opaque, unsigned char *buffer, int bufferSize) {
+    auto *reader = static_cast<MemoryReader *>(opaque);
+    if (reader->position >= reader->size) {
+        return AVERROR_EOF;
+    }
+    size_t count = std::min(reader->size - reader->position,
+                            static_cast<size_t>(bufferSize));
+    std::memcpy(buffer, reader->data + reader->position, count);
+    reader->position += count;
+    return static_cast<int>(count);
+}
+
+int64_t seekPacket(void *opaque, int64_t offset, int whence) {
+    auto *reader = static_cast<MemoryReader *>(opaque);
+    if (whence == AVSEEK_SIZE) {
+        return static_cast<int64_t>(reader->size);
+    }
+
+    int64_t position = 0;
+    switch (whence & ~AVSEEK_FORCE) {
+    case SEEK_SET:
+        position = offset;
+        break;
+    case SEEK_CUR:
+        position = static_cast<int64_t>(reader->position) + offset;
+        break;
+    case SEEK_END:
+        position = static_cast<int64_t>(reader->size) + offset;
+        break;
+    default:
+        return AVERROR(EINVAL);
+    }
+    if (position < 0 || position > static_cast<int64_t>(reader->size)) {
+        return AVERROR(EINVAL);
+    }
+    reader->position = static_cast<size_t>(position);
+    return position;
+}
+
+struct InputContext {
+    MemoryReader reader{};
+    AVFormatContext *format = nullptr;
+    AVIOContext *io = nullptr;
+};
+
+void closeInput(InputContext *input) {
+    if (!input) {
+        return;
+    }
+    if (input->format) {
+        avformat_close_input(&input->format);
+    }
+    if (input->io) {
+        avio_context_free(&input->io);
+    }
+}
+
+bool openInput(const unsigned char *data, size_t length, InputContext *input) {
+    input->reader = {data, length, 0};
+    input->format = avformat_alloc_context();
+    if (!input->format) {
+        return false;
+    }
+
+    unsigned char *ioBuffer = static_cast<unsigned char *>(av_malloc(kIOBufferSize));
+    if (!ioBuffer) {
+        closeInput(input);
+        return false;
+    }
+    input->io = avio_alloc_context(
+        ioBuffer,
+        kIOBufferSize,
+        0,
+        &input->reader,
+        readPacket,
+        nullptr,
+        seekPacket);
+    if (!input->io) {
+        av_free(ioBuffer);
+        closeInput(input);
+        return false;
+    }
+    input->format->pb = input->io;
+    input->format->flags |= AVFMT_FLAG_CUSTOM_IO;
+
+    if (avformat_open_input(&input->format, nullptr, nullptr, nullptr) < 0 ||
+        avformat_find_stream_info(input->format, nullptr) < 0) {
+        closeInput(input);
+        return false;
+    }
+    return true;
+}
+
+int findAudioStream(AVFormatContext *format) {
+    return av_find_best_stream(format, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+}
+
+int64_t streamDurationUs(const AVFormatContext *format, int streamIndex) {
+    const AVStream *stream = format->streams[streamIndex];
+    if (stream->duration != AV_NOPTS_VALUE) {
+        return av_rescale_q(stream->duration, stream->time_base, AV_TIME_BASE_Q);
+    }
+    if (format->duration != AV_NOPTS_VALUE) {
+        return format->duration;
+    }
+    return 0;
+}
+}
+
+namespace SoLoud {
+class FfmpegInstance : public AudioSourceInstance {
+public:
+    explicit FfmpegInstance(FfmpegSource *parent) : mParent(parent) {
+        if (!parent->mData ||
+            !openInput(parent->mData, parent->mDataLength, &mInput)) {
+            return;
+        }
+        mFormat = mInput.format;
+
+        mStreamIndex = findAudioStream(mFormat);
+        if (mStreamIndex < 0) {
+            return;
+        }
+        const AVCodecParameters *parameters = mFormat->streams[mStreamIndex]->codecpar;
+        const AVCodec *codec = avcodec_find_decoder(parameters->codec_id);
+        if (!codec) {
+            return;
+        }
+        mCodec = avcodec_alloc_context3(codec);
+        if (!mCodec || avcodec_parameters_to_context(mCodec, parameters) < 0 ||
+            avcodec_open2(mCodec, codec, nullptr) < 0) {
+            return;
+        }
+        mPacket = av_packet_alloc();
+        mFrame = av_frame_alloc();
+        if (!mPacket || !mFrame) {
+            return;
+        }
+
+        AVChannelLayout outputLayout;
+        av_channel_layout_default(&outputLayout, 2);
+        if (swr_alloc_set_opts2(
+                &mResampler,
+                &outputLayout,
+                AV_SAMPLE_FMT_FLTP,
+                kOutputRate,
+                &mCodec->ch_layout,
+                mCodec->sample_fmt,
+                mCodec->sample_rate,
+                0,
+                nullptr) < 0 ||
+            !mResampler || swr_init(mResampler) < 0) {
+            av_channel_layout_uninit(&outputLayout);
+            return;
+        }
+        av_channel_layout_uninit(&outputLayout);
+        mBaseSamplerate = static_cast<float>(kOutputRate);
+        mChannels = 2;
+        mReady = true;
+    }
+
+    ~FfmpegInstance() override {
+        if (mResampler) swr_free(&mResampler);
+        if (mFrame) av_frame_free(&mFrame);
+        if (mPacket) av_packet_free(&mPacket);
+        if (mCodec) avcodec_free_context(&mCodec);
+        closeInput(&mInput);
+    }
+
+    unsigned int getAudio(float *buffer, unsigned int frames, unsigned int bufferSize) override {
+        if (!mReady || mEnded) return 0;
+        unsigned int produced = 0;
+        while (produced < frames) {
+            if (mPendingFrames == 0 && !decodeMore()) {
+                mEnded = true;
+                break;
+            }
+            unsigned int count = std::min(frames - produced, mPendingFrames);
+            for (unsigned int i = 0; i < count; ++i) {
+                buffer[produced + i] = mPendingLeft[i];
+                buffer[bufferSize + produced + i] = mPendingRight[i];
+            }
+            mPendingLeft.erase(mPendingLeft.begin(), mPendingLeft.begin() + count);
+            mPendingRight.erase(mPendingRight.begin(), mPendingRight.begin() + count);
+            mPendingFrames -= count;
+            produced += count;
+        }
+        return produced;
+    }
+
+    bool hasEnded() override { return mEnded; }
+
+    result seek(time seconds, float *, unsigned int) override {
+        if (!mReady) return FILE_LOAD_FAILED;
+        int64_t timestamp = av_rescale_q(
+            static_cast<int64_t>(seconds * AV_TIME_BASE),
+            AV_TIME_BASE_Q,
+            mFormat->streams[mStreamIndex]->time_base);
+        if (avformat_seek_file(mFormat, mStreamIndex, INT64_MIN, timestamp,
+                               INT64_MAX, AVSEEK_FLAG_BACKWARD) < 0) {
+            return FILE_LOAD_FAILED;
+        }
+        avcodec_flush_buffers(mCodec);
+        swr_close(mResampler);
+        if (swr_init(mResampler) < 0) return FILE_LOAD_FAILED;
+        mPendingLeft.clear();
+        mPendingRight.clear();
+        mPendingFrames = 0;
+        mEnded = false;
+        return SO_NO_ERROR;
+    }
+
+    result rewind() override { return seek(0, nullptr, 0); }
+
+private:
+    bool decodeMore() {
+        while (true) {
+            int error = av_read_frame(mFormat, mPacket);
+            if (error < 0) {
+                avcodec_send_packet(mCodec, nullptr);
+                error = AVERROR_EOF;
+            } else if (mPacket->stream_index != mStreamIndex) {
+                av_packet_unref(mPacket);
+                continue;
+            } else {
+                error = avcodec_send_packet(mCodec, mPacket);
+                av_packet_unref(mPacket);
+            }
+            if (error < 0 && error != AVERROR_EOF) return false;
+
+            while (true) {
+                error = avcodec_receive_frame(mCodec, mFrame);
+                if (error == AVERROR(EAGAIN)) break;
+                if (error == AVERROR_EOF) return false;
+                if (error < 0) return false;
+                appendFrame();
+                av_frame_unref(mFrame);
+                if (mPendingFrames != 0) return true;
+            }
+            if (mEnded) return false;
+        }
+    }
+
+    void appendFrame() {
+        int outputFrames = swr_get_out_samples(mResampler, mFrame->nb_samples);
+        if (outputFrames <= 0) return;
+        std::vector<float> left(outputFrames);
+        std::vector<float> right(outputFrames);
+        uint8_t *output[] = {
+            reinterpret_cast<uint8_t *>(left.data()),
+            reinterpret_cast<uint8_t *>(right.data())};
+        int converted = swr_convert(
+            mResampler,
+            output,
+            outputFrames,
+            const_cast<const uint8_t **>(mFrame->extended_data),
+            mFrame->nb_samples);
+        if (converted <= 0) return;
+        mPendingLeft.insert(mPendingLeft.end(), left.begin(), left.begin() + converted);
+        mPendingRight.insert(mPendingRight.end(), right.begin(), right.begin() + converted);
+        mPendingFrames += static_cast<unsigned int>(converted);
+    }
+
+    FfmpegSource *mParent;
+    InputContext mInput;
+    AVFormatContext *mFormat = nullptr;
+    AVCodecContext *mCodec = nullptr;
+    AVPacket *mPacket = nullptr;
+    AVFrame *mFrame = nullptr;
+    SwrContext *mResampler = nullptr;
+    int mStreamIndex = -1;
+    bool mReady = false;
+    bool mEnded = false;
+    unsigned int mPendingFrames = 0;
+    std::vector<float> mPendingLeft;
+    std::vector<float> mPendingRight;
+};
+
+FfmpegSource::FfmpegSource()
+    : mData(nullptr), mDataLength(0), mSampleRate(kOutputRate), mChannels(2), mDurationUs(0) {
+    mBaseSamplerate = static_cast<float>(mSampleRate);
+    mChannels = 2;
+}
+
+FfmpegSource::~FfmpegSource() { delete[] mData; }
+
+result FfmpegSource::loadMem(const unsigned char *data, unsigned int length, bool) {
+    if (!data || length == 0) return FILE_LOAD_FAILED;
+    InputContext input;
+    if (!openInput(data, length, &input)) return FILE_LOAD_FAILED;
+    int streamIndex = findAudioStream(input.format);
+    if (streamIndex < 0) {
+        closeInput(&input);
+        return FILE_LOAD_FAILED;
+    }
+    int64_t durationUs = streamDurationUs(input.format, streamIndex);
+    unsigned char *copy = new (std::nothrow) unsigned char[length];
+    if (!copy) {
+        closeInput(&input);
+        return OUT_OF_MEMORY;
+    }
+    std::memcpy(copy, data, length);
+    closeInput(&input);
+    delete[] mData;
+    mData = copy;
+    mDataLength = length;
+    mDurationUs = durationUs;
+    return SO_NO_ERROR;
+}
+
+AudioSourceInstance *FfmpegSource::createInstance() { return new FfmpegInstance(this); }
+double FfmpegSource::getLengthSeconds() const { return mDurationUs > 0 ? mDurationUs / 1000000.0 : 0.0; }
+int FfmpegSource::getChannels() const { return mChannels; }
+int FfmpegSource::getSampleRate() const { return mSampleRate; }
+}
+
+extern "C" {
+void *Ffmpeg_create() { return new (std::nothrow) SoLoud::FfmpegSource(); }
+void Ffmpeg_destroy(void *source) { delete static_cast<SoLoud::FfmpegSource *>(source); }
+int Ffmpeg_loadMem(void *source, const unsigned char *data, unsigned int length) {
+    return static_cast<SoLoud::FfmpegSource *>(source)->loadMem(data, length) == SoLoud::SO_NO_ERROR ? 0 : 1;
+}
+unsigned int Ffmpeg_getLengthMs(void *source) {
+    return static_cast<unsigned int>(static_cast<SoLoud::FfmpegSource *>(source)->getLengthSeconds() * 1000.0);
+}
+unsigned int Ffmpeg_getChannels(void *source) {
+    return static_cast<unsigned int>(static_cast<SoLoud::FfmpegSource *>(source)->getChannels());
+}
+unsigned int Ffmpeg_getSampleRate(void *source) {
+    return static_cast<unsigned int>(static_cast<SoLoud::FfmpegSource *>(source)->getSampleRate());
+}
+}
