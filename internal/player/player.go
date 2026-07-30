@@ -22,6 +22,7 @@ type pendingLoad struct {
 	gme      *soloud.Gme     // non-nil for Game Music Emu formats
 	ayumi    *soloud.Ayumi   // non-nil for AY/YM VTX formats
 	pt3      *soloud.Pt3     // non-nil for PT3 formats
+	ym       *soloud.Ym      // non-nil for YM/LHA formats
 	bpm      float64         // tracker metadata
 	channels int
 	duration float64
@@ -37,6 +38,7 @@ type Player struct {
 	currentGme      *soloud.Gme     // non-nil when playing via Game Music Emu
 	currentAyumi    *soloud.Ayumi   // non-nil when playing via AY/YM VTX
 	currentPt3      *soloud.Pt3     // non-nil when playing via PT3
+	currentYm       *soloud.Ym      // non-nil when playing via YM/LHA
 	currentPath     string
 	currentBPM      float64
 	currentDuration float64
@@ -83,6 +85,8 @@ func isGmeExt(ext string) bool {
 func isAyumiExt(ext string) bool { return ext == ".vtx" }
 
 func isPt3Ext(ext string) bool { return ext == ".pt3" }
+
+func isYmExt(ext string) bool { return ext == ".ym" || ext == ".lh" || ext == ".lha" }
 
 // PlayFile loads and plays an audio file. Only one file at a time.
 func (p *Player) PlayFile(path string) error {
@@ -137,6 +141,22 @@ func (p *Player) PlayFile(path string) error {
 		p.replacePt3Source(pt3)
 		p.currentPath = path
 		p.currentDuration = pt3.GetLength()
+		p.channels = 2
+		p.isTracker = true
+		return nil
+	}
+	if isYmExt(ext) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("ym read %s: %w", path, err)
+		}
+		ym, err := soloud.NewYm(data)
+		if err != nil {
+			return fmt.Errorf("ym %s: %w", path, err)
+		}
+		p.replaceYmSource(ym)
+		p.currentPath = path
+		p.currentDuration = ym.GetLength()
 		p.channels = 2
 		p.isTracker = true
 		return nil
@@ -265,6 +285,20 @@ func (p *Player) PlayFileAsync(path string) {
 			p.pendingCh <- pendingLoad{path: path, pt3: pt3}
 			return
 		}
+		if isYmExt(ext) {
+			fileBuf, err := os.ReadFile(localPath)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			ym, err := soloud.NewYm(fileBuf)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			p.pendingCh <- pendingLoad{path: path, ym: ym}
+			return
+		}
 		w, err := soloud.LoadWav(localPath)
 		p.pendingCh <- pendingLoad{path: path, wav: w, err: err}
 	}()
@@ -303,6 +337,9 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			}
 			if res.pt3 != nil {
 				res.pt3.Destroy()
+			}
+			if res.ym != nil {
+				res.ym.Destroy()
 			}
 			return false, false
 		}
@@ -366,6 +403,15 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			p.channels = 2
 			p.isTracker = true
 			slog.Info("playing pt3 (async)", "path", res.path)
+		} else if res.ym != nil {
+			p.replaceYmSource(res.ym)
+			p.currentPath = res.path
+			p.currentDuration = res.ym.GetLength()
+			p.currentBPM = 0
+			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
+			p.channels = 2
+			p.isTracker = true
+			slog.Info("playing ym (async)", "path", res.path)
 		}
 		return true, false
 	default:
@@ -446,6 +492,10 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 		p.currentPt3.Destroy()
 		p.currentPt3 = nil
 	}
+	if p.currentYm != nil {
+		p.currentYm.Destroy()
+		p.currentYm = nil
+	}
 	if w != nil {
 		p.currentWav = w
 		p.voice = p.s.Play(w)
@@ -468,6 +518,12 @@ func (p *Player) replacePt3Source(pt3 *soloud.Pt3) {
 	p.replaceSource(nil, nil, nil, nil)
 	p.currentPt3 = pt3
 	p.voice = p.s.PlayPt3(pt3)
+}
+
+func (p *Player) replaceYmSource(ym *soloud.Ym) {
+	p.replaceSource(nil, nil, nil, nil)
+	p.currentYm = ym
+	p.voice = p.s.PlayYm(ym)
 }
 
 // GetWave returns the current SoLoud waveform data (256 float32 samples).

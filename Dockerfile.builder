@@ -154,10 +154,9 @@ RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-4.7.1/libx
     && make install \
     && rm -rf /build/libxmp-4.7.1
 
-
-COPY lib/ayumi lib/ayumi
-COPY lib/pt3player lib/pt3player
 # --- Build PT3 player core for amd64 and arm64 ---
+COPY lib/pt3player lib/pt3player
+COPY patches/pt3player-build.patch /build/patches/pt3player-build.patch
 RUN cd lib/pt3player \
     && git apply /build/patches/pt3player-build.patch \
     && mkdir -p /opt/pt3player/amd64/lib /opt/pt3player/arm64/lib \
@@ -168,6 +167,7 @@ RUN cd lib/pt3player \
     && mkdir -p /opt/pt3player/include \
     && cp pt3player.h /opt/pt3player/include/
 # --- Build libayumi static for amd64 and arm64 ---
+COPY lib/ayumi lib/ayumi
 RUN mkdir -p /opt/ayumi/amd64/lib /opt/ayumi/arm64/lib \
     && cc -std=c99 -O2 -Ilib/ayumi -c lib/ayumi/ayumi.c -o /tmp/ayumi-amd64.o \
     && ar rcs /opt/ayumi/amd64/lib/libayumi.a /tmp/ayumi-amd64.o \
@@ -175,6 +175,26 @@ RUN mkdir -p /opt/ayumi/amd64/lib /opt/ayumi/arm64/lib \
     && aarch64-linux-gnu-ar rcs /opt/ayumi/arm64/lib/libayumi.a /tmp/ayumi-arm64.o \
     && mkdir -p /opt/ayumi/include \
     && cp lib/ayumi/ayumi.h /opt/ayumi/include/
+
+# --- Build libstsound static for amd64 and arm64 ---
+COPY lib/libstsound lib/libstsound
+RUN mkdir -p /opt/libstsound/amd64/lib /opt/libstsound/arm64/lib \
+    && for source in YmMusic.cpp Ymload.cpp YmUserInterface.cpp Ym2149Ex.cpp digidrum.cpp YmFilters.cpp; do \
+        g++ -std=c++11 -O2 -Wno-write-strings -Ilib/libstsound -Ilib/libstsound/LZH \
+            -c lib/libstsound/$source -o /tmp/libstsound-amd64-${source%.cpp}.o; \
+    done \
+    && g++ -std=c++11 -O2 -Wno-write-strings -Ilib/libstsound -Ilib/libstsound/LZH \
+        -c lib/libstsound/LZH/LzhLib.cpp -o /tmp/libstsound-amd64-LzhLib.o \
+    && ar rcs /opt/libstsound/amd64/lib/libstsound.a /tmp/libstsound-amd64-*.o \
+    && for source in YmMusic.cpp Ymload.cpp YmUserInterface.cpp Ym2149Ex.cpp digidrum.cpp YmFilters.cpp; do \
+        aarch64-linux-gnu-g++ -std=c++11 -O2 -Wno-write-strings -Ilib/libstsound -Ilib/libstsound/LZH \
+            -c lib/libstsound/$source -o /tmp/libstsound-arm64-${source%.cpp}.o; \
+    done \
+    && aarch64-linux-gnu-g++ -std=c++11 -O2 -Wno-write-strings -Ilib/libstsound -Ilib/libstsound/LZH \
+        -c lib/libstsound/LZH/LzhLib.cpp -o /tmp/libstsound-arm64-LzhLib.o \
+    && aarch64-linux-gnu-ar rcs /opt/libstsound/arm64/lib/libstsound.a /tmp/libstsound-arm64-*.o \
+    && mkdir -p /opt/libstsound/include \
+    && cp lib/libstsound/StSoundLibrary.h lib/libstsound/YmTypes.h /opt/libstsound/include/
 
 # Pre-download Go dependencies
 COPY go.mod go.sum* ./

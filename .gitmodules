@@ -13,3 +13,6 @@
 [submodule "lib/pt3player"]
 	path = lib/pt3player
 	url = https://github.com/Volutar/pt3player.git
+[submodule "lib/libstsound"]
+	path = lib/libstsound
+	url = https://github.com/cpcsdk/libstsound.git

@@ -2,6 +2,10 @@ diff --git a/pt3player.c b/pt3player.c
 index 0db3756..0000000 100644
 --- a/pt3player.c
 +++ b/pt3player.c
-@@ -693,0 +694,2 @@ int func_restart_music(int ch) {
-+
+@@ -690,5 +690,6 @@ int func_restart_music(int ch) {
+ 		pl->PT3_[abc].Note = 0;
+ 		pl->PT3_[abc].Ton = 0;
+ 	}
 +	return 1;
+ 
+ }

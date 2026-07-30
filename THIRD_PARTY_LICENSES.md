@@ -26,6 +26,10 @@ This file contains license information for all third-party libraries used in mdp
 **License:** MIT
 **Source:** https://github.com/Volutar/pt3player
 
+## libstsound
+**License:** BSD-2-Clause
+**Source:** https://github.com/cpcsdk/libstsound
+
 ## cRSID
 **License:** GPL-2.0+
 **Source:** Rockbox project (https://www.rockbox.org/)

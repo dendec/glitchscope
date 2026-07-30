@@ -249,7 +249,20 @@ a reference for the behavior to reproduce, not an upstream ayumi API. The
 initial adapter may accept uncompressed register data first; LZH support must
 be added before considering VTX coverage complete.
 
-### 2b. PT2/PT3 Parsers
+### 2b. YM/LHARC via libstsound
+
+**Source:** https://github.com/cpcsdk/libstsound
+**License:** BSD-2-Clause
+**Integration:** Git submodule at `lib/libstsound/`
+
+libstsound provides a complete YM2/YM3/YM4/YM5/YM6 player, metadata, duration,
+seek, loop handling, AY emulation, and LHA/LHARC depacking. The `mdpp` adapter
+uses its memory-loading API and PCM renderer, so `.ym`, `.lh`, and `.lha` files
+share one implementation without a separate LHA parser. Its built-in emulator
+is tuned for AY-3-8912/Amstrad CPC behavior; VTX and PT3 therefore continue to
+use the existing ayumi-based paths.
+
+### 2c. PT2/PT3 Parsers
 
 **File count:** .pt2: 6,284, .pt3: 6,868
 
@@ -270,7 +283,7 @@ the main player yet.
 **Action:** Keep direct PT3/VTX integrations stable and prototype the emulator
 backend separately before adding PT2 support.
 
-### 2c. Other Spectrum Formats
+### 2d. Other Spectrum Formats
 
 | Format | Files | Parser needed |
 |--------|-------|---------------|

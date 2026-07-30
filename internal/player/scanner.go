@@ -38,6 +38,7 @@ var SupportedExts = map[string]bool{
 	// AY/YM VTX via libayumi
 	".vtx": true,
 	".pt3": true,
+	".ym":  true, ".lh": true, ".lha": true,
 	// libopenmpt fallback formats
 	".mo3": true, ".ktm": true, ".ims": true, ".mdc": true,
 	".spx": true, ".txn": true,
