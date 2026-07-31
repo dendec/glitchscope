@@ -51,6 +51,8 @@ func init() {
 		// libopenmpt fallback formats
 		".mo3": true, ".ktm": true, ".ims": true, ".mdc": true,
 		".spx": true, ".txn": true,
+		// Specialized player routes.
+		".pt3": true, ".vtx": true, ".ym": true, ".lh": true, ".lha": true,
 	}
 }
 

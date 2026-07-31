@@ -3,7 +3,7 @@
 ## Purpose
 
 This is a deferred research project for broad ZX Spectrum music coverage. It
-is separate from the direct format integrations in `mdpp` and should only be
+is separate from the direct format integrations in `pmv` and should only be
 embedded after a small standalone prototype is proven.
 
 The goal is to play Spectrum music by executing the original loader/player
