@@ -346,6 +346,9 @@ func (o *Overlay) Select() bool {
 			case entryFormat:
 				o.pushLevel(o.buildAlbumsInFormatEntries(e.format))
 				return false
+			case entryLocalDir:
+				o.pushLevel(o.buildLocalDirEntries(e.dirPath))
+				return false
 			case entryModArchiveRoot:
 				entries := o.buildModArchiveEntries("http://modarchive.textfiles.com/")
 				if len(entries) > 0 {

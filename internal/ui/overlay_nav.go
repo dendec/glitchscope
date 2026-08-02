@@ -2,6 +2,7 @@ package ui
 
 import (
 	"net/url"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -37,6 +38,7 @@ type navEntryKind int
 
 const (
 	entryLocalAlbum      navEntryKind = iota // real album/folder — leaf, has tracks
+	entryLocalDir                            // real folder — intermediate, drill down
 	entryModlandRoot                         // "Modland" pseudo-folder at the library root
 	entryFormat                              // modland format bucket (e.g. "Protracker")
 	entryModlandAlbum                        // modland author/album within a format — leaf, has tracks
@@ -52,6 +54,7 @@ type navEntry struct {
 	albumIdx int    // index into Overlay.allAlbums when kind is a leaf album, else -1
 	format   string // set when kind == entryFormat
 	url      string // set when kind == entryModArchiveDir
+	dirPath  string // set when kind == entryLocalDir
 }
 
 // navLevel is a pushed navigation level.
@@ -92,8 +95,7 @@ func (o *Overlay) FocusPlayingTrack(albumIdx, trackIdx int) {
 		} else if strings.HasPrefix(path, player.ModArchivePrefix) {
 			o.focusModArchiveAlbum(albumIdx)
 		} else {
-			o.albumCursor = o.rootIndexOf(albumIdx)
-			o.refreshPreview()
+			o.focusLocalAlbum(albumIdx)
 		}
 	} else {
 		o.albumCursor = 0
@@ -146,9 +148,60 @@ func (o *Overlay) focusModArchiveAlbum(albumIdx int) {
 	o.syncPanels()
 }
 
+// focusLocalAlbum drills the nav stack down the folder chain holding
+// allAlbums[albumIdx], positioning the cursor on the playing album.
+func (o *Overlay) focusLocalAlbum(albumIdx int) {
+	parts := relParts(o.baseDir, o.allAlbums[albumIdx].Path)
+	if len(parts) <= 1 {
+		// Album at (or is) the library root — no drill needed.
+		o.albumCursor = o.rootIndexOf(albumIdx)
+		o.albumsScroll = 0
+		o.syncPanels()
+		return
+	}
+
+	o.rootCursor = o.rootLocalDirIndex(filepath.Join(o.baseDir, parts[0]))
+	o.rootScroll = 0
+
+	dirPath := o.baseDir
+	for i, seg := range parts[:len(parts)-1] {
+		dirPath = filepath.Join(dirPath, seg)
+		entries := o.buildLocalDirEntries(dirPath)
+		cursor := 0
+		if i == len(parts)-2 {
+			cursor = indexOfEntry(entries, func(e navEntry) bool { return e.albumIdx == albumIdx })
+			o.albumCursor = cursor
+		} else {
+			cursor = indexOfEntry(entries, func(e navEntry) bool { return e.kind == entryLocalDir && e.dirPath == filepath.Join(dirPath, parts[i+1]) })
+		}
+		o.navStack = append(o.navStack, navLevel{entries: entries, cursor: cursor})
+	}
+
+	o.albumsScroll = 0
+	o.syncPanels()
+}
+
+// relParts returns the path segments of path relative to base: nil when path
+// isn't under base, empty for base itself.
+func relParts(base, path string) []string {
+	rel, err := filepath.Rel(base, path)
+	if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return nil
+	}
+	if rel == "." {
+		return []string{}
+	}
+	return strings.Split(filepath.ToSlash(rel), "/")
+}
+
 // rootModlandIndex returns the root-level index of the "Modland" entry.
 func (o *Overlay) rootModlandIndex() int {
 	return indexOfEntry(o.rootEntries, func(e navEntry) bool { return e.kind == entryModlandRoot })
+}
+
+// rootLocalDirIndex returns the root-level index of a top-level local folder.
+func (o *Overlay) rootLocalDirIndex(dirPath string) int {
+	return indexOfEntry(o.rootEntries, func(e navEntry) bool { return e.kind == entryLocalDir && e.dirPath == dirPath })
 }
 
 // rootModArchiveIndex returns the root-level index of the "ModArchive" entry.
@@ -166,25 +219,69 @@ func indexOfEntry(entries []navEntry, pred func(navEntry) bool) int {
 	return 0
 }
 
-// buildRootEntries builds the library-root rows from allAlbums.
+// buildRootEntries builds the library-root rows from allAlbums: local albums
+// are grouped into top-level folders, with albums sitting directly in the
+// music root shown as leaf rows.
 func (o *Overlay) buildRootEntries() []navEntry {
 	var entries []navEntry
 	hasModland := false
+	seenDirs := map[string]bool{}
 	for i, a := range o.allAlbums {
 		if strings.HasPrefix(a.Path, player.ModlandPrefix) {
 			hasModland = true
 			continue
 		}
-		if strings.HasPrefix(a.Path, player.ModArchivePrefix) {
+		if isVirtualAlbum(a) {
+			continue // modarchive virtual album
+		}
+		parts := relParts(o.baseDir, a.Path)
+		if len(parts) <= 1 {
+			// Album at the library root (or the root itself is an album).
+			entries = append(entries, navEntry{label: a.Name, kind: entryLocalAlbum, albumIdx: i})
 			continue
 		}
-		entries = append(entries, navEntry{label: a.Name, kind: entryLocalAlbum, albumIdx: i})
+		dirPath := filepath.Join(o.baseDir, parts[0])
+		if !seenDirs[dirPath] {
+			seenDirs[dirPath] = true
+			entries = append(entries, navEntry{label: parts[0], kind: entryLocalDir, albumIdx: -1, dirPath: dirPath})
+		}
 	}
 	if hasModland {
 		entries = append(entries, navEntry{label: "Modland", kind: entryModlandRoot, albumIdx: -1})
 	}
 	entries = append(entries, navEntry{label: "ModArchive", kind: entryModArchiveRoot, albumIdx: -1})
 	return entries
+}
+
+// buildLocalDirEntries lists the immediate children of a local folder:
+// sub-folders first, then leaf albums. A folder that also holds tracks of
+// its own appears as a leaf album row too, so nothing becomes unreachable.
+func (o *Overlay) buildLocalDirEntries(dirPath string) []navEntry {
+	var folders, albums []navEntry
+	seenDirs := map[string]bool{}
+	for i, a := range o.allAlbums {
+		if isVirtualAlbum(a) {
+			continue
+		}
+		parts := relParts(dirPath, a.Path)
+		if parts == nil {
+			continue
+		}
+		if len(parts) <= 1 {
+			// Leaf album in this folder — or the folder itself when it holds
+			// tracks directly (hybrid dir), kept reachable.
+			albums = append(albums, navEntry{label: a.Name, kind: entryLocalAlbum, albumIdx: i})
+			continue
+		}
+		child := filepath.Join(dirPath, parts[0])
+		if !seenDirs[child] {
+			seenDirs[child] = true
+			folders = append(folders, navEntry{label: parts[0], kind: entryLocalDir, albumIdx: -1, dirPath: child})
+		}
+	}
+	sort.Slice(folders, func(x, y int) bool { return folders[x].label < folders[y].label })
+	sort.Slice(albums, func(x, y int) bool { return albums[x].label < albums[y].label })
+	return append(folders, albums...)
 }
 
 // buildFormatEntries lists distinct modland formats.
@@ -398,6 +495,9 @@ func (o *Overlay) refreshPreview() {
 			}
 		}
 		o.previewEntries = entries
+		o.previewActive = true
+	case entryLocalDir:
+		o.previewEntries = o.buildLocalDirEntries(e.dirPath)
 		o.previewActive = true
 	default:
 		o.previewEntries = nil
