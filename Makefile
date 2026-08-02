@@ -48,9 +48,10 @@ DOCKER_GO_CACHE  := pmv-go-build-cache
 
 ALLMODS_URL := https://modland.antarctica.no/allmods.zip
 ALLMODS_ZIP := $(DIST_DIR)/allmods.zip
-CATALOG     := dist/modland
+MODLAND_CATALOG    := .cache/modland/catalog
+MODARCHIVE_CATALOG := .cache/modarchive/catalog
 
-.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets pmv portable-pmv textures optimize-textures texture-archive texture-report catalog catalog-validate
+.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets pmv portable-pmv textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog
 
 DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
 
@@ -64,8 +65,20 @@ lint: builder
 test: builder
 	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go test -count=1 ./cmd/... ./internal/...'
 
+# Build modarchive catalog via crawler (only if missing).
+$(MODARCHIVE_CATALOG): builder
+	@if [ ! -f "$@" ]; then \
+		$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go run ./cmd/modarchive-catalog -v'; \
+		echo "=== Built modarchive catalog $@ ==="; \
+	else \
+		echo "=== Modarchive catalog $@ already exists, skipping ==="; \
+	fi
+
+modland-catalog: $(MODLAND_CATALOG)
+modarchive-catalog: $(MODARCHIVE_CATALOG)
+
 # Docker build (amd64)
-dist: builder $(PMV_FILE) $(TEXTURES_PMV_FILE) $(CATALOG)
+dist: builder $(PMV_FILE) $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t pmv:amd64 -f Dockerfile .
 	@rm -rf $(X64_DIST_DIR)
 	@mkdir -p $(X64_DIST_DIR)
@@ -79,14 +92,16 @@ dist: builder $(PMV_FILE) $(TEXTURES_PMV_FILE) $(CATALOG)
 	rm -rf $(X64_DIST_DIR)/textures
 	cp $(TEXTURES_PMV_FILE) $(X64_DIST_DIR)/presets/textures.pmv
 	cp -r test_data/* $(X64_DIST_DIR)/
-	cp $(CATALOG) $(X64_DIST_DIR)/modland
+	@mkdir -p $(X64_DIST_DIR)/.cache/modland $(X64_DIST_DIR)/.cache/modarchive
+	@cp $(MODLAND_CATALOG) $(X64_DIST_DIR)/.cache/modland/catalog
+	@cp $(MODARCHIVE_CATALOG) $(X64_DIST_DIR)/.cache/modarchive/catalog
 	@echo "=== Built $(APP) (amd64) ==="
 	@ls -lhR $(X64_DIST_DIR)/
 
 # ARM64 cross-build via Docker
 DOCKER_IMAGE_ARM64 := pmv:arm64
 
-dist-arm64: builder portable-pmv $(TEXTURES_PMV_FILE) $(CATALOG)
+dist-arm64: builder portable-pmv $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)
@@ -99,12 +114,14 @@ dist-arm64: builder portable-pmv $(TEXTURES_PMV_FILE) $(CATALOG)
 	rm -rf $(ARM64_DIST_DIR)/pmv/textures
 	cp $(TEXTURES_PMV_FILE) $(ARM64_DIST_DIR)/pmv/presets/textures.pmv
 	cp -r test_data/* $(ARM64_DIST_DIR)/
-	cp $(CATALOG) $(ARM64_DIST_DIR)/pmv/modland
+	@mkdir -p $(ARM64_DIST_DIR)/pmv/.cache/modland $(ARM64_DIST_DIR)/pmv/.cache/modarchive
+	@cp $(MODLAND_CATALOG) $(ARM64_DIST_DIR)/pmv/.cache/modland/catalog
+	@cp $(MODARCHIVE_CATALOG) $(ARM64_DIST_DIR)/pmv/.cache/modarchive/catalog
 	@echo "=== $(ARM64_DIST_DIR)/ ==="
 	@ls -lhR $(ARM64_DIST_DIR)/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
-dist-portmaster: dist-arm64 portable-pmv $(TEXTURES_PMV_FILE) $(CATALOG)
+dist-portmaster: dist-arm64 portable-pmv $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	@rm -rf dist/portmaster_build
 	@mkdir -p dist/portmaster_build/pmv/presets dist/portmaster_build/pmv/licenses
 	cp portmaster/PMV.sh dist/portmaster_build/
@@ -117,7 +134,9 @@ dist-portmaster: dist-arm64 portable-pmv $(TEXTURES_PMV_FILE) $(CATALOG)
 	cp $(ARM64_DIST_DIR)/pmv/pmv dist/portmaster_build/pmv/
 	cp $(PMV_FILE) dist/portmaster_build/pmv/presets/presets.pmv
 	cp $(TEXTURES_PMV_FILE) dist/portmaster_build/pmv/presets/textures.pmv
-	cp $(CATALOG) dist/portmaster_build/pmv/modland
+	@mkdir -p dist/portmaster_build/pmv/.cache/modland dist/portmaster_build/pmv/.cache/modarchive
+	@cp $(MODLAND_CATALOG) dist/portmaster_build/pmv/.cache/modland/catalog
+	@cp $(MODARCHIVE_CATALOG) dist/portmaster_build/pmv/.cache/modarchive/catalog
 	cp portmaster/licenses/* dist/portmaster_build/pmv/licenses/ 2>/dev/null; true
 	cp portmaster/screenshot.png dist/portmaster_build/pmv/cover.png 2>/dev/null; true
 	@rm -f dist/pmv.zip
@@ -136,11 +155,10 @@ deploy: dist-arm64 portable-pmv $(TEXTURES_PMV_FILE)
 	adb push $(PMV_FILE) $(DEVICE_DIR)/presets/presets.pmv
 	# Deploy the optimized texture archive for MilkDrop presets.
 	adb push $(TEXTURES_PMV_FILE) $(DEVICE_DIR)/presets/textures.pmv
-	# Deploy modland catalog.
-	adb shell "mkdir -p $(DEVICE_DIR)/modland"
-	adb push $(CATALOG) $(DEVICE_DIR)/modland/
+	# Deploy .cache directory (modland & modarchive catalogs)
+	@if [ -d ".cache" ]; then adb push .cache $(DEVICE_DIR)/; fi
 	adb shell "killall -9 pmv 2>/dev/null; true"
-	@echo "=== Deployed binary + music + presets + textures + catalog ==="
+	@echo "=== Deployed binary + music + presets + textures + cache ==="
 
 deploy-portmaster: dist-portmaster
 	adb push dist/pmv.zip $(PM_AUTOINSTALL)/
@@ -224,36 +242,19 @@ $(ALLMODS_ZIP):
 	curl -fL -o $@ $(ALLMODS_URL)
 	@echo "=== Downloaded $(ALLMODS_URL) → $@ ==="
 
-# Build modland catalog from allmods.zip.
-$(CATALOG):
+# Build modland catalog from allmods.zip (only if missing).
+$(MODLAND_CATALOG): builder
 	@if [ ! -f "$@" ]; then \
 		$(MAKE) $(ALLMODS_ZIP); \
 		mkdir -p $(dir $@); \
-		$(GO) run ./cmd/modland-catalog/ $(ALLMODS_ZIP) $(DIST_DIR); \
-		echo "=== Built catalog $@ ==="; \
+		$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go run ./cmd/modland-catalog $(ALLMODS_ZIP) .'; \
+		echo "=== Built modland catalog $@ ==="; \
 	else \
-		echo "=== Catalog $@ already exists, skipping ==="; \
+		echo "=== Modland catalog $@ already exists, skipping ==="; \
 	fi
 
 # Validate catalog: build validator in Docker, run with network to test each format.
-catalog-validate: $(CATALOG) builder
-	@docker rm -f pmv-catalog 2>/dev/null || true
-	docker create --name pmv-catalog -v $(PWD):/build -w /build \
-		$(DOCKER_BUILDER) bash -c '\
-		CGO_ENABLED=1 \
-		CGO_CFLAGS="-I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include" \
-		CGO_CXXFLAGS="-std=c++11 -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include" \
-		CGO_LDFLAGS="/opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a -lstdc++ -lm" \
-		go build -o /tmp/validate-catalog \
-			-ldflags="-s -w" -buildvcs=false \
-			./cmd/validate-catalog/ && \
-		/tmp/validate-catalog /build/$(DIST_DIR) && \
-		cp /build/$(DIST_DIR)/modland /tmp/modland-catalog'
-	docker start -a pmv-catalog
-	@mkdir -p $(dir $(CATALOG))
-	docker cp pmv-catalog:/tmp/modland-catalog $(CATALOG)
-	docker rm -f pmv-catalog
+catalog-validate: $(MODLAND_CATALOG) builder
+	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go run ./cmd/validate-catalog /build/'
 
-catalog: $(CATALOG) catalog-validate
-
-
+catalog: modland-catalog modarchive-catalog catalog-validate

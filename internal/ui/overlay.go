@@ -61,6 +61,7 @@ type Overlay struct {
 
 	screenW, screenH int
 	fontSize         float64
+	baseDir          string
 
 	allAlbums      []player.Album
 	rootEntries    []navEntry
@@ -213,6 +214,10 @@ func (o *Overlay) ToggleVisibility() {
 
 // --- UI mode ---
 
+func (o *Overlay) SetBaseDir(dir string) {
+	o.baseDir = dir
+}
+
 func (o *Overlay) SetSettingsRows(rows []SettingRow, cursor int) {
 	o.settingsRows = rows
 	o.settingsCursor = cursor
@@ -288,10 +293,16 @@ func (o *Overlay) rebuildFace() {
 
 // SetAlbums updates the album list and rebuilds library-root navigation rows.
 func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
-	listChanged := len(o.allAlbums) != len(albums)
+	listChanged := false
+	// Virtual provider albums (modland/modarchive) are overlay-owned and
+	// don't exist in the library — ignore them when detecting a rescan,
+	// otherwise creating a ModArchive album resets the nav stack to root.
+	prev := realAlbumsOnly(o.allAlbums)
+	next := realAlbumsOnly(albums)
+	listChanged = len(prev) != len(next)
 	if !listChanged {
-		for i := range albums {
-			if o.allAlbums[i].Name != albums[i].Name || o.allAlbums[i].Path != albums[i].Path {
+		for i := range next {
+			if prev[i].Name != next[i].Name || prev[i].Path != next[i].Path {
 				listChanged = true
 				break
 			}

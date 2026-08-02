@@ -265,19 +265,45 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 }
 
 // TrackTitle returns a display-friendly name for a track path.
-func TrackTitle(path string) string {
-	p := strings.TrimPrefix(path, "modland:")
-	return strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
+const (
+	ModlandPrefix    = "modland:"
+	ModArchivePrefix = "modarchive:"
+)
+
+var KnownPrefixes = []string{
+	ModlandPrefix,
+	ModArchivePrefix,
 }
 
-const ModlandPrefix = "modland:"
+// TrimPrefixes strips any virtual provider prefix (modland:, modarchive:, etc.) from path.
+func TrimPrefixes(path string) string {
+	for _, prefix := range KnownPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return strings.TrimPrefix(path, prefix)
+		}
+	}
+	return path
+}
+
+func TrackTitle(path string) string {
+	p := TrimPrefixes(path)
+	base := filepath.Base(p)
+	if strings.HasSuffix(strings.ToLower(base), ".zip") {
+		base = base[:len(base)-4]
+	}
+	return strings.TrimSuffix(base, filepath.Ext(base))
+}
 
 func IsModland(path string) bool {
 	return strings.HasPrefix(path, ModlandPrefix)
 }
 
+func IsModArchive(path string) bool {
+	return strings.HasPrefix(path, ModArchivePrefix)
+}
+
 func RemotePath(path string) string {
-	return strings.TrimPrefix(path, ModlandPrefix)
+	return TrimPrefixes(path)
 }
 
 // AddVirtualAlbums appends pre-built albums (e.g. from modland) to the library.

@@ -30,6 +30,10 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 		return
 	}
 
+	// Overlay-owned ModArchive albums can't be resolved via the library's
+	// SetTrackInfos; re-assert their track list each frame.
+	o.refreshVirtualTracks()
+
 	state := sdl.GetKeyboardState()
 	now := time.Now()
 
@@ -331,8 +335,8 @@ func (o *Overlay) Select() bool {
 		return o.currentCategory() != nil && len(o.currentCategory().Presets) > 0
 	}
 
-	// Album panel selected: drill into a non-leaf entry (Modland root or a
-	// format bucket), or switch to the tracks panel for a leaf album.
+	// Album panel selected: drill into a non-leaf entry (Modland/ModArchive root or a
+	// format/directory bucket), or switch to the tracks panel for a leaf album.
 	if o.focusPanel == 0 {
 		if e := o.currentEntry(); e != nil {
 			switch e.kind {
@@ -342,6 +346,24 @@ func (o *Overlay) Select() bool {
 			case entryFormat:
 				o.pushLevel(o.buildAlbumsInFormatEntries(e.format))
 				return false
+			case entryModArchiveRoot:
+				entries := o.buildModArchiveEntries("http://modarchive.textfiles.com/")
+				if len(entries) > 0 {
+					o.pushLevel(entries)
+				}
+				return false
+			case entryModArchiveDir:
+				entries := o.buildModArchiveEntries(e.url)
+				if len(entries) == 1 && entries[0].kind == entryModArchiveAlbum {
+					o.pushLevel(entries)
+					o.focusPanel = 1
+					o.tracksDirty = true
+					return false
+				}
+				if len(entries) > 0 {
+					o.pushLevel(entries)
+					return false
+				}
 			}
 		}
 		o.focusPanel = 1

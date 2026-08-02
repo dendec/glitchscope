@@ -12,6 +12,7 @@ import (
 	"github.com/dendec/pmv/internal/archive"
 	"github.com/dendec/pmv/internal/config"
 	"github.com/dendec/pmv/internal/input"
+	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/dendec/pmv/internal/modland"
 	"github.com/dendec/pmv/internal/player"
 	"github.com/dendec/pmv/internal/presets"
@@ -110,6 +111,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 		return nil, fmt.Errorf("gl context: %w", err)
 	}
 	a.glCtx = glCtx
+	_ = sdl.GLSetSwapInterval(0)
 
 	t0 := time.Now()
 	pm, err := projectm.Create()
@@ -248,9 +250,14 @@ func (a *App) initAudio() {
 			}
 			return modland.DownloadFile(baseDir(), remotePath, expectedSize, onProgress)
 		}
+		if player.IsModArchive(path) {
+			remoteURL := player.RemotePath(path)
+			return modarchive.DownloadAndExtract(baseDir(), remoteURL, onProgress)
+		}
 		return path, nil
 	}
 	a.overlay = ui.New()
+	a.overlay.SetBaseDir(baseDir())
 	w, h := a.window.GLGetDrawableSize()
 	a.overlay.SetScreenSize(int(w), int(h))
 	slog.Info("audio init", "ms", time.Since(t).Milliseconds())
@@ -269,6 +276,9 @@ func (a *App) initLibrary() {
 
 	// Load modland from cache only (no download on startup).
 	a.loadModlandFromCache()
+
+	// Preload modarchive catalog if available on disk.
+	modarchive.InitCatalog(baseDir())
 }
 
 func (a *App) loadModlandFromCache() {
@@ -686,7 +696,7 @@ func (a *App) allTracks() []trackRef {
 func (a *App) localTracks() []trackRef {
 	var all []trackRef
 	for ai, album := range a.lib.Albums {
-		if player.IsModland(album.Path) {
+		if player.IsModland(album.Path) || player.IsModArchive(album.Path) {
 			continue
 		}
 		for ti, path := range album.Tracks {

@@ -2,8 +2,6 @@
 package modland
 
 import (
-	"compress/gzip"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -13,48 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/pmv/internal/util"
 )
-
-const (
-	catalogFile = "modland"
-	filesDir    = "modland-cache"
-)
-
-// SupportedExts is the set of file extensions accepted from modland.
-var SupportedExts map[string]bool
-
-func init() {
-	SupportedExts = map[string]bool{
-		".mp3": true, ".ogg": true, ".flac": true, ".wav": true,
-		// Core tracker formats
-		".mod": true, ".xm": true, ".it": true, ".s3m": true,
-		// Additional tracker formats
-		".mptm": true, ".stm": true, ".nst": true, ".wow": true,
-		".ult": true, ".669": true, ".mtm": true, ".med": true,
-		".far": true, ".mdl": true, ".ams": true, ".dsm": true,
-		".amf": true, ".okt": true, ".dmf": true, ".ptm": true,
-		".psm": true, ".mt2": true, ".dbm": true,
-		// Exotic formats supported by libxmp
-		".abk": true, ".digi": true, ".dtt": true,
-		".flx": true, ".gtk": true, ".imf": true, ".liq": true,
-		".masi": true, ".mgt": true, ".mmd": true, ".mmdc": true,
-		".mmcmp": true, ".muse": true, ".nt": true, ".pmd": true,
-		".ppm": true, ".pru": true, ".pt36": true, ".rh": true,
-		".rtm": true, ".sfx": true, ".sfx2": true, ".stim": true,
-		".stx": true, ".tcb": true, ".tdd": true, ".tp": true,
-		".uni": true, ".xd": true,
-		// Game Music Emu formats
-		".ay": true, ".nsf": true, ".nsfe": true, ".spc": true, ".gbs": true,
-		".hes": true, ".kss": true, ".sap": true,
-		".vgm": true, ".vgz": true,
-		".sid": true, ".rsid": true,
-		// libopenmpt fallback formats
-		".mo3": true, ".ktm": true, ".ims": true, ".mdc": true,
-		".spx": true, ".txn": true,
-		// Specialized player routes.
-		".pt3": true, ".vtx": true, ".ym": true, ".lh": true, ".lha": true,
-	}
-}
 
 // Track holds a module filename and its expected size.
 type Track struct {
@@ -86,47 +46,84 @@ type cacheEntry struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
-// CacheDir returns the modland cache directory.
+// CacheDir returns the modland cache directory (.cache/modland).
 func CacheDir(baseDir string) (string, error) {
-	dir := filepath.Join(baseDir, filesDir)
+	dir := filepath.Join(baseDir, ".cache", "modland")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("modland mkdir: %w", err)
 	}
 	return dir, nil
 }
 
-// FilesDir returns the directory where downloaded module files are cached.
+// FilesDir returns the directory where downloaded module files are cached (.cache/modland/files).
 func FilesDir(baseDir string) (string, error) {
 	cacheDir, err := CacheDir(baseDir)
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(cacheDir, filesDir)
+	dir := filepath.Join(cacheDir, "files")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("modland files mkdir: %w", err)
 	}
 	return dir, nil
 }
 
+// CatalogPath returns the path to the modland catalog file.
+func CatalogPath(baseDir string) string {
+	cacheDir, _ := CacheDir(baseDir)
+	return filepath.Join(cacheDir, "catalog")
+}
+
+// MigrateLegacyCache moves old modland-cache/ or modland catalog files into .cache/modland/.
+func MigrateLegacyCache(baseDir string) {
+	targetDir, err := CacheDir(baseDir)
+	if err != nil {
+		return
+	}
+
+	oldCat := filepath.Join(baseDir, "modland")
+	newCat := filepath.Join(targetDir, "catalog")
+	if _, err := os.Stat(oldCat); err == nil {
+		if _, err := os.Stat(newCat); os.IsNotExist(err) {
+			_ = os.Rename(oldCat, newCat)
+		} else {
+			_ = os.Remove(oldCat)
+		}
+	}
+
+	oldFiles := filepath.Join(baseDir, "modland-cache")
+	newFiles, _ := FilesDir(baseDir)
+	if info, err := os.Stat(oldFiles); err == nil && info.IsDir() {
+		nested := filepath.Join(oldFiles, "modland-cache")
+		if nInfo, nErr := os.Stat(nested); nErr == nil && nInfo.IsDir() {
+			oldFiles = nested
+		}
+		_ = filepath.Walk(oldFiles, func(path string, fi os.FileInfo, err error) error {
+			if err != nil || fi.IsDir() {
+				return nil
+			}
+			rel, err := filepath.Rel(oldFiles, path)
+			if err != nil {
+				return nil
+			}
+			dst := filepath.Join(newFiles, rel)
+			if _, err := os.Stat(dst); os.IsNotExist(err) {
+				_ = os.MkdirAll(filepath.Dir(dst), 0o755)
+				_ = os.Rename(path, dst)
+			}
+			return nil
+		})
+		_ = os.RemoveAll(filepath.Join(baseDir, "modland-cache"))
+	}
+}
+
 // LoadCatalog reads the catalog from disk.
 func LoadCatalog(baseDir string) *Catalog {
-	path := filepath.Join(baseDir, catalogFile)
-
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		return nil
-	}
-	defer gz.Close()
+	MigrateLegacyCache(baseDir)
+	path := CatalogPath(baseDir)
 
 	var entry cacheEntry
-	if err := json.NewDecoder(gz).Decode(&entry); err != nil {
-		slog.Error("modland catalog decode failed", "error", err)
+	if err := util.LoadGzipJSON(path, &entry); err != nil {
 		return nil
 	}
 
@@ -144,41 +141,14 @@ func LoadCatalog(baseDir string) *Catalog {
 
 // SaveCatalog writes the catalog to disk as gzipped JSON.
 func SaveCatalog(baseDir string, cat *Catalog) error {
-	path := filepath.Join(baseDir, catalogFile)
-
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("modland catalog mkdir: %w", err)
-	}
-
-	tmp, err := os.CreateTemp(filepath.Dir(path), "catalog*.tmp")
-	if err != nil {
-		return fmt.Errorf("modland catalog temp: %w", err)
-	}
-	tmpPath := tmp.Name()
-
-	gz := gzip.NewWriter(tmp)
-	if err := json.NewEncoder(gz).Encode(cacheEntry{
+	path := CatalogPath(baseDir)
+	entry := cacheEntry{
 		Albums:          cat.Albums,
 		ExcludedFormats: cat.ExcludedFormats,
 		UpdatedAt:       cat.UpdatedAt,
-	}); err != nil {
-		gz.Close()
-		tmp.Close()
-		os.Remove(tmpPath)
-		return fmt.Errorf("modland catalog encode: %w", err)
 	}
-	if err := gz.Close(); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("modland catalog rename: %w", err)
+	if err := util.SaveGzipJSON(path, entry); err != nil {
+		return fmt.Errorf("modland catalog save: %w", err)
 	}
 	return nil
 }
@@ -255,7 +225,7 @@ func ParseListing(data []byte) (*Catalog, error) {
 		path = filepath.ToSlash(path)
 
 		ext := strings.ToLower(filepath.Ext(path))
-		if !SupportedExts[ext] {
+		if !player.IsSupportedExt(ext) {
 			continue
 		}
 

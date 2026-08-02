@@ -1,6 +1,7 @@
 package player
 
 import (
+	"path/filepath"
 	"strings"
 )
 
@@ -57,7 +58,15 @@ var SupportedExts = map[string]bool{
 	".txn": true,
 }
 
+func IsSupportedExt(ext string) bool {
+	return SupportedExts[strings.ToLower(ext)]
+}
+
 func shouldSkipDir(path string) bool {
+	base := strings.ToLower(filepath.Base(path))
+	if strings.HasPrefix(base, ".") || base == "modland-cache" || base == "modarchive-cache" {
+		return true
+	}
 	for _, p := range skipPrefixes {
 		if strings.HasPrefix(path, p) {
 			return true

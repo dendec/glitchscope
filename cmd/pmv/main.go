@@ -20,14 +20,20 @@ var (
 	flagBenchOut      = flag.String("benchmark-out", "benchmark.csv", "output path for benchmark CSV")
 	flagBenchWorker   = flag.Bool("benchmark-worker", false, "internal: run as benchmark worker subprocess")
 	flagFile          = flag.String("file", "", "audio file to play on startup")
+	flagVerbose       = flag.Bool("v", false, "verbose debug logging (incl. modarchive navigation)")
 )
 
 func main() {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	flag.Parse()
+
+	logLevel := slog.LevelInfo
+	if *flagVerbose {
+		logLevel = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
 
 	renderScaleExplicit, renderNearestSet := trackExplicitFlags()
 
