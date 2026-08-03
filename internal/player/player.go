@@ -42,11 +42,14 @@ type Player struct {
 
 	// Downloader optionally fetches a remote file to a local path (e.g. for modland).
 	Downloader  func(path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
-	pendingCh   chan loadResult // background load results
+	loadFunc    func(localPath string) loadResult // test seam: override loadSource
+	pendingCh   chan loadResult                    // background load results
 	pendingMu   sync.Mutex
 	requestID   atomic.Uint64
 	loading     atomic.Bool
 	loadPercent atomic.Int64 // download progress percent [0..100], -1 if unknown
+	loadWG      sync.WaitGroup
+	closed      bool
 }
 
 // New creates and initializes a Player.
@@ -230,6 +233,14 @@ func (p *Player) PlayFile(path string) error {
 
 // PlayFileAsync starts loading in a background goroutine.
 func (p *Player) PlayFileAsync(path string) {
+	p.pendingMu.Lock()
+	if p.closed {
+		p.pendingMu.Unlock()
+		return
+	}
+	p.loadWG.Add(1)
+	p.pendingMu.Unlock()
+
 	requestID := p.requestID.Add(1)
 	p.pendingMu.Lock()
 	select {
@@ -241,16 +252,23 @@ func (p *Player) PlayFileAsync(path string) {
 	}
 	p.pendingMu.Unlock()
 
-	p.s.StopAll()
+	if p.s != nil {
+		p.s.StopAll()
+	}
 	p.voice = 0
 	p.currentPath = path // show path in UI while loading
 	p.loading.Store(true)
 	p.loadPercent.Store(-1)
 
 	go func() {
+		defer p.loadWG.Done()
+
 		localPath := path
 		if p.Downloader != nil {
 			onProgress := func(read, total int64) {
+				if p.requestID.Load() != requestID {
+					return // stale request — ignore progress
+				}
 				if total <= 0 {
 					return
 				}
@@ -269,8 +287,15 @@ func (p *Player) PlayFileAsync(path string) {
 			}
 			localPath = dlPath
 		}
+		if p.requestID.Load() != requestID {
+			return // stale — skip decode, do not reset progress
+		}
 		p.loadPercent.Store(-1) // decode phase: unknown progress
-		r := loadSource(localPath)
+		loader := loadSource
+		if p.loadFunc != nil {
+			loader = p.loadFunc
+		}
+		r := loader(localPath)
 		r.path = path
 		r.localPath = localPath
 		r.requestID = requestID
@@ -362,14 +387,18 @@ func (p *Player) applyResult(r loadResult, displayPath string) {
 
 // replaceSource stops current playback and swaps in a new audio source.
 func (p *Player) replaceSource(src soloud.AudioSource) {
-	p.s.StopAll()
+	if p.s != nil {
+		p.s.StopAll()
+	}
 	if p.current != nil {
 		p.current.Destroy()
 		p.current = nil
 	}
 	if src != nil {
 		p.current = src
-		p.voice = p.s.PlaySource(src)
+		if p.s != nil {
+			p.voice = p.s.PlaySource(src)
+		}
 	}
 }
 
@@ -427,18 +456,46 @@ func (p *Player) TrackFinished() bool {
 }
 
 func (p *Player) Stop() {
-	p.s.StopAll()
+	if p.s != nil {
+		p.s.StopAll()
+	}
 	p.voice = 0
 	if p.current != nil {
 		p.current.Destroy()
 		p.current = nil
 	}
 	p.currentPath = ""
+	p.loading.Store(false)
+	p.loadPercent.Store(-1)
+	p.requestID.Add(1) // invalidate any in-flight async load
 }
 
 func (p *Player) Close() {
+	p.pendingMu.Lock()
+	if p.closed {
+		p.pendingMu.Unlock()
+		return
+	}
+	p.closed = true
+	p.pendingMu.Unlock()
+
 	p.Stop()
-	p.s.Destroy()
+	p.loadWG.Wait() // wait for all in-flight workers
+
+	// Discard any remaining pending source.
+	p.pendingMu.Lock()
+	select {
+	case r := <-p.pendingCh:
+		if r.src != nil {
+			r.src.Destroy()
+		}
+	default:
+	}
+	p.pendingMu.Unlock()
+
+	if p.s != nil {
+		p.s.Destroy()
+	}
 	slog.Info("SoLoud shut down")
 }
 
