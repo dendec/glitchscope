@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"net/url"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -371,51 +370,26 @@ func (o *Overlay) buildModArchiveEntries(targetURL string) []navEntry {
 			}
 		}
 
-		label := modArchiveAlbumLabel(targetURL)
 		if albumIdx < 0 {
-			albumName := "ModArchive: " + label
-			var tracks []string
-			for _, item := range items {
-				if item.Kind == modarchive.KindFile {
-					tracks = append(tracks, player.ModArchivePrefix+item.URL)
-				}
+			if album := modarchive.BuildAlbum(targetURL, items); album != nil {
+				o.allAlbums = append(o.allAlbums, *album)
+				albumIdx = len(o.allAlbums) - 1
 			}
-			newAlbum := player.Album{
-				Name:   albumName,
-				Path:   albumPath,
-				Tracks: tracks,
-			}
-			o.allAlbums = append(o.allAlbums, newAlbum)
-			albumIdx = len(o.allAlbums) - 1
 		}
 
-		return []navEntry{
-			{
-				label:    label,
-				kind:     entryModArchiveAlbum,
-				albumIdx: albumIdx,
-				url:      targetURL,
-			},
+		if albumIdx >= 0 {
+			return []navEntry{
+				{
+					label:    modarchive.AlbumLabel(targetURL),
+					kind:     entryModArchiveAlbum,
+					albumIdx: albumIdx,
+					url:      targetURL,
+				},
+			}
 		}
 	}
 
 	return nil
-}
-
-func modArchiveAlbumLabel(targetURL string) string {
-	u, err := url.Parse(targetURL)
-	if err != nil {
-		return targetURL
-	}
-	p := strings.Trim(u.Path, "/")
-	parts := strings.Split(p, "/")
-	if len(parts) >= 3 {
-		return modarchive.FormatDirName(parts[0]) + "/" + strings.Join(parts[1:], "/")
-	}
-	if len(parts) > 0 {
-		return modarchive.FormatDirName(parts[0])
-	}
-	return "ModArchive"
 }
 
 // rootIndexOf finds the root-level row for a real allAlbums index.

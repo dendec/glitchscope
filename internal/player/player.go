@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/dendec/pmv/internal/openmpt"
@@ -18,6 +19,8 @@ import (
 type loadResult struct {
 	src        soloud.AudioSource
 	path       string
+	localPath  string
+	requestID  uint64
 	bpm        float64
 	channels   int
 	duration   float64
@@ -40,6 +43,8 @@ type Player struct {
 	// Downloader optionally fetches a remote file to a local path (e.g. for modland).
 	Downloader  func(path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
 	pendingCh   chan loadResult // background load results
+	pendingMu   sync.Mutex
+	requestID   atomic.Uint64
 	loading     atomic.Bool
 	loadPercent atomic.Int64 // download progress percent [0..100], -1 if unknown
 }
@@ -225,10 +230,16 @@ func (p *Player) PlayFile(path string) error {
 
 // PlayFileAsync starts loading in a background goroutine.
 func (p *Player) PlayFileAsync(path string) {
+	requestID := p.requestID.Add(1)
+	p.pendingMu.Lock()
 	select {
-	case <-p.pendingCh:
+	case old := <-p.pendingCh:
+		if old.src != nil {
+			old.src.Destroy()
+		}
 	default:
 	}
+	p.pendingMu.Unlock()
 
 	p.s.StopAll()
 	p.voice = 0
@@ -253,14 +264,38 @@ func (p *Player) PlayFileAsync(path string) {
 			}
 			dlPath, err := p.Downloader(path, 0, onProgress)
 			if err != nil {
-				p.pendingCh <- loadResult{path: path, err: err}
+				p.publishResult(loadResult{path: path, requestID: requestID, err: err})
 				return
 			}
 			localPath = dlPath
 		}
 		p.loadPercent.Store(-1) // decode phase: unknown progress
-		p.pendingCh <- loadSource(localPath)
+		r := loadSource(localPath)
+		r.path = path
+		r.localPath = localPath
+		r.requestID = requestID
+		p.publishResult(r)
 	}()
+}
+
+func (p *Player) publishResult(r loadResult) {
+	p.pendingMu.Lock()
+	defer p.pendingMu.Unlock()
+	if r.requestID != p.requestID.Load() {
+		if r.src != nil {
+			r.src.Destroy()
+		}
+		return
+	}
+
+	select {
+	case old := <-p.pendingCh:
+		if old.src != nil {
+			old.src.Destroy()
+		}
+	default:
+	}
+	p.pendingCh <- r
 }
 
 func (p *Player) Loading() bool {
@@ -276,9 +311,11 @@ func (p *Player) LoadProgress() (active bool, percent int64) {
 // CheckPending picks up a completed background load.
 // Returns (started, failed). Call every frame.
 func (p *Player) CheckPending() (started bool, failed bool) {
+	p.pendingMu.Lock()
 	select {
 	case r := <-p.pendingCh:
-		if r.path != p.currentPath {
+		p.pendingMu.Unlock()
+		if r.requestID != p.requestID.Load() {
 			// Stale result — discard.
 			if r.src != nil {
 				r.src.Destroy()
@@ -299,6 +336,7 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 		}
 		return true, false
 	default:
+		p.pendingMu.Unlock()
 		return false, false
 	}
 }
@@ -314,7 +352,11 @@ func (p *Player) applyResult(r loadResult, displayPath string) {
 	if r.isTracker {
 		p.currentBitrate = 0
 	} else {
-		p.currentBitrate = fileBitrate(displayPath, r.duration)
+		bitratePath := r.localPath
+		if bitratePath == "" {
+			bitratePath = displayPath
+		}
+		p.currentBitrate = fileBitrate(bitratePath, r.duration)
 	}
 }
 

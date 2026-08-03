@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/dendec/pmv/internal/formats"
+	"github.com/dendec/pmv/internal/player"
 	"github.com/dendec/pmv/internal/util"
 )
 
@@ -384,4 +385,49 @@ func saveCachedIndex(cacheFile string, items []DirItem) {
 		UpdatedAt: time.Now(),
 	}
 	_ = util.SaveJSONAtomic(cacheFile, entry)
+}
+
+// BuildAlbum constructs a virtual Album from a ModArchive directory listing.
+// Returns nil when items contain no files (i.e. it's a folder listing).
+func BuildAlbum(targetURL string, items []DirItem) *player.Album {
+	hasFiles := false
+	for _, item := range items {
+		if item.Kind == KindFile {
+			hasFiles = true
+			break
+		}
+	}
+	if !hasFiles {
+		return nil
+	}
+
+	var tracks []string
+	for _, item := range items {
+		if item.Kind == KindFile {
+			tracks = append(tracks, player.ModArchivePrefix+item.URL)
+		}
+	}
+
+	return &player.Album{
+		Name:   "ModArchive: " + AlbumLabel(targetURL),
+		Path:   player.ModArchivePrefix + targetURL,
+		Tracks: tracks,
+	}
+}
+
+// AlbumLabel produces a human-readable label for a ModArchive URL path.
+func AlbumLabel(targetURL string) string {
+	u, err := url.Parse(targetURL)
+	if err != nil {
+		return targetURL
+	}
+	p := strings.Trim(u.Path, "/")
+	parts := strings.Split(p, "/")
+	if len(parts) >= 3 {
+		return FormatDirName(parts[0]) + "/" + strings.Join(parts[1:], "/")
+	}
+	if len(parts) > 0 {
+		return FormatDirName(parts[0])
+	}
+	return "ModArchive"
 }
