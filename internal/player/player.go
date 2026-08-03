@@ -14,37 +14,22 @@ import (
 	"github.com/dendec/pmv/internal/xmp"
 )
 
-type pendingLoad struct {
-	path     string
-	wav      *soloud.Wav     // non-nil for WAV/MP3/FLAC etc.
-	mod      *soloud.Xmp     // non-nil for libxmp-supported formats
-	ompt     *soloud.Openmpt // non-nil for libopenmpt fallback formats
-	gme      *soloud.Gme     // non-nil for Game Music Emu formats
-	sid      *soloud.Sid     // non-nil for SID/RSID formats
-	ayumi    *soloud.Ayumi   // non-nil for AY/YM VTX formats
-	pt3      *soloud.Pt3     // non-nil for PT3 formats
-	ym       *soloud.Ym      // non-nil for YM/LHA formats
-	hvl      *soloud.Hvl     // non-nil for AHX/HVL formats
-	ffmpeg   *soloud.Ffmpeg  // non-nil for FFmpeg-supported audio formats
-	bpm      float64         // tracker metadata
-	channels int
-	duration float64
-	err      error
+// loadResult holds the outcome of loading a single audio source.
+type loadResult struct {
+	src        soloud.AudioSource
+	path       string
+	bpm        float64
+	channels   int
+	duration   float64
+	isTracker  bool
+	trackCount int // non-zero for multi-track sources (gme, sid, hvl)
+	err        error
 }
 
 type Player struct {
 	s               *soloud.Soloud
 	voice           uint
-	currentWav      *soloud.Wav     // non-nil when playing WAV/MP3/FLAC etc.
-	currentMod      *soloud.Xmp     // non-nil when playing via libxmp
-	currentOmpt     *soloud.Openmpt // non-nil when playing via libopenmpt
-	currentGme      *soloud.Gme     // non-nil when playing via Game Music Emu
-	currentSid      *soloud.Sid     // non-nil when playing via SID/RSID
-	currentAyumi    *soloud.Ayumi   // non-nil when playing via AY/YM VTX
-	currentPt3      *soloud.Pt3     // non-nil when playing via PT3
-	currentYm       *soloud.Ym      // non-nil when playing via YM/LHA
-	currentHvl      *soloud.Hvl     // non-nil when playing via AHX/HVL
-	currentFfmpeg   *soloud.Ffmpeg  // non-nil when playing via FFmpeg
+	current         soloud.AudioSource // single field replaces 10 format-specific fields
 	currentPath     string
 	currentBPM      float64
 	currentDuration float64
@@ -53,12 +38,10 @@ type Player struct {
 	isTracker       bool
 
 	// Downloader optionally fetches a remote file to a local path (e.g. for modland).
-	// onProgress, if non-nil, should be called with (bytesRead, totalBytes) as the
-	// download progresses; totalBytes may be 0 if unknown.
 	Downloader  func(path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
-	pendingCh   chan pendingLoad // background load results
-	loading     atomic.Bool      // true while an async load is in flight
-	loadPercent atomic.Int64     // download progress percent [0..100], -1 if unknown
+	pendingCh   chan loadResult // background load results
+	loading     atomic.Bool
+	loadPercent atomic.Int64 // download progress percent [0..100], -1 if unknown
 }
 
 // New creates and initializes a Player.
@@ -72,7 +55,7 @@ func New() (*Player, error) {
 		return nil, fmt.Errorf("soloud init: %w", err)
 	}
 	slog.Info("SoLoud initialized")
-	return &Player{s: s, pendingCh: make(chan pendingLoad, 1)}, nil
+	return &Player{s: s, pendingCh: make(chan loadResult, 1)}, nil
 }
 
 func isTrackerExt(ext string) bool {
@@ -112,153 +95,135 @@ func isFfmpegExt(ext string) bool {
 	}
 }
 
-// PlayFile loads and plays an audio file. Only one file at a time.
-func (p *Player) PlayFile(path string) error {
-	ext := strings.ToLower(filepath.Ext(path))
+// loadSource loads an audio source from a local path and returns a loadResult.
+func loadSource(localPath string) loadResult {
+	ext := strings.ToLower(filepath.Ext(localPath))
+
+	if isHvlExt(ext) {
+		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
+			return soloud.NewHvl(data)
+		}, true, 2)
+	}
 	if isTrackerExt(ext) {
-		return p.playTracker(path)
+		return loadTracker(localPath, ext)
 	}
 	if isGmeExt(ext) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("gme read %s: %w", path, err)
-		}
-		gme, err := soloud.NewGme(data)
-		if err != nil {
-			return fmt.Errorf("gme %s: %w", path, err)
-		}
-		p.replaceSource(nil, nil, nil, gme)
-		p.currentPath = path
-		p.currentDuration = gme.GetLength()
-		p.currentBPM = 0
-		p.currentBitrate = fileBitrate(path, p.currentDuration)
-		p.channels = 2
-		p.isTracker = true
-		slog.Info("playing gme", "path", path, "tracks", gme.GetTrackCount())
-		return nil
-	}
-	if isHvlExt(ext) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("hvl read %s: %w", path, err)
-		}
-		hvl, err := soloud.NewHvl(data)
-		if err != nil {
-			return fmt.Errorf("hvl %s: %w", path, err)
-		}
-		p.replaceHvlSource(hvl)
-		p.currentPath = path
-		p.currentDuration = hvl.GetLength()
-		p.currentBPM = 0
-		p.currentBitrate = fileBitrate(path, p.currentDuration)
-		p.channels = 2
-		p.isTracker = true
-		slog.Info("playing hvl", "path", path, "tracks", hvl.GetTrackCount())
-		return nil
+		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
+			return soloud.NewGme(data)
+		}, true, 2)
 	}
 	if isSidExt(ext) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("sid read %s: %w", path, err)
-		}
-		sid, err := soloud.NewSid(data)
-		if err != nil {
-			return fmt.Errorf("sid %s: %w", path, err)
-		}
-		p.replaceSidSource(sid)
-		p.currentPath = path
-		p.currentDuration = sid.GetLength()
-		p.currentBPM = 0
-		p.currentBitrate = fileBitrate(path, p.currentDuration)
-		p.channels = 1
-		p.isTracker = true
-		slog.Info("playing sid", "path", path, "tracks", sid.GetTrackCount())
-		return nil
+		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
+			return soloud.NewSid(data)
+		}, true, 1)
 	}
 	if isAyumiExt(ext) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("vtx read %s: %w", path, err)
-		}
-		ayumi, err := soloud.NewAyumi(data)
-		if err != nil {
-			return fmt.Errorf("vtx %s: %w", path, err)
-		}
-		p.replaceSource(nil, nil, nil, nil, ayumi)
-		p.currentPath = path
-		p.currentDuration = ayumi.GetLength()
-		p.channels = 2
-		p.isTracker = true
-		return nil
+		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
+			return soloud.NewAyumi(data)
+		}, true, 2)
 	}
 	if isPt3Ext(ext) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("pt3 read %s: %w", path, err)
-		}
-		pt3, err := soloud.NewPt3(data)
-		if err != nil {
-			return fmt.Errorf("pt3 %s: %w", path, err)
-		}
-		p.replacePt3Source(pt3)
-		p.currentPath = path
-		p.currentDuration = pt3.GetLength()
-		p.channels = 2
-		p.isTracker = true
-		return nil
+		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
+			return soloud.NewPt3(data)
+		}, true, 2)
 	}
 	if isYmExt(ext) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("ym read %s: %w", path, err)
-		}
-		ym, err := soloud.NewYm(data)
-		if err != nil {
-			return fmt.Errorf("ym %s: %w", path, err)
-		}
-		p.replaceYmSource(ym)
-		p.currentPath = path
-		p.currentDuration = ym.GetLength()
-		p.channels = 2
-		p.isTracker = true
-		return nil
+		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
+			return soloud.NewYm(data)
+		}, true, 2)
 	}
 	if isFfmpegExt(ext) {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("ffmpeg read %s: %w", path, err)
-		}
-		ffmpeg, err := soloud.NewFfmpeg(data)
-		if err != nil {
-			return fmt.Errorf("ffmpeg %s: %w", path, err)
-		}
-		p.replaceFfmpegSource(ffmpeg)
-		p.currentPath = path
-		p.currentDuration = ffmpeg.GetLength()
-		p.currentBPM = 0
-		p.currentBitrate = fileBitrate(path, p.currentDuration)
-		p.channels = ffmpeg.GetChannels()
-		p.isTracker = false
-		return nil
+		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
+			return soloud.NewFfmpeg(data)
+		}, false, 0) // channels determined after load
 	}
 
-	w, err := soloud.LoadWav(path)
+	// WAV and other formats loaded via SoLoud's file loader.
+	w, err := soloud.LoadWav(localPath)
 	if err != nil {
-		return fmt.Errorf("load %s: %w", path, err)
+		return loadResult{path: localPath, err: fmt.Errorf("load %s: %w", localPath, err)}
 	}
-	p.replaceSource(w, nil, nil, nil)
-	p.currentPath = path
-	p.currentDuration = w.GetLength()
-	p.currentBPM = 0
-	p.currentBitrate = fileBitrate(path, p.currentDuration)
-	p.channels = w.GetChannels()
-	p.isTracker = false
-	slog.Info("playing", "path", path)
+	return loadResult{
+		src:       w,
+		path:      localPath,
+		duration:  w.GetLength(),
+		channels:  w.GetChannels(),
+		isTracker: false,
+	}
+}
+
+// loadFromBytes is a helper that reads a file and creates an audio source.
+func loadFromBytes(path, ext string, factory func([]byte) (soloud.AudioSource, error), isTracker bool, channels int) loadResult {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return loadResult{path: path, err: fmt.Errorf("%s read %s: %w", ext, path, err)}
+	}
+	src, err := factory(data)
+	if err != nil {
+		return loadResult{path: path, err: fmt.Errorf("%s %s: %w", ext, path, err)}
+	}
+	r := loadResult{
+		src:       src,
+		path:      path,
+		duration:  src.(interface{ GetLength() float64 }).GetLength(),
+		channels:  channels,
+		isTracker: isTracker,
+	}
+	// Extract track count for multi-track sources.
+	if tc, ok := src.(interface{ GetTrackCount() int }); ok {
+		r.trackCount = tc.GetTrackCount()
+	}
+	// Determine channels dynamically for ffmpeg.
+	if ch, ok := src.(interface{ GetChannels() int }); ok && channels == 0 {
+		r.channels = ch.GetChannels()
+	}
+	return r
+}
+
+// loadTracker loads a tracker file, trying openmpt first, then xmp.
+func loadTracker(path, ext string) loadResult {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return loadResult{path: path, err: fmt.Errorf("tracker read %s: %w", path, err)}
+	}
+
+	// Try libopenmpt first (broader format support), fallback to libxmp.
+	if openmpt.HasExt(ext) {
+		ompt, err := soloud.NewOpenmpt(data)
+		if err == nil {
+			bpm, ch, dur, _ := openmpt.GetTrackerMeta(data)
+			return loadResult{src: ompt, path: path, bpm: bpm, channels: ch, duration: dur, isTracker: true}
+		}
+		slog.Debug("openmpt fallback to xmp", "ext", ext, "err", err)
+	}
+
+	mod, err := soloud.NewXmp(data)
+	if err != nil {
+		return loadResult{path: path, err: fmt.Errorf("tracker %s: %w", path, err)}
+	}
+	bpm, ch, dur, err := xmp.GetTrackerMetaFromBytes(data)
+	if err != nil {
+		slog.Warn("tracker meta", "path", path, "err", err)
+	}
+	return loadResult{src: mod, path: path, bpm: bpm, channels: ch, duration: dur, isTracker: true}
+}
+
+// PlayFile loads and plays an audio file. Only one file at a time.
+func (p *Player) PlayFile(path string) error {
+	r := loadSource(path)
+	if r.err != nil {
+		return r.err
+	}
+	p.applyResult(r, path)
+	if r.trackCount > 0 {
+		slog.Info("playing", "format", strings.ToLower(filepath.Ext(path)), "path", path, "tracks", r.trackCount)
+	} else {
+		slog.Info("playing", "path", path)
+	}
 	return nil
 }
 
 // PlayFileAsync starts loading in a background goroutine.
-// Call CheckPending() from the main loop to pick up the result.
 func (p *Player) PlayFileAsync(path string) {
 	select {
 	case <-p.pendingCh:
@@ -271,8 +236,6 @@ func (p *Player) PlayFileAsync(path string) {
 	p.loading.Store(true)
 	p.loadPercent.Store(-1)
 
-	// loading is cleared by CheckPending, NOT here — a newer goroutine
-	// may already be running when this one ends.
 	go func() {
 		localPath := path
 		if p.Downloader != nil {
@@ -288,141 +251,15 @@ func (p *Player) PlayFileAsync(path string) {
 				}
 				p.loadPercent.Store(pct)
 			}
-			dlPath, err := p.Downloader(path, 0, onProgress) // size unknown at call site
+			dlPath, err := p.Downloader(path, 0, onProgress)
 			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
+				p.pendingCh <- loadResult{path: path, err: err}
 				return
 			}
 			localPath = dlPath
 		}
 		p.loadPercent.Store(-1) // decode phase: unknown progress
-
-		ext := strings.ToLower(filepath.Ext(localPath))
-		if isHvlExt(ext) {
-			fileBuf, err := os.ReadFile(localPath)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			hvl, err := soloud.NewHvl(fileBuf)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			p.pendingCh <- pendingLoad{path: path, hvl: hvl}
-			return
-		}
-		if isTrackerExt(ext) {
-			fileBuf, err := os.ReadFile(localPath)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			// Try libopenmpt first (broader format support), fallback to libxmp.
-			if openmpt.HasExt(ext) {
-				ompt, err := soloud.NewOpenmpt(fileBuf)
-				if err == nil {
-					bpm, ch, dur, _ := openmpt.GetTrackerMeta(fileBuf)
-					p.pendingCh <- pendingLoad{path: path, ompt: ompt, bpm: bpm, channels: ch, duration: dur}
-					return
-				}
-				slog.Debug("openmpt fallback to xmp", "ext", ext, "err", err)
-			}
-			mod, err := soloud.NewXmp(fileBuf)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			bpm, ch, dur, _ := xmp.GetTrackerMetaFromBytes(fileBuf)
-			p.pendingCh <- pendingLoad{path: path, mod: mod, bpm: bpm, channels: ch, duration: dur}
-			return
-		}
-		if isGmeExt(ext) {
-			fileBuf, err := os.ReadFile(localPath)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			gme, err := soloud.NewGme(fileBuf)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			p.pendingCh <- pendingLoad{path: path, gme: gme}
-			return
-		}
-		if isSidExt(ext) {
-			fileBuf, err := os.ReadFile(localPath)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			sid, err := soloud.NewSid(fileBuf)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			p.pendingCh <- pendingLoad{path: path, sid: sid}
-			return
-		}
-		if isAyumiExt(ext) {
-			fileBuf, err := os.ReadFile(localPath)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			ayumi, err := soloud.NewAyumi(fileBuf)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			p.pendingCh <- pendingLoad{path: path, ayumi: ayumi}
-			return
-		}
-		if isPt3Ext(ext) {
-			fileBuf, err := os.ReadFile(localPath)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			pt3, err := soloud.NewPt3(fileBuf)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			p.pendingCh <- pendingLoad{path: path, pt3: pt3}
-			return
-		}
-		if isYmExt(ext) {
-			fileBuf, err := os.ReadFile(localPath)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			ym, err := soloud.NewYm(fileBuf)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			p.pendingCh <- pendingLoad{path: path, ym: ym}
-			return
-		}
-		if isFfmpegExt(ext) {
-			fileBuf, err := os.ReadFile(localPath)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			ffmpeg, err := soloud.NewFfmpeg(fileBuf)
-			if err != nil {
-				p.pendingCh <- pendingLoad{path: path, err: err}
-				return
-			}
-			p.pendingCh <- pendingLoad{path: path, ffmpeg: ffmpeg}
-			return
-		}
-		w, err := soloud.LoadWav(localPath)
-		p.pendingCh <- pendingLoad{path: path, wav: w, err: err}
+		p.pendingCh <- loadSource(localPath)
 	}()
 }
 
@@ -431,7 +268,7 @@ func (p *Player) Loading() bool {
 }
 
 // LoadProgress returns whether an async load is in flight and download
-// progress percent [0..100], or -1 when unknown (decode phase or no download).
+// progress percent [0..100], or -1 when unknown.
 func (p *Player) LoadProgress() (active bool, percent int64) {
 	return p.loading.Load(), p.loadPercent.Load()
 }
@@ -440,136 +277,25 @@ func (p *Player) LoadProgress() (active bool, percent int64) {
 // Returns (started, failed). Call every frame.
 func (p *Player) CheckPending() (started bool, failed bool) {
 	select {
-	case res := <-p.pendingCh:
-		if res.path != p.currentPath {
-			if res.wav != nil {
-				res.wav.Destroy()
-			}
-			if res.mod != nil {
-				res.mod.Destroy()
-			}
-			if res.ompt != nil {
-				res.ompt.Destroy()
-			}
-			if res.gme != nil {
-				res.gme.Destroy()
-			}
-			if res.sid != nil {
-				res.sid.Destroy()
-			}
-			if res.ayumi != nil {
-				res.ayumi.Destroy()
-			}
-			if res.pt3 != nil {
-				res.pt3.Destroy()
-			}
-			if res.ym != nil {
-				res.ym.Destroy()
-			}
-			if res.ffmpeg != nil {
-				res.ffmpeg.Destroy()
-			}
-			if res.hvl != nil {
-				res.hvl.Destroy()
+	case r := <-p.pendingCh:
+		if r.path != p.currentPath {
+			// Stale result — discard.
+			if r.src != nil {
+				r.src.Destroy()
 			}
 			return false, false
 		}
 		p.loading.Store(false)
-		if res.err != nil {
-			slog.Error("async load", "path", res.path, "error", res.err)
-			p.currentPath = "" // clear failed path so player state is consistent
+		if r.err != nil {
+			slog.Error("async load", "path", r.path, "error", r.err)
+			p.currentPath = ""
 			return false, true
 		}
-		if res.mod != nil {
-			p.replaceSource(nil, res.mod, nil, nil)
-			p.currentPath = res.path
-			p.currentBPM = res.bpm
-			p.currentBitrate = 0
-			p.channels = res.channels
-			p.isTracker = true
-			p.currentDuration = res.duration
-			slog.Info("tracker xmp (async)", "path", res.path)
-		} else if res.ompt != nil {
-			p.replaceSource(nil, nil, res.ompt, nil)
-			p.currentPath = res.path
-			p.currentBPM = res.bpm
-			p.currentBitrate = 0
-			p.channels = res.channels
-			p.isTracker = true
-			p.currentDuration = res.duration
-			slog.Info("tracker openmpt (async)", "path", res.path)
-		} else if res.wav != nil {
-			p.replaceSource(res.wav, nil, nil, nil)
-			p.currentPath = res.path
-			p.currentDuration = res.wav.GetLength()
-			p.currentBPM = 0
-			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
-			p.channels = res.wav.GetChannels()
-			p.isTracker = false
-			slog.Info("playing (async)", "path", res.path)
-		} else if res.gme != nil {
-			p.replaceSource(nil, nil, nil, res.gme)
-			p.currentPath = res.path
-			p.currentDuration = res.gme.GetLength()
-			p.currentBPM = 0
-			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
-			p.channels = 2
-			p.isTracker = true
-			slog.Info("playing gme (async)", "path", res.path, "tracks", res.gme.GetTrackCount())
-		} else if res.sid != nil {
-			p.replaceSidSource(res.sid)
-			p.currentPath = res.path
-			p.currentDuration = res.sid.GetLength()
-			p.currentBPM = 0
-			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
-			p.channels = 1
-			p.isTracker = true
-			slog.Info("playing sid (async)", "path", res.path, "tracks", res.sid.GetTrackCount())
-		} else if res.ayumi != nil {
-			p.replaceSource(nil, nil, nil, nil, res.ayumi)
-			p.currentPath = res.path
-			p.currentDuration = res.ayumi.GetLength()
-			p.currentBPM = 0
-			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
-			p.channels = 2
-			p.isTracker = true
-			slog.Info("playing vtx (async)", "path", res.path)
-		} else if res.pt3 != nil {
-			p.replacePt3Source(res.pt3)
-			p.currentPath = res.path
-			p.currentDuration = res.pt3.GetLength()
-			p.currentBPM = 0
-			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
-			p.channels = 2
-			p.isTracker = true
-			slog.Info("playing pt3 (async)", "path", res.path)
-		} else if res.ym != nil {
-			p.replaceYmSource(res.ym)
-			p.currentPath = res.path
-			p.currentDuration = res.ym.GetLength()
-			p.currentBPM = 0
-			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
-			p.channels = 2
-			p.isTracker = true
-			slog.Info("playing ym (async)", "path", res.path)
-		} else if res.ffmpeg != nil {
-			p.replaceFfmpegSource(res.ffmpeg)
-			p.currentPath = res.path
-			p.currentDuration = res.ffmpeg.GetLength()
-			p.currentBPM = 0
-			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
-			p.channels = res.ffmpeg.GetChannels()
-			p.isTracker = false
-			slog.Info("playing ffmpeg (async)", "path", res.path)
-		} else if res.hvl != nil {
-			p.replaceHvlSource(res.hvl)
-			p.currentPath = res.path
-			p.currentDuration = res.hvl.GetLength()
-			p.currentBPM = 0
-			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
-			p.channels = 2
-			p.isTracker = true
-			slog.Info("playing hvl (async)", "path", res.path, "tracks", res.hvl.GetTrackCount())
+		p.applyResult(r, r.path)
+		if r.trackCount > 0 {
+			slog.Info("playing (async)", "format", strings.ToLower(filepath.Ext(r.path)), "path", r.path, "tracks", r.trackCount)
+		} else {
+			slog.Info("playing (async)", "path", r.path)
 		}
 		return true, false
 	default:
@@ -577,148 +303,34 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 	}
 }
 
-func (p *Player) playTracker(path string) error {
-	fileBuf, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("tracker read %s: %w", path, err)
+// applyResult applies a loadResult to the player state, replacing any current source.
+func (p *Player) applyResult(r loadResult, displayPath string) {
+	p.replaceSource(r.src)
+	p.currentPath = displayPath
+	p.currentBPM = r.bpm
+	p.currentDuration = r.duration
+	p.channels = r.channels
+	p.isTracker = r.isTracker
+	if r.isTracker {
+		p.currentBitrate = 0
+	} else {
+		p.currentBitrate = fileBitrate(displayPath, r.duration)
 	}
-
-	ext := strings.ToLower(filepath.Ext(path))
-	// Try libopenmpt first (broader format support), fallback to libxmp.
-	if openmpt.HasExt(ext) {
-		ompt, err := soloud.NewOpenmpt(fileBuf)
-		if err == nil {
-			bpm, ch, dur, _ := openmpt.GetTrackerMeta(fileBuf)
-			p.replaceSource(nil, nil, ompt, nil)
-			p.currentPath = path
-			p.currentBPM = bpm
-			p.currentBitrate = 0
-			p.channels = ch
-			p.isTracker = true
-			p.currentDuration = dur
-			slog.Info("tracker openmpt", "path", path, "bpm", bpm, "channels", ch, "duration", dur)
-			return nil
-		}
-		slog.Debug("openmpt fallback to xmp", "ext", ext, "err", err)
-	}
-
-	mod, err := soloud.NewXmp(fileBuf)
-	if err != nil {
-		return fmt.Errorf("tracker %s: %w", path, err)
-	}
-	p.replaceSource(nil, mod, nil, nil)
-	p.currentPath = path
-
-	// Metadata via lightweight libxmp probe (no decode).
-	bpm, ch, dur, err := xmp.GetTrackerMetaFromBytes(fileBuf)
-	if err != nil {
-		slog.Warn("tracker meta", "path", path, "err", err)
-	}
-	p.currentBPM = bpm
-	p.currentBitrate = 0
-	p.channels = ch
-	p.isTracker = true
-	p.currentDuration = dur
-	slog.Info("tracker xmp", "path", path, "bpm", bpm, "channels", ch, "duration", dur)
-	return nil
 }
 
 // replaceSource stops current playback and swaps in a new audio source.
-func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Openmpt, gme *soloud.Gme, ayumi ...*soloud.Ayumi) {
+func (p *Player) replaceSource(src soloud.AudioSource) {
 	p.s.StopAll()
-	if p.currentWav != nil {
-		p.currentWav.Destroy()
-		p.currentWav = nil
+	if p.current != nil {
+		p.current.Destroy()
+		p.current = nil
 	}
-	if p.currentMod != nil {
-		p.currentMod.Destroy()
-		p.currentMod = nil
-	}
-	if p.currentOmpt != nil {
-		p.currentOmpt.Destroy()
-		p.currentOmpt = nil
-	}
-	if p.currentGme != nil {
-		p.currentGme.Destroy()
-		p.currentGme = nil
-	}
-	if p.currentSid != nil {
-		p.currentSid.Destroy()
-		p.currentSid = nil
-	}
-	if p.currentAyumi != nil {
-		p.currentAyumi.Destroy()
-		p.currentAyumi = nil
-	}
-	if p.currentPt3 != nil {
-		p.currentPt3.Destroy()
-		p.currentPt3 = nil
-	}
-	if p.currentYm != nil {
-		p.currentYm.Destroy()
-		p.currentYm = nil
-	}
-	if p.currentFfmpeg != nil {
-		p.currentFfmpeg.Destroy()
-		p.currentFfmpeg = nil
-	}
-	if p.currentHvl != nil {
-		p.currentHvl.Destroy()
-		p.currentHvl = nil
-	}
-	if w != nil {
-		p.currentWav = w
-		p.voice = p.s.Play(w)
-	} else if mod != nil {
-		p.currentMod = mod
-		p.voice = p.s.PlayXmp(mod)
-	} else if ompt != nil {
-		p.currentOmpt = ompt
-		p.voice = p.s.PlayOpenmpt(ompt)
-	} else if gme != nil {
-		p.currentGme = gme
-		p.voice = p.s.PlayGme(gme)
-	} else if p.currentHvl != nil {
-		p.voice = p.s.PlayHvl(p.currentHvl)
-	} else if p.currentSid != nil {
-		p.voice = p.s.PlaySid(p.currentSid)
-	} else if len(ayumi) > 0 && ayumi[0] != nil {
-		p.currentAyumi = ayumi[0]
-		p.voice = p.s.PlayAyumi(ayumi[0])
+	if src != nil {
+		p.current = src
+		p.voice = p.s.PlaySource(src)
 	}
 }
 
-func (p *Player) replaceSidSource(sid *soloud.Sid) {
-	p.replaceSource(nil, nil, nil, nil)
-	p.currentSid = sid
-	p.voice = p.s.PlaySid(sid)
-}
-
-func (p *Player) replacePt3Source(pt3 *soloud.Pt3) {
-	p.replaceSource(nil, nil, nil, nil)
-	p.currentPt3 = pt3
-	p.voice = p.s.PlayPt3(pt3)
-}
-
-func (p *Player) replaceYmSource(ym *soloud.Ym) {
-	p.replaceSource(nil, nil, nil, nil)
-	p.currentYm = ym
-	p.voice = p.s.PlayYm(ym)
-}
-
-func (p *Player) replaceFfmpegSource(ffmpeg *soloud.Ffmpeg) {
-	p.replaceSource(nil, nil, nil, nil)
-	p.currentFfmpeg = ffmpeg
-	p.voice = p.s.PlayFfmpeg(ffmpeg)
-}
-
-func (p *Player) replaceHvlSource(hvl *soloud.Hvl) {
-	p.replaceSource(nil, nil, nil, nil)
-	p.currentHvl = hvl
-	p.voice = p.s.PlayHvl(hvl)
-}
-
-// GetWave returns the current SoLoud waveform data (256 float32 samples).
 func (p *Player) GetWave() []float32 {
 	return p.s.GetWave()
 }
@@ -762,8 +374,6 @@ func (p *Player) IsValidVoice() bool {
 }
 
 // TrackFinished reports whether playback should be considered over.
-// For trackers, also checks estimated duration since many contain internal
-// loops that never signal end-of-stream.
 func (p *Player) TrackFinished() bool {
 	if !p.IsValidVoice() {
 		return true
@@ -777,29 +387,9 @@ func (p *Player) TrackFinished() bool {
 func (p *Player) Stop() {
 	p.s.StopAll()
 	p.voice = 0
-	if p.currentWav != nil {
-		p.currentWav.Destroy()
-		p.currentWav = nil
-	}
-	if p.currentMod != nil {
-		p.currentMod.Destroy()
-		p.currentMod = nil
-	}
-	if p.currentOmpt != nil {
-		p.currentOmpt.Destroy()
-		p.currentOmpt = nil
-	}
-	if p.currentGme != nil {
-		p.currentGme.Destroy()
-		p.currentGme = nil
-	}
-	if p.currentFfmpeg != nil {
-		p.currentFfmpeg.Destroy()
-		p.currentFfmpeg = nil
-	}
-	if p.currentSid != nil {
-		p.currentSid.Destroy()
-		p.currentSid = nil
+	if p.current != nil {
+		p.current.Destroy()
+		p.current = nil
 	}
 	p.currentPath = ""
 }
@@ -826,8 +416,8 @@ func (p *Player) Seek(seconds float64) error {
 }
 
 func (p *Player) Duration() float64 {
-	if p.currentWav != nil {
-		return p.currentWav.GetLength()
+	if w, ok := p.current.(*soloud.Wav); ok {
+		return w.GetLength()
 	}
 	return p.currentDuration
 }

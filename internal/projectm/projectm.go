@@ -62,18 +62,6 @@ func (h *Handle) RenderFrame() {
 	C.projectm_opengl_render_frame(h.p)
 }
 
-// SetMeshSize sets per-pixel equation mesh resolution. Clamped [8,400].
-func (h *Handle) SetMeshSize(width, height int) {
-	C.projectm_set_mesh_size(h.p, C.size_t(width), C.size_t(height))
-}
-
-// GetMeshSize returns current mesh resolution.
-func (pm *Handle) GetMeshSize() (int, int) {
-	var mw, mh C.size_t
-	C.projectm_get_mesh_size(pm.p, &mw, &mh)
-	return int(mw), int(mh)
-}
-
 // SetFPS reports actual frame rate to presets for time-dependent expressions.
 func (h *Handle) SetFPS(fps int32) {
 	C.projectm_set_fps(h.p, C.int32_t(fps))

@@ -12,16 +12,17 @@ import (
 )
 
 type Notifier struct {
-	tex      uint32
-	texW     int
-	texH     int
-	text     string
-	fontSize float64
-	alpha    float64
-	started  time.Time
-	visible  bool
-	injected bool
-	hidden   bool
+	tex        uint32
+	texW       int
+	texH       int
+	text       string
+	fontSize   float64
+	alpha      float64
+	started    time.Time
+	visible    bool
+	injected   bool
+	hidden     bool
+	cachedFont *opentype.Font // parsed once, reused
 }
 
 func (n *Notifier) Visible() bool { return n.visible }
@@ -69,12 +70,15 @@ func (n *Notifier) rebuildTexture(path string, fontSize float64, textColor color
 	if notifSize < 20 {
 		notifSize = 20
 	}
-	f, err := opentype.Parse(unifontData)
-	if err != nil {
-		slog.Error("font parse", "error", err)
-		return false
+	if n.cachedFont == nil {
+		var err error
+		n.cachedFont, err = opentype.Parse(unifontData)
+		if err != nil {
+			slog.Error("font parse", "error", err)
+			return false
+		}
 	}
-	face, err := opentype.NewFace(f, &opentype.FaceOptions{
+	face, err := opentype.NewFace(n.cachedFont, &opentype.FaceOptions{
 		Size:    notifSize,
 		DPI:     72,
 		Hinting: font.HintingNone,

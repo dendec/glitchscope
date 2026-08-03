@@ -240,7 +240,7 @@ func (a *App) applySettings(winW, winH int) {
 		return
 	}
 
-	resIndex := rows[0].Index
+	resIndex := rows[ui.SettingResolution].Index
 	resolutions := config.ComputeResolutions(winW, winH)
 	if resIndex >= 0 && resIndex < len(resolutions) {
 		r := resolutions[resIndex]
@@ -250,7 +250,7 @@ func (a *App) applySettings(winW, winH int) {
 		a.pm.SetWindowSize(r.Width, r.Height)
 	}
 
-	filterIndex := rows[1].Index
+	filterIndex := rows[ui.SettingFilter].Index
 	filters := config.AllFilters()
 	if filterIndex >= 0 && filterIndex < len(filters) {
 		a.settings.Graphics.UpscaleFilter = filters[filterIndex]
@@ -258,30 +258,30 @@ func (a *App) applySettings(winW, winH int) {
 	}
 
 	shuffleModes := config.AllShuffleModes()
-	if rows[2].Index >= 0 && rows[2].Index < len(shuffleModes) {
-		a.settings.Playback.ShuffleMode = shuffleModes[rows[2].Index]
+	if rows[ui.SettingShuffle].Index >= 0 && rows[ui.SettingShuffle].Index < len(shuffleModes) {
+		a.settings.Playback.ShuffleMode = shuffleModes[rows[ui.SettingShuffle].Index]
 	}
 	a.regenerateShuffleOrder()
 
 	repeatModes := config.AllRepeatModes()
-	if rows[3].Index >= 0 && rows[3].Index < len(repeatModes) {
-		a.settings.Playback.Repeat = repeatModes[rows[3].Index]
+	if rows[ui.SettingRepeat].Index >= 0 && rows[ui.SettingRepeat].Index < len(repeatModes) {
+		a.settings.Playback.Repeat = repeatModes[rows[ui.SettingRepeat].Index]
 	}
 
 	presetIntervals := config.AllPresetIntervals()
-	if rows[4].Index >= 0 && rows[4].Index < len(presetIntervals) {
-		a.settings.PresetInterval = presetIntervals[rows[4].Index]
+	if rows[ui.SettingPresetTimer].Index >= 0 && rows[ui.SettingPresetTimer].Index < len(presetIntervals) {
+		a.settings.PresetInterval = presetIntervals[rows[ui.SettingPresetTimer].Index]
 		a.resetPresetTicker()
 	}
 
 	themes := config.AllThemes()
-	if rows[5].Index >= 0 && rows[5].Index < len(themes) {
-		a.settings.UI.Theme = themes[rows[5].Index]
+	if rows[ui.SettingTheme].Index >= 0 && rows[ui.SettingTheme].Index < len(themes) {
+		a.settings.UI.Theme = themes[rows[ui.SettingTheme].Index]
 	}
 
 	transparencies := config.AllTransparencies()
-	if rows[6].Index >= 0 && rows[6].Index < len(transparencies) {
-		a.settings.UI.Transparency = transparencies[rows[6].Index]
+	if rows[ui.SettingTransparency].Index >= 0 && rows[ui.SettingTransparency].Index < len(transparencies) {
+		a.settings.UI.Transparency = transparencies[rows[ui.SettingTransparency].Index]
 	}
 
 	a.overlay.SetTheme(a.settings.UI.Theme, int(a.settings.UI.Transparency))

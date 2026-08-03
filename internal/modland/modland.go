@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/pmv/internal/formats"
 	"github.com/dendec/pmv/internal/util"
 )
 
@@ -225,7 +225,7 @@ func ParseListing(data []byte) (*Catalog, error) {
 		path = filepath.ToSlash(path)
 
 		ext := strings.ToLower(filepath.Ext(path))
-		if !player.IsSupportedExt(ext) {
+		if !formats.IsSupportedExt(ext) {
 			continue
 		}
 

@@ -51,20 +51,13 @@ func ClosestResolution(list []RenderResolution, target RenderResolution) RenderR
 	}
 	targetArea := target.Width * target.Height
 	best := list[0]
-	bestDiff := abs(targetArea - best.Width*best.Height)
+	bestDiff := max(targetArea-best.Width*best.Height, best.Width*best.Height-targetArea)
 	for _, r := range list[1:] {
-		d := abs(targetArea - r.Width*r.Height)
+		d := max(targetArea-r.Width*r.Height, r.Width*r.Height-targetArea)
 		if d < bestDiff {
 			bestDiff = d
 			best = r
 		}
 	}
 	return best
-}
-
-func abs(v int) int {
-	if v < 0 {
-		return -v
-	}
-	return v
 }

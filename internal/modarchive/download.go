@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/pmv/internal/formats"
 	"github.com/dendec/pmv/internal/util"
 )
 
@@ -49,7 +49,7 @@ func DownloadAndExtract(baseDir, remoteURL string, onProgress func(read, total i
 			return "", fmt.Errorf("modarchive download %s: %w", remoteURL, err)
 		}
 
-		extractedPath, err := util.ExtractModuleFromZip(tmpZipPath, targetPath, player.IsSupportedExt)
+		extractedPath, err := util.ExtractModuleFromZip(tmpZipPath, targetPath, formats.IsSupportedExt)
 		if err != nil {
 			return "", fmt.Errorf("modarchive extract zip %s: %w", remoteURL, err)
 		}

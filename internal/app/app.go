@@ -373,7 +373,7 @@ func (a *App) playFirst() {
 	if a.pl == nil || a.lib == nil {
 		return
 	}
-	if first := a.lib.PlayCurrent(); first != "" {
+	if first := a.lib.CurrentTrack(); first != "" {
 		a.playTrack(first, a.lib.CurrentAlbum().Name)
 	}
 }

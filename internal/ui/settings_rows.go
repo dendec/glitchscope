@@ -2,6 +2,17 @@ package ui
 
 import "github.com/dendec/pmv/internal/config"
 
+// Settings row indices — shared between BuildSettingsRows and applySettings.
+const (
+	SettingResolution   = 0
+	SettingFilter       = 1
+	SettingShuffle      = 2
+	SettingRepeat       = 3
+	SettingPresetTimer  = 4
+	SettingTheme        = 5
+	SettingTransparency = 6
+)
+
 // BuildSettingsRows creates SettingRow entries from the current config.
 func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 	resolutions := config.ComputeResolutions(winW, winH)

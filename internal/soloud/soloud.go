@@ -127,14 +127,15 @@ func (s *Soloud) Init() error {
 	return nil
 }
 
-// Deinit shuts down the audio backend.
-func (s *Soloud) Deinit() {
-	C.Soloud_deinit(s.p)
-}
-
 // Destroy frees the engine instance.
 func (s *Soloud) Destroy() {
 	C.Soloud_destroy(s.p)
+}
+
+// AudioSource is the common interface for all SoLoud audio source types.
+type AudioSource interface {
+	raw() unsafe.Pointer
+	Destroy()
 }
 
 // LoadWav loads an audio file into a Wav source.
@@ -305,6 +306,9 @@ func NewFfmpeg(data []byte) (*Ffmpeg, error) {
 	return &Ffmpeg{p: p}, nil
 }
 
+// raw returns the underlying C pointer for generic playback.
+func (w *Wav) raw() unsafe.Pointer { return unsafe.Pointer(w.p) }
+
 // Destroy frees the Wav resource.
 func (w *Wav) Destroy() {
 	if w.p != nil {
@@ -312,6 +316,9 @@ func (w *Wav) Destroy() {
 		w.p = nil
 	}
 }
+
+// raw returns the underlying C pointer for generic playback.
+func (x *Xmp) raw() unsafe.Pointer { return unsafe.Pointer(x.p) }
 
 // Destroy frees the Xmp resource.
 func (x *Xmp) Destroy() {
@@ -321,6 +328,9 @@ func (x *Xmp) Destroy() {
 	}
 }
 
+// raw returns the underlying C pointer for generic playback.
+func (o *Openmpt) raw() unsafe.Pointer { return unsafe.Pointer(o.p) }
+
 // Destroy frees the Openmpt resource.
 func (o *Openmpt) Destroy() {
 	if o.p != nil {
@@ -328,6 +338,9 @@ func (o *Openmpt) Destroy() {
 		o.p = nil
 	}
 }
+
+// raw returns the underlying C pointer for generic playback.
+func (g *Gme) raw() unsafe.Pointer { return g.p }
 
 // Destroy frees the GME resource.
 func (g *Gme) Destroy() {
@@ -337,6 +350,9 @@ func (g *Gme) Destroy() {
 	}
 }
 
+// raw returns the underlying C pointer for generic playback.
+func (h *Hvl) raw() unsafe.Pointer { return h.p }
+
 // Destroy frees the AHX/HVL resource.
 func (h *Hvl) Destroy() {
 	if h.p != nil {
@@ -344,6 +360,9 @@ func (h *Hvl) Destroy() {
 		h.p = nil
 	}
 }
+
+// raw returns the underlying C pointer for generic playback.
+func (s *Sid) raw() unsafe.Pointer { return s.p }
 
 // Destroy frees the SID resource.
 func (s *Sid) Destroy() {
@@ -353,6 +372,9 @@ func (s *Sid) Destroy() {
 	}
 }
 
+// raw returns the underlying C pointer for generic playback.
+func (a *Ayumi) raw() unsafe.Pointer { return a.p }
+
 // Destroy frees the Ayumi resource.
 func (a *Ayumi) Destroy() {
 	if a.p != nil {
@@ -360,6 +382,9 @@ func (a *Ayumi) Destroy() {
 		a.p = nil
 	}
 }
+
+// raw returns the underlying C pointer for generic playback.
+func (p *Pt3) raw() unsafe.Pointer { return p.p }
 
 // Destroy frees the PT3 resource.
 func (p *Pt3) Destroy() {
@@ -369,6 +394,9 @@ func (p *Pt3) Destroy() {
 	}
 }
 
+// raw returns the underlying C pointer for generic playback.
+func (y *Ym) raw() unsafe.Pointer { return y.p }
+
 // Destroy frees the YM resource.
 func (y *Ym) Destroy() {
 	if y.p != nil {
@@ -377,12 +405,20 @@ func (y *Ym) Destroy() {
 	}
 }
 
+// raw returns the underlying C pointer for generic playback.
+func (f *Ffmpeg) raw() unsafe.Pointer { return f.p }
+
 // Destroy frees the FFmpeg resource.
 func (f *Ffmpeg) Destroy() {
 	if f.p != nil {
 		C.Ffmpeg_destroy(f.p)
 		f.p = nil
 	}
+}
+
+// PlaySource starts playing any AudioSource. Returns the voice handle.
+func (s *Soloud) PlaySource(src AudioSource) uint {
+	return uint(C.Soloud_play(s.p, (*C.AudioSource)(src.raw())))
 }
 
 // Play starts playing a Wav source. Returns the voice handle.
@@ -470,16 +506,6 @@ func (s *Soloud) GetWave() []float32 {
 	return unsafe.Slice((*float32)(unsafe.Pointer(p)), 256)
 }
 
-// CalcFFT returns the current FFT data (256 float32 bins).
-// Visualization must be enabled. The slice references SoLoud's internal buffer.
-func (s *Soloud) CalcFFT() []float32 {
-	p := C.Soloud_calcFFT(s.p)
-	if p == nil {
-		return nil
-	}
-	return unsafe.Slice((*float32)(unsafe.Pointer(p)), 256)
-}
-
 func (s *Soloud) IsValidVoiceHandle(voice uint) bool {
 	return C.Soloud_isValidVoiceHandle(s.p, C.uint(voice)) != 0
 }
@@ -520,11 +546,6 @@ func (w *Wav) GetChannels() int {
 
 func (s *Soloud) GetSamplerate(voice uint) float32 {
 	return float32(C.Soloud_getSamplerate(s.p, C.uint(voice)))
-}
-
-// GetInfo returns an info value for a voice.
-func (s *Soloud) GetInfo(voice uint, infoKey uint) float32 {
-	return float32(C.Soloud_getInfo(s.p, C.uint(voice), C.uint(infoKey)))
 }
 
 // StopAll stops all playing voices.

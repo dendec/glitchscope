@@ -193,11 +193,6 @@ func (l *Library) SelectTrack(idx int) string {
 	return l.Albums[l.albumIdx].Tracks[idx]
 }
 
-// PlayCurrent returns the current track path, or "".
-func (l *Library) PlayCurrent() string {
-	return l.CurrentTrack()
-}
-
 // GetAlbumTracks returns TrackInfo for each track. Reads cache first;
 // computes missing entries on demand.
 func (l *Library) GetAlbumTracks(idx int) []TrackInfo {

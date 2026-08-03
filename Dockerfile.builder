@@ -1,34 +1,40 @@
 FROM debian:bookworm-slim
 
-# Install Go
-RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates \
-    && wget -q https://go.dev/dl/go1.25.4.linux-amd64.tar.gz -O /tmp/go.tar.gz \
-    && tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz \
-    && rm -rf /var/lib/apt/lists/*
-ENV PATH=/usr/local/go/bin:$PATH
+ARG GO_VERSION=1.25.4
+ARG OPENMPT_VERSION=0.8.7
+ARG XMP_VERSION=4.7.1
+ARG UNIFONT_VERSION=17.0.05
 
-# Add arm64 arch & install tools & cross-compilers
-RUN dpkg --add-architecture arm64 && apt-get update && apt-get install -y --no-install-recommends \
+# Add arm64 architecture and install the complete build toolchain.
+RUN dpkg --add-architecture arm64 \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        wget ca-certificates \
         build-essential cmake git patchelf \
         g++-aarch64-linux-gnu binutils-aarch64-linux-gnu \
         libsdl2-dev libsdl2-dev:arm64 \
         libgl1-mesa-dev libgles2-mesa-dev libgles2-mesa-dev:arm64 \
         libopenmpt-dev \
-        python3-pip python3-fonttools \
+        libogg-dev libogg-dev:arm64 \
+        libvorbis-dev libvorbis-dev:arm64 \
+        libflac-dev libflac-dev:arm64 \
+        libmpg123-dev libmpg123-dev:arm64 \
+        zlib1g-dev zlib1g-dev:arm64 \
+        python3-fonttools \
         autoconf automake libtool \
-    && pip3 install --break-system-packages fonttools \
     && rm -rf /var/lib/apt/lists/*
+
+# Install the Go toolchain separately so changing GO_VERSION does not rerun apt.
+RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz -O /tmp/go.tar.gz \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz
+ENV PATH=/usr/local/go/bin:$PATH
 
 WORKDIR /build
 
-# Copy local C/C++ libraries and patches from workspace
-COPY lib/soloud lib/soloud
-COPY lib/projectm lib/projectm
-COPY lib/game-music-emu lib/game-music-emu
-COPY lib/cRSID lib/cRSID
-COPY patches patches
-
 # Apply patch & prepare projectM
+COPY lib/projectm lib/projectm
+COPY patches/projectm-feedback.patch /build/patches/projectm-feedback.patch
 RUN cd lib/projectm \
     && (git apply /build/patches/projectm-feedback.patch 2>/dev/null || true) \
     && sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
@@ -75,6 +81,7 @@ RUN mkdir -p /opt/projectm/arm64/lib \
     && cp lib/projectm/build-arm64/vendor/projectm-eval/projectm-eval/libprojectM_eval.a /opt/projectm/arm64/lib/
 
 # --- Build libgme static for amd64 ---
+COPY lib/game-music-emu lib/game-music-emu
 RUN mkdir -p lib/game-music-emu/build-amd64 && cd lib/game-music-emu/build-amd64 && \
     cmake .. -DGME_BUILD_SHARED=OFF -DGME_BUILD_STATIC=ON \
              -DGME_BUILD_TESTING=OFF -DGME_BUILD_EXAMPLES=OFF \
@@ -92,18 +99,11 @@ RUN mkdir -p lib/game-music-emu/build-arm64 && cd lib/game-music-emu/build-arm64
     cmake --build . --target gme_static -- -j$(nproc) && \
     cmake --install .
 
-# Add arm64 dependencies for libopenmpt and libxmp
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libogg-dev libogg-dev:arm64 libvorbis-dev libvorbis-dev:arm64 \
-        libflac-dev libflac-dev:arm64 libmpg123-dev libmpg123-dev:arm64 \
-        zlib1g-dev zlib1g-dev:arm64 \
-    && rm -rf /var/lib/apt/lists/*
-
 # --- Build libopenmpt static for amd64 + arm64 ---
-RUN wget -q https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.8.7+release.autotools.tar.gz \
-    && tar xzf libopenmpt-0.8.7+release.autotools.tar.gz \
-    && rm libopenmpt-0.8.7+release.autotools.tar.gz \
-    && cd libopenmpt-0.8.7+release.autotools \
+RUN wget -q https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-${OPENMPT_VERSION}+release.autotools.tar.gz \
+    && tar xzf libopenmpt-${OPENMPT_VERSION}+release.autotools.tar.gz \
+    && rm libopenmpt-${OPENMPT_VERSION}+release.autotools.tar.gz \
+    && cd libopenmpt-${OPENMPT_VERSION}+release.autotools \
     && ./configure --enable-static --disable-shared \
         --with-mpg123 --with-ogg --with-vorbis --with-vorbisfile --with-flac --with-zlib \
         --without-pulseaudio --without-sdl2 --without-portaudio --without-portaudiocpp --without-dsound \
@@ -120,40 +120,29 @@ RUN wget -q https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.8.7+releas
         --prefix=/opt/openmpt/arm64 \
     && make -j$(nproc) \
     && make install \
-    && rm -rf /build/libopenmpt-0.8.7+release.autotools
-
-# --- Pre-build font subset ---
-COPY internal/ui/font_ranges.json /tmp/font_ranges.json
-RUN mkdir -p /opt/font \
-    && wget -q https://unifoundry.com/pub/unifont/unifont-17.0.05/font-builds/unifont-17.0.05.otf -O /tmp/unifont-full.otf \
-    && python3 -m fontTools.subset /tmp/unifont-full.otf \
-        --unicodes=$(python3 -c "import json; print(','.join(json.load(open('/tmp/font_ranges.json'))))") \
-        --no-subset-tables+=OS/2 \
-        --no-prune-unicode-ranges \
-        --output-file=/opt/font/unifont.otf 2>&1 \
-    && rm -f /tmp/unifont-full.otf /tmp/font_ranges.json
+    && rm -rf /build/libopenmpt-${OPENMPT_VERSION}+release.autotools
 
 # --- Build libxmp static for amd64 ---
-RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-4.7.1/libxmp-4.7.1.tar.gz -O /tmp/libxmp-amd64.tar.gz \
+RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-${XMP_VERSION}/libxmp-${XMP_VERSION}.tar.gz -O /tmp/libxmp-amd64.tar.gz \
     && tar xzf /tmp/libxmp-amd64.tar.gz \
     && rm /tmp/libxmp-amd64.tar.gz \
-    && cd libxmp-4.7.1 \
+    && cd libxmp-${XMP_VERSION} \
     && ./configure --enable-static --disable-shared \
         --prefix=/opt/xmp/amd64 \
     && make -j$(nproc) \
     && make install \
-    && rm -rf /build/libxmp-4.7.1
+    && rm -rf /build/libxmp-${XMP_VERSION}
 
 # --- Build libxmp static for arm64 ---
-RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-4.7.1/libxmp-4.7.1.tar.gz -O /tmp/libxmp.tar.gz \
+RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-${XMP_VERSION}/libxmp-${XMP_VERSION}.tar.gz -O /tmp/libxmp.tar.gz \
     && tar xzf /tmp/libxmp.tar.gz \
     && rm /tmp/libxmp.tar.gz \
-    && cd libxmp-4.7.1 \
+    && cd libxmp-${XMP_VERSION} \
     && ./configure --host=aarch64-linux-gnu --enable-static --disable-shared \
         --prefix=/opt/xmp/arm64 \
     && make -j$(nproc) \
     && make install \
-    && rm -rf /build/libxmp-4.7.1
+    && rm -rf /build/libxmp-${XMP_VERSION}
 
 # --- Build PT3 player core for amd64 and arm64 ---
 COPY lib/pt3player lib/pt3player
@@ -198,6 +187,7 @@ RUN mkdir -p /opt/libstsound/amd64/lib /opt/libstsound/arm64/lib \
     && cp lib/libstsound/StSoundLibrary.h lib/libstsound/YmTypes.h /opt/libstsound/include/
 
 # --- Build cRSID static for amd64 and arm64 ---
+COPY lib/cRSID lib/cRSID
 RUN mkdir -p /opt/crsid/amd64/lib /opt/crsid/arm64/lib \
     && cc -std=c99 -O2 -Ilib/cRSID -c lib/cRSID/libcRSID.c -o /tmp/libcrsid-amd64.o \
     && ar rcs /opt/crsid/amd64/lib/libcrsid.a /tmp/libcrsid-amd64.o \
@@ -282,14 +272,27 @@ RUN cd lib/ffmpeg \
     && make -j$(nproc) \
     && make install
 
+# --- Pre-build font subset ---
+COPY internal/ui/font_ranges.json /tmp/font_ranges.json
+RUN mkdir -p /opt/font \
+    && wget -q https://unifoundry.com/pub/unifont/unifont-${UNIFONT_VERSION}/font-builds/unifont-${UNIFONT_VERSION}.otf -O /tmp/unifont-full.otf \
+    && python3 -m fontTools.subset /tmp/unifont-full.otf \
+        --unicodes=$(python3 -c "import json; print(','.join(json.load(open('/tmp/font_ranges.json'))))") \
+        --no-subset-tables+=OS/2 \
+        --no-prune-unicode-ranges \
+        --output-file=/opt/font/unifont.otf 2>&1 \
+    && rm -f /tmp/unifont-full.otf /tmp/font_ranges.json
+
 # Pre-download Go dependencies
 COPY go.mod go.sum* ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Install golangci-lint using container Go toolchain
 RUN GOBIN=/usr/local/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 # Copy SoLoud headers
+COPY lib/soloud lib/soloud
 RUN mkdir -p /opt/soloud/include && cp -r lib/soloud/include/* /opt/soloud/include/
 
 # Export headers and place generated export header into source include tree

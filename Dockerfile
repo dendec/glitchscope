@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 ARG BUILDER_IMAGE=pmv-builder:latest
 FROM ${BUILDER_IMAGE} AS builder
 
@@ -16,7 +17,8 @@ COPY portmaster/ portmaster/
 RUN mkdir -p internal/ui/assets && cp /opt/font/unifont.otf internal/ui/assets/unifont.otf
 
 # Build Go app for target architecture
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    if [ "$TARGETARCH" = "arm64" ]; then \
         CGO_ENABLED=1 GOOS=linux GOARCH=arm64 \
         CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ \
         CGO_CFLAGS="-I/opt/xmp/arm64/include -I/opt/openmpt/arm64/include -I/opt/gme/arm64/include -I/opt/crsid/include" \
@@ -45,10 +47,7 @@ RUN mkdir -p /dist/pmv/presets /dist/pmv/textures \
         && cp portmaster/README.md /dist/pmv/; \
     fi
 
-# Minimal runtime stage
-FROM debian:bookworm-slim AS runner
-
-WORKDIR /dist
+# The image is an artifact carrier; Makefile targets extract /dist with docker cp.
+FROM scratch AS runner
 COPY --from=builder /dist /dist
-
 ENTRYPOINT ["/dist/pmv/pmv"]

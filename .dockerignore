@@ -5,3 +5,11 @@ lib/projectm/build/
 dist_portmaster/
 .git/
 **/.git
+.cache/
+coverage/
+tmp/
+*.o
+*.a
+*.so
+*.d
+*.log

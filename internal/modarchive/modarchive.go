@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/pmv/internal/formats"
 	"github.com/dendec/pmv/internal/util"
 )
 
@@ -131,8 +131,7 @@ func FormatDirName(raw string) string {
 		return "ModArchive"
 	}
 	// modarchive_2023_additions -> 2023
-	re := regexp.MustCompile(`^modarchive_(\d{4})_additions$`)
-	if matches := re.FindStringSubmatch(raw); len(matches) == 2 {
+	if matches := yearAdditionsExtract.FindStringSubmatch(raw); len(matches) == 2 {
 		return matches[1]
 	}
 	if strings.HasSuffix(raw, " Additions") {
@@ -143,6 +142,12 @@ func FormatDirName(raw string) string {
 
 // hrefRegex extracts href attributes from HTML anchor tags.
 var hrefRegex = regexp.MustCompile(`(?i)<a\s+[^>]*href=["']([^"']+)["'][^>]*>([^<]*)</a>`)
+
+// yearAdditionsRegex matches modarchive year-based addition directories.
+var yearAdditionsRegex = regexp.MustCompile(`^modarchive_(\d{4})_additions/?$`)
+
+// yearAdditionsExtract extracts the year from modarchive_*_additions format.
+var yearAdditionsExtract = regexp.MustCompile(`^modarchive_(\d{4})_additions$`)
 
 // ParseDirectoryListing parses textfiles.com directory listing HTML into a slice of DirItem.
 func ParseDirectoryListing(htmlBody string, currentURL string) ([]DirItem, error) {
@@ -158,8 +163,6 @@ func ParseDirectoryListing(htmlBody string, currentURL string) ([]DirItem, error
 
 	var items []DirItem
 	matches := hrefRegex.FindAllStringSubmatch(htmlBody, -1)
-
-	yearAdditionsRegex := regexp.MustCompile(`^modarchive_\d{4}_additions/?$`)
 
 	for _, m := range matches {
 		href := strings.TrimSpace(m[1])
@@ -224,12 +227,12 @@ func ParseDirectoryListing(htmlBody string, currentURL string) ([]DirItem, error
 				// E.g. "song.mod.zip" -> cleanName = "song.mod", "song.zip" -> cleanName = "song"
 				inner := name[:len(name)-4]
 				innerExt := strings.ToLower(filepath.Ext(inner))
-				if player.IsSupportedExt(innerExt) {
+				if formats.IsSupportedExt(innerExt) {
 					cleanName = inner
 				} else if inner != "" {
 					cleanName = inner
 				}
-			} else if !player.IsSupportedExt(ext) {
+			} else if !formats.IsSupportedExt(ext) {
 				// Unsupported file
 				continue
 			}
