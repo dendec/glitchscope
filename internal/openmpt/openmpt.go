@@ -16,6 +16,7 @@ const char * openmpt_module_get_format_name(void * mod);
 const char * openmpt_module_get_metadata(void * mod, const char * key);
 */
 import "C"
+
 import (
 	"fmt"
 	"unsafe"

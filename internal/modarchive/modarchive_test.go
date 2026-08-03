@@ -89,6 +89,19 @@ func TestParseDirectoryListing_Subfolder(t *testing.T) {
 	}
 }
 
+func TestParseDirectoryListing_HvlZip(t *testing.T) {
+	htmlBody := `<a href="street_fighter_ii_-_vega.hvl.zip"> street_fighter_ii_-_vega.hvl.zip</a>`
+
+	items, err := ParseDirectoryListing(htmlBody, "http://modarchive.textfiles.com/modarchive_2023_additions/HVL/S/")
+	if err != nil {
+		t.Fatalf("ParseDirectoryListing HVL failed: %v", err)
+	}
+
+	if len(items) != 1 || items[0].CleanName != "street_fighter_ii_-_vega.hvl" || items[0].Kind != KindFile {
+		t.Fatalf("unexpected HVL item: %+v", items)
+	}
+}
+
 func TestDownloadAndExtract_Zip(t *testing.T) {
 	// Create mock zip containing test.mod
 	buf := new(bytes.Buffer)

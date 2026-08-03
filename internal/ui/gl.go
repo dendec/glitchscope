@@ -166,6 +166,7 @@ static void texDelete(unsigned int tex) {
 }
 */
 import "C"
+
 import (
 	"image"
 	"unsafe"

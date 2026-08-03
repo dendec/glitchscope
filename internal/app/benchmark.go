@@ -304,11 +304,11 @@ func (bw *benchWorker) run(name string, timeout time.Duration) (benchResult, err
 	case line, ok := <-bw.lines:
 		if !ok {
 			werr := <-bw.done
-			return benchResult{}, fmt.Errorf("worker exited without a result (crash?): %v", werr)
+			return benchResult{}, fmt.Errorf("worker exited without a result (crash?): %w", werr)
 		}
 		return parseBenchLine(line)
 	case werr := <-bw.done:
-		return benchResult{}, fmt.Errorf("worker exited unexpectedly: %v", werr)
+		return benchResult{}, fmt.Errorf("worker exited unexpectedly: %w", werr)
 	case <-time.After(timeout):
 		return benchResult{}, fmt.Errorf("timed out after %s (hang?)", timeout)
 	}
@@ -354,5 +354,3 @@ func readBenchmarkedPresets(outPath string) map[string]bool {
 	}
 	return done
 }
-
-

@@ -1,0 +1,38 @@
+linters:
+  enable:
+    # ── catches real bugs ──
+    - errorlint      # fmt.Errorf %w usage, error type/assertion checks
+    - nilerr         # returning nil when err != nil
+    - bodyclose      # unclosed HTTP response bodies
+    - fatcontext     # context.Value in loops, nested contexts
+    - copyloopvar    # pre-Go1.22 loop variable copy patterns
+
+    # ── formatting & hygiene ──
+    - gofumpt        # stricter gofmt (auto-fix: golangci-lint run --fix)
+    - misspell       # typos in comments/strings
+
+    # ── style (low noise) ──
+    - gocritic       # catches real performance/style issues
+
+linters-settings:
+  errorlint:
+    errorf: true
+    asserts: true
+    comparison: true
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+    disabled-checks:
+      - hugeParam          # CGO structs are large by nature
+      - rangeValCopy       # not relevant for this codebase
+      - ifElseChain        # style preference
+      - dupSubExpr         # CGO calls trigger false positives (C.xmp_get_*)
+
+issues:
+  exclude-rules:
+    # Test files — relaxed rules
+    - path: _test\.go
+      linters: [gocritic]
+  max-issues-per-linter: 0
+  max-same-issues: 0

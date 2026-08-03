@@ -107,11 +107,11 @@ func MigrateLegacyCache(baseDir string) {
 	if info, err := os.Stat(oldCacheDir); err == nil && info.IsDir() {
 		_ = filepath.Walk(oldCacheDir, func(path string, fi os.FileInfo, err error) error {
 			if err != nil || fi.IsDir() {
-				return nil
+				return nil //nolint:nilerr // intentional: skip errors and dirs during cache migration
 			}
 			rel, err := filepath.Rel(oldCacheDir, path)
 			if err != nil {
-				return nil
+				return nil //nolint:nilerr // intentional: skip unresolvable paths
 			}
 			dst := filepath.Join(targetDir, rel)
 			if _, err := os.Stat(dst); os.IsNotExist(err) {

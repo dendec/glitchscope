@@ -7,6 +7,7 @@ package xmp
 #include <stdlib.h>
 */
 import "C"
+
 import (
 	"fmt"
 	"os"

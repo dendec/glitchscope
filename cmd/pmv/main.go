@@ -47,7 +47,7 @@ func main() {
 		renderScaleExplicit, renderNearestSet, *flagFile)
 	if err != nil {
 		slog.Error("app init", "error", err)
-		os.Exit(1)
+		return
 	}
 	defer a.Close()
 

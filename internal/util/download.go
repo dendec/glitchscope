@@ -72,7 +72,7 @@ func DownloadWithFallback(urls []string, targetPath string, expectedSize int64, 
 		if resp != nil {
 			lastStatus = resp.StatusCode
 		}
-		return fmt.Errorf("download failed (last status %d): %v", lastStatus, lastErr)
+		return fmt.Errorf("download failed (last status %d): %w", lastStatus, lastErr)
 	}
 	defer resp.Body.Close()
 

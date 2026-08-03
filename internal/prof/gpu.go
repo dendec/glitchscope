@@ -67,5 +67,3 @@ func parseFdinfoValue(data []byte, prefix string) uint64 {
 	}
 	return 0
 }
-
-

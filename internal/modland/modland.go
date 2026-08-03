@@ -100,11 +100,11 @@ func MigrateLegacyCache(baseDir string) {
 		}
 		_ = filepath.Walk(oldFiles, func(path string, fi os.FileInfo, err error) error {
 			if err != nil || fi.IsDir() {
-				return nil
+				return nil //nolint:nilerr // intentional: skip errors and dirs during cache migration
 			}
 			rel, err := filepath.Rel(oldFiles, path)
 			if err != nil {
-				return nil
+				return nil //nolint:nilerr // intentional: skip unresolvable paths
 			}
 			dst := filepath.Join(newFiles, rel)
 			if _, err := os.Stat(dst); os.IsNotExist(err) {
@@ -260,7 +260,7 @@ func ParseListing(data []byte) (*Catalog, error) {
 func extractAlbum(path string) string {
 	parts := strings.Split(path, "/")
 	for i, p := range parts {
-		if strings.ToLower(p) == "modules" && i+2 < len(parts) {
+		if strings.EqualFold(p, "modules") && i+2 < len(parts) {
 			if i+3 < len(parts) {
 				return parts[i+1] + "/" + parts[i+2]
 			}

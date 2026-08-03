@@ -55,3 +55,29 @@ func TestCatalog_SaveLoadInit(t *testing.T) {
 		t.Errorf("unexpected clean name: %s", items[0].CleanName)
 	}
 }
+
+func TestCatalog_InitSkipsEmptyDirectories(t *testing.T) {
+	ResetMemCache()
+	defer ResetMemCache()
+
+	tmpDir, err := os.MkdirTemp("", "modarchive_catalog_empty_test_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp failed: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cat := &Catalog{
+		Directories: map[string][]DirItem{
+			BaseURL + "modarchive_2023_additions/HVL/S/": {},
+		},
+		UpdatedAt: time.Now(),
+	}
+	if err := SaveCatalog(tmpDir, cat); err != nil {
+		t.Fatalf("SaveCatalog failed: %v", err)
+	}
+
+	InitCatalog(tmpDir)
+	if _, ok := FetchDirectoryCached(tmpDir, BaseURL+"modarchive_2023_additions/HVL/S/"); ok {
+		t.Fatal("empty catalog directory should be refreshed instead of served from memory")
+	}
+}

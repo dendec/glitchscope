@@ -403,7 +403,7 @@ func (a *App) Run() {
 	fpsBuf := make([]float64, 0, fpsWindow)
 	lowFPSWarned := false
 
-	var lastAlbumIdx = -1
+	lastAlbumIdx := -1
 	var prevW, prevH int
 
 	for range ticker.C {

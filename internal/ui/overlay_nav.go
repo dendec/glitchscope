@@ -172,7 +172,9 @@ func (o *Overlay) focusLocalAlbum(albumIdx int) {
 			cursor = indexOfEntry(entries, func(e navEntry) bool { return e.albumIdx == albumIdx })
 			o.albumCursor = cursor
 		} else {
-			cursor = indexOfEntry(entries, func(e navEntry) bool { return e.kind == entryLocalDir && e.dirPath == filepath.Join(dirPath, parts[i+1]) })
+			cursor = indexOfEntry(entries, func(e navEntry) bool {
+				return e.kind == entryLocalDir && e.dirPath == filepath.Join(dirPath, parts[i+1])
+			})
 		}
 		o.navStack = append(o.navStack, navLevel{entries: entries, cursor: cursor})
 	}

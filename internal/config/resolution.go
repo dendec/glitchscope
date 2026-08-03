@@ -6,15 +6,15 @@ type scale struct{ num, den int }
 
 // scaleCandidates are render scale fractions, tried descending (highest res first).
 var scaleCandidates = []scale{
-	{1, 1},   // 1.0
-	{3, 4},   // 0.75
-	{5, 8},   // 0.625
-	{1, 2},   // 0.5
-	{2, 5},   // 0.4
-	{3, 8},   // 0.375
-	{1, 4},   // 0.25
-	{1, 5},   // 0.2
-	{1, 8},   // 0.125
+	{1, 1}, // 1.0
+	{3, 4}, // 0.75
+	{5, 8}, // 0.625
+	{1, 2}, // 0.5
+	{2, 5}, // 0.4
+	{3, 8}, // 0.375
+	{1, 4}, // 0.25
+	{1, 5}, // 0.2
+	{1, 8}, // 0.125
 }
 
 // ComputeResolutions generates valid RenderResolutions for a base window size.

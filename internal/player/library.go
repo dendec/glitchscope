@@ -41,7 +41,7 @@ func NewLibrary(rootDir string) (*Library, error) {
 	dirTracks := map[string][]string{}
 	err := filepath.Walk(rootDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
-			return nil // skip inaccessible
+			return nil //nolint:nilerr // skip inaccessible — intentional
 		}
 		if fi.IsDir() {
 			if shouldSkipDir(path) {

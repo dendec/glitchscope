@@ -39,7 +39,7 @@ func SaveGzipJSON(path string, v any) error {
 		return fmt.Errorf("close temp file: %w", err)
 	}
 
-	_ = os.Chmod(tmpPath, 0644)
+	_ = os.Chmod(tmpPath, 0o644)
 
 	if err := os.Rename(tmpPath, path); err != nil {
 		_ = os.Remove(tmpPath)
@@ -93,7 +93,7 @@ func SaveJSONAtomic(path string, v any) error {
 		return fmt.Errorf("close temp file: %w", err)
 	}
 
-	_ = os.Chmod(tmpPath, 0644)
+	_ = os.Chmod(tmpPath, 0o644)
 
 	if err := os.Rename(tmpPath, path); err != nil {
 		_ = os.Remove(tmpPath)

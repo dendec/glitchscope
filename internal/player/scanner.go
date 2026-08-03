@@ -51,6 +51,7 @@ var SupportedExts = map[string]bool{
 	".vtx": true,
 	".pt3": true,
 	".ym":  true, ".lh": true, ".lha": true,
+	".ahx": true, ".hvl": true,
 	// Speex via FFmpeg; kept here for discovery alongside fallback formats.
 	".spx": true,
 	// libopenmpt fallback formats

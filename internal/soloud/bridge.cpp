@@ -6,6 +6,7 @@
 #include "soloud_xmp.h"
 #include "soloud_openmpt.h"
 #include "gme_source.h"
+#include "hvl_source.h"
 
 using namespace SoLoud;
 

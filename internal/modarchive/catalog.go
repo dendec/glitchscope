@@ -53,6 +53,11 @@ func InitCatalog(baseDir string) {
 
 	memCacheMu.Lock()
 	for urlPath, items := range cat.Directories {
+		// Empty entries may have been generated before a newly supported
+		// extension was added. Let FetchDirectory refresh those listings.
+		if len(items) == 0 {
+			continue
+		}
 		for i := range items {
 			if items[i].Kind == KindDir {
 				items[i].CleanName = FormatDirName(items[i].CleanName)

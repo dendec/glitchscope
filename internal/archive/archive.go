@@ -18,9 +18,7 @@ const (
 	maxNameSize = 4096
 )
 
-var (
-	zstdDecoder, zstdDecoderErr = zstd.NewReader(nil)
-)
+var zstdDecoder, zstdDecoderErr = zstd.NewReader(nil)
 
 type Entry struct {
 	Name   string
@@ -82,7 +80,7 @@ func Write(path string, entries []SourceEntry) error {
 	write := func(value any) error {
 		return binary.Write(file, binary.LittleEndian, value)
 	}
-	if _, err := file.Write([]byte(magic)); err != nil {
+	if _, err := file.WriteString(magic); err != nil {
 		return err
 	}
 	if err := write(uint32(1)); err != nil {

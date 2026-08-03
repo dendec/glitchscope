@@ -30,7 +30,7 @@ func main() {
 	// Group albums by format, track smallest file per format
 	type formatInfo struct {
 		format   string
-	 smallest modland.Track
+		smallest modland.Track
 		album    string // first album in this format
 	}
 	formats := map[string]*formatInfo{}

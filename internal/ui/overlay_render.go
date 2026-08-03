@@ -457,8 +457,7 @@ func (o *Overlay) rebuildPageIndicatorTextures() {
 		if UIPage(i) == o.uiPage {
 			label = "[ " + name + " ]"
 		}
-		o.pageIndicatorTex[i], o.pageIndicatorTexW[i], o.pageIndicatorTexH[i] =
-			o.renderTextToTex(label, textColor)
+		o.pageIndicatorTex[i], o.pageIndicatorTexW[i], o.pageIndicatorTexH[i] = o.renderTextToTex(label, textColor)
 	}
 }
 

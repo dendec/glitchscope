@@ -24,6 +24,7 @@ type pendingLoad struct {
 	ayumi    *soloud.Ayumi   // non-nil for AY/YM VTX formats
 	pt3      *soloud.Pt3     // non-nil for PT3 formats
 	ym       *soloud.Ym      // non-nil for YM/LHA formats
+	hvl      *soloud.Hvl     // non-nil for AHX/HVL formats
 	ffmpeg   *soloud.Ffmpeg  // non-nil for FFmpeg-supported audio formats
 	bpm      float64         // tracker metadata
 	channels int
@@ -42,6 +43,7 @@ type Player struct {
 	currentAyumi    *soloud.Ayumi   // non-nil when playing via AY/YM VTX
 	currentPt3      *soloud.Pt3     // non-nil when playing via PT3
 	currentYm       *soloud.Ym      // non-nil when playing via YM/LHA
+	currentHvl      *soloud.Hvl     // non-nil when playing via AHX/HVL
 	currentFfmpeg   *soloud.Ffmpeg  // non-nil when playing via FFmpeg
 	currentPath     string
 	currentBPM      float64
@@ -94,6 +96,8 @@ func isPt3Ext(ext string) bool { return ext == ".pt3" }
 
 func isYmExt(ext string) bool { return ext == ".ym" || ext == ".lh" || ext == ".lha" }
 
+func isHvlExt(ext string) bool { return ext == ".ahx" || ext == ".hvl" }
+
 func isFfmpegExt(ext string) bool {
 	switch ext {
 	case ".aac", ".ac3", ".eac3", ".mp1", ".mp2", ".mp3",
@@ -131,6 +135,25 @@ func (p *Player) PlayFile(path string) error {
 		p.channels = 2
 		p.isTracker = true
 		slog.Info("playing gme", "path", path, "tracks", gme.GetTrackCount())
+		return nil
+	}
+	if isHvlExt(ext) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("hvl read %s: %w", path, err)
+		}
+		hvl, err := soloud.NewHvl(data)
+		if err != nil {
+			return fmt.Errorf("hvl %s: %w", path, err)
+		}
+		p.replaceHvlSource(hvl)
+		p.currentPath = path
+		p.currentDuration = hvl.GetLength()
+		p.currentBPM = 0
+		p.currentBitrate = fileBitrate(path, p.currentDuration)
+		p.channels = 2
+		p.isTracker = true
+		slog.Info("playing hvl", "path", path, "tracks", hvl.GetTrackCount())
 		return nil
 	}
 	if isSidExt(ext) {
@@ -275,6 +298,20 @@ func (p *Player) PlayFileAsync(path string) {
 		p.loadPercent.Store(-1) // decode phase: unknown progress
 
 		ext := strings.ToLower(filepath.Ext(localPath))
+		if isHvlExt(ext) {
+			fileBuf, err := os.ReadFile(localPath)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			hvl, err := soloud.NewHvl(fileBuf)
+			if err != nil {
+				p.pendingCh <- pendingLoad{path: path, err: err}
+				return
+			}
+			p.pendingCh <- pendingLoad{path: path, hvl: hvl}
+			return
+		}
 		if isTrackerExt(ext) {
 			fileBuf, err := os.ReadFile(localPath)
 			if err != nil {
@@ -432,6 +469,9 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			if res.ffmpeg != nil {
 				res.ffmpeg.Destroy()
 			}
+			if res.hvl != nil {
+				res.hvl.Destroy()
+			}
 			return false, false
 		}
 		p.loading.Store(false)
@@ -521,6 +561,15 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 			p.channels = res.ffmpeg.GetChannels()
 			p.isTracker = false
 			slog.Info("playing ffmpeg (async)", "path", res.path)
+		} else if res.hvl != nil {
+			p.replaceHvlSource(res.hvl)
+			p.currentPath = res.path
+			p.currentDuration = res.hvl.GetLength()
+			p.currentBPM = 0
+			p.currentBitrate = fileBitrate(res.path, p.currentDuration)
+			p.channels = 2
+			p.isTracker = true
+			slog.Info("playing hvl (async)", "path", res.path, "tracks", res.hvl.GetTrackCount())
 		}
 		return true, false
 	default:
@@ -613,6 +662,10 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 		p.currentFfmpeg.Destroy()
 		p.currentFfmpeg = nil
 	}
+	if p.currentHvl != nil {
+		p.currentHvl.Destroy()
+		p.currentHvl = nil
+	}
 	if w != nil {
 		p.currentWav = w
 		p.voice = p.s.Play(w)
@@ -625,6 +678,8 @@ func (p *Player) replaceSource(w *soloud.Wav, mod *soloud.Xmp, ompt *soloud.Open
 	} else if gme != nil {
 		p.currentGme = gme
 		p.voice = p.s.PlayGme(gme)
+	} else if p.currentHvl != nil {
+		p.voice = p.s.PlayHvl(p.currentHvl)
 	} else if p.currentSid != nil {
 		p.voice = p.s.PlaySid(p.currentSid)
 	} else if len(ayumi) > 0 && ayumi[0] != nil {
@@ -655,6 +710,12 @@ func (p *Player) replaceFfmpegSource(ffmpeg *soloud.Ffmpeg) {
 	p.replaceSource(nil, nil, nil, nil)
 	p.currentFfmpeg = ffmpeg
 	p.voice = p.s.PlayFfmpeg(ffmpeg)
+}
+
+func (p *Player) replaceHvlSource(hvl *soloud.Hvl) {
+	p.replaceSource(nil, nil, nil, nil)
+	p.currentHvl = hvl
+	p.voice = p.s.PlayHvl(hvl)
 }
 
 // GetWave returns the current SoLoud waveform data (256 float32 samples).

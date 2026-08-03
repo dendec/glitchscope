@@ -12,17 +12,17 @@ const (
 )
 
 type Stats struct {
-	MemKB     float64
-	CPUPct    float64
-	GPUMemKB  float64
+	MemKB      float64
+	CPUPct     float64
+	GPUMemKB   float64
 	GPUUtilPct float64
-	GPUOK     bool
+	GPUOK      bool
 }
 
 type Collector struct {
-	mu            sync.Mutex
-	lastProcRead  time.Time
-	lastStats     Stats
+	mu           sync.Mutex
+	lastProcRead time.Time
+	lastStats    Stats
 
 	prevCPUJiffies uint64
 	prevCPUWall    time.Time

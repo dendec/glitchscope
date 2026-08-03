@@ -22,6 +22,12 @@ unsigned int Gme_getTrackCount(void *source);
 const char *Gme_getTitle(void *source);
 const char *Gme_getAuthor(void *source);
 unsigned int Gme_getSampleRate(void *source);
+void *Hvl_create(void);
+void Hvl_destroy(void *source);
+int Hvl_loadMem(void *source, const unsigned char *data, unsigned int length);
+unsigned int Hvl_getLengthMs(void *source);
+unsigned int Hvl_getTrackCount(void *source);
+unsigned int Hvl_getSampleRate(void *source);
 void *SidSource_create(void);
 void SidSource_destroy(void *source);
 int SidSource_loadMem(void *source, const unsigned char *data, unsigned int length);
@@ -45,6 +51,7 @@ unsigned int Ym_getLengthMs(void *source);
 unsigned int Ym_getSampleRate(void *source);
 */
 import "C"
+
 import (
 	"fmt"
 	"unsafe"
@@ -72,6 +79,11 @@ type Openmpt struct {
 
 // Gme wraps a Game Music Emu SoLoud source.
 type Gme struct {
+	p unsafe.Pointer
+}
+
+// Hvl wraps the AHX/HVL SoLoud source.
+type Hvl struct {
 	p unsafe.Pointer
 }
 
@@ -196,6 +208,22 @@ func NewGme(data []byte) (*Gme, error) {
 	return &Gme{p: p}, nil
 }
 
+// NewHvl creates an AHX/HVL source from module data.
+func NewHvl(data []byte) (*Hvl, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("hvl: empty data")
+	}
+	p := C.Hvl_create()
+	if p == nil {
+		return nil, fmt.Errorf("hvl: create failed")
+	}
+	if C.Hvl_loadMem(p, (*C.uchar)(unsafe.Pointer(&data[0])), C.uint(len(data))) != 0 {
+		C.Hvl_destroy(p)
+		return nil, fmt.Errorf("hvl: load failed")
+	}
+	return &Hvl{p: p}, nil
+}
+
 // NewSid creates a cRSID source from SID or RSID data.
 func NewSid(data []byte) (*Sid, error) {
 	if len(data) == 0 {
@@ -309,6 +337,14 @@ func (g *Gme) Destroy() {
 	}
 }
 
+// Destroy frees the AHX/HVL resource.
+func (h *Hvl) Destroy() {
+	if h.p != nil {
+		C.Hvl_destroy(h.p)
+		h.p = nil
+	}
+}
+
 // Destroy frees the SID resource.
 func (s *Sid) Destroy() {
 	if s.p != nil {
@@ -389,6 +425,11 @@ func (s *Soloud) PlayYm(y *Ym) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(y.p)))
 }
 
+// PlayHvl starts playing an AHX/HVL source.
+func (s *Soloud) PlayHvl(h *Hvl) uint {
+	return uint(C.Soloud_play(s.p, (*C.AudioSource)(h.p)))
+}
+
 // PlayFfmpeg starts playing an FFmpeg source.
 func (s *Soloud) PlayFfmpeg(f *Ffmpeg) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(f.p)))
@@ -397,6 +438,10 @@ func (s *Soloud) PlayFfmpeg(f *Ffmpeg) uint {
 func (g *Gme) GetLength() float64 {
 	return float64(C.Gme_getLengthMs(g.p)) / 1000
 }
+
+func (h *Hvl) GetLength() float64 { return float64(C.Hvl_getLengthMs(h.p)) / 1000 }
+func (h *Hvl) GetTrackCount() int { return int(C.Hvl_getTrackCount(h.p)) }
+func (h *Hvl) GetSampleRate() int { return int(C.Hvl_getSampleRate(h.p)) }
 
 func (g *Gme) GetTrackCount() int { return int(C.Gme_getTrackCount(g.p)) }
 func (g *Gme) GetSampleRate() int { return int(C.Gme_getSampleRate(g.p)) }

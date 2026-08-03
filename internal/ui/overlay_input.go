@@ -200,11 +200,9 @@ func (o *Overlay) cursorDown1() {
 				o.settingsValueCursor++
 				o.settingsDirty = true
 			}
-		} else {
-			if o.settingsCursor < len(o.settingsRows)-1 {
-				o.settingsCursor++
-				o.settingsDirty = true
-			}
+		} else if o.settingsCursor < len(o.settingsRows)-1 {
+			o.settingsCursor++
+			o.settingsDirty = true
 		}
 		return
 	}

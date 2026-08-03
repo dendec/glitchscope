@@ -7,6 +7,7 @@ package projectm
 #include "projectM-4/projectM.h"
 */
 import "C"
+
 import (
 	"fmt"
 	"unsafe"
@@ -104,5 +105,3 @@ func (h *Handle) BindFeedbackFramebuffer() {
 func (h *Handle) SetSoftCutDuration(seconds float64) {
 	C.projectm_set_soft_cut_duration(h.p, C.double(seconds))
 }
-
-
