@@ -76,6 +76,20 @@ static void rtDestroyTexture(GLuint tex) {
 	if (tex) glDeleteTextures(1, &tex);
 }
 
+// rtClearTexture binds the texture to a temporary FBO and clears it to black.
+// Guaranteed zeroed on all GLES2 implementations.
+static void rtClearTexture(GLuint tex, GLsizei w, GLsizei h) {
+	GLuint fbo;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+	glViewport(0, 0, w, h);
+	glClearColor(0, 0, 0, 0);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDeleteFramebuffers(1, &fbo);
+}
+
 // rtCapture copies a w x h rectangle from the bottom-left corner of the
 // currently bound read framebuffer (where projectM always draws its final
 // composite, at whatever size was passed to projectm_set_window_size) into
@@ -133,12 +147,12 @@ func (rt *RenderTarget) SetNearest(nearest bool) {
 }
 
 // Resize updates the dimensions for the next Capture call.
-// Clears the texture to avoid stale content when increasing resolution.
 func (rt *RenderTarget) Resize(width, height int) {
+	if width <= 0 || height <= 0 || rt.tex == 0 {
+		return
+	}
 	rt.w, rt.h = width, height
-	C.glBindTexture(C.GL_TEXTURE_2D, rt.tex)
-	C.glTexImage2D(C.GL_TEXTURE_2D, 0, C.GL_RGBA, C.GLsizei(width), C.GLsizei(height), 0, C.GL_RGBA, C.GL_UNSIGNED_BYTE, nil)
-	C.glBindTexture(C.GL_TEXTURE_2D, 0)
+	C.rtClearTexture(rt.tex, C.GLsizei(width), C.GLsizei(height))
 }
 
 // Size returns the current render target dimensions.
