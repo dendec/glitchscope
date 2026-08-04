@@ -163,7 +163,7 @@ func (a *App) Run() {
 				line += fmt.Sprintf(" GPU:%.0fM %.0f%%", s.GPUMemKB/1024, s.GPUUtilPct)
 			}
 			if a.settings.Graphics.Adaptive && !a.renderScaleExplicit {
-				line += fmt.Sprintf(" %dx%d", a.settings.Graphics.RenderWidth, a.settings.Graphics.RenderHeight)
+				line += fmt.Sprintf(" %dp", a.settings.Graphics.RenderHeight)
 			}
 			a.overlay.SetStats(line)
 			if a.pl != nil {
