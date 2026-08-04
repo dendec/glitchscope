@@ -38,40 +38,42 @@ func applyOutlineShadow(rgba *image.RGBA, textColor color.RGBA, radius int) {
 		return
 	}
 
-	coverage := make([]float64, w*h)
+	coverage := make([]uint8, w*h)
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			_, _, _, a := rgba.At(rgba.Rect.Min.X+x, rgba.Rect.Min.Y+y).RGBA()
-			coverage[y*w+x] = float64(a) / 0xffff
+			coverage[y*w+x] = uint8(a >> 8)
 		}
 	}
 
-	outline := coverage
+	buf0 := make([]uint8, w*h)
+	buf1 := make([]uint8, w*h)
+	copy(buf0, coverage)
+	src, dst := buf0, buf1
 	for pass := 0; pass < radius; pass++ {
-		outline = dilate3x3(outline, w, h)
+		dilate3x3(dst, src, w, h)
+		src, dst = dst, src
 	}
+	// src = final dilated mask (never aliases coverage)
 
 	shadowColor := shadowColorFor(textColor)
-	tr, tg, tb := float64(textColor.R), float64(textColor.G), float64(textColor.B)
-	sr, sg, sb := float64(shadowColor.R), float64(shadowColor.G), float64(shadowColor.B)
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			i := y*w + x
 			glyphA := coverage[i]
-			if glyphA >= 1.0 {
+			if glyphA == 255 {
 				continue // fully opaque glyph pixel; already the desired color
 			}
-			if outline[i] <= 0 {
+			if src[i] == 0 {
 				continue // outside the outline, leave transparent
 			}
 			// Blend glyph color over the fully opaque outline color.
-			r := tr*glyphA + sr*(1-glyphA)
-			g := tg*glyphA + sg*(1-glyphA)
-			b := tb*glyphA + sb*(1-glyphA)
+			a := uint32(glyphA)
+			inv := uint32(255 - glyphA)
 			rgba.SetRGBA(rgba.Rect.Min.X+x, rgba.Rect.Min.Y+y, color.RGBA{
-				R: clamp255(r),
-				G: clamp255(g),
-				B: clamp255(b),
+				R: uint8((uint32(textColor.R)*a + uint32(shadowColor.R)*inv) / 255),
+				G: uint8((uint32(textColor.G)*a + uint32(shadowColor.G)*inv) / 255),
+				B: uint8((uint32(textColor.B)*a + uint32(shadowColor.B)*inv) / 255),
 				A: 255,
 			})
 		}
@@ -91,19 +93,7 @@ func newShadowedTextRGBA(contentW, contentH int, fontSizePx float64, textColor c
 	return rgba, texW, texH, padding
 }
 
-func clamp255(v float64) uint8 {
-	r := math.Round(v)
-	if r < 0 {
-		return 0
-	}
-	if r > 255 {
-		return 255
-	}
-	return uint8(r)
-}
-
-func dilate3x3(src []float64, w, h int) []float64 {
-	out := make([]float64, w*h)
+func dilate3x3(out, src []uint8, w, h int) {
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			m := src[y*w+x]
@@ -126,5 +116,4 @@ func dilate3x3(src []float64, w, h int) []float64 {
 			out[y*w+x] = m
 		}
 	}
-	return out
 }

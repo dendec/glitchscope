@@ -25,6 +25,7 @@ type scrollHold struct {
 // gamepadUp/gamepadDown report D-Pad state (SDL button events don't auto-repeat).
 func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	o.notif.Update(o.uiVisible)
+	o.applyModArchiveResults()
 
 	if !o.uiVisible || !o.panelEntered {
 		return
@@ -83,7 +84,10 @@ func (o *Overlay) ToggleUI() {
 		o.panelEntered = true
 		o.focusPanel = 1
 		o.uiPage = PageLibrary
-		o.markAllDirty()
+		if !o.textureCacheReady {
+			o.markAllDirty()
+			o.textureCacheReady = true
+		}
 	}
 	slog.Debug("ui visibility", "visible", o.uiVisible)
 }

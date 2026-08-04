@@ -21,6 +21,10 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		if o.focusPanel == 0 {
 			drawPanelBorder(o, px, py, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		}
+		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
+			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh)
+			o.drawCursorHighlight(px, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
+		}
 		glDrawOverlayText(o.programText, o.albumsTex, 1,
 			px, py, float32(o.albumsTexW), float32(o.albumsTexH), winW, winH, viewW, viewH)
 		am := panelH / lh
@@ -28,6 +32,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 			am = 1
 		}
 		drawScrollbar(o, px+float32(panelW)-sbW, py, float32(panelH), len(o.albums), am, o.albumsScroll, winW, winH, viewW, viewH)
+		// Cursor highlight row — drawn as separate overlay, no texture rebuild needed.
 		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
 			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh)
 			o.drawMarqueeCol(&o.marqueeL, px, py, float32(textW), float32(panelH), lh, rowY, winW, winH, viewW, viewH)
@@ -44,6 +49,10 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		drawPanelBg(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		if o.focusPanel == 1 {
 			drawPanelBorder(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
+		}
+		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
+			rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
+			o.drawCursorHighlight(tx, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 		}
 		glDrawOverlayText(o.programText, o.tracksTex, 1,
 			tx, ty, float32(o.tracksTexW), float32(o.tracksTexH), winW, winH, viewW, viewH)
@@ -65,10 +74,11 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 
 func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	o.albumsDirty = false
-	o.deleteTex(&o.albumsTex)
-	o.marqueeL.invalidate(o)
 
 	if len(o.albums) == 0 {
+		o.deleteTex(&o.albumsTex)
+		o.marqueeL.invalidate(o)
+		o.albumsContentDirty = false
 		return
 	}
 
@@ -77,7 +87,19 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	if maxRows < 1 {
 		maxRows = 1
 	}
+	prevScroll := o.albumsScroll
 	o.albumsScroll = scrollOffset(o.albumsScroll, o.albumCursor, len(o.albums), maxRows)
+
+	// Skip expensive re-render if scroll didn't change — cursor highlight
+	// is drawn as a separate overlay in renderLibraryPanels.
+	if o.albumsScroll == prevScroll && o.albumsTex != 0 && !o.albumsContentDirty {
+		maxTextPx := availableRowTextWidth(maxW)
+		o.refreshCursorMarquee(&o.marqueeL, o.albums, o.albumCursor, o.focusPanel == 0, maxTextPx)
+		return
+	}
+
+	o.deleteTex(&o.albumsTex)
+	o.marqueeL.invalidate(o)
 
 	start := o.albumsScroll
 	end := start + maxRows
@@ -93,30 +115,28 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 			prefix = "▸ "
 		}
 		line := prefix + name
-		isCursor := i == o.albumCursor && o.focusPanel == 0
-		rows = append(rows, listRow{
-			text:   line,
-			active: isCursor,
-			bold:   o.panelEntered && isCursor,
-		})
-		if isCursor {
+		rows = append(rows, listRow{text: line})
+		if i == o.albumCursor && o.focusPanel == 0 {
 			o.rebuildMarqueeLine(&o.marqueeL, line, maxTextPx)
 		}
 	}
 	o.albumsTex, o.albumsTexW, o.albumsTexH = o.renderListRows(rows, maxTextPx, maxW)
+	o.albumsContentDirty = false
 }
 
 func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.tracksDirty = false
-	o.deleteTex(&o.tracksTex)
-	o.marqueeR.invalidate(o)
 
 	if o.previewActive {
 		o.rebuildPreviewTex(maxW, maxH)
+		o.tracksContentDirty = false
 		return
 	}
 
 	if len(o.trackInfos) == 0 {
+		o.deleteTex(&o.tracksTex)
+		o.marqueeR.invalidate(o)
+		o.tracksContentDirty = false
 		return
 	}
 
@@ -125,7 +145,17 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	if maxRows < 1 {
 		maxRows = 1
 	}
+	prevScroll := o.tracksScroll
 	o.tracksScroll = scrollOffset(o.tracksScroll, o.trackCursor, len(o.trackInfos), maxRows)
+
+	if o.tracksScroll == prevScroll && o.tracksTex != 0 && !o.tracksContentDirty {
+		maxTextPx := availableRowTextWidth(maxW)
+		o.refreshCursorMarqueeTracks(maxTextPx)
+		return
+	}
+
+	o.deleteTex(&o.tracksTex)
+	o.marqueeR.invalidate(o)
 
 	start := o.tracksScroll
 	end := start + maxRows
@@ -146,22 +176,20 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 			prefix = "▸ "
 		}
 		line := prefix + title + suffix
-		isCursor := i == o.trackCursor && o.focusPanel == 1
-		rows = append(rows, listRow{
-			text:   line,
-			active: isCursor,
-			bold:   o.panelEntered && isCursor,
-		})
-		if isCursor {
+		rows = append(rows, listRow{text: line})
+		if i == o.trackCursor && o.focusPanel == 1 {
 			o.rebuildMarqueeLine(&o.marqueeR, line, maxTextPx)
 		}
 	}
 	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
+	o.tracksContentDirty = false
 }
 
 // rebuildPreviewTex renders the right-panel preview for a non-leaf entry.
 func (o *Overlay) rebuildPreviewTex(maxW, maxH int) {
 	if len(o.previewEntries) == 0 {
+		o.deleteTex(&o.tracksTex)
+		o.marqueeR.invalidate(o)
 		return
 	}
 

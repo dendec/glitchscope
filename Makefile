@@ -155,10 +155,13 @@ deploy: dist-arm64 portable-pmv $(TEXTURES_PMV_FILE)
 	adb push $(PMV_FILE) $(DEVICE_DIR)/presets/presets.pmv
 	# Deploy the optimized texture archive for MilkDrop presets.
 	adb push $(TEXTURES_PMV_FILE) $(DEVICE_DIR)/presets/textures.pmv
-	# Deploy .cache directory (modland & modarchive catalogs)
-	@if [ -d ".cache" ]; then adb push .cache $(DEVICE_DIR)/; fi
 	adb shell "killall -9 pmv 2>/dev/null; true"
-	@echo "=== Deployed binary + music + presets + textures + cache ==="
+	@echo "=== Deployed binary + music + presets + textures ==="
+
+deploy-fast: dist-arm64
+	adb push $(ARM64_DIST_DIR)/pmv/pmv $(DEVICE_DIR)/
+	adb shell "killall -9 pmv 2>/dev/null; true"
+	@echo "=== Deployed binary only ==="
 
 deploy-portmaster: dist-portmaster
 	adb push dist/pmv.zip $(PM_AUTOINSTALL)/

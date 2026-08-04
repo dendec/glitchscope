@@ -15,6 +15,12 @@ import (
 
 const modlandNamePrefix = "Modland: "
 
+type modArchiveResult struct {
+	targetURL string
+	items     []modarchive.DirItem
+	err       error
+}
+
 // isVirtualAlbum reports provider-browsed albums (modland/modarchive) that
 // live only in the overlay, not in the library scan.
 func isVirtualAlbum(a player.Album) bool {
@@ -108,7 +114,9 @@ func (o *Overlay) FocusPlayingTrack(albumIdx, trackIdx int) {
 	}
 	o.panelEntered = true
 	o.albumsDirty = true
+	o.albumsContentDirty = true
 	o.tracksDirty = true
+	o.tracksContentDirty = true
 }
 
 func (e *navEntry) IsLeafAlbum() bool {
@@ -327,11 +335,63 @@ func (o *Overlay) buildAlbumsInFormatEntries(format string) []navEntry {
 	return entries
 }
 
-// buildModArchiveEntries reads directory items from the catalog/cache, or
-// fetches the listing over HTTP synchronously, and converts to navEntries.
+// buildModArchiveEntries returns cached directory items and starts an async
+// fetch when the listing is not available yet. Retries on re-enter after error.
 func (o *Overlay) buildModArchiveEntries(targetURL string) []navEntry {
-	items, err := modarchive.FetchDirectory(o.baseDir, targetURL)
-	if err != nil || len(items) == 0 {
+	if items, ok := o.modArchiveItems[targetURL]; ok {
+		return o.buildModArchiveEntriesFromItems(targetURL, items)
+	}
+	// Clear error on re-enter to allow retry.
+	delete(o.modArchiveErrors, targetURL)
+	o.requestModArchiveEntries(targetURL)
+	return nil
+}
+
+func (o *Overlay) requestModArchiveEntries(targetURL string) {
+	if o.modArchivePending[targetURL] {
+		return
+	}
+	o.modArchivePending[targetURL] = true
+	baseDir := o.baseDir
+	closeCh := o.closeCh
+	results := o.modArchiveResults
+	go func() {
+		items, err := modarchive.FetchDirectory(baseDir, targetURL)
+		r := modArchiveResult{targetURL: targetURL, items: items, err: err}
+		select {
+		case results <- r:
+		case <-closeCh:
+		}
+	}()
+}
+
+func (o *Overlay) applyModArchiveResults() {
+	for {
+		select {
+		case result := <-o.modArchiveResults:
+			delete(o.modArchivePending, result.targetURL)
+			if result.err != nil {
+				// Don't cache errors — allow retry on next enter.
+				delete(o.modArchiveItems, result.targetURL)
+				o.modArchiveErrors[result.targetURL] = result.err
+			} else {
+				delete(o.modArchiveErrors, result.targetURL)
+				o.modArchiveItems[result.targetURL] = result.items
+			}
+			if o.uiVisible && o.uiPage == PageLibrary {
+				o.refreshPreview()
+				o.albumsDirty = true
+				o.tracksDirty = true
+				o.tracksContentDirty = true
+			}
+		default:
+			return
+		}
+	}
+}
+
+func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []modarchive.DirItem) []navEntry {
+	if len(items) == 0 {
 		return nil
 	}
 
@@ -428,7 +488,9 @@ func (o *Overlay) syncPanels() {
 	o.refreshAlbumLabels()
 	o.refreshPreview()
 	o.albumsDirty = true
+	o.albumsContentDirty = true
 	o.tracksDirty = true
+	o.tracksContentDirty = true
 }
 
 // refreshPreview recomputes the right-panel preview for a non-leaf entry.
@@ -480,6 +542,7 @@ func (o *Overlay) refreshPreview() {
 		o.previewActive = false
 	}
 	o.tracksDirty = true
+	o.tracksContentDirty = true
 }
 
 // pushLevel drills into a non-leaf entry, saving cursor/scroll for popLevel.
@@ -549,6 +612,7 @@ func (o *Overlay) refreshVirtualTracks() {
 			o.trackCursor = 0
 		}
 		o.tracksDirty = true
+		o.tracksContentDirty = true
 	}
 }
 

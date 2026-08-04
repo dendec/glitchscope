@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/dendec/pmv/internal/player"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
@@ -134,25 +135,48 @@ type Overlay struct {
 	pageIndicatorTexW  [3]int
 	pageIndicatorTexH  [3]int
 	pageIndicatorDirty bool
+	textureCacheReady  bool
 
 	albumsDirty        bool
+	albumsContentDirty bool
 	tracksDirty        bool
+	tracksContentDirty bool
 	statsDirty         bool
 	bottomDirty        bool
 	presetNameDirty    bool
 	presetsDirty       bool
 	closeInjectPending bool
+	modArchiveItems    map[string][]modarchive.DirItem
+	modArchiveErrors   map[string]error
+	modArchivePending  map[string]bool
+	modArchiveResults  chan modArchiveResult
+	closeCh            chan struct{} // closed by Close() to unblock goroutines
 }
 
 // New creates an Overlay.
 func New() *Overlay {
 	return &Overlay{
-		programText: glCreateTextProgram(),
-		programRect: glCreateRectProgram(),
+		programText:       glCreateTextProgram(),
+		programRect:       glCreateRectProgram(),
+		modArchiveItems:   make(map[string][]modarchive.DirItem),
+		modArchiveErrors:  make(map[string]error),
+		modArchivePending: make(map[string]bool),
+		modArchiveResults: make(chan modArchiveResult, 8),
+		closeCh:           make(chan struct{}),
 	}
 }
 
 func (o *Overlay) Close() {
+	close(o.closeCh)
+	// Drain pending results so goroutines don't leak.
+	for {
+		select {
+		case <-o.modArchiveResults:
+		default:
+			goto drained
+		}
+	}
+drained:
 	o.notif.Hide()
 	o.deleteTex(&o.albumsTex)
 	o.deleteTex(&o.tracksTex)
@@ -238,7 +262,9 @@ func (o *Overlay) IsSettingsEditing() bool { return o.settingsEditing }
 
 func (o *Overlay) markAllDirty() {
 	o.albumsDirty = true
+	o.albumsContentDirty = true
 	o.tracksDirty = true
+	o.tracksContentDirty = true
 	o.bottomDirty = true
 	o.statsDirty = true
 	o.presetNameDirty = true
@@ -293,6 +319,7 @@ func (o *Overlay) rebuildFace() {
 
 // SetAlbums updates the album list and rebuilds library-root navigation rows.
 func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
+	previousCursor := o.albumCursor
 	listChanged := false
 	// Virtual provider albums (modland/modarchive) are overlay-owned and
 	// don't exist in the library — ignore them when detecting a rescan,
@@ -324,14 +351,35 @@ func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
 	if listChanged {
 		o.refreshAlbumLabels()
 	}
-	o.refreshPreview()
-	o.albumsDirty = true
+	cursorChanged := previousCursor != o.albumCursor
+	if listChanged || cursorChanged {
+		o.refreshPreview()
+		o.albumsDirty = true
+		if listChanged {
+			o.albumsContentDirty = true
+		}
+	}
 }
 
 func (o *Overlay) SetTrackInfos(infos []player.TrackInfo, cursor int) {
+	dataChanged := len(o.trackInfos) != len(infos)
+	if !dataChanged {
+		for i := range infos {
+			if o.trackInfos[i] != infos[i] {
+				dataChanged = true
+				break
+			}
+		}
+	}
 	o.trackInfos = infos
+	cursorChanged := o.trackCursor != cursor
 	o.trackCursor = cursor
-	o.tracksDirty = true
+	if dataChanged || cursorChanged {
+		o.tracksDirty = true
+		if dataChanged {
+			o.tracksContentDirty = true
+		}
+	}
 }
 
 // SetPlayback updates playback state.
@@ -356,7 +404,9 @@ func (o *Overlay) SetPlaying(album, track string) {
 		o.playingAlbum = album
 		o.playingTrack = track
 		o.albumsDirty = true
+		o.albumsContentDirty = true
 		o.tracksDirty = true
+		o.tracksContentDirty = true
 		o.bottomDirty = true
 	}
 }

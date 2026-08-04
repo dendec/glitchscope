@@ -359,10 +359,11 @@ func (o *Overlay) renderTextToTexBold(text string, minW int, bold []bool, textCo
 	}
 	lines := strings.Split(text, "\n")
 	lineHeight := o.face.Metrics().Height.Ceil()
+	bounds := make([]fixed.Rectangle26_6, len(lines))
 	contentW := 0
-	for _, line := range lines {
-		bounds, _ := font.BoundString(o.face, line)
-		if width := (bounds.Max.X - bounds.Min.X).Ceil(); width > contentW {
+	for i, line := range lines {
+		bounds[i], _ = font.BoundString(o.face, line)
+		if width := (bounds[i].Max.X - bounds[i].Min.X).Ceil(); width > contentW {
 			contentW = width
 		}
 	}
@@ -377,10 +378,9 @@ func (o *Overlay) renderTextToTexBold(text string, minW int, bold []bool, textCo
 
 	rgba, texW, texH, _ := newShadowedTextRGBA(contentW, contentH, o.fontSize, textColor, func(rgba *image.RGBA, originX, originY int) {
 		for i, line := range lines {
-			bounds, _ := font.BoundString(o.face, line)
 			startDot := fixed.Point26_6{
-				X: fixed.I(originX) - bounds.Min.X,
-				Y: fixed.I(originY+i*lineHeight) - bounds.Min.Y,
+				X: fixed.I(originX) - bounds[i].Min.X,
+				Y: fixed.I(originY+i*lineHeight) - bounds[i].Min.Y,
 			}
 			d := &font.Drawer{
 				Dst:  rgba,
@@ -518,4 +518,43 @@ func availableRowTextWidth(panelW int) int {
 		return 1
 	}
 	return width
+}
+
+// refreshCursorMarquee rebuilds only the marquee for the album cursor row
+// when scroll hasn't changed — avoids full texture re-render.
+func (o *Overlay) refreshCursorMarquee(m *marqueeState, albums []string, cursor int, focusAlbum bool, maxTextPx int) {
+	if !focusAlbum || cursor < 0 || cursor >= len(albums) {
+		return
+	}
+	name := albums[cursor]
+	prefix := "  "
+	if name == o.playingAlbum {
+		prefix = "▸ "
+	}
+	o.rebuildMarqueeLine(m, prefix+name, maxTextPx)
+}
+
+// refreshCursorMarqueeTracks is the tracks-panel equivalent.
+func (o *Overlay) refreshCursorMarqueeTracks(maxTextPx int) {
+	if o.focusPanel != 1 || o.trackCursor < 0 || o.trackCursor >= len(o.trackInfos) {
+		return
+	}
+	info := o.trackInfos[o.trackCursor]
+	title := player.TrackTitle(info.Path)
+	suffix := ""
+	if info.Duration > 0 {
+		suffix = "  " + formatDuration(info.Duration)
+	}
+	prefix := "  "
+	if info.Path == o.playingTrack {
+		prefix = "▸ "
+	}
+	o.rebuildMarqueeLine(&o.marqueeR, prefix+title+suffix, maxTextPx)
+}
+
+// drawCursorHighlight draws a subtle highlight behind the focused row.
+func (o *Overlay) drawCursorHighlight(x, y, w, h float32, winW, winH, viewW, viewH int) {
+	tc := o.textColor()
+	r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
+	glDrawFilledRect(o.programRect, x, y, w, h, r, g, b, 0.12, winW, winH, viewW, viewH)
 }
