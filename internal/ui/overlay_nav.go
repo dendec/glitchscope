@@ -255,10 +255,12 @@ func (o *Overlay) buildRootEntries() []navEntry {
 			entries = append(entries, navEntry{label: parts[0], kind: entryLocalDir, albumIdx: -1, dirPath: dirPath})
 		}
 	}
-	if hasModland {
+	if hasModland && o.online {
 		entries = append(entries, navEntry{label: "Modland", kind: entryModlandRoot, albumIdx: -1})
 	}
-	entries = append(entries, navEntry{label: "ModArchive", kind: entryModArchiveRoot, albumIdx: -1})
+	if o.online {
+		entries = append(entries, navEntry{label: "ModArchive", kind: entryModArchiveRoot, albumIdx: -1})
+	}
 	return entries
 }
 

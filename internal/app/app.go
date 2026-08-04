@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -224,6 +225,7 @@ func (a *App) Close() {
 func (a *App) Init() {
 	a.initAudio()
 	a.initLibrary()
+	a.checkConnectivity()
 	a.initInput()
 	a.initPreset()
 	if a.startupFile != "" && a.pl != nil {
@@ -285,6 +287,30 @@ func (a *App) initLibrary() {
 
 	// Preload modarchive catalog if available on disk.
 	modarchive.InitCatalog(baseDir())
+}
+
+// checkConnectivity probes the network in the background. On success it
+// enables the remote catalogs (Modland/ModArchive) in the navigation tree.
+func (a *App) checkConnectivity() {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://modland.antarctica.no/", nil)
+		if err != nil {
+			slog.Info("connectivity check: request create failed", "error", err)
+			return
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			slog.Info("connectivity check: offline", "error", err)
+			return
+		}
+		resp.Body.Close()
+		slog.Info("connectivity check: online", "status", resp.StatusCode)
+		if a.overlay != nil {
+			a.overlay.SetOnline(true)
+		}
+	}()
 }
 
 func (a *App) loadModlandFromCache() {

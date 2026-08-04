@@ -16,14 +16,14 @@ import (
 )
 
 const (
-	fpsWindow            = 10
-	lowFPSThresh         = 30.0
-	softCutDuration      = 2.5 // seconds, for smooth preset transitions
-	adaptiveThreshLow    = 25.0
-	adaptiveThreshHigh   = 30.0
-	adaptiveDownCount    = 15
-	adaptiveUpCount      = 30
-	adaptiveCooldown     = 2 * time.Second
+	fpsWindow          = 10
+	lowFPSThresh       = 30.0
+	softCutDuration    = 2.5 // seconds, for smooth preset transitions
+	adaptiveThreshLow  = 25.0
+	adaptiveThreshHigh = 30.0
+	adaptiveDownCount  = 15
+	adaptiveUpCount    = 30
+	adaptiveCooldown   = 2 * time.Second
 )
 
 type pendingPreset struct {

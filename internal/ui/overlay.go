@@ -146,6 +146,7 @@ type Overlay struct {
 	bottomDirty        bool
 	presetNameDirty    bool
 	presetsDirty       bool
+	online             bool
 	closeInjectPending bool
 	modArchiveItems    map[string][]modarchive.DirItem
 	modArchiveErrors   map[string]error
@@ -444,6 +445,19 @@ func (o *Overlay) SetPresetName(name string) {
 	}
 	o.presetName = name
 	o.presetNameDirty = true
+}
+
+// SetOnline updates the connectivity flag. When transitioning true, rebuilds
+// root entries so remote catalogs (Modland/ModArchive) appear in the nav list.
+func (o *Overlay) SetOnline(v bool) {
+	if o.online == v {
+		return
+	}
+	o.online = v
+	if v && len(o.navStack) == 0 {
+		o.rootEntries = o.buildRootEntries()
+		o.syncPanels()
+	}
 }
 
 func (o *Overlay) SettingsRows() []SettingRow { return o.settingsRows }
