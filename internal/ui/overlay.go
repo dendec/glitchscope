@@ -209,10 +209,13 @@ func (o *Overlay) Draw(width, height int) {
 		if o.notif.Visible() && o.notif.Tex() != 0 && !o.notif.Hidden() {
 			o.notif.Render(o.programText, width, height)
 		}
-	} else if o.showFPS && o.statsTex != 0 {
-		o.renderStatsOnly(width, height)
-	} else if o.notif.Visible() && !o.notif.Hidden() && !o.notif.Injected() {
-		o.notif.Render(o.programText, width, height)
+	} else {
+		if o.showFPS {
+			o.renderStatsOnly(width, height)
+		}
+		if o.notif.Visible() && !o.notif.Hidden() && !o.notif.Injected() {
+			o.notif.Render(o.programText, width, height)
+		}
 	}
 }
 
