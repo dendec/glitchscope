@@ -133,8 +133,12 @@ func (rt *RenderTarget) SetNearest(nearest bool) {
 }
 
 // Resize updates the dimensions for the next Capture call.
+// Clears the texture to avoid stale content when increasing resolution.
 func (rt *RenderTarget) Resize(width, height int) {
 	rt.w, rt.h = width, height
+	C.glBindTexture(C.GL_TEXTURE_2D, rt.tex)
+	C.glTexImage2D(C.GL_TEXTURE_2D, 0, C.GL_RGBA, C.GLsizei(width), C.GLsizei(height), 0, C.GL_RGBA, C.GL_UNSIGNED_BYTE, nil)
+	C.glBindTexture(C.GL_TEXTURE_2D, 0)
 }
 
 // Size returns the current render target dimensions.
