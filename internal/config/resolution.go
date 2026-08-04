@@ -44,20 +44,28 @@ func ComputeResolutions(baseW, baseH int) []RenderResolution {
 	return out
 }
 
+// ClosestResolutionIndex returns the index of the resolution nearest to target by area.
+func ClosestResolutionIndex(list []RenderResolution, target RenderResolution) int {
+	if len(list) == 0 {
+		return 0
+	}
+	targetArea := target.Width * target.Height
+	best := 0
+	bestDiff := max(targetArea-list[0].Width*list[0].Height, list[0].Width*list[0].Height-targetArea)
+	for i, r := range list[1:] {
+		d := max(targetArea-r.Width*r.Height, r.Width*r.Height-targetArea)
+		if d < bestDiff {
+			bestDiff = d
+			best = i + 1
+		}
+	}
+	return best
+}
+
 // ClosestResolution returns the resolution nearest to target by area.
 func ClosestResolution(list []RenderResolution, target RenderResolution) RenderResolution {
 	if len(list) == 0 {
 		return target
 	}
-	targetArea := target.Width * target.Height
-	best := list[0]
-	bestDiff := max(targetArea-best.Width*best.Height, best.Width*best.Height-targetArea)
-	for _, r := range list[1:] {
-		d := max(targetArea-r.Width*r.Height, r.Width*r.Height-targetArea)
-		if d < bestDiff {
-			bestDiff = d
-			best = r
-		}
-	}
-	return best
+	return list[ClosestResolutionIndex(list, target)]
 }

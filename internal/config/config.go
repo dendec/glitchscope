@@ -73,6 +73,7 @@ type GraphicsSettings struct {
 	RenderWidth   int           `json:"render_width"`
 	RenderHeight  int           `json:"render_height"`
 	UpscaleFilter UpscaleFilter `json:"upscale_filter"`
+	Adaptive      bool          `json:"adaptive"`
 }
 
 // DefaultGraphics returns sensible defaults.
@@ -81,6 +82,7 @@ func DefaultGraphics() GraphicsSettings {
 		RenderWidth:   320,
 		RenderHeight:  240,
 		UpscaleFilter: FilterPixel,
+		Adaptive:      true,
 	}
 }
 

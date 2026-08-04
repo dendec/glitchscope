@@ -49,6 +49,12 @@ type App struct {
 	renderScaleExplicit bool
 	startupFile         string
 
+	adaptiveResolutions []config.RenderResolution
+	adaptiveResIdx      int
+	adaptiveCooldown    time.Time
+	adaptiveLowCount    int
+	adaptiveHighCount   int
+
 	pending      pendingPreset // pending preset name + scheduled load time
 	presetTicker *time.Ticker
 
@@ -144,11 +150,24 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	}
 
 	resolutions := config.ComputeResolutions(int(w), int(h))
-	savedRes := config.RenderResolution{Width: gs.Graphics.RenderWidth, Height: gs.Graphics.RenderHeight}
-	target := config.ClosestResolution(resolutions, savedRes)
-	renderW, renderH := target.Width, target.Height
-	if renderScaleExplicit {
+	var renderW, renderH int
+	switch {
+	case renderScaleExplicit:
 		renderW, renderH = scaledDim(int(w), renderScale), scaledDim(int(h), renderScale)
+	case gs.Graphics.Adaptive && len(resolutions) > 0:
+		a.adaptiveResolutions = resolutions
+		a.adaptiveResIdx = 0
+		renderW, renderH = resolutions[0].Width, resolutions[0].Height
+	case gs.Graphics.Adaptive:
+		slog.Warn("adaptive: empty resolution list at startup, using saved size",
+			"window", fmt.Sprintf("%dx%d", int(w), int(h)))
+		savedRes := config.RenderResolution{Width: gs.Graphics.RenderWidth, Height: gs.Graphics.RenderHeight}
+		target := config.ClosestResolution(resolutions, savedRes)
+		renderW, renderH = target.Width, target.Height
+	default:
+		savedRes := config.RenderResolution{Width: gs.Graphics.RenderWidth, Height: gs.Graphics.RenderHeight}
+		target := config.ClosestResolution(resolutions, savedRes)
+		renderW, renderH = target.Width, target.Height
 	}
 	gs.Graphics.RenderWidth, gs.Graphics.RenderHeight = renderW, renderH
 

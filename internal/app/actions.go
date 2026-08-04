@@ -110,7 +110,7 @@ func (a *App) switchScreen(winW, winH int, forward bool) {
 		a.overlay.PrevScreen()
 	}
 	if a.overlay.IsSettingsPage() {
-		rows := ui.BuildSettingsRows(*a.settings, winW, winH)
+		rows := ui.BuildSettingsRows(*a.settings, winW, winH, a.renderScaleExplicit)
 		a.overlay.SetSettingsRows(rows, 0)
 	}
 }
@@ -242,12 +242,22 @@ func (a *App) applySettings(winW, winH int) {
 
 	resIndex := rows[ui.SettingResolution].Index
 	resolutions := config.ComputeResolutions(winW, winH)
-	if resIndex >= 0 && resIndex < len(resolutions) {
-		r := resolutions[resIndex]
-		a.settings.Graphics.RenderWidth = r.Width
-		a.settings.Graphics.RenderHeight = r.Height
-		a.rt.Resize(r.Width, r.Height)
-		a.pm.SetWindowSize(r.Width, r.Height)
+
+	if a.renderScaleExplicit {
+		if resIndex >= 0 && resIndex < len(resolutions) {
+			a.applyAdaptiveResolution(resolutions[resIndex])
+		}
+		a.resetAdaptiveCounters()
+	} else if resIndex == 0 {
+		a.settings.Graphics.Adaptive = true
+		a.resetAdaptiveState(winW, winH)
+	} else {
+		a.settings.Graphics.Adaptive = false
+		fixedIdx := resIndex - 1
+		if fixedIdx >= 0 && fixedIdx < len(resolutions) {
+			a.applyAdaptiveResolution(resolutions[fixedIdx])
+		}
+		a.resetAdaptiveCounters()
 	}
 
 	filterIndex := rows[ui.SettingFilter].Index
@@ -292,7 +302,7 @@ func (a *App) applySettings(winW, winH int) {
 		slog.Debug("settings saved", "path", a.settingsPath)
 	}
 
-	rows = ui.BuildSettingsRows(*a.settings, winW, winH)
+	rows = ui.BuildSettingsRows(*a.settings, winW, winH, a.renderScaleExplicit)
 	a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 }
 

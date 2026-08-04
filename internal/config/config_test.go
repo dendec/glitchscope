@@ -20,10 +20,10 @@ func TestGraphicsValidate(t *testing.T) {
 		g    GraphicsSettings
 		ok   bool
 	}{
-		{"valid", GraphicsSettings{320, 240, FilterPixel}, true},
-		{"zero width", GraphicsSettings{0, 240, FilterPixel}, false},
-		{"zero height", GraphicsSettings{320, 0, FilterPixel}, false},
-		{"bad filter", GraphicsSettings{320, 240, 99}, false},
+		{"valid", GraphicsSettings{RenderWidth: 320, RenderHeight: 240, UpscaleFilter: FilterPixel}, true},
+		{"zero width", GraphicsSettings{RenderWidth: 0, RenderHeight: 240, UpscaleFilter: FilterPixel}, false},
+		{"zero height", GraphicsSettings{RenderWidth: 320, RenderHeight: 0, UpscaleFilter: FilterPixel}, false},
+		{"bad filter", GraphicsSettings{RenderWidth: 320, RenderHeight: 240, UpscaleFilter: 99}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -182,6 +182,65 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 	if got != orig {
 		t.Fatalf("round trip: got %+v, want %+v", got, orig)
+	}
+}
+
+func TestSaveLoadRoundTripAdaptive(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "settings.json")
+
+	orig := Settings{
+		Graphics: GraphicsSettings{RenderWidth: 640, RenderHeight: 480, UpscaleFilter: FilterPixel, Adaptive: true},
+	}
+	if err := SaveSettings(p, orig); err != nil {
+		t.Fatal("save:", err)
+	}
+	got, err := LoadSettings(p)
+	if err != nil {
+		t.Fatal("load:", err)
+	}
+	if !got.Graphics.Adaptive {
+		t.Fatal("Adaptive should be true after round-trip")
+	}
+	if got != orig {
+		t.Fatalf("round trip: got %+v, want %+v", got, orig)
+	}
+}
+
+func TestLoadSettingsAdaptivePartial(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "settings.json")
+
+	data := `{"graphics":{"adaptive":true}}`
+	if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := LoadSettings(p)
+	if err != nil {
+		t.Fatal("load:", err)
+	}
+	if !s.Graphics.Adaptive {
+		t.Fatal("Adaptive should be true from partial JSON")
+	}
+	if s.Graphics.RenderWidth != DefaultGraphics().RenderWidth {
+		t.Fatal("missing render_width should use default")
+	}
+}
+
+func TestLoadSettingsAdaptiveFalseOmitted(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "settings.json")
+
+	data := `{"graphics":{"render_width":320}}`
+	if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := LoadSettings(p)
+	if err != nil {
+		t.Fatal("load:", err)
+	}
+	if !s.Graphics.Adaptive {
+		t.Fatal("omitted adaptive should default to true from DefaultGraphics")
 	}
 }
 

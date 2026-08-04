@@ -33,6 +33,7 @@ func LoadSettings(path string) (Settings, error) {
 			RenderWidth   *int           `json:"render_width"`
 			RenderHeight  *int           `json:"render_height"`
 			UpscaleFilter *UpscaleFilter `json:"upscale_filter"`
+			Adaptive      *bool          `json:"adaptive"`
 		} `json:"graphics"`
 		Playback *struct {
 			ShuffleMode *ShuffleMode `json:"shuffle_mode"`
@@ -60,6 +61,9 @@ func LoadSettings(path string) (Settings, error) {
 		}
 		if raw.Graphics.UpscaleFilter != nil {
 			s.Graphics.UpscaleFilter = *raw.Graphics.UpscaleFilter
+		}
+		if raw.Graphics.Adaptive != nil {
+			s.Graphics.Adaptive = *raw.Graphics.Adaptive
 		}
 	}
 	if raw.Playback != nil {

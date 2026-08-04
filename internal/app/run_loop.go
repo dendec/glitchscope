@@ -16,9 +16,14 @@ import (
 )
 
 const (
-	fpsWindow       = 30
-	lowFPSThresh    = 30.0
-	softCutDuration = 2.5 // seconds, for smooth preset transitions
+	fpsWindow            = 10
+	lowFPSThresh         = 30.0
+	softCutDuration      = 2.5 // seconds, for smooth preset transitions
+	adaptiveThreshLow    = 25.0
+	adaptiveThreshHigh   = 30.0
+	adaptiveDownCount    = 15
+	adaptiveUpCount      = 30
+	adaptiveCooldown     = 2 * time.Second
 )
 
 type pendingPreset struct {
@@ -89,6 +94,16 @@ func (a *App) Run() {
 			if a.renderScaleExplicit {
 				a.settings.Graphics.RenderWidth = scaledDim(w, a.renderScale)
 				a.settings.Graphics.RenderHeight = scaledDim(h, a.renderScale)
+			} else if a.settings.Graphics.Adaptive {
+				a.adaptiveResolutions = config.ComputeResolutions(w, h)
+				if len(a.adaptiveResolutions) > 0 {
+					cur := config.RenderResolution{Width: a.settings.Graphics.RenderWidth, Height: a.settings.Graphics.RenderHeight}
+					a.adaptiveResIdx = config.ClosestResolutionIndex(a.adaptiveResolutions, cur)
+					a.applyAdaptiveResolution(a.adaptiveResolutions[a.adaptiveResIdx])
+				} else {
+					slog.Warn("adaptive: empty resolution list on resize", "window", fmt.Sprintf("%dx%d", w, h))
+				}
+				a.resetAdaptiveCounters()
 			} else {
 				resolutions := config.ComputeResolutions(w, h)
 				saved := config.RenderResolution{Width: a.settings.Graphics.RenderWidth, Height: a.settings.Graphics.RenderHeight}
@@ -97,7 +112,7 @@ func (a *App) Run() {
 			}
 
 			if a.overlay != nil && a.overlay.IsSettingsPage() {
-				rows := ui.BuildSettingsRows(*a.settings, w, h)
+				rows := ui.BuildSettingsRows(*a.settings, w, h, a.renderScaleExplicit)
 				a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 			}
 		}
@@ -107,6 +122,34 @@ func (a *App) Run() {
 		if rw, rh := a.rt.Size(); rw != renderW || rh != renderH {
 			a.rt.Resize(renderW, renderH)
 			a.pm.SetWindowSize(renderW, renderH)
+		}
+
+		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && len(fpsBuf) == fpsWindow {
+			switch {
+			case fpsAvg < adaptiveThreshLow:
+				a.adaptiveLowCount++
+				a.adaptiveHighCount = 0
+			case fpsAvg > adaptiveThreshHigh:
+				a.adaptiveHighCount++
+				a.adaptiveLowCount = 0
+			default:
+				a.adaptiveLowCount = 0
+				a.adaptiveHighCount = 0
+			}
+			now := time.Now()
+			if a.adaptiveLowCount >= adaptiveDownCount && now.Sub(a.adaptiveCooldown) > adaptiveCooldown {
+				if a.stepDown() {
+					a.adaptiveLowCount = 0
+					a.adaptiveHighCount = 0
+					a.adaptiveCooldown = now
+				}
+			} else if a.adaptiveHighCount >= adaptiveUpCount && now.Sub(a.adaptiveCooldown) > adaptiveCooldown {
+				if a.stepUp() {
+					a.adaptiveLowCount = 0
+					a.adaptiveHighCount = 0
+					a.adaptiveCooldown = now
+				}
+			}
 		}
 
 		if a.overlay != nil {
@@ -364,4 +407,56 @@ func (a *App) resetPresetTicker() {
 		a.presetTicker = nil
 	}
 	a.startPresetTicker()
+}
+
+func (a *App) stepDown() bool {
+	return a.stepAdaptive(1)
+}
+
+func (a *App) stepUp() bool {
+	return a.stepAdaptive(-1)
+}
+
+func (a *App) stepAdaptive(dir int) bool {
+	if len(a.adaptiveResolutions) == 0 {
+		return false
+	}
+	next := a.adaptiveResIdx + dir
+	if next < 0 || next >= len(a.adaptiveResolutions) {
+		return false
+	}
+	a.adaptiveResIdx = next
+	r := a.adaptiveResolutions[a.adaptiveResIdx]
+	a.applyAdaptiveResolution(r)
+	if dir > 0 {
+		slog.Info("adaptive: step down", "resolution", r)
+	} else {
+		slog.Info("adaptive: step up", "resolution", r)
+	}
+	return true
+}
+
+func (a *App) applyAdaptiveResolution(r config.RenderResolution) {
+	a.settings.Graphics.RenderWidth = r.Width
+	a.settings.Graphics.RenderHeight = r.Height
+	a.rt.Resize(r.Width, r.Height)
+	a.pm.SetWindowSize(r.Width, r.Height)
+}
+
+func (a *App) resetAdaptiveCounters() {
+	a.adaptiveLowCount = 0
+	a.adaptiveHighCount = 0
+	a.adaptiveCooldown = time.Time{}
+}
+
+func (a *App) resetAdaptiveState(winW, winH int) {
+	a.adaptiveResolutions = config.ComputeResolutions(winW, winH)
+	if len(a.adaptiveResolutions) == 0 {
+		slog.Warn("adaptive: empty resolution list", "window", fmt.Sprintf("%dx%d", winW, winH))
+		a.resetAdaptiveCounters()
+		return
+	}
+	a.adaptiveResIdx = 0
+	a.applyAdaptiveResolution(a.adaptiveResolutions[0])
+	a.resetAdaptiveCounters()
 }

@@ -14,26 +14,42 @@ const (
 )
 
 // BuildSettingsRows creates SettingRow entries from the current config.
-func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
+func BuildSettingsRows(s config.Settings, winW, winH int, renderScaleExplicit bool) []SettingRow {
 	resolutions := config.ComputeResolutions(winW, winH)
-	resValues := make([]string, len(resolutions))
-	resIndex := 0
-	found := false
-	for i, r := range resolutions {
-		resValues[i] = r.String()
-		if !found && r.Width == s.Graphics.RenderWidth && r.Height == s.Graphics.RenderHeight {
-			resIndex = i
-			found = true
+
+	var resValues []string
+	var resIndex int
+
+	if !renderScaleExplicit {
+		resValues = append(resValues, "Auto")
+		if s.Graphics.Adaptive {
+			resIndex = 0
+		} else {
+			resIndex = 1
+			for i, r := range resolutions {
+				if r.Width == s.Graphics.RenderWidth && r.Height == s.Graphics.RenderHeight {
+					resIndex = i + 1
+					break
+				}
+			}
 		}
-	}
-	if !found && len(resolutions) > 0 {
-		closest := config.ClosestResolution(resolutions, config.RenderResolution{Width: s.Graphics.RenderWidth, Height: s.Graphics.RenderHeight})
+	} else {
+		resIndex = 0
 		for i, r := range resolutions {
-			if r == closest {
+			if r.Width == s.Graphics.RenderWidth && r.Height == s.Graphics.RenderHeight {
 				resIndex = i
 				break
 			}
 		}
+	}
+
+	for _, r := range resolutions {
+		resValues = append(resValues, r.String())
+	}
+
+	if len(resolutions) == 0 && !renderScaleExplicit && len(resValues) == 1 {
+		resValues = append(resValues, "N/A")
+		resIndex = 0
 	}
 
 	filters := config.AllFilters()
