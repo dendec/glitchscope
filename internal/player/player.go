@@ -2,6 +2,7 @@
 package player
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -41,9 +42,11 @@ type Player struct {
 	isTracker       bool
 
 	// Downloader optionally fetches a remote file to a local path (e.g. for modland).
-	Downloader  func(path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
+	// The context is cancelled when a new track is requested or playback is stopped.
+	Downloader  func(ctx context.Context, path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
 	loadFunc    func(localPath string) loadResult // test seam: override loadSource
-	pendingCh   chan loadResult                    // background load results
+	loadCancel  context.CancelFunc                // cancels the current in-flight load
+	pendingCh   chan loadResult                   // background load results
 	pendingMu   sync.Mutex
 	requestID   atomic.Uint64
 	loading     atomic.Bool
@@ -241,7 +244,15 @@ func (p *Player) PlayFileAsync(path string) {
 	p.loadWG.Add(1)
 	p.pendingMu.Unlock()
 
+	// Cancel any in-flight load from a previous track.
+	if p.loadCancel != nil {
+		p.loadCancel()
+	}
+
 	requestID := p.requestID.Add(1)
+	ctx, cancel := context.WithCancel(context.Background())
+	p.loadCancel = cancel
+
 	p.pendingMu.Lock()
 	select {
 	case old := <-p.pendingCh:
@@ -262,6 +273,11 @@ func (p *Player) PlayFileAsync(path string) {
 
 	go func() {
 		defer p.loadWG.Done()
+		defer cancel()
+
+		if ctx.Err() != nil {
+			return
+		}
 
 		localPath := path
 		if p.Downloader != nil {
@@ -280,15 +296,18 @@ func (p *Player) PlayFileAsync(path string) {
 				}
 				p.loadPercent.Store(pct)
 			}
-			dlPath, err := p.Downloader(path, 0, onProgress)
+			dlPath, err := p.Downloader(ctx, path, 0, onProgress)
 			if err != nil {
+				if ctx.Err() != nil {
+					return // cancelled — discard silently
+				}
 				p.publishResult(loadResult{path: path, requestID: requestID, err: err})
 				return
 			}
 			localPath = dlPath
 		}
-		if p.requestID.Load() != requestID {
-			return // stale — skip decode, do not reset progress
+		if ctx.Err() != nil {
+			return
 		}
 		p.loadPercent.Store(-1) // decode phase: unknown progress
 		loader := loadSource
@@ -456,6 +475,10 @@ func (p *Player) TrackFinished() bool {
 }
 
 func (p *Player) Stop() {
+	if p.loadCancel != nil {
+		p.loadCancel()
+		p.loadCancel = nil
+	}
 	if p.s != nil {
 		p.s.StopAll()
 	}

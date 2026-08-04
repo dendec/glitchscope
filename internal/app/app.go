@@ -2,6 +2,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -225,17 +226,17 @@ func (a *App) initAudio() {
 		return
 	}
 	a.pl = pl
-	a.pl.Downloader = func(path string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
+	a.pl.Downloader = func(ctx context.Context, path string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
 		if player.IsModland(path) {
 			remotePath := player.RemotePath(path)
 			if expectedSize == 0 {
 				expectedSize = a.modlandSizes[remotePath]
 			}
-			return modland.DownloadFile(baseDir(), remotePath, expectedSize, onProgress)
+			return modland.DownloadFile(ctx, baseDir(), remotePath, expectedSize, onProgress)
 		}
 		if player.IsModArchive(path) {
 			remoteURL := player.RemotePath(path)
-			return modarchive.DownloadAndExtract(baseDir(), remoteURL, onProgress)
+			return modarchive.DownloadAndExtract(ctx, baseDir(), remoteURL, onProgress)
 		}
 		return path, nil
 	}

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -32,7 +33,7 @@ func TestDownloadWithFallback(t *testing.T) {
 	}
 
 	var bytesRead int64
-	err = DownloadWithFallback(urls, targetPath, 0, func(read, total int64) {
+	err = DownloadWithFallback(context.Background(), urls, targetPath, 0, func(read, total int64) {
 		bytesRead = read
 	})
 	if err != nil {

@@ -1,6 +1,7 @@
 package modland
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -11,7 +12,7 @@ import (
 
 // DownloadFile downloads a single module file from modland to the local cache.
 // Returns the local file path. Skips download if already cached and size matches.
-func DownloadFile(baseDir, remotePath string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
+func DownloadFile(ctx context.Context, baseDir, remotePath string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
 	filesDir, err := FilesDir(baseDir)
 	if err != nil {
 		return "", err
@@ -26,7 +27,7 @@ func DownloadFile(baseDir, remotePath string, expectedSize int64, onProgress fun
 		FileFallbackURLLower(remotePath),
 	}
 
-	if err := util.DownloadWithFallback(urls, localPath, expectedSize, onProgress); err != nil {
+	if err := util.DownloadWithFallback(ctx, urls, localPath, expectedSize, onProgress); err != nil {
 		return "", fmt.Errorf("modland download %s: %w", remotePath, err)
 	}
 

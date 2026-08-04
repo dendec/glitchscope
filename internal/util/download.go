@@ -2,6 +2,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -33,7 +34,8 @@ func (pr *ProgressReader) Read(p []byte) (int, error) {
 }
 
 // DownloadWithFallback downloads from the first succeeding URL in urls to targetPath atomically.
-func DownloadWithFallback(urls []string, targetPath string, expectedSize int64, onProgress func(read, total int64)) error {
+// The context controls cancellation of the entire operation including HTTP requests.
+func DownloadWithFallback(ctx context.Context, urls []string, targetPath string, expectedSize int64, onProgress func(read, total int64)) error {
 	if info, err := os.Stat(targetPath); err == nil {
 		if (expectedSize > 0 && info.Size() == expectedSize) || (expectedSize <= 0 && info.Size() > 0) {
 			return nil
@@ -52,8 +54,15 @@ func DownloadWithFallback(urls []string, targetPath string, expectedSize int64, 
 	lastStatus := 0
 
 	for i, u := range urls {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		slog.Debug("downloading", "url", u)
-		resp, lastErr = client.Get(u)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return fmt.Errorf("download request: %w", err)
+		}
+		resp, lastErr = client.Do(req)
 		if lastErr != nil || resp.StatusCode != http.StatusOK {
 			if resp != nil {
 				lastStatus = resp.StatusCode
@@ -95,6 +104,9 @@ func DownloadWithFallback(urls []string, targetPath string, expectedSize int64, 
 	if _, err := io.Copy(tmp, reader); err != nil {
 		tmp.Close()
 		_ = os.Remove(tmpPath)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return fmt.Errorf("write file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {

@@ -1,6 +1,7 @@
 package player
 
 import (
+	"context"
 	"encoding/binary"
 	"os"
 	"path/filepath"
@@ -84,7 +85,7 @@ func TestPlayFileAsyncDisplayPathPreserved(t *testing.T) {
 
 	virtualPath := "modland:mods/cool.mod"
 
-	p.Downloader = func(path string, _ int64, _ func(int64, int64)) (string, error) {
+	p.Downloader = func(ctx context.Context, path string, _ int64, _ func(int64, int64)) (string, error) {
 		if path != virtualPath {
 			t.Fatalf("Downloader got path %q, want %q", path, virtualPath)
 		}
@@ -164,7 +165,7 @@ func TestPlayFileAsyncNewerRequestWins(t *testing.T) {
 func TestPlayFileAsyncDownloaderErrorClearsLoading(t *testing.T) {
 	p := newTestPlayer(t)
 
-	p.Downloader = func(_ string, _ int64, _ func(int64, int64)) (string, error) {
+	p.Downloader = func(_ context.Context, _ string, _ int64, _ func(int64, int64)) (string, error) {
 		return "", &testErr{msg: "download failed"}
 	}
 
@@ -236,9 +237,9 @@ func TestPlayFileAsyncProgressNotOverwritten(t *testing.T) {
 
 	dl1Started := make(chan struct{})
 	dl1DownloadDone := make(chan struct{}) // download finished, about to enter decode
-	dl1Proceed := make(chan struct{})       // let old worker finish
+	dl1Proceed := make(chan struct{})      // let old worker finish
 
-	p.Downloader = func(_ string, _ int64, onProgress func(int64, int64)) (string, error) {
+	p.Downloader = func(_ context.Context, _ string, _ int64, onProgress func(int64, int64)) (string, error) {
 		close(dl1Started)
 		// Emit some progress.
 		onProgress(50, 100)
@@ -261,7 +262,7 @@ func TestPlayFileAsyncProgressNotOverwritten(t *testing.T) {
 	// Start second request — its downloader immediately reports progress.
 	dl2Started := make(chan struct{})
 	dl2Done := make(chan struct{})
-	p.Downloader = func(_ string, _ int64, onProgress func(int64, int64)) (string, error) {
+	p.Downloader = func(_ context.Context, _ string, _ int64, onProgress func(int64, int64)) (string, error) {
 		close(dl2Started)
 		// New request gets progress quickly.
 		onProgress(75, 100)
@@ -298,7 +299,7 @@ func TestPlayFileAsyncLocalPathUsedForBitrate(t *testing.T) {
 
 	virtualPath := "modarchive:mods/test.mod"
 
-	p.Downloader = func(_ string, _ int64, _ func(int64, int64)) (string, error) {
+	p.Downloader = func(_ context.Context, _ string, _ int64, _ func(int64, int64)) (string, error) {
 		return wav, nil
 	}
 
@@ -328,7 +329,7 @@ func TestCloseWaitsForWorkers(t *testing.T) {
 	dlStarted := make(chan struct{})
 	dlDone := make(chan struct{})
 
-	p.Downloader = func(_ string, _ int64, _ func(int64, int64)) (string, error) {
+	p.Downloader = func(_ context.Context, _ string, _ int64, _ func(int64, int64)) (string, error) {
 		close(dlStarted)
 		<-dlDone // slow download — goroutine alive until unblocked
 		return "/dev/null", nil
@@ -407,3 +408,72 @@ func TestCheckPendingReturnsCorrectState(t *testing.T) {
 type testErr struct{ msg string }
 
 func (e *testErr) Error() string { return e.msg }
+
+func TestPlayFileAsyncContextCancelledOnStop(t *testing.T) {
+	p := newTestPlayer(t)
+
+	ctxReceived := make(chan context.Context, 1)
+	dlStarted := make(chan struct{})
+	dlDone := make(chan struct{})
+
+	p.Downloader = func(ctx context.Context, _ string, _ int64, _ func(int64, int64)) (string, error) {
+		ctxReceived <- ctx
+		close(dlStarted)
+		<-dlDone
+		return "/dev/null", nil
+	}
+
+	p.PlayFileAsync("modland:slow.mod")
+	<-dlStarted
+
+	ctx := <-ctxReceived
+	if ctx.Err() != nil {
+		t.Fatal("context should not be cancelled before Stop")
+	}
+
+	p.Stop()
+
+	select {
+	case <-ctx.Done():
+		// context cancelled — correct
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("context was not cancelled after Stop")
+	}
+
+	close(dlDone)
+}
+
+func TestPlayFileAsyncContextCancelledOnNewTrack(t *testing.T) {
+	p := newTestPlayer(t)
+
+	ctx1Received := make(chan context.Context, 1)
+	dl1Started := make(chan struct{})
+	dl1Done := make(chan struct{})
+
+	p.Downloader = func(ctx context.Context, _ string, _ int64, _ func(int64, int64)) (string, error) {
+		ctx1Received <- ctx
+		close(dl1Started)
+		<-dl1Done
+		return "/dev/null", nil
+	}
+
+	p.PlayFileAsync("modland:track1.mod")
+	<-dl1Started
+
+	ctx1 := <-ctx1Received
+
+	// Start a second track — should cancel the first.
+	p.Downloader = func(ctx context.Context, _ string, _ int64, _ func(int64, int64)) (string, error) {
+		return "/dev/null", nil
+	}
+	p.PlayFileAsync("modland:track2.mod")
+
+	select {
+	case <-ctx1.Done():
+		// first context cancelled — correct
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("first context was not cancelled when second track started")
+	}
+
+	close(dl1Done)
+}

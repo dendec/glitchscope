@@ -3,6 +3,7 @@ package modarchive
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -132,7 +133,7 @@ func TestDownloadAndExtract_Zip(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	remoteURL := ts.URL + "/modarchive_2008_additions/MOD/A/test.mod.zip"
-	extractedPath, err := DownloadAndExtract(tmpDir, remoteURL, nil)
+	extractedPath, err := DownloadAndExtract(context.Background(), tmpDir, remoteURL, nil)
 	if err != nil {
 		t.Fatalf("DownloadAndExtract failed: %v", err)
 	}
@@ -147,7 +148,7 @@ func TestDownloadAndExtract_Zip(t *testing.T) {
 	}
 
 	// Verify caching on second call
-	cachedPath, err := DownloadAndExtract(tmpDir, remoteURL, nil)
+	cachedPath, err := DownloadAndExtract(context.Background(), tmpDir, remoteURL, nil)
 	if err != nil {
 		t.Fatalf("DownloadAndExtract cached failed: %v", err)
 	}

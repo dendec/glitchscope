@@ -1,6 +1,7 @@
 package modarchive
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -15,7 +16,7 @@ import (
 // DownloadAndExtract downloads a track from remoteURL to local modarchive-cache/files/.
 // If the downloaded file is a ZIP archive, it automatically extracts the module file inside.
 // Returns absolute path to the local ready-to-play file.
-func DownloadAndExtract(baseDir, remoteURL string, onProgress func(read, total int64)) (string, error) {
+func DownloadAndExtract(ctx context.Context, baseDir, remoteURL string, onProgress func(read, total int64)) (string, error) {
 	filesDir, err := FilesDir(baseDir)
 	if err != nil {
 		return "", err
@@ -45,7 +46,7 @@ func DownloadAndExtract(baseDir, remoteURL string, onProgress func(read, total i
 		tmpZipPath := filepath.Join(filesDir, "tmp_"+filepath.Base(rawLocalPath))
 		defer os.Remove(tmpZipPath)
 
-		if err := util.DownloadWithFallback([]string{remoteURL}, tmpZipPath, 0, onProgress); err != nil {
+		if err := util.DownloadWithFallback(ctx, []string{remoteURL}, tmpZipPath, 0, onProgress); err != nil {
 			return "", fmt.Errorf("modarchive download %s: %w", remoteURL, err)
 		}
 
@@ -57,7 +58,7 @@ func DownloadAndExtract(baseDir, remoteURL string, onProgress func(read, total i
 		return extractedPath, nil
 	}
 
-	if err := util.DownloadWithFallback([]string{remoteURL}, targetPath, 0, onProgress); err != nil {
+	if err := util.DownloadWithFallback(ctx, []string{remoteURL}, targetPath, 0, onProgress); err != nil {
 		return "", fmt.Errorf("modarchive download %s: %w", remoteURL, err)
 	}
 
