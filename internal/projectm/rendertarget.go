@@ -76,18 +76,56 @@ static void rtDestroyTexture(GLuint tex) {
 	if (tex) glDeleteTextures(1, &tex);
 }
 
-// rtClearTexture binds the texture to a temporary FBO and clears it to black.
-// Guaranteed zeroed on all GLES2 implementations.
-static void rtClearTexture(GLuint tex, GLsizei w, GLsizei h) {
+static GLuint rtCreateFBO() {
 	GLuint fbo;
 	glGenFramebuffers(1, &fbo);
+	return fbo;
+}
+
+// rtResizeTexture allocates texture storage and clears it through a complete FBO.
+// The caller owns the GL context; all modified GL state is restored before return.
+static int rtResizeTextureStorage(GLuint tex, GLuint fbo, GLsizei w, GLsizei h) {
+	GLint oldFbo, oldTexture, oldViewport[4], oldScissorBox[4];
+	GLboolean oldScissor, oldColorMask[4];
+	GLfloat oldClearColor[4];
+
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFbo);
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldTexture);
+	glGetIntegerv(GL_VIEWPORT, oldViewport);
+	glGetIntegerv(GL_SCISSOR_BOX, oldScissorBox);
+	glGetBooleanv(GL_SCISSOR_TEST, &oldScissor);
+	glGetBooleanv(GL_COLOR_WRITEMASK, oldColorMask);
+	glGetFloatv(GL_COLOR_CLEAR_VALUE, oldClearColor);
+
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
-	glViewport(0, 0, w, h);
-	glClearColor(0, 0, 0, 0);
-	glClear(GL_COLOR_BUFFER_BIT);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glDeleteFramebuffers(1, &fbo);
+	GLboolean complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+	if (complete) {
+		glDisable(GL_SCISSOR_TEST);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glViewport(0, 0, w, h);
+		glClearColor(0, 0, 0, 0);
+		glClear(GL_COLOR_BUFFER_BIT);
+	}
+
+	glColorMask(oldColorMask[0], oldColorMask[1], oldColorMask[2], oldColorMask[3]);
+	glClearColor(oldClearColor[0], oldClearColor[1], oldClearColor[2], oldClearColor[3]);
+	glScissor(oldScissorBox[0], oldScissorBox[1], oldScissorBox[2], oldScissorBox[3]);
+	glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
+	glBindFramebuffer(GL_FRAMEBUFFER, oldFbo);
+	glBindTexture(GL_TEXTURE_2D, oldTexture);
+	if (oldScissor) {
+		glEnable(GL_SCISSOR_TEST);
+	} else {
+		glDisable(GL_SCISSOR_TEST);
+	}
+	return complete ? 1 : 0;
+}
+
+static void rtDeleteFBO(GLuint fbo) {
+	if (fbo) glDeleteFramebuffers(1, &fbo);
 }
 
 // rtCapture copies a w x h rectangle from the bottom-left corner of the
@@ -96,7 +134,7 @@ static void rtClearTexture(GLuint tex, GLsizei w, GLsizei h) {
 // our texture.
 static void rtCapture(GLuint tex, GLsizei w, GLsizei h) {
 	glBindTexture(GL_TEXTURE_2D, tex);
-	glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, w, h, 0);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -123,17 +161,22 @@ import "C"
 // RenderTarget upscales projectM's reduced-resolution output to fill the screen.
 //
 // libprojectM always draws into framebuffer 0 at SetWindowSize dimensions.
-// We capture that corner with glCopyTexImage2D and blit/upscale to the full window.
+// We capture that corner with glCopyTexSubImage2D and blit/upscale to the full window.
 type RenderTarget struct {
-	tex, program C.GLuint
-	w, h         int
+	tex, fbo, program C.GLuint
+	w, h              int
 }
 
 // NewRenderTarget creates the capture texture and blit shader.
 func NewRenderTarget(width, height int) *RenderTarget {
-	rt := &RenderTarget{program: C.rtCreateBlitProgram()}
+	rt := &RenderTarget{program: C.rtCreateBlitProgram(), fbo: C.rtCreateFBO()}
 	C.rtCreateTexture(&rt.tex)
-	rt.w, rt.h = width, height
+	if C.rtResizeTextureStorage(rt.tex, rt.fbo, C.GLsizei(width), C.GLsizei(height)) == 0 {
+		C.rtDeleteFBO(rt.fbo)
+		rt.fbo = 0
+	} else {
+		rt.w, rt.h = width, height
+	}
 	return rt
 }
 
@@ -151,8 +194,10 @@ func (rt *RenderTarget) Resize(width, height int) {
 	if width <= 0 || height <= 0 || rt.tex == 0 {
 		return
 	}
+	if rt.fbo == 0 || C.rtResizeTextureStorage(rt.tex, rt.fbo, C.GLsizei(width), C.GLsizei(height)) == 0 {
+		return
+	}
 	rt.w, rt.h = width, height
-	C.rtClearTexture(rt.tex, C.GLsizei(width), C.GLsizei(height))
 }
 
 // Size returns the current render target dimensions.
@@ -175,6 +220,10 @@ func (rt *RenderTarget) BlitToScreen(dstW, dstH int) {
 func (rt *RenderTarget) Destroy() {
 	C.rtDestroyTexture(rt.tex)
 	rt.tex = 0
+	if rt.fbo != 0 {
+		C.rtDeleteFBO(rt.fbo)
+		rt.fbo = 0
+	}
 	if rt.program != 0 {
 		C.glDeleteProgram(rt.program)
 		rt.program = 0
