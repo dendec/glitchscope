@@ -37,6 +37,6 @@ pm_message "Loading PMV... (Compiling shaders)"
 $GPTOKEYB "pmv" &
 
 pm_platform_helper "$GAMEDIR/pmv"
-./pmv
+./pmv -show-fps
 
 pm_finish
