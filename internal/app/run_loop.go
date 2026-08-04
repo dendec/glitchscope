@@ -162,6 +162,9 @@ func (a *App) Run() {
 			if s.GPUOK {
 				line += fmt.Sprintf(" GPU:%.0fM %.0f%%", s.GPUMemKB/1024, s.GPUUtilPct)
 			}
+			if a.settings.Graphics.Adaptive && !a.renderScaleExplicit {
+				line += fmt.Sprintf(" %dx%d", a.settings.Graphics.RenderWidth, a.settings.Graphics.RenderHeight)
+			}
 			a.overlay.SetStats(line)
 			if a.pl != nil {
 				a.overlay.SetPlayback(a.pl.Position(), a.pl.Duration(), a.pl.SampleRate(), a.pl.Bitrate(), a.pl.BPM(), a.pl.Channels(), a.pl.IsPaused(), a.pl.IsTracker())
