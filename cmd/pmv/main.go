@@ -20,6 +20,7 @@ var (
 	flagBenchOut      = flag.String("benchmark-out", "benchmark.csv", "output path for benchmark CSV")
 	flagBenchWorker   = flag.Bool("benchmark-worker", false, "internal: run as benchmark worker subprocess")
 	flagFile          = flag.String("file", "", "audio file to play on startup")
+	flagShowFPS       = flag.Bool("show-fps", false, "always show FPS counter, even when UI is hidden")
 	flagVerbose       = flag.Bool("v", false, "verbose debug logging (incl. modarchive navigation)")
 )
 
@@ -44,7 +45,7 @@ func main() {
 
 	a, err := app.New(*flagFullscreen, *flagWidth, *flagHeight,
 		*flagRenderScale, *flagRenderNearest,
-		renderScaleExplicit, renderNearestSet, *flagFile)
+		renderScaleExplicit, renderNearestSet, *flagFile, *flagShowFPS)
 	if err != nil {
 		slog.Error("app init", "error", err)
 		return

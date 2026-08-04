@@ -47,6 +47,7 @@ type App struct {
 
 	renderScale         float64
 	renderScaleExplicit bool
+	showFPS             bool
 	startupFile         string
 
 	adaptiveResolutions []config.RenderResolution
@@ -63,12 +64,13 @@ type App struct {
 
 // New creates an App with display initialised. Player/overlay/input/library
 // are created later by Init().
-func New(fullscreen bool, width, height int, renderScale float64, renderNearest bool, renderScaleExplicit, renderNearestSet bool, startupFile string) (*App, error) {
+func New(fullscreen bool, width, height int, renderScale float64, renderNearest bool, renderScaleExplicit, renderNearestSet bool, startupFile string, showFPS bool) (*App, error) {
 	a := &App{
 		prof:                prof.NewCollector(),
 		settingsPath:        config.SettingsPath(),
 		renderScale:         renderScale,
 		renderScaleExplicit: renderScaleExplicit,
+		showFPS:             showFPS,
 		startupFile:         startupFile,
 		modlandSizes:        make(map[string]int64),
 	}
@@ -261,6 +263,7 @@ func (a *App) initAudio() {
 	}
 	a.overlay = ui.New()
 	a.overlay.SetBaseDir(baseDir())
+	a.overlay.SetShowFPS(a.showFPS)
 	w, h := a.window.GLGetDrawableSize()
 	a.overlay.SetScreenSize(int(w), int(h))
 	slog.Info("audio init", "ms", time.Since(t).Milliseconds())

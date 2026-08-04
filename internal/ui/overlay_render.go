@@ -558,3 +558,20 @@ func (o *Overlay) drawCursorHighlight(x, y, w, h float32, winW, winH, viewW, vie
 	r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
 	glDrawFilledRect(o.programRect, x, y, w, h, r, g, b, 0.12, winW, winH, viewW, viewH)
 }
+
+// renderStatsOnly draws a minimal stats bar (FPS/MEM/CPU) without the full UI.
+func (o *Overlay) renderStatsOnly(winW, winH int) {
+	if o.programRect == 0 || o.programText == 0 {
+		return
+	}
+	if o.statsDirty {
+		o.rebuildStatsTex()
+	}
+	lh := o.face.Metrics().Height.Ceil()
+	hR, hG, hB := o.panelBgRGB()
+	glDrawFilledRect(o.programRect, 0, 0, float32(winW), float32(lh), hR, hG, hB, o.bgAlpha(), winW, winH, winW, winH)
+	if o.statsTex != 0 {
+		glDrawOverlayText(o.programText, o.statsTex, 1,
+			headerMarginX, 0, float32(o.statsTexW), float32(o.statsTexH), winW, winH, winW, winH)
+	}
+}

@@ -58,6 +58,7 @@ type Overlay struct {
 
 	uiVisible    bool
 	panelEntered bool
+	showFPS      bool
 	uiPage       UIPage
 
 	screenW, screenH int
@@ -208,6 +209,8 @@ func (o *Overlay) Draw(width, height int) {
 		if o.notif.Visible() && o.notif.Tex() != 0 && !o.notif.Hidden() {
 			o.notif.Render(o.programText, width, height)
 		}
+	} else if o.showFPS && o.statsTex != 0 {
+		o.renderStatsOnly(width, height)
 	} else if o.notif.Visible() && !o.notif.Hidden() && !o.notif.Injected() {
 		o.notif.Render(o.programText, width, height)
 	}
@@ -250,6 +253,10 @@ func (o *Overlay) SetSettingsRows(rows []SettingRow, cursor int) {
 
 func (o *Overlay) UIVisible() bool {
 	return o.uiVisible
+}
+
+func (o *Overlay) SetShowFPS(v bool) {
+	o.showFPS = v
 }
 
 func (o *Overlay) SettingsCursor() int { return o.settingsCursor }
