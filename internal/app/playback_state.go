@@ -26,6 +26,14 @@ type playbackState struct {
 	shuffle shuffleState
 }
 
+func (s *playbackState) play(path string) bool {
+	if s.pl == nil {
+		return false
+	}
+	s.pl.PlayFileAsync(path)
+	return true
+}
+
 func (s *playbackState) previousAlbum() (string, string, bool) {
 	if s.lib == nil || s.pl == nil {
 		return "", "", false

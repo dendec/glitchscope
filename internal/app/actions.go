@@ -304,6 +304,8 @@ func (a *App) playTrack(path, album string) {
 		a.overlay.ShowTrack(label)
 	}
 
-	a.pl.PlayFileAsync(path)
+	if !a.playbackState.play(path) {
+		return
+	}
 	slog.Info("now loading", "track", path, "album", album)
 }
