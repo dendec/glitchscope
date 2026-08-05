@@ -3,12 +3,10 @@ package app
 import (
 	"fmt"
 	"log/slog"
-	"math/rand"
 	"time"
 
 	"github.com/dendec/pmv/internal/config"
 	"github.com/dendec/pmv/internal/input"
-	"github.com/dendec/pmv/internal/player"
 	"github.com/dendec/pmv/internal/presets"
 	"github.com/dendec/pmv/internal/projectm"
 	"github.com/dendec/pmv/internal/ui"
@@ -218,137 +216,9 @@ func (a *App) Run() {
 
 // autoAdvance picks the next track based on shuffle/repeat settings.
 func (a *App) autoAdvance() {
-	if a.lib == nil || a.pl == nil {
-		return
+	if track, ok := a.playbackState.advance(a.settings.Playback); ok {
+		a.playTrack(track.path, track.album)
 	}
-
-	ps := a.settings.Playback
-
-	if ps.Repeat == config.RepeatOne {
-		path := a.lib.CurrentTrack()
-		if path != "" {
-			a.playTrack(path, a.lib.CurrentAlbum().Name)
-		}
-		return
-	}
-
-	if ps.ShuffleMode != config.ShuffleOff {
-		// Regenerate when album changed, order empty, or exhausted with RepeatAll.
-		needsRegen := len(a.shuffle.order) == 0
-		if ps.ShuffleMode == config.ShuffleAlbum && a.shuffle.albumIdx != a.lib.CurrentAlbumIndex() {
-			needsRegen = true
-		}
-		if a.shuffle.idx >= len(a.shuffle.order) && ps.Repeat == config.RepeatAll {
-			needsRegen = true
-		}
-		if needsRegen {
-			a.regenerateShuffleOrder()
-		}
-		if len(a.shuffle.order) == 0 || a.shuffle.idx >= len(a.shuffle.order) {
-			return
-		}
-		t := a.shuffle.order[a.shuffle.idx]
-		a.shuffle.idx++
-		a.lib.SelectAlbum(t.albumIdx)
-		a.lib.SelectTrack(t.trackIdx)
-		a.playTrack(t.path, t.album)
-		return
-	}
-
-	// Sequential: detect "last track" before TrackNext() (it wraps).
-	album := a.lib.CurrentAlbum()
-	if a.lib.CurrentTrackIndex() < len(album.Tracks)-1 {
-		path := a.lib.TrackNext()
-		if path != "" {
-			a.playTrack(path, a.lib.CurrentAlbum().Name)
-		}
-		return
-	}
-
-	if ps.Repeat == config.RepeatAll {
-		path := a.lib.AlbumNext()
-		if path != "" {
-			a.playTrack(path, a.lib.CurrentAlbum().Name)
-		}
-	}
-	// RepeatOff + end of album: stop (no next track played).
-}
-
-func (a *App) allTracks() []trackRef {
-	var all []trackRef
-	for ai, album := range a.lib.Albums {
-		for ti, path := range album.Tracks {
-			all = append(all, trackRef{path: path, album: album.Name, albumIdx: ai, trackIdx: ti})
-		}
-	}
-	return all
-}
-
-func (a *App) localTracks() []trackRef {
-	var all []trackRef
-	for ai, album := range a.lib.Albums {
-		if player.IsModland(album.Path) || player.IsModArchive(album.Path) {
-			continue
-		}
-		for ti, path := range album.Tracks {
-			all = append(all, trackRef{path: path, album: album.Name, albumIdx: ai, trackIdx: ti})
-		}
-	}
-	return all
-}
-
-func (a *App) currentAlbumTracks() []trackRef {
-	ai := a.lib.CurrentAlbumIndex()
-	if ai < 0 || ai >= len(a.lib.Albums) {
-		return nil
-	}
-	album := a.lib.Albums[ai]
-	tracks := make([]trackRef, len(album.Tracks))
-	for ti, path := range album.Tracks {
-		tracks[ti] = trackRef{path: path, album: album.Name, albumIdx: ai, trackIdx: ti}
-	}
-	return tracks
-}
-
-// regenerateShuffleOrder builds a new shuffled order. Current track is
-// excluded so it doesn't replay immediately (unless single-track pool).
-func (a *App) regenerateShuffleOrder() {
-	if a.lib == nil {
-		a.shuffle = shuffleState{}
-		return
-	}
-
-	var pool []trackRef
-	switch a.settings.Playback.ShuffleMode {
-	case config.ShuffleAlbum:
-		pool = a.currentAlbumTracks()
-		a.shuffle.albumIdx = a.lib.CurrentAlbumIndex()
-	case config.ShuffleLocal:
-		pool = a.localTracks()
-	case config.ShuffleAll:
-		pool = a.allTracks()
-	default:
-		a.shuffle = shuffleState{}
-		return
-	}
-
-	cur := ""
-	if a.pl != nil {
-		cur = a.pl.TrackPath()
-	}
-	if cur != "" && len(pool) > 1 {
-		filtered := pool[:0]
-		for _, t := range pool {
-			if t.path != cur {
-				filtered = append(filtered, t)
-			}
-		}
-		pool = filtered
-	}
-
-	rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
-	a.shuffle.order = pool
-	a.shuffle.idx = 0
 }
 
 func (a *App) startPresetTicker() {

@@ -259,7 +259,7 @@ func (a *App) applySettings(winW, winH int) {
 	if rows[ui.SettingShuffle].Index >= 0 && rows[ui.SettingShuffle].Index < len(shuffleModes) {
 		a.settings.Playback.ShuffleMode = shuffleModes[rows[ui.SettingShuffle].Index]
 	}
-	a.regenerateShuffleOrder()
+	a.playbackState.regenerateShuffleOrder(a.settings.Playback)
 
 	repeatModes := config.AllRepeatModes()
 	if rows[ui.SettingRepeat].Index >= 0 && rows[ui.SettingRepeat].Index < len(repeatModes) {
