@@ -25,19 +25,6 @@ type pendingPreset struct {
 	at   time.Time
 }
 
-type shuffleState struct {
-	order    []trackRef
-	idx      int
-	albumIdx int // tracks which album the order covers (ShuffleAlbum only)
-}
-
-type trackRef struct {
-	path     string
-	album    string
-	albumIdx int
-	trackIdx int
-}
-
 // Run enters the main loop. Must be called after Init().
 func (a *App) Run() {
 	ticker := time.NewTicker(time.Second / 60)

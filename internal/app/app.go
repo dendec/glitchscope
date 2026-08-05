@@ -30,10 +30,9 @@ type App struct {
 	pm     *projectm.Handle
 	rt     *projectm.RenderTarget
 
-	pl      *player.Player
 	overlay *ui.Overlay
 	inp     *input.Input
-	lib     *player.Library
+	playbackState
 
 	modlandSizes map[string]int64 // remote path → expected size for downloads
 
@@ -55,8 +54,6 @@ type App struct {
 
 	pending      pendingPreset // pending preset name + scheduled load time
 	presetTicker *time.Ticker
-
-	shuffle shuffleState
 }
 
 // New creates an App with display initialised. Player/overlay/input/library
