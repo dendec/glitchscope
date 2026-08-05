@@ -126,35 +126,23 @@ func (a *App) handleNormalAction(act input.Action) {
 		// ignored in normal mode
 
 	case input.ActionCursorUp, input.ActionPrevAlbum:
-		if a.lib == nil || a.pl == nil {
-			return
-		}
-		if path := a.lib.AlbumPrev(); path != "" {
-			a.playTrack(path, a.lib.CurrentAlbum().Name)
+		if path, album, ok := a.previousAlbum(); ok {
+			a.playTrack(path, album)
 		}
 
 	case input.ActionCursorDown, input.ActionNextAlbum:
-		if a.lib == nil || a.pl == nil {
-			return
-		}
-		if path := a.lib.AlbumNext(); path != "" {
-			a.playTrack(path, a.lib.CurrentAlbum().Name)
+		if path, album, ok := a.nextAlbum(); ok {
+			a.playTrack(path, album)
 		}
 
 	case input.ActionFocusLeft, input.ActionPrevTrack:
-		if a.lib == nil || a.pl == nil {
-			return
-		}
-		if path := a.lib.TrackPrev(); path != "" {
-			a.playTrack(path, a.lib.CurrentAlbum().Name)
+		if path, album, ok := a.previousTrack(); ok {
+			a.playTrack(path, album)
 		}
 
 	case input.ActionFocusRight, input.ActionNextTrack:
-		if a.lib == nil || a.pl == nil {
-			return
-		}
-		if path := a.lib.TrackNext(); path != "" {
-			a.playTrack(path, a.lib.CurrentAlbum().Name)
+		if path, album, ok := a.nextTrack(); ok {
+			a.playTrack(path, album)
 		}
 
 	case input.ActionNextPreset:
