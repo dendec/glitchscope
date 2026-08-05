@@ -3,7 +3,6 @@ package app
 import (
 	"log/slog"
 	"math/rand"
-	"strings"
 
 	"github.com/dendec/pmv/internal/config"
 	"github.com/dendec/pmv/internal/input"
@@ -76,10 +75,11 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 					a.playTrack(path, a.lib.CurrentAlbum().Name)
 				}
 			} else {
-				if albumName, path := a.overlay.SelectedTrackPath(); strings.HasPrefix(path, player.ModArchivePrefix) {
-					// ModArchive albums live in the overlay, not the library —
-					// play straight from the overlay's track list.
-					a.playTrack(path, albumName)
+				if albumName, tracks, cursor := a.overlay.SelectedTrackPlaylist(); len(tracks) > 0 &&
+					(player.IsModArchive(tracks[0]) || player.IsModland(tracks[0])) {
+					if a.playbackState.setPlaylist(tracks, cursor, albumName) {
+						a.playTrack(tracks[cursor], albumName)
+					}
 				} else {
 					a.lib.SelectAlbum(a.overlay.AlbumCursor())
 					if path := a.lib.SelectTrack(a.overlay.TrackCursor()); path != "" {

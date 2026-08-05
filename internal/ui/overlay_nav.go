@@ -618,19 +618,18 @@ func (o *Overlay) refreshVirtualTracks() {
 	}
 }
 
-// SelectedTrackPath returns the album name and track path for the current
-// track selection, or ("", "") when none is selected.
-func (o *Overlay) SelectedTrackPath() (string, string) {
+// SelectedTrackPlaylist returns the current virtual album and all its tracks.
+func (o *Overlay) SelectedTrackPlaylist() (string, []string, int) {
 	if o.focusPanel != 1 {
-		return "", ""
+		return "", nil, -1
 	}
 	e := o.currentEntry()
 	if e == nil || !e.IsLeafAlbum() || e.albumIdx < 0 || e.albumIdx >= len(o.allAlbums) {
-		return "", ""
+		return "", nil, -1
 	}
 	album := o.allAlbums[e.albumIdx]
 	if o.trackCursor < 0 || o.trackCursor >= len(album.Tracks) {
-		return "", ""
+		return "", nil, -1
 	}
-	return album.Name, album.Tracks[o.trackCursor]
+	return album.Name, album.Tracks, o.trackCursor
 }

@@ -360,8 +360,14 @@ func (o *Overlay) Select() bool {
 			case entryModArchiveDir:
 				entries := o.buildModArchiveEntries(e.url)
 				if len(entries) == 1 && entries[0].kind == entryModArchiveAlbum {
-					o.pushLevel(entries)
+					// Keep the parent directory list visible and turn the selected
+					// row into the resolved virtual album in place.
+					level := o.currentLevelEntries()
+					level[o.albumCursor] = entries[0]
+					o.refreshAlbumLabels()
 					o.focusPanel = 1
+					o.trackCursor = 0
+					o.refreshPreview()
 					o.tracksDirty = true
 					return false
 				}

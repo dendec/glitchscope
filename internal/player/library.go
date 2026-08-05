@@ -286,7 +286,7 @@ func TrackTitle(path string) string {
 	if strings.HasSuffix(strings.ToLower(base), ".zip") {
 		base = base[:len(base)-4]
 	}
-	return strings.TrimSuffix(base, filepath.Ext(base))
+	return base
 }
 
 func IsModland(path string) bool {

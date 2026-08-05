@@ -5,6 +5,8 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/dendec/pmv/internal/player"
@@ -247,6 +249,37 @@ func (o *Overlay) rebuildPresetNameTex() {
 	o.presetNameTex, o.presetNameTexW, o.presetNameTexH = o.renderTextToTex(o.presetName, o.textColor())
 }
 
+func (o *Overlay) displayTrackPath(path string) string {
+	if player.IsModArchive(path) {
+		remote := player.RemotePath(path)
+		if parsed, err := url.Parse(remote); err == nil && parsed.Path != "" {
+			remote = parsed.Path
+		}
+		remote = strings.TrimPrefix(filepath.ToSlash(remote), "/")
+		if strings.HasPrefix(remote, "modarchive_") {
+			if slash := strings.IndexByte(remote, '/'); slash >= 0 {
+				catalog := remote[:slash]
+				if strings.HasSuffix(catalog, "_additions") {
+					remote = strings.TrimSuffix(strings.TrimPrefix(catalog, "modarchive_"), "_additions") + remote[slash:]
+				}
+			}
+		}
+		remote = strings.TrimSuffix(remote, ".zip")
+		return "modarchive/" + remote
+	}
+	if player.IsModland(path) {
+		return "modland/" + strings.TrimPrefix(filepath.ToSlash(player.RemotePath(path)), "/")
+	}
+	if o.baseDir == "" || !filepath.IsAbs(path) {
+		return filepath.ToSlash(path)
+	}
+	relative, err := filepath.Rel(o.baseDir, path)
+	if err != nil || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || relative == ".." {
+		return filepath.ToSlash(path)
+	}
+	return filepath.ToSlash(relative)
+}
+
 func (o *Overlay) rebuildBottomTex(w, botH int) {
 	o.bottomDirty = false
 	o.deleteTex(&o.bottomTex)
@@ -257,7 +290,7 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 
 	title := ""
 	if o.playingTrack != "" {
-		title = player.TrackTitle(o.playingTrack)
+		title = o.displayTrackPath(o.playingTrack)
 		maxTitleW := w - int(o.fontSize*14)
 		title = o.truncateEnd(title, maxTitleW)
 	}

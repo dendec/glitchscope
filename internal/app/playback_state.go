@@ -61,16 +61,34 @@ type trackRef struct {
 }
 
 type playbackState struct {
-	pl      *player.Player
-	lib     *player.Library
-	shuffle shuffleState
+	pl            *player.Player
+	lib           *player.Library
+	shuffle       shuffleState
+	playlist      []string
+	playlistIdx   int
+	playlistAlbum string
 }
 
 func (s *playbackState) play(path string) bool {
 	if s.pl == nil {
 		return false
 	}
+	if s.playlistIdx < 0 || s.playlistIdx >= len(s.playlist) || s.playlist[s.playlistIdx] != path {
+		s.playlist = nil
+		s.playlistIdx = -1
+		s.playlistAlbum = ""
+	}
 	s.pl.PlayFileAsync(path)
+	return true
+}
+
+func (s *playbackState) setPlaylist(tracks []string, index int, album string) bool {
+	if index < 0 || index >= len(tracks) {
+		return false
+	}
+	s.playlist = append([]string(nil), tracks...)
+	s.playlistIdx = index
+	s.playlistAlbum = album
 	return true
 }
 
@@ -120,6 +138,22 @@ func (s *playbackState) nextTrack() (string, string, bool) {
 
 func (s *playbackState) advance(settings config.PlaybackSettings) (trackRef, bool) {
 	if s.lib == nil || s.pl == nil {
+		return trackRef{}, false
+	}
+
+	if len(s.playlist) > 0 {
+		if settings.Repeat == config.RepeatOne {
+			return trackRef{path: s.playlist[s.playlistIdx], album: s.playlistAlbum}, true
+		}
+		next := s.playlistIdx + 1
+		if next < len(s.playlist) {
+			s.playlistIdx = next
+			return trackRef{path: s.playlist[next], album: s.playlistAlbum}, true
+		}
+		if settings.Repeat == config.RepeatAll {
+			s.playlistIdx = 0
+			return trackRef{path: s.playlist[0], album: s.playlistAlbum}, true
+		}
 		return trackRef{}, false
 	}
 

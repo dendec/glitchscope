@@ -4,9 +4,110 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/dendec/pmv/internal/modarchive"
+	"github.com/dendec/pmv/internal/player"
 )
+
+func TestDisplayTrackPath(t *testing.T) {
+	o := &Overlay{baseDir: "/opt/pmv"}
+
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{
+			name: "local file relative to application",
+			path: filepath.Join("/opt/pmv", "music", "2010", "IT", "1_9.it"),
+			want: "music/2010/IT/1_9.it",
+		},
+		{
+			name: "modarchive URL",
+			path: "modarchive:http://modarchive.textfiles.com/modarchive_2011_additions/M03/B/bibix-life.mo3.zip",
+			want: "modarchive/2011/M03/B/bibix-life.mo3",
+		},
+		{
+			name: "modland URL",
+			path: "modland:Protracker/Curt Cool/song.mod",
+			want: "modland/Protracker/Curt Cool/song.mod",
+		},
+		{
+			name: "external local file",
+			path: "/tmp/track.it",
+			want: "/tmp/track.it",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := o.displayTrackPath(test.path); got != test.want {
+				t.Fatalf("displayTrackPath(%q) = %q, want %q", test.path, got, test.want)
+			}
+		})
+	}
+}
+
+func TestTrackTitleKeepsExtension(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "/music/song.it", want: "song.it"},
+		{path: player.ModlandPrefix + "Protracker/song.mod", want: "song.mod"},
+		{path: player.ModArchivePrefix + "http://modarchive.textfiles.com/song.mo3.zip", want: "song.mo3"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.path, func(t *testing.T) {
+			if got := player.TrackTitle(test.path); got != test.want {
+				t.Fatalf("TrackTitle(%q) = %q, want %q", test.path, got, test.want)
+			}
+		})
+	}
+}
+
+func TestSelectModArchiveAlbumKeepsParentEntries(t *testing.T) {
+	targetURL := "http://modarchive.textfiles.com/2014/IT/J/"
+	o := &Overlay{
+		rootEntries: []navEntry{
+			{label: "2014", kind: entryModArchiveDir, url: targetURL},
+			{label: "other", kind: entryModArchiveDir, url: "other/"},
+		},
+		albumEntries: []navEntry{
+			{label: "2014", kind: entryModArchiveDir, url: targetURL},
+			{label: "other", kind: entryModArchiveDir, url: "other/"},
+		},
+		albums:      []string{"2014", "other"},
+		albumCursor: 0,
+		focusPanel:  0,
+		allAlbums:   []player.Album{},
+		modArchiveItems: map[string][]modarchive.DirItem{
+			targetURL: {{
+				Name:      "j-61m_-_kilobyte_chillout.it.zip",
+				URL:       targetURL + "j-61m_-_kilobyte_chillout.it.zip",
+				Kind:      modarchive.KindFile,
+				CleanName: "j-61m_-_kilobyte_chillout.it",
+			}},
+		},
+	}
+
+	if selected := o.Select(); selected {
+		t.Fatal("directory selection unexpectedly started playback")
+	}
+	if o.focusPanel != 1 {
+		t.Fatalf("focusPanel = %d, want tracks panel", o.focusPanel)
+	}
+	if len(o.albumEntries) != 2 || o.albumEntries[1].label != "other" {
+		t.Fatalf("parent entries were not preserved: %#v", o.albumEntries)
+	}
+	if !o.albumEntries[0].IsLeafAlbum() {
+		t.Fatalf("selected entry was not resolved to an album: %#v", o.albumEntries[0])
+	}
+}
 
 // --- scrollOffset ---
 
