@@ -53,9 +53,7 @@ type App struct {
 
 	adaptiveResolutions []config.RenderResolution
 	adaptiveResIdx      int
-	adaptiveCooldown    time.Time
-	adaptiveLowCount    int
-	adaptiveHighCount   int
+	adaptive            adaptivePolicy
 
 	pending      pendingPreset // pending preset name + scheduled load time
 	presetTicker *time.Ticker

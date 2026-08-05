@@ -16,14 +16,8 @@ import (
 )
 
 const (
-	fpsWindow          = 10
-	lowFPSThresh       = 30.0
-	softCutDuration    = 2.5 // seconds, for smooth preset transitions
-	adaptiveThreshLow  = 25.0
-	adaptiveThreshHigh = 30.0
-	adaptiveDownCount  = 15
-	adaptiveUpCount    = 30
-	adaptiveCooldown   = 2 * time.Second
+	lowFPSThresh    = 30.0
+	softCutDuration = 2.5 // seconds, for smooth preset transitions
 )
 
 type pendingPreset struct {
@@ -50,7 +44,7 @@ func (a *App) Run() {
 	defer ticker.Stop()
 
 	lastFrame := time.Now()
-	fpsBuf := make([]float64, 0, fpsWindow)
+	var fpsMeter fpsMeter
 	lowFPSWarned := false
 
 	lastAlbumIdx := -1
@@ -62,18 +56,11 @@ func (a *App) Run() {
 		lastFrame = now
 
 		if dt > 0 {
-			fpsBuf = append(fpsBuf, 1.0/dt)
-			if len(fpsBuf) > fpsWindow {
-				fpsBuf = fpsBuf[1:]
-			}
+			fpsMeter.Add(1.0 / dt)
 		}
-		var fpsAvg float64
-		for _, v := range fpsBuf {
-			fpsAvg += v
-		}
-		fpsAvg /= float64(len(fpsBuf))
+		fpsAvg := fpsMeter.Average()
 
-		if len(fpsBuf) == fpsWindow {
+		if fpsMeter.Full() {
 			if fpsAvg < lowFPSThresh && !lowFPSWarned {
 				presetName := ""
 				if a.presetIdx >= 0 && a.presetIdx < len(a.presetNames) {
@@ -124,30 +111,15 @@ func (a *App) Run() {
 			a.pm.SetWindowSize(renderW, renderH)
 		}
 
-		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && len(fpsBuf) == fpsWindow {
-			switch {
-			case fpsAvg < adaptiveThreshLow:
-				a.adaptiveLowCount++
-				a.adaptiveHighCount = 0
-			case fpsAvg > adaptiveThreshHigh:
-				a.adaptiveHighCount++
-				a.adaptiveLowCount = 0
-			default:
-				a.adaptiveLowCount = 0
-				a.adaptiveHighCount = 0
-			}
-			now := time.Now()
-			if a.adaptiveLowCount >= adaptiveDownCount && now.Sub(a.adaptiveCooldown) > adaptiveCooldown {
-				if a.stepDown() {
-					a.adaptiveLowCount = 0
-					a.adaptiveHighCount = 0
-					a.adaptiveCooldown = now
-				}
-			} else if a.adaptiveHighCount >= adaptiveUpCount && now.Sub(a.adaptiveCooldown) > adaptiveCooldown {
-				if a.stepUp() {
-					a.adaptiveLowCount = 0
-					a.adaptiveHighCount = 0
-					a.adaptiveCooldown = now
+		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && fpsMeter.Full() {
+			if next, changed := a.adaptive.Decide(now, fpsAvg, a.adaptiveResIdx, len(a.adaptiveResolutions)); changed {
+				previous := a.adaptiveResIdx
+				a.adaptiveResIdx = next
+				a.applyAdaptiveResolution(a.adaptiveResolutions[next])
+				if next > previous {
+					slog.Info("adaptive: step down", "resolution", a.adaptiveResolutions[next])
+				} else {
+					slog.Info("adaptive: step up", "resolution", a.adaptiveResolutions[next])
 				}
 			}
 		}
@@ -412,33 +384,6 @@ func (a *App) resetPresetTicker() {
 	a.startPresetTicker()
 }
 
-func (a *App) stepDown() bool {
-	return a.stepAdaptive(1)
-}
-
-func (a *App) stepUp() bool {
-	return a.stepAdaptive(-1)
-}
-
-func (a *App) stepAdaptive(dir int) bool {
-	if len(a.adaptiveResolutions) == 0 {
-		return false
-	}
-	next := a.adaptiveResIdx + dir
-	if next < 0 || next >= len(a.adaptiveResolutions) {
-		return false
-	}
-	a.adaptiveResIdx = next
-	r := a.adaptiveResolutions[a.adaptiveResIdx]
-	a.applyAdaptiveResolution(r)
-	if dir > 0 {
-		slog.Info("adaptive: step down", "resolution", r)
-	} else {
-		slog.Info("adaptive: step up", "resolution", r)
-	}
-	return true
-}
-
 func (a *App) applyAdaptiveResolution(r config.RenderResolution) {
 	a.settings.Graphics.RenderWidth = r.Width
 	a.settings.Graphics.RenderHeight = r.Height
@@ -447,9 +392,7 @@ func (a *App) applyAdaptiveResolution(r config.RenderResolution) {
 }
 
 func (a *App) resetAdaptiveCounters() {
-	a.adaptiveLowCount = 0
-	a.adaptiveHighCount = 0
-	a.adaptiveCooldown = time.Time{}
+	a.adaptive.Reset()
 }
 
 func (a *App) resetAdaptiveState(winW, winH int) {
