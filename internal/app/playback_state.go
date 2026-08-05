@@ -7,7 +7,7 @@ import (
 	"github.com/dendec/pmv/internal/player"
 )
 
-func (s *playbackState) snapshot(trackAlbumIdx int) overlayPlaybackSnapshot {
+func (s *playbackState) snapshot(trackAlbumIdx int, includeTrackInfos bool) overlayPlaybackSnapshot {
 	snapshot := overlayPlaybackSnapshot{}
 	if s.pl != nil {
 		snapshot.position = s.pl.Position()
@@ -29,7 +29,9 @@ func (s *playbackState) snapshot(trackAlbumIdx int) overlayPlaybackSnapshot {
 	if trackAlbumIdx < 0 {
 		trackAlbumIdx = snapshot.currentAlbum
 	}
-	snapshot.trackInfos = s.lib.GetAlbumTracks(trackAlbumIdx)
+	if includeTrackInfos {
+		snapshot.trackInfos = s.lib.GetAlbumTracks(trackAlbumIdx)
+	}
 	if trackAlbumIdx == snapshot.currentAlbum {
 		snapshot.trackCursor = snapshot.currentTrack
 	}

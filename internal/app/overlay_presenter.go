@@ -56,6 +56,14 @@ func (p *overlayPresenter) selectedAlbumIndex() int {
 	return p.overlay.AlbumCursor()
 }
 
+func (p *overlayPresenter) needsTrackInfos(currentAlbum, selectedAlbum int) bool {
+	target := currentAlbum
+	if selectedAlbum >= 0 {
+		target = selectedAlbum
+	}
+	return target != p.lastAlbumIdx
+}
+
 func (p *overlayPresenter) Update(fps float64, adaptive bool, renderHeight int, stats prof.Stats, playback overlayPlaybackSnapshot) {
 	if p.overlay == nil {
 		return

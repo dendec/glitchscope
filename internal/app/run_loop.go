@@ -108,9 +108,14 @@ func (a *App) Run() {
 			a.overlay.SetScreenSize(w, h)
 		}
 		if a.overlay != nil {
+			selectedAlbum := a.presenter.selectedAlbumIndex()
+			currentAlbum := -1
+			if a.lib != nil {
+				currentAlbum = a.lib.CurrentAlbumIndex()
+			}
 			a.presenter.Update(fpsAvg, a.settings.Graphics.Adaptive && !a.renderScaleExplicit,
 				a.settings.Graphics.RenderHeight, a.prof.ReadStats(),
-				a.playbackState.snapshot(a.presenter.selectedAlbumIndex()))
+				a.playbackState.snapshot(selectedAlbum, a.presenter.needsTrackInfos(currentAlbum, selectedAlbum)))
 		}
 
 		for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
