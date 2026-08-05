@@ -88,12 +88,6 @@ func (a *App) Run() {
 		}
 		prevW, prevH = w, h
 
-		renderW, renderH := a.settings.Graphics.RenderWidth, a.settings.Graphics.RenderHeight
-		if rw, rh := a.rt.Size(); rw != renderW || rh != renderH {
-			a.rt.Resize(renderW, renderH)
-			a.pm.SetWindowSize(renderW, renderH)
-		}
-
 		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && fpsMeter.Full() {
 			if resolution, direction, changed := a.adaptive.Decide(now, fpsAvg); changed {
 				a.applyAdaptiveResolution(resolution)
@@ -103,6 +97,12 @@ func (a *App) Run() {
 					slog.Info("adaptive: step up", "resolution", resolution)
 				}
 			}
+		}
+
+		renderW, renderH := a.settings.Graphics.RenderWidth, a.settings.Graphics.RenderHeight
+		if rw, rh := a.rt.Size(); rw != renderW || rh != renderH {
+			a.rt.Resize(renderW, renderH)
+			a.pm.SetWindowSize(renderW, renderH)
 		}
 
 		if a.overlay != nil {

@@ -151,10 +151,8 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	case renderScaleExplicit:
 		renderW, renderH = scaledDim(int(w), renderScale), scaledDim(int(h), renderScale)
 	case gs.Graphics.Adaptive && len(resolutions) > 0:
-		a.adaptive.resolutions = resolutions
-		a.adaptive.index = 0
-		a.adaptive.policy.Reset()
-		renderW, renderH = resolutions[0].Width, resolutions[0].Height
+		a.adaptive.Reset(int(w), int(h))
+		renderW, renderH = a.adaptive.resolutions[0].Width, a.adaptive.resolutions[0].Height
 	case gs.Graphics.Adaptive:
 		slog.Warn("adaptive: empty resolution list at startup, using saved size",
 			"window", fmt.Sprintf("%dx%d", int(w), int(h)))
