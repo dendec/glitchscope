@@ -51,9 +51,7 @@ type App struct {
 	showFPS             bool
 	startupFile         string
 
-	adaptiveResolutions []config.RenderResolution
-	adaptiveResIdx      int
-	adaptive            adaptivePolicy
+	adaptive resolutionState
 
 	pending      pendingPreset // pending preset name + scheduled load time
 	presetTicker *time.Ticker
@@ -156,8 +154,9 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	case renderScaleExplicit:
 		renderW, renderH = scaledDim(int(w), renderScale), scaledDim(int(h), renderScale)
 	case gs.Graphics.Adaptive && len(resolutions) > 0:
-		a.adaptiveResolutions = resolutions
-		a.adaptiveResIdx = 0
+		a.adaptive.resolutions = resolutions
+		a.adaptive.index = 0
+		a.adaptive.policy.Reset()
 		renderW, renderH = resolutions[0].Width, resolutions[0].Height
 	case gs.Graphics.Adaptive:
 		slog.Warn("adaptive: empty resolution list at startup, using saved size",

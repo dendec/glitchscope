@@ -82,11 +82,9 @@ func (a *App) Run() {
 				a.settings.Graphics.RenderWidth = scaledDim(w, a.renderScale)
 				a.settings.Graphics.RenderHeight = scaledDim(h, a.renderScale)
 			} else if a.settings.Graphics.Adaptive {
-				a.adaptiveResolutions = config.ComputeResolutions(w, h)
-				if len(a.adaptiveResolutions) > 0 {
-					cur := config.RenderResolution{Width: a.settings.Graphics.RenderWidth, Height: a.settings.Graphics.RenderHeight}
-					a.adaptiveResIdx = config.ClosestResolutionIndex(a.adaptiveResolutions, cur)
-					a.applyAdaptiveResolution(a.adaptiveResolutions[a.adaptiveResIdx])
+				cur := config.RenderResolution{Width: a.settings.Graphics.RenderWidth, Height: a.settings.Graphics.RenderHeight}
+				if a.adaptive.Configure(w, h, cur) {
+					a.applyAdaptiveResolution(a.adaptive.resolutions[a.adaptive.index])
 				} else {
 					slog.Warn("adaptive: empty resolution list on resize", "window", fmt.Sprintf("%dx%d", w, h))
 				}
@@ -112,14 +110,12 @@ func (a *App) Run() {
 		}
 
 		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && fpsMeter.Full() {
-			if next, changed := a.adaptive.Decide(now, fpsAvg, a.adaptiveResIdx, len(a.adaptiveResolutions)); changed {
-				previous := a.adaptiveResIdx
-				a.adaptiveResIdx = next
-				a.applyAdaptiveResolution(a.adaptiveResolutions[next])
-				if next > previous {
-					slog.Info("adaptive: step down", "resolution", a.adaptiveResolutions[next])
+			if resolution, direction, changed := a.adaptive.Decide(now, fpsAvg); changed {
+				a.applyAdaptiveResolution(resolution)
+				if direction > 0 {
+					slog.Info("adaptive: step down", "resolution", resolution)
 				} else {
-					slog.Info("adaptive: step up", "resolution", a.adaptiveResolutions[next])
+					slog.Info("adaptive: step up", "resolution", resolution)
 				}
 			}
 		}
@@ -392,17 +388,13 @@ func (a *App) applyAdaptiveResolution(r config.RenderResolution) {
 }
 
 func (a *App) resetAdaptiveCounters() {
-	a.adaptive.Reset()
+	a.adaptive.policy.Reset()
 }
 
 func (a *App) resetAdaptiveState(winW, winH int) {
-	a.adaptiveResolutions = config.ComputeResolutions(winW, winH)
-	if len(a.adaptiveResolutions) == 0 {
+	if !a.adaptive.Reset(winW, winH) {
 		slog.Warn("adaptive: empty resolution list", "window", fmt.Sprintf("%dx%d", winW, winH))
-		a.resetAdaptiveCounters()
 		return
 	}
-	a.adaptiveResIdx = 0
-	a.applyAdaptiveResolution(a.adaptiveResolutions[0])
-	a.resetAdaptiveCounters()
+	a.applyAdaptiveResolution(a.adaptive.resolutions[0])
 }

@@ -3,6 +3,8 @@ package app
 import (
 	"testing"
 	"time"
+
+	"github.com/dendec/pmv/internal/config"
 )
 
 func TestFpsMeterUsesFixedWindow(t *testing.T) {
@@ -53,5 +55,22 @@ func TestAdaptivePolicyHonorsCooldownAndBounds(t *testing.T) {
 	}
 	if next, changed := policy.Decide(now.Add(2*adaptiveCooldown+time.Nanosecond), adaptiveThreshHigh+1, 0, 3); changed || next != 0 {
 		t.Fatalf("upper bound result = (%d, %v), want (0, false)", next, changed)
+	}
+}
+
+func TestResolutionStateDecidesAndUpdatesIndex(t *testing.T) {
+	state := resolutionState{
+		resolutions: []config.RenderResolution{{Width: 320, Height: 180}, {Width: 480, Height: 270}},
+	}
+	now := time.Now()
+	for i := 0; i < adaptiveDownCount; i++ {
+		state.Decide(now, adaptiveThreshLow-1)
+	}
+
+	if state.index != 1 {
+		t.Fatalf("index = %d, want 1", state.index)
+	}
+	if got := state.resolutions[state.index]; got.Width != 480 || got.Height != 270 {
+		t.Fatalf("resolution = %v, want 480x270", got)
 	}
 }
