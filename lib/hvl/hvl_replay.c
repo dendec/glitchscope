@@ -72,7 +72,7 @@ void hvl_GenTriangle( int8 *buf, uint32 len )
   d4  = -(d2 >> 1);
   val = 0;
   
-  for( i=0; i<d5; i++ )
+  for( i=0; i<(uint32)d5; i++ )
   {
     *buf++ = val;
     val += d1;
@@ -82,7 +82,7 @@ void hvl_GenTriangle( int8 *buf, uint32 len )
   if( d5 != 1 )
   {
     val = 128;
-    for( i=0; i<d5-1; i++ )
+    for( i=0; i<(uint32)(d5-1); i++ )
     {
       val -= d1;
       *buf++ = val;
@@ -90,7 +90,7 @@ void hvl_GenTriangle( int8 *buf, uint32 len )
   }
   
   buf2 = buf + d4;
-  for( i=0; i<d5*2; i++ )
+  for( i=0; i<(uint32)(d5*2); i++ )
   {
     int8 c;
     
@@ -121,7 +121,7 @@ static int32 clipshifted8(int32 in)
 {
   int16 top = (int16)(in >> 16);
   if (top > 127) in = 127 << 16;
-  else if (top < -128) in = -128 << 16;
+  else if (top < -128) in = -(128 << 16);
   return in;
 }
 
@@ -314,10 +314,10 @@ void hvl_InitReplayer( void )
   hvl_GenFilterWaves( &waves[WO_TRIANGLE_04], &waves[WO_LOWPASSES], &waves[WO_HIGHPASSES] );
 }
 
-struct hvl_tune *hvl_load_ahx( uint8 *buf, uint32 buflen, uint32 defstereo, uint32 freq )
+struct hvl_tune *hvl_load_ahx( const uint8 *buf, uint32 buflen, uint32 defstereo, uint32 freq )
 {
-  uint8  *bptr;
-  TEXT   *nptr;
+  const uint8  *bptr;
+  const TEXT   *nptr;
   uint32  i, j, k, l, posn, insn, ssn, hs, trkn, trkl;
   struct hvl_tune *ht;
   struct  hvl_plsentry *ple;
@@ -411,7 +411,7 @@ struct hvl_tune *hvl_load_ahx( uint8 *buf, uint32 buflen, uint32 defstereo, uint
   strncpy( ht->ht_Name, (TEXT *)bptr, i );
   if ( i < 128 ) ht->ht_Name[ i ] = 0;
   nptr = (TEXT *)bptr+strlen( ht->ht_Name )+1;
-  if ( nptr > buf + buflen )
+  if ( nptr > (const TEXT *)(buf + buflen) )
   {
     free( ht );
     return NULL;
@@ -472,7 +472,8 @@ struct hvl_tune *hvl_load_ahx( uint8 *buf, uint32 buflen, uint32 defstereo, uint
   {
     if( nptr < (TEXT *)(buf+buflen) )
     {
-      strncpy( ht->ht_Instruments[i].ins_Name, nptr, 128 );
+      strncpy( ht->ht_Instruments[i].ins_Name, nptr, sizeof(ht->ht_Instruments[i].ins_Name) - 1 );
+      ht->ht_Instruments[i].ins_Name[sizeof(ht->ht_Instruments[i].ins_Name) - 1] = 0;
       nptr += strlen( nptr )+1;
     } else {
       ht->ht_Instruments[i].ins_Name[0] = 0;
@@ -507,7 +508,7 @@ struct hvl_tune *hvl_load_ahx( uint8 *buf, uint32 buflen, uint32 defstereo, uint
     ple += bptr[21];
     
     bptr += 22;
-    for( j=0; j<ht->ht_Instruments[i].ins_PList.pls_Length; j++ )
+    for( j=0; j<(uint32)ht->ht_Instruments[i].ins_PList.pls_Length; j++ )
     {
       k = (bptr[0]>>5)&7;
       if( k == 6 ) k = 12;
@@ -541,10 +542,9 @@ struct hvl_tune *hvl_load_ahx( uint8 *buf, uint32 buflen, uint32 defstereo, uint
 struct hvl_tune *hvl_LoadTune( const uint8 *buf, uint32 buflen, uint32 freq, uint32 defstereo )
 {
   struct hvl_tune *ht;
-  uint8  *bptr;
-  TEXT   *nptr;
+  const uint8  *bptr;
+  const TEXT   *nptr;
   uint32  i, j, posn, insn, ssn, chnn, hs, trkl, trkn;
-  FILE *fh;
   struct  hvl_plsentry *ple;
 
   if ( !buf || buflen < 4 )
@@ -675,7 +675,7 @@ struct hvl_tune *hvl_LoadTune( const uint8 *buf, uint32 buflen, uint32 freq, uin
   strncpy( ht->ht_Name, (TEXT *)bptr, i );
   if ( i < 128 ) ht->ht_Name[ i ] = 0;
   nptr = (TEXT *)bptr+strlen( ht->ht_Name )+1;
-  if ( nptr > buf + buflen )
+  if ( nptr > (const TEXT *)(buf + buflen) )
   {
     free( ht );
     return NULL;
@@ -747,7 +747,8 @@ struct hvl_tune *hvl_LoadTune( const uint8 *buf, uint32 buflen, uint32 freq, uin
   {
     if( nptr < (TEXT *)(buf+buflen) )
     {
-      strncpy( ht->ht_Instruments[i].ins_Name, nptr, 128 );
+      strncpy( ht->ht_Instruments[i].ins_Name, nptr, sizeof(ht->ht_Instruments[i].ins_Name) - 1 );
+      ht->ht_Instruments[i].ins_Name[sizeof(ht->ht_Instruments[i].ins_Name) - 1] = 0;
       nptr += strlen( nptr )+1;
     } else {
       ht->ht_Instruments[i].ins_Name[0] = 0;
@@ -782,7 +783,7 @@ struct hvl_tune *hvl_LoadTune( const uint8 *buf, uint32 buflen, uint32 freq, uin
     ple += bptr[21];
     
     bptr += 22;
-    for( j=0; j<ht->ht_Instruments[i].ins_PList.pls_Length; j++ )
+    for( j=0; j<(uint32)ht->ht_Instruments[i].ins_PList.pls_Length; j++ )
     {
       ht->ht_Instruments[i].ins_PList.pls_Entries[j].ple_FX[0] = bptr[0]&0xf;
       ht->ht_Instruments[i].ins_PList.pls_Entries[j].ple_FX[1] = (bptr[1]>>3)&0xf;
@@ -873,6 +874,8 @@ void hvl_process_stepfx_1( struct hvl_tune *ht, struct hvl_voice *voice, int32 F
 
 void hvl_process_stepfx_2( struct hvl_tune *ht, struct hvl_voice *voice, int32 FX, int32 FXParam, int32 *Note )
 {
+  (void)ht;
+
   switch( FX )
   {
     case 0x9: // Set squarewave offset
@@ -883,6 +886,7 @@ void hvl_process_stepfx_2( struct hvl_tune *ht, struct hvl_voice *voice, int32 F
     
     case 0x3: // Tone portamento
       if( FXParam != 0 ) voice->vc_PeriodSlideSpeed = FXParam;
+      /* fall through */
     case 0x5: // Tone portamento + volume slide
       
       if( *Note )
@@ -1167,6 +1171,8 @@ void hvl_process_step( struct hvl_tune *ht, struct hvl_voice *voice )
 
 void hvl_plist_command_parse( struct hvl_tune *ht, struct hvl_voice *voice, int32 FX, int32 FXParam )
 {
+  (void)ht;
+
   switch( FX )
   {
     case 0:
@@ -1613,7 +1619,7 @@ void hvl_process_frame( struct hvl_tune *ht, struct hvl_voice *voice )
     Delta = 32 >> voice->vc_WaveLength;
     ht->ht_WaveformTab[2] = voice->vc_SquareTempBuffer;
     
-    for( i=0; i<(1<<voice->vc_WaveLength)*4; i++ )
+    for( i=0; i<(uint32)((1<<voice->vc_WaveLength)*4); i++ )
     {
       voice->vc_SquareTempBuffer[i] = *SquarePtr;
       SquarePtr += Delta;
@@ -1884,7 +1890,6 @@ void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf1, int8 *buf2, 
   int32   vol[MAX_CHANNELS];
   uint32  pos[MAX_CHANNELS];
   uint32  rpos[MAX_CHANNELS];
-  uint32  cnt;
   int32   panl[MAX_CHANNELS];
   int32   panr[MAX_CHANNELS];
 //  uint32  vu[MAX_CHANNELS];
@@ -1929,7 +1934,7 @@ void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf1, int8 *buf2, 
     // Inner loop
       for( i=0; i<chans; i++ )
       {
-		if( delta[i] == ~0 ) continue;
+		if( delta[i] == ~0u ) continue;
 		last_ampl = last_amp[i][0];
 		last_ampr = last_amp[i][1];
 		clock = last_clock[i][0];
