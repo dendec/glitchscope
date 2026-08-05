@@ -32,7 +32,6 @@ func (a *App) Run() {
 	var fpsMeter fpsMeter
 	lowFPSWarned := false
 
-	lastAlbumIdx := -1
 	var prevW, prevH int
 
 	for range ticker.C {
@@ -108,47 +107,7 @@ func (a *App) Run() {
 		if a.overlay != nil {
 			a.overlay.SetScreenSize(w, h)
 		}
-
-		if a.overlay != nil {
-			s := a.prof.ReadStats()
-			line := fmt.Sprintf("FPS:%.0f MEM:%.0fM CPU:%.0f%%", fpsAvg, s.MemKB/1024, s.CPUPct)
-			if s.GPUOK {
-				line += fmt.Sprintf(" GPU:%.0fM %.0f%%", s.GPUMemKB/1024, s.GPUUtilPct)
-			}
-			if a.settings.Graphics.Adaptive && !a.renderScaleExplicit {
-				line += fmt.Sprintf(" %dp", a.settings.Graphics.RenderHeight)
-			}
-			a.overlay.SetStats(line)
-			if a.pl != nil {
-				a.overlay.SetPlayback(a.pl.Position(), a.pl.Duration(), a.pl.SampleRate(), a.pl.Bitrate(), a.pl.BPM(), a.pl.Channels(), a.pl.IsPaused(), a.pl.IsTracker())
-			}
-			if a.lib != nil {
-				a.overlay.SetAlbums(a.lib.Albums, a.lib.CurrentAlbumIndex())
-
-				trackAlbumIdx := a.lib.CurrentAlbumIndex()
-				if a.overlay.UIVisible() {
-					trackAlbumIdx = a.overlay.AlbumCursor()
-				}
-				if trackAlbumIdx != lastAlbumIdx {
-					trackCursor := 0
-					if trackAlbumIdx == a.lib.CurrentAlbumIndex() {
-						trackCursor = a.lib.CurrentTrackIndex()
-					}
-					a.overlay.SetTrackInfos(a.lib.GetAlbumTracks(trackAlbumIdx), trackCursor)
-					lastAlbumIdx = trackAlbumIdx
-				}
-
-				if a.pl != nil {
-					curTrack := a.pl.TrackPath()
-					if !a.pl.IsValidVoice() && !a.pl.Loading() {
-						curTrack = ""
-					}
-					curAlbum := a.lib.CurrentAlbum().Name
-					a.overlay.SetPlaying(curAlbum, curTrack)
-					a.overlay.SetLoading(a.pl.LoadProgress())
-				}
-			}
-		}
+		a.presenter.Update(fpsAvg, a.settings, a.renderScaleExplicit, &a.playbackState, a.prof)
 
 		for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 			act := a.inp.ProcessEvent(e)

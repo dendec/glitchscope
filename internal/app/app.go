@@ -33,6 +33,7 @@ type App struct {
 	overlay *ui.Overlay
 	inp     *input.Input
 	playbackState
+	presenter overlayPresenter
 
 	modlandSizes map[string]int64 // remote path → expected size for downloads
 
@@ -256,6 +257,7 @@ func (a *App) initAudio() {
 		return path, nil
 	}
 	a.overlay = ui.New()
+	a.presenter = newOverlayPresenter(a.overlay)
 	a.overlay.SetBaseDir(baseDir())
 	a.overlay.SetShowFPS(a.showFPS)
 	w, h := a.window.GLGetDrawableSize()
