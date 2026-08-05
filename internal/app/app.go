@@ -68,6 +68,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 		showFPS:             showFPS,
 		startupFile:         startupFile,
 		modlandSizes:        make(map[string]int64),
+		presenter:           newOverlayPresenter(nil),
 	}
 
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK); err != nil {

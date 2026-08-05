@@ -107,7 +107,11 @@ func (a *App) Run() {
 		if a.overlay != nil {
 			a.overlay.SetScreenSize(w, h)
 		}
-		a.presenter.Update(fpsAvg, a.settings, a.renderScaleExplicit, &a.playbackState, a.prof)
+		if a.overlay != nil {
+			a.presenter.Update(fpsAvg, a.settings.Graphics.Adaptive && !a.renderScaleExplicit,
+				a.settings.Graphics.RenderHeight, a.prof.ReadStats(),
+				a.playbackState.snapshot(a.presenter.selectedAlbumIndex()))
+		}
 
 		for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 			act := a.inp.ProcessEvent(e)

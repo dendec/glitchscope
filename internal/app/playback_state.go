@@ -7,6 +7,44 @@ import (
 	"github.com/dendec/pmv/internal/player"
 )
 
+func (s *playbackState) snapshot(trackAlbumIdx int) overlayPlaybackSnapshot {
+	snapshot := overlayPlaybackSnapshot{}
+	if s.pl != nil {
+		snapshot.position = s.pl.Position()
+		snapshot.duration = s.pl.Duration()
+		snapshot.sampleRate = s.pl.SampleRate()
+		snapshot.bitrate = s.pl.Bitrate()
+		snapshot.bpm = s.pl.BPM()
+		snapshot.channels = s.pl.Channels()
+		snapshot.paused = s.pl.IsPaused()
+		snapshot.tracker = s.pl.IsTracker()
+		snapshot.hasPlayer = true
+	}
+	if s.lib == nil {
+		return snapshot
+	}
+	snapshot.albums = s.lib.Albums
+	snapshot.currentAlbum = s.lib.CurrentAlbumIndex()
+	snapshot.currentTrack = s.lib.CurrentTrackIndex()
+	if trackAlbumIdx < 0 {
+		trackAlbumIdx = snapshot.currentAlbum
+	}
+	snapshot.trackInfos = s.lib.GetAlbumTracks(trackAlbumIdx)
+	if trackAlbumIdx == snapshot.currentAlbum {
+		snapshot.trackCursor = snapshot.currentTrack
+	}
+	if s.pl != nil {
+		snapshot.playingAlbum = s.lib.CurrentAlbum().Name
+		snapshot.playingTrack = s.pl.TrackPath()
+		if !s.pl.IsValidVoice() && !s.pl.Loading() {
+			snapshot.playingTrack = ""
+		}
+		snapshot.loading, snapshot.loadPercent = s.pl.LoadProgress()
+	}
+	snapshot.hasLibrary = true
+	return snapshot
+}
+
 type shuffleState struct {
 	order    []trackRef
 	idx      int

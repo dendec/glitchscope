@@ -3,64 +3,90 @@ package app
 import (
 	"fmt"
 
-	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/pmv/internal/player"
 	"github.com/dendec/pmv/internal/prof"
-	"github.com/dendec/pmv/internal/ui"
 )
 
+type overlayView interface {
+	SetStats(string)
+	SetPlayback(float64, float64, float32, float64, float64, int, bool, bool)
+	SetAlbums([]player.Album, int)
+	UIVisible() bool
+	AlbumCursor() int
+	SetTrackInfos([]player.TrackInfo, int)
+	SetPlaying(string, string)
+	SetLoading(bool, int64)
+}
+
+type overlayPlaybackSnapshot struct {
+	position     float64
+	duration     float64
+	sampleRate   float32
+	bitrate      float64
+	bpm          float64
+	channels     int
+	paused       bool
+	tracker      bool
+	albums       []player.Album
+	currentAlbum int
+	currentTrack int
+	trackInfos   []player.TrackInfo
+	trackCursor  int
+	playingAlbum string
+	playingTrack string
+	loading      bool
+	loadPercent  int64
+	hasPlayer    bool
+	hasLibrary   bool
+}
+
 type overlayPresenter struct {
-	overlay      *ui.Overlay
+	overlay      overlayView
 	lastAlbumIdx int
 }
 
-func newOverlayPresenter(overlay *ui.Overlay) overlayPresenter {
+func newOverlayPresenter(overlay overlayView) overlayPresenter {
 	return overlayPresenter{overlay: overlay, lastAlbumIdx: -1}
 }
 
-func (p *overlayPresenter) Update(fps float64, settings *config.Settings, renderScaleExplicit bool, playback *playbackState, collector *prof.Collector) {
+func (p *overlayPresenter) selectedAlbumIndex() int {
+	if p.overlay == nil || !p.overlay.UIVisible() {
+		return -1
+	}
+	return p.overlay.AlbumCursor()
+}
+
+func (p *overlayPresenter) Update(fps float64, adaptive bool, renderHeight int, stats prof.Stats, playback overlayPlaybackSnapshot) {
 	if p.overlay == nil {
 		return
 	}
 
-	s := collector.ReadStats()
-	line := fmt.Sprintf("FPS:%.0f MEM:%.0fM CPU:%.0f%%", fps, s.MemKB/1024, s.CPUPct)
-	if s.GPUOK {
-		line += fmt.Sprintf(" GPU:%.0fM %.0f%%", s.GPUMemKB/1024, s.GPUUtilPct)
+	line := fmt.Sprintf("FPS:%.0f MEM:%.0fM CPU:%.0f%%", fps, stats.MemKB/1024, stats.CPUPct)
+	if stats.GPUOK {
+		line += fmt.Sprintf(" GPU:%.0fM %.0f%%", stats.GPUMemKB/1024, stats.GPUUtilPct)
 	}
-	if settings.Graphics.Adaptive && !renderScaleExplicit {
-		line += fmt.Sprintf(" %dp", settings.Graphics.RenderHeight)
+	if adaptive {
+		line += fmt.Sprintf(" %dp", renderHeight)
 	}
 	p.overlay.SetStats(line)
 
-	if playback.pl != nil {
-		p.overlay.SetPlayback(playback.pl.Position(), playback.pl.Duration(), playback.pl.SampleRate(), playback.pl.Bitrate(), playback.pl.BPM(), playback.pl.Channels(), playback.pl.IsPaused(), playback.pl.IsTracker())
+	if playback.hasPlayer {
+		p.overlay.SetPlayback(playback.position, playback.duration, playback.sampleRate, playback.bitrate, playback.bpm, playback.channels, playback.paused, playback.tracker)
 	}
-	if playback.lib == nil {
+	if !playback.hasLibrary {
 		return
 	}
 
-	p.overlay.SetAlbums(playback.lib.Albums, playback.lib.CurrentAlbumIndex())
-	trackAlbumIdx := playback.lib.CurrentAlbumIndex()
-	if p.overlay.UIVisible() {
-		trackAlbumIdx = p.overlay.AlbumCursor()
+	p.overlay.SetAlbums(playback.albums, playback.currentAlbum)
+	trackAlbumIdx := playback.currentAlbum
+	if selected := p.selectedAlbumIndex(); selected >= 0 {
+		trackAlbumIdx = selected
 	}
 	if trackAlbumIdx != p.lastAlbumIdx {
-		trackCursor := 0
-		if trackAlbumIdx == playback.lib.CurrentAlbumIndex() {
-			trackCursor = playback.lib.CurrentTrackIndex()
-		}
-		p.overlay.SetTrackInfos(playback.lib.GetAlbumTracks(trackAlbumIdx), trackCursor)
+		p.overlay.SetTrackInfos(playback.trackInfos, playback.trackCursor)
 		p.lastAlbumIdx = trackAlbumIdx
 	}
 
-	if playback.pl == nil {
-		return
-	}
-	curTrack := playback.pl.TrackPath()
-	if !playback.pl.IsValidVoice() && !playback.pl.Loading() {
-		curTrack = ""
-	}
-	p.overlay.SetPlaying(playback.lib.CurrentAlbum().Name, curTrack)
-	active, percent := playback.pl.LoadProgress()
-	p.overlay.SetLoading(active, percent)
+	p.overlay.SetPlaying(playback.playingAlbum, playback.playingTrack)
+	p.overlay.SetLoading(playback.loading, playback.loadPercent)
 }
