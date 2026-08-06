@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"log/slog"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/dendec/pmv/internal/formats"
 	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/dendec/pmv/internal/player"
 )
@@ -50,6 +53,8 @@ const (
 	entryModArchiveRoot                      // "ModArchive" pseudo-folder at the library root
 	entryModArchiveDir                       // ModArchive HTTP directory folder
 	entryModArchiveAlbum                     // ModArchive leaf album containing tracks
+	entryNCDir                               // NC directory entry
+	entryNCFile                              // NC file entry (leaf)
 )
 
 // navEntry is one row in the library's left (navigation) panel.
@@ -59,7 +64,8 @@ type navEntry struct {
 	albumIdx int    // index into Overlay.allAlbums when kind is a leaf album, else -1
 	format   string // set when kind == entryFormat
 	url      string // set when kind == entryModArchiveDir
-	dirPath  string // set when kind == entryLocalDir
+	dirPath  string // set when kind == entryLocalDir or entryNCDir
+	filePath string // set when kind == entryNCFile
 }
 
 // navLevel is a pushed navigation level.
@@ -89,6 +95,44 @@ func labelsOf(entries []navEntry) []string {
 // FocusPlayingTrack points the cursor at the currently playing album/track,
 // including deep-linking into modland/modarchive drill-down when needed.
 func (o *Overlay) FocusPlayingTrack(albumIdx, trackIdx int) {
+	if albumIdx >= 0 && albumIdx < len(o.allAlbums) {
+		path := o.allAlbums[albumIdx].Path
+		if !strings.HasPrefix(path, player.ModlandPrefix) && !strings.HasPrefix(path, player.ModArchivePrefix) {
+			// Local track — NC mode.
+			o.libMode = libModeNC
+			o.ncStack = nil
+			albumPath := o.allAlbums[albumIdx].Path
+			o.ncPath = albumPath
+			o.albumCursor = 0
+			o.albumsScroll = 0
+			o.focusPanel = 0
+			o.panelEntered = true
+			o.albumEntries = o.buildNCDirectoryEntries(albumPath)
+			o.albums = labelsOf(o.albumEntries)
+			// Find the track file in the entries.
+			if trackIdx >= 0 && trackIdx < len(o.allAlbums[albumIdx].Tracks) {
+				trackPath := o.allAlbums[albumIdx].Tracks[trackIdx]
+				for i, e := range o.albumEntries {
+					if e.IsNCFile() && e.filePath == trackPath {
+						o.albumCursor = i
+						break
+					}
+				}
+			}
+			o.ncInfoDir = ""
+			o.ncInfoFile = ""
+			o.ncInfoIsDir = false
+			o.refreshNCPreview()
+			o.albumsDirty = true
+			o.albumsContentDirty = true
+			o.tracksDirty = true
+			o.tracksContentDirty = true
+			return
+		}
+	}
+
+	// Remote or unknown — provider mode (existing logic).
+	o.libMode = libModeProvider
 	o.navStack = nil
 	o.refreshAlbumLabels()
 	o.trackCursor = trackIdx
@@ -103,8 +147,8 @@ func (o *Overlay) FocusPlayingTrack(albumIdx, trackIdx int) {
 			o.focusLocalAlbum(albumIdx)
 		}
 	} else {
-		o.albumCursor = 0
-		o.refreshPreview()
+		// No playback — start NC mode at baseDir.
+		o.ncSync()
 	}
 
 	if e := o.currentEntry(); e.IsLeafAlbum() {
@@ -124,6 +168,14 @@ func (e *navEntry) IsLeafAlbum() bool {
 		return false
 	}
 	return e.kind == entryLocalAlbum || e.kind == entryModlandAlbum || e.kind == entryModArchiveAlbum
+}
+
+func (e *navEntry) IsNCDirectory() bool {
+	return e != nil && e.kind == entryNCDir
+}
+
+func (e *navEntry) IsNCFile() bool {
+	return e != nil && e.kind == entryNCFile
 }
 
 // focusModlandAlbum drills the nav stack to the format/album containing
@@ -483,6 +535,14 @@ func (o *Overlay) refreshAlbumLabels() {
 
 // syncPanels refreshes labels and preview for the current cursor position.
 func (o *Overlay) syncPanels() {
+	if o.libMode == libModeNC {
+		o.refreshNCPreview()
+		o.albumsDirty = true
+		o.albumsContentDirty = true
+		o.tracksDirty = true
+		o.tracksContentDirty = true
+		return
+	}
 	o.refreshAlbumLabels()
 	o.refreshPreview()
 	o.albumsDirty = true
@@ -628,4 +688,295 @@ func (o *Overlay) SelectedTrackPlaylist() (string, []string, int) {
 		return "", nil, -1
 	}
 	return album.Name, album.Tracks, o.trackCursor
+}
+
+// --- NC-local filesystem navigation ---
+
+// buildNCDirectoryEntries lists entries in a local directory for the NC panel.
+// Shows: ".." (unless at baseDir), directories, supported audio files.
+// Hides: dotfiles, .pmv_meta.json, artwork, symlinks, empty dirs.
+func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
+	var entries []navEntry
+
+	// Parent directory entry. Not shown at baseDir — nothing above it.
+	if dirPath != o.baseDir {
+		entries = append(entries, navEntry{
+			label:    "..",
+			kind:     entryNCDir,
+			dirPath:  filepath.Dir(dirPath),
+			albumIdx: -1,
+		})
+	}
+
+	dirEntries, err := os.ReadDir(dirPath)
+	if err != nil {
+		slog.Warn("nc readdir", "path", dirPath, "error", err)
+		return entries
+	}
+
+	var dirs, files []navEntry
+	for _, de := range dirEntries {
+		name := de.Name()
+		if strings.HasPrefix(name, ".") || name == ".pmv_meta.json" {
+			continue
+		}
+		if de.IsDir() {
+			fullPath := filepath.Join(dirPath, name)
+			if de.Type()&os.ModeSymlink != 0 {
+				continue // v1: skip all symlinks
+			}
+			// Skip empty directories (no supported audio + no subdirs).
+			if ncDirIsEmpty(fullPath) {
+				continue
+			}
+			dirs = append(dirs, navEntry{
+				label:    name + "/",
+				kind:     entryNCDir,
+				dirPath:  fullPath,
+				albumIdx: -1,
+			})
+			continue
+		}
+		if !de.Type().IsRegular() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		if !formats.SupportedExts[ext] {
+			continue
+		}
+		files = append(files, navEntry{
+			label:    name,
+			kind:     entryNCFile,
+			filePath: filepath.Join(dirPath, name),
+			albumIdx: -1,
+		})
+	}
+
+	sort.Slice(dirs, func(i, j int) bool { return dirs[i].label < dirs[j].label })
+	sort.Slice(files, func(i, j int) bool { return files[i].label < files[j].label })
+	return append(entries, append(dirs, files...)...)
+}
+
+// ncDirIsEmpty reports whether a directory has no supported audio files and
+// no non-hidden subdirectories. Used to prune empty leaf dirs from the tree.
+func ncDirIsEmpty(dirPath string) bool {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return true
+	}
+	for _, de := range entries {
+		name := de.Name()
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+		if de.IsDir() {
+			return false
+		}
+		if de.Type().IsRegular() {
+			ext := strings.ToLower(filepath.Ext(name))
+			if formats.SupportedExts[ext] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// buildNCRootEntries builds the top-level NC navigation: local dirs + files + remote.
+func (o *Overlay) buildNCRootEntries() []navEntry {
+	var entries []navEntry
+
+	dirEntries, err := os.ReadDir(o.baseDir)
+	if err != nil {
+		slog.Warn("nc root readdir", "path", o.baseDir, "error", err)
+	} else {
+		var dirs, files []navEntry
+		for _, de := range dirEntries {
+			name := de.Name()
+			if strings.HasPrefix(name, ".") || name == ".pmv_meta.json" {
+				continue
+			}
+			if de.IsDir() {
+				if de.Type()&os.ModeSymlink != 0 {
+					continue
+				}
+				fullPath := filepath.Join(o.baseDir, name)
+				if ncDirIsEmpty(fullPath) {
+					continue
+				}
+				dirs = append(dirs, navEntry{
+					label:    name + "/",
+					kind:     entryNCDir,
+					dirPath:  fullPath,
+					albumIdx: -1,
+				})
+			} else if de.Type().IsRegular() {
+				ext := strings.ToLower(filepath.Ext(name))
+				if formats.SupportedExts[ext] {
+					files = append(files, navEntry{
+						label:    name,
+						kind:     entryNCFile,
+						filePath: filepath.Join(o.baseDir, name),
+						albumIdx: -1,
+					})
+				}
+			}
+		}
+		sort.Slice(dirs, func(i, j int) bool { return dirs[i].label < dirs[j].label })
+		sort.Slice(files, func(i, j int) bool { return files[i].label < files[j].label })
+		entries = append(entries, dirs...)
+		entries = append(entries, files...)
+	}
+
+	// Remote catalog pseudo-entries.
+	if o.online {
+		entries = append(entries,
+			navEntry{label: "Modland/", kind: entryModlandRoot, albumIdx: -1},
+			navEntry{label: "ModArchive/", kind: entryModArchiveRoot, albumIdx: -1},
+		)
+	}
+
+	return entries
+}
+
+// ncSync rebuilds the NC left-panel entries from the current ncPath.
+func (o *Overlay) ncSync() {
+	o.libMode = libModeNC
+	o.ncStack = nil
+	if o.ncPath == "" {
+		o.ncPath = o.baseDir
+	}
+	if o.ncPath == o.baseDir {
+		o.albumEntries = o.buildNCRootEntries()
+	} else {
+		o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
+	}
+	o.albums = labelsOf(o.albumEntries)
+	o.albumCursor = clampCursor(o.albumCursor, len(o.albumEntries))
+	o.albumsDirty = true
+	o.albumsContentDirty = true
+	o.tracksDirty = true
+	o.tracksContentDirty = true
+	o.refreshNCPreview()
+}
+
+// ncEnterDir enters a subdirectory in NC mode.
+func (o *Overlay) ncEnterDir(dirPath string) {
+	o.ncStack = append(o.ncStack, navLevel{
+		entries: o.albumEntries,
+		cursor:  o.albumCursor,
+		scroll:  o.albumsScroll,
+	})
+	o.ncPath = dirPath
+	o.albumCursor = 0
+	o.albumsScroll = 0
+	o.albumEntries = o.buildNCDirectoryEntries(dirPath)
+	o.albums = labelsOf(o.albumEntries)
+	o.marqueeL.invalidate(o)
+	o.albumsDirty = true
+	o.albumsContentDirty = true
+	o.tracksDirty = true
+	o.tracksContentDirty = true
+	o.refreshNCPreview()
+}
+
+// ncBack goes up one directory level. Returns false if already at baseDir.
+func (o *Overlay) ncBack() bool {
+	if o.ncPath == o.baseDir || len(o.ncStack) == 0 {
+		return false
+	}
+	top := o.ncStack[len(o.ncStack)-1]
+	o.ncStack = o.ncStack[:len(o.ncStack)-1]
+	o.ncPath = filepath.Dir(o.ncPath)
+	o.albumEntries = top.entries
+	o.albums = labelsOf(o.albumEntries)
+	o.albumCursor = top.cursor
+	o.albumsScroll = top.scroll
+	o.marqueeL.invalidate(o)
+	o.albumsDirty = true
+	o.albumsContentDirty = true
+	o.tracksDirty = true
+	o.tracksContentDirty = true
+	o.refreshNCPreview()
+	return true
+}
+
+// ncSwitchToProvider enters provider mode (Modland/ModArchive) from NC.
+func (o *Overlay) ncSwitchToProvider() {
+	// Save NC cursor/scroll at root level so ncSwitchToNC can restore.
+	o.ncRootCursor, o.ncRootScroll = o.albumCursor, o.albumsScroll
+	o.libMode = libModeProvider
+	o.navStack = nil
+	o.rootEntries = o.buildRootEntries()
+	o.refreshAlbumLabels()
+	o.albumCursor = 0
+	o.albumsScroll = 0
+	o.focusPanel = 0
+	o.panelEntered = true
+	o.marqueeL.invalidate(o)
+	o.syncPanels()
+}
+
+// ncSwitchToNC returns to NC mode from provider mode.
+// Preserves ncStack so Backspace still works after return.
+func (o *Overlay) ncSwitchToNC() {
+	o.libMode = libModeNC
+	o.navStack = nil
+	if o.ncPath == "" {
+		o.ncPath = o.baseDir
+	}
+	if o.ncPath == o.baseDir {
+		o.albumEntries = o.buildNCRootEntries()
+		o.albumCursor = clampCursor(o.ncRootCursor, len(o.albumEntries))
+		o.albumsScroll = o.ncRootScroll
+	} else {
+		o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
+		o.albumCursor = clampCursor(o.albumCursor, len(o.albumEntries))
+	}
+	o.albums = labelsOf(o.albumEntries)
+	o.marqueeL.invalidate(o)
+	o.albumsDirty = true
+	o.albumsContentDirty = true
+	o.tracksDirty = true
+	o.tracksContentDirty = true
+	o.refreshNCPreview()
+	o.focusPanel = 0
+	o.panelEntered = true
+}
+
+// refreshNCPreview updates the right-panel NC info for the selected entry.
+func (o *Overlay) refreshNCPreview() {
+	e := o.currentEntry()
+	o.ncInfoFile = ""
+	o.ncInfoDir = ""
+	o.ncInfoIsDir = false
+	o.previewActive = false
+	o.previewEntries = nil
+	if e == nil {
+		o.tracksDirty = true
+		o.tracksContentDirty = true
+		return
+	}
+	if e.IsNCDirectory() {
+		o.ncInfoDir = e.dirPath
+		o.ncInfoIsDir = true
+	} else if e.IsNCFile() {
+		o.ncInfoFile = e.filePath
+		o.ncInfoIsDir = false
+	}
+	o.tracksDirty = true
+	o.tracksContentDirty = true
+}
+
+func clampCursor(cur, max int) int {
+	if max == 0 {
+		return 0
+	}
+	if cur < 0 {
+		return 0
+	}
+	if cur >= max {
+		return max - 1
+	}
+	return cur
 }

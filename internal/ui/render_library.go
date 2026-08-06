@@ -1,6 +1,13 @@
 package ui
 
-import "github.com/dendec/pmv/internal/player"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/dendec/pmv/internal/player"
+)
 
 // This file owns rendering for the Library page: albums/tracks panels.
 // Shared primitives in overlay_render.go.
@@ -50,24 +57,29 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		if o.focusPanel == 1 {
 			drawPanelBorder(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		}
-		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
-			rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
-			o.drawCursorHighlight(tx, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
+		// NC right panel: no cursor highlight, no scrollbar, no marquee.
+		if o.libMode != libModeNC {
+			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
+				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
+				o.drawCursorHighlight(tx, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
+			}
 		}
 		glDrawOverlayText(o.programText, o.tracksTex, 1,
 			tx, ty, float32(o.tracksTexW), float32(o.tracksTexH), winW, winH, viewW, viewH)
-		tm := panelH / lh
-		if tm < 1 {
-			tm = 1
-		}
-		tracksCount := len(o.trackInfos)
-		if o.previewActive {
-			tracksCount = len(o.previewEntries)
-		}
-		drawScrollbar(o, tx+float32(panelW)-sbW, ty, float32(panelH), tracksCount, tm, o.tracksScroll, winW, winH, viewW, viewH)
-		if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
-			rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
-			o.drawMarqueeCol(&o.marqueeR, tx, ty, float32(textW), float32(panelH), lh, rowY, winW, winH, viewW, viewH)
+		if o.libMode != libModeNC {
+			tm := panelH / lh
+			if tm < 1 {
+				tm = 1
+			}
+			tracksCount := len(o.trackInfos)
+			if o.previewActive {
+				tracksCount = len(o.previewEntries)
+			}
+			drawScrollbar(o, tx+float32(panelW)-sbW, ty, float32(panelH), tracksCount, tm, o.tracksScroll, winW, winH, viewW, viewH)
+			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
+				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
+				o.drawMarqueeCol(&o.marqueeR, tx, ty, float32(textW), float32(panelH), lh, rowY, winW, winH, viewW, viewH)
+			}
 		}
 	}
 }
@@ -87,21 +99,27 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	if maxRows < 1 {
 		maxRows = 1
 	}
-	prevScroll := o.albumsScroll
-	o.albumsScroll = scrollOffset(o.albumsScroll, o.albumCursor, len(o.albums), maxRows)
+
+	// NC mode uses albumCursor/albumsScroll like provider mode.
+	cursor := o.albumCursor
+	scroll := &o.albumsScroll
+	isNC := o.libMode == libModeNC
+
+	prevScroll := *scroll
+	*scroll = scrollOffset(*scroll, cursor, len(o.albums), maxRows)
 
 	// Skip expensive re-render if scroll didn't change — cursor highlight
 	// is drawn as a separate overlay in renderLibraryPanels.
-	if o.albumsScroll == prevScroll && o.albumsTex != 0 && !o.albumsContentDirty {
+	if *scroll == prevScroll && o.albumsTex != 0 && !o.albumsContentDirty {
 		maxTextPx := availableRowTextWidth(maxW)
-		o.refreshCursorMarquee(&o.marqueeL, o.albums, o.albumCursor, o.focusPanel == 0, maxTextPx)
+		o.refreshCursorMarquee(&o.marqueeL, o.albums, cursor, o.focusPanel == 0, maxTextPx)
 		return
 	}
 
 	o.deleteTex(&o.albumsTex)
 	o.marqueeL.invalidate(o)
 
-	start := o.albumsScroll
+	start := *scroll
 	end := start + maxRows
 	if end > len(o.albums) {
 		end = len(o.albums)
@@ -111,12 +129,18 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	for i := start; i < end; i++ {
 		name := o.albums[i]
 		prefix := "  "
-		if name == o.playingAlbum {
+		if isNC {
+			// NC: highlight by file path match.
+			e := o.albumEntries[i]
+			if e.IsNCFile() && e.filePath == o.playingTrack {
+				prefix = "▸ "
+			}
+		} else if name == o.playingAlbum {
 			prefix = "▸ "
 		}
 		line := prefix + name
 		rows = append(rows, listRow{text: line})
-		if i == o.albumCursor && o.focusPanel == 0 {
+		if i == cursor && o.focusPanel == 0 {
 			o.rebuildMarqueeLine(&o.marqueeL, line, maxTextPx)
 		}
 	}
@@ -126,6 +150,12 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 
 func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.tracksDirty = false
+
+	if o.libMode == libModeNC {
+		o.rebuildNCInfoTex(maxW, maxH)
+		o.tracksContentDirty = false
+		return
+	}
 
 	if o.previewActive {
 		o.rebuildPreviewTex(maxW, maxH)
@@ -207,6 +237,85 @@ func (o *Overlay) rebuildPreviewTex(maxW, maxH int) {
 	rows := make([]listRow, end)
 	for i := 0; i < end; i++ {
 		rows[i] = listRow{text: o.previewEntries[i].label}
+	}
+	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
+}
+
+// rebuildNCInfoTex renders the right-panel NC info (file/dir details + buttons).
+func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
+	o.deleteTex(&o.tracksTex)
+	o.marqueeR.invalidate(o)
+
+	var lines []string
+
+	if o.ncInfoIsDir && o.ncInfoDir != "" {
+		// Directory info.
+		baseName := filepath.Base(o.ncInfoDir)
+		if o.ncInfoDir == o.baseDir {
+			baseName = "Music"
+		}
+		lines = append(lines, baseName, "")
+
+		// List directory contents.
+		dirEntries, err := os.ReadDir(o.ncInfoDir)
+		if err == nil {
+			for _, de := range dirEntries {
+				name := de.Name()
+				if strings.HasPrefix(name, ".") || name == ".pmv_meta.json" {
+					continue
+				}
+				if de.IsDir() {
+					lines = append(lines, "  "+name+"/")
+				} else if de.Type().IsRegular() {
+					ext := strings.ToLower(filepath.Ext(name))
+					if player.IsSupportedExt(ext) {
+						lines = append(lines, "  "+name)
+					}
+				}
+			}
+		}
+	} else if o.ncInfoFile != "" {
+		// File info.
+		lines = append(lines, filepath.Base(o.ncInfoFile), "", o.displayTrackPath(o.ncInfoFile), "")
+		if info, err := os.Stat(o.ncInfoFile); err == nil {
+			size := info.Size()
+			if size < 1024 {
+				lines = append(lines, fmt.Sprintf("  %d B", size))
+			} else {
+				lines = append(lines, fmt.Sprintf("  %.1f KB", float64(size)/1024))
+			}
+		}
+	} else {
+		o.tracksTex, o.tracksTexW, o.tracksTexH = 0, 0, 0
+		return
+	}
+
+	// Buttons.
+	lines = append(lines, "")
+	playLine := "  [Play]"
+	if o.focusPanel == 1 && o.ncRight == ncRightPlay {
+		playLine = " >[Play]"
+	}
+	lines = append(lines, playLine)
+
+	if o.ncConfirm {
+		deleteLine := "  [Delete?]"
+		if o.focusPanel == 1 && o.ncRight == ncRightDelete {
+			deleteLine = " >[Delete?]"
+		}
+		lines = append(lines, deleteLine, "  press Enter to confirm", "  press Backspace to cancel")
+	} else if o.ncInfoFile != "" || (o.ncInfoIsDir && o.ncInfoDir != o.baseDir) {
+		deleteLine := "  [Delete]"
+		if o.focusPanel == 1 && o.ncRight == ncRightDelete {
+			deleteLine = " >[Delete]"
+		}
+		lines = append(lines, deleteLine)
+	}
+
+	maxTextPx := availableRowTextWidth(maxW)
+	var rows []listRow
+	for _, line := range lines {
+		rows = append(rows, listRow{text: line})
 	}
 	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
 }

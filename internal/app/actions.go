@@ -69,6 +69,18 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 					a.loadPresetByKey(key)
 				}
 			}
+		} else if a.overlay.IsNCMode() {
+			if a.overlay.Select() && a.pl != nil {
+				path := a.overlay.NCSelectedFilePath()
+				if path != "" {
+					a.playTrack(path, "")
+				}
+				// TODO(2.3): NCPlaySelected for directory playback
+			}
+			if a.overlay.NCConsumeDeleteConfirmed() {
+				// TODO(2.4): delete service
+				slog.Info("nc delete confirmed (not implemented)", "path", a.overlay.NCDeletePath())
+			}
 		} else if a.overlay.Select() && a.lib != nil && a.pl != nil {
 			if a.overlay.FocusPanel() == 0 {
 				if path := a.lib.SelectAlbum(a.overlay.AlbumCursor()); path != "" {

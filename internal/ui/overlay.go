@@ -48,6 +48,23 @@ type PresetCat struct {
 	Presets []string
 }
 
+// libMode selects the library page navigation model.
+type libMode int
+
+const (
+	libModeProvider libMode = iota // Modland/ModArchive album-oriented (default)
+	libModeNC                      // NC-local filesystem browser
+)
+
+// ncRightPanel tracks focus within the NC right panel.
+type ncRightPanel int
+
+const (
+	ncRightInfo   ncRightPanel = iota // info area focused
+	ncRightPlay                       // Play button focused
+	ncRightDelete                     // Delete button focused
+)
+
 // Overlay manages UI and notification rendering.
 type Overlay struct {
 	programText uint32
@@ -114,6 +131,18 @@ type Overlay struct {
 
 	albumsScroll int
 	tracksScroll int
+
+	libMode           libMode // current library navigation mode
+	ncPath            string  // current NC directory path (always under baseDir)
+	ncStack           []navLevel
+	ncRootCursor      int          // saved cursor at NC root for Provider→NC restore
+	ncRootScroll      int          // saved scroll at NC root for Provider→NC restore
+	ncRight           ncRightPanel // which NC right-panel area is focused
+	ncConfirm         bool         // delete confirm dialog active
+	ncDeleteConfirmed bool         // delete was just confirmed (one-shot)
+	ncInfoFile        string       // selected file path for right-panel info
+	ncInfoDir         string       // selected dir path for right-panel info
+	ncInfoIsDir       bool         // selected entry is a directory
 
 	theme        config.Theme
 	transparency float32
@@ -328,6 +357,9 @@ func (o *Overlay) rebuildFace() {
 
 // SetAlbums updates the album list and rebuilds library-root navigation rows.
 func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
+	if o.libMode == libModeNC {
+		return
+	}
 	previousCursor := o.albumCursor
 	listChanged := false
 	// Virtual provider albums (modland/modarchive) are overlay-owned and
