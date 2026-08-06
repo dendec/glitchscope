@@ -128,6 +128,26 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 				0, statusY, float32(o.bottomTexW), float32(o.bottomTexH), winW, winH, viewW, viewH)
 		}
 	}
+
+	// Progress bar under the bottom line.
+	if !o.loading && o.duration > 0 {
+		barH := int(math.Round(float64(winH) / 480))
+		if barH < 2 {
+			barH = 2
+		}
+		tc := o.textColor()
+		r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
+		barY := float32(winH - barH)
+		glDrawFilledRect(o.programRect, 0, barY, float32(winW), float32(barH), r, g, b, 0.15, winW, winH, viewW, viewH)
+		progress := o.position / o.duration
+		if progress > 1 {
+			progress = 1
+		}
+		if progress < 0 {
+			progress = 0
+		}
+		glDrawFilledRect(o.programRect, 0, barY, float32(float64(winW)*progress), float32(barH), r, g, b, 0.7, winW, winH, viewW, viewH)
+	}
 }
 
 // --- Panel drawing helpers ---

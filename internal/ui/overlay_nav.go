@@ -252,14 +252,14 @@ func (o *Overlay) buildRootEntries() []navEntry {
 		dirPath := filepath.Join(o.baseDir, parts[0])
 		if !seenDirs[dirPath] {
 			seenDirs[dirPath] = true
-			entries = append(entries, navEntry{label: parts[0], kind: entryLocalDir, albumIdx: -1, dirPath: dirPath})
+			entries = append(entries, navEntry{label: parts[0] + "/", kind: entryLocalDir, albumIdx: -1, dirPath: dirPath})
 		}
 	}
 	if hasModland && o.online {
-		entries = append(entries, navEntry{label: "Modland", kind: entryModlandRoot, albumIdx: -1})
+		entries = append(entries, navEntry{label: "Modland/", kind: entryModlandRoot, albumIdx: -1})
 	}
 	if o.online {
-		entries = append(entries, navEntry{label: "ModArchive", kind: entryModArchiveRoot, albumIdx: -1})
+		entries = append(entries, navEntry{label: "ModArchive/", kind: entryModArchiveRoot, albumIdx: -1})
 	}
 	return entries
 }
@@ -287,7 +287,7 @@ func (o *Overlay) buildLocalDirEntries(dirPath string) []navEntry {
 		child := filepath.Join(dirPath, parts[0])
 		if !seenDirs[child] {
 			seenDirs[child] = true
-			folders = append(folders, navEntry{label: parts[0], kind: entryLocalDir, albumIdx: -1, dirPath: child})
+			folders = append(folders, navEntry{label: parts[0] + "/", kind: entryLocalDir, albumIdx: -1, dirPath: child})
 		}
 	}
 	sort.Slice(folders, func(x, y int) bool { return folders[x].label < folders[y].label })
@@ -312,7 +312,7 @@ func (o *Overlay) buildFormatEntries() []navEntry {
 	sort.Strings(formats)
 	entries := make([]navEntry, len(formats))
 	for i, f := range formats {
-		entries[i] = navEntry{label: f, kind: entryFormat, format: f, albumIdx: -1}
+		entries[i] = navEntry{label: f + "/", kind: entryFormat, format: f, albumIdx: -1}
 	}
 	return entries
 }
@@ -343,8 +343,6 @@ func (o *Overlay) buildModArchiveEntries(targetURL string) []navEntry {
 	if items, ok := o.modArchiveItems[targetURL]; ok {
 		return o.buildModArchiveEntriesFromItems(targetURL, items)
 	}
-	// Clear error on re-enter to allow retry.
-	delete(o.modArchiveErrors, targetURL)
 	o.requestModArchiveEntries(targetURL)
 	return nil
 }
@@ -375,9 +373,7 @@ func (o *Overlay) applyModArchiveResults() {
 			if result.err != nil {
 				// Don't cache errors — allow retry on next enter.
 				delete(o.modArchiveItems, result.targetURL)
-				o.modArchiveErrors[result.targetURL] = result.err
 			} else {
-				delete(o.modArchiveErrors, result.targetURL)
 				o.modArchiveItems[result.targetURL] = result.items
 			}
 			if o.uiVisible && o.uiPage == PageLibrary {
@@ -412,7 +408,7 @@ func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []moda
 		for _, item := range items {
 			if item.Kind == modarchive.KindDir {
 				entries = append(entries, navEntry{
-					label:    item.CleanName,
+					label:    item.CleanName + "/",
 					kind:     entryModArchiveDir,
 					url:      item.URL,
 					albumIdx: -1,

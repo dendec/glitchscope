@@ -217,3 +217,37 @@ func TestOverlayCloseCancelsWorker(t *testing.T) {
 		t.Fatal("goroutine did not exit after Close()")
 	}
 }
+
+// --- Retry after failed ModArchive fetch ---
+
+func TestModArchiveRetryAfterError(t *testing.T) {
+	url := "http://modarchive.textfiles.com/2014/IT/"
+	o := &Overlay{
+		modArchiveItems:   make(map[string][]modarchive.DirItem),
+		modArchivePending: make(map[string]bool),
+		modArchiveResults: make(chan modArchiveResult, 8),
+		closeCh:           make(chan struct{}),
+	}
+	defer o.Close()
+
+	// Simulate a failed fetch result.
+	o.modArchiveResults <- modArchiveResult{targetURL: url, err: errors.New("network error")}
+	o.applyModArchiveResults()
+
+	// Error should not be cached — items should be absent.
+	if _, ok := o.modArchiveItems[url]; ok {
+		t.Fatal("error result should not be cached in modArchiveItems")
+	}
+	if o.modArchivePending[url] {
+		t.Fatal("pending flag should be cleared after result")
+	}
+
+	// Re-enter: should trigger a new async request.
+	entries := o.buildModArchiveEntries(url)
+	if entries != nil {
+		t.Fatalf("expected nil entries before fetch completes, got %d", len(entries))
+	}
+	if !o.modArchivePending[url] {
+		t.Fatal("retry should have set modArchivePending")
+	}
+}

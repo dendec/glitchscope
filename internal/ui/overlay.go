@@ -149,7 +149,6 @@ type Overlay struct {
 	online             bool
 	closeInjectPending bool
 	modArchiveItems    map[string][]modarchive.DirItem
-	modArchiveErrors   map[string]error
 	modArchivePending  map[string]bool
 	modArchiveResults  chan modArchiveResult
 	closeCh            chan struct{} // closed by Close() to unblock goroutines
@@ -161,7 +160,6 @@ func New() *Overlay {
 		programText:       glCreateTextProgram(),
 		programRect:       glCreateRectProgram(),
 		modArchiveItems:   make(map[string][]modarchive.DirItem),
-		modArchiveErrors:  make(map[string]error),
 		modArchivePending: make(map[string]bool),
 		modArchiveResults: make(chan modArchiveResult, 8),
 		closeCh:           make(chan struct{}),
