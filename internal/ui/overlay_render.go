@@ -254,7 +254,9 @@ func drawListColumn(o *Overlay, x, y, w, h float32, t listTex, bordered bool, wi
 	if t.tex == 0 {
 		return
 	}
-	glDrawOverlayText(o.programText, t.tex, 1, x, y, float32(t.w), float32(t.h), winW, winH, viewW, viewH)
+	glDrawOverlayTextClipped(o.programText, t.tex, 1,
+		x, y, float32(t.w), float32(t.h), x, y, w, h,
+		winW, winH, viewW, viewH)
 }
 
 func (o *Overlay) rebuildStatsTex() {

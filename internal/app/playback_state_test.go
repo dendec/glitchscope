@@ -28,3 +28,23 @@ func TestPlaybackStateAdvancesWithinVirtualPlaylist(t *testing.T) {
 		t.Fatal("advance returned a track after the virtual playlist ended")
 	}
 }
+
+func TestPlaybackStateManualNavigationUsesActivePlaylist(t *testing.T) {
+	state := playbackState{
+		pl:            &player.Player{},
+		lib:           &player.Library{},
+		playlist:      []string{"folder:first.mod", "folder:second.mod", "folder:third.mod"},
+		playlistIdx:   0,
+		playlistAlbum: "folder",
+	}
+
+	path, album, ok := state.nextTrack()
+	if !ok || path != "folder:second.mod" || album != "folder" {
+		t.Fatalf("nextTrack returned (%q, %q, %v), want second playlist track", path, album, ok)
+	}
+
+	path, album, ok = state.previousTrack()
+	if !ok || path != "folder:first.mod" || album != "folder" {
+		t.Fatalf("previousTrack returned (%q, %q, %v), want first playlist track", path, album, ok)
+	}
+}

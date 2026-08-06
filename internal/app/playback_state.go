@@ -127,6 +127,14 @@ func (s *playbackState) previousTrack() (string, string, bool) {
 	if s.lib == nil || s.pl == nil {
 		return "", "", false
 	}
+	if len(s.playlist) > 0 {
+		if s.playlistIdx <= 0 {
+			s.playlistIdx = len(s.playlist) - 1
+		} else {
+			s.playlistIdx--
+		}
+		return s.playlist[s.playlistIdx], s.playlistAlbum, true
+	}
 	path := s.lib.TrackPrev()
 	if path == "" {
 		return "", "", false
@@ -137,6 +145,13 @@ func (s *playbackState) previousTrack() (string, string, bool) {
 func (s *playbackState) nextTrack() (string, string, bool) {
 	if s.lib == nil || s.pl == nil {
 		return "", "", false
+	}
+	if len(s.playlist) > 0 {
+		s.playlistIdx++
+		if s.playlistIdx >= len(s.playlist) {
+			s.playlistIdx = 0
+		}
+		return s.playlist[s.playlistIdx], s.playlistAlbum, true
 	}
 	path := s.lib.TrackNext()
 	if path == "" {

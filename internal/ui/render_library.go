@@ -32,8 +32,9 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh)
 			o.drawCursorHighlight(px, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 		}
-		glDrawOverlayText(o.programText, o.albumsTex, 1,
-			px, py, float32(o.albumsTexW), float32(o.albumsTexH), winW, winH, viewW, viewH)
+		glDrawOverlayTextClipped(o.programText, o.albumsTex, 1,
+			px, py, float32(o.albumsTexW), float32(o.albumsTexH),
+			px, py, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		am := panelH / lh
 		if am < 1 {
 			am = 1
@@ -64,8 +65,9 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 				o.drawCursorHighlight(tx, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 			}
 		}
-		glDrawOverlayText(o.programText, o.tracksTex, 1,
-			tx, ty, float32(o.tracksTexW), float32(o.tracksTexH), winW, winH, viewW, viewH)
+		glDrawOverlayTextClipped(o.programText, o.tracksTex, 1,
+			tx, ty, float32(o.tracksTexW), float32(o.tracksTexH),
+			tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		if !o.isNC() {
 			tm := panelH / lh
 			if tm < 1 {
