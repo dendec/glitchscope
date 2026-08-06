@@ -48,12 +48,13 @@ type PresetCat struct {
 	Presets []string
 }
 
-// libMode selects the library page navigation model.
-type libMode int
+// navCtx selects the navigation model for a stack level.
+type navCtx int
 
 const (
-	libModeProvider libMode = iota // Modland/ModArchive album-oriented (default)
-	libModeNC                      // NC-local filesystem browser
+	ctxNC      navCtx = iota // NC-local filesystem browser (dirPath set)
+	ctxLibrary               // library root: local albums grouped by directory
+	ctxCatalog               // remote catalog level: formats / albums / modarchive dirs
 )
 
 // ncRightPanel tracks focus within the NC right panel.
@@ -83,9 +84,6 @@ type Overlay struct {
 	baseDir          string
 
 	allAlbums      []player.Album
-	rootEntries    []navEntry
-	rootCursor     int
-	rootScroll     int
 	navStack       []navLevel
 	albumEntries   []navEntry
 	albums         []string
@@ -132,11 +130,6 @@ type Overlay struct {
 	albumsScroll int
 	tracksScroll int
 
-	libMode           libMode // current library navigation mode
-	ncPath            string  // current NC directory path (always under baseDir)
-	ncStack           []navLevel
-	ncRootCursor      int          // saved cursor at NC root for Provider→NC restore
-	ncRootScroll      int          // saved scroll at NC root for Provider→NC restore
 	ncRight           ncRightPanel // which NC right-panel area is focused
 	ncConfirm         bool         // delete confirm dialog active
 	ncDeleteConfirmed bool         // delete was just confirmed (one-shot)
@@ -178,34 +171,20 @@ type Overlay struct {
 	online             bool
 	closeInjectPending bool
 	modArchiveItems    map[string][]modarchive.DirItem
-	modArchivePending  map[string]bool
-	modArchiveResults  chan modArchiveResult
-	closeCh            chan struct{} // closed by Close() to unblock goroutines
 }
 
-// New creates an Overlay.
+// New creates an Overlay. The stack always has a root level; it starts as
+// the library root and is replaced by switchToNC/switchToLibrary.
 func New() *Overlay {
 	return &Overlay{
-		programText:       glCreateTextProgram(),
-		programRect:       glCreateRectProgram(),
-		modArchiveItems:   make(map[string][]modarchive.DirItem),
-		modArchivePending: make(map[string]bool),
-		modArchiveResults: make(chan modArchiveResult, 8),
-		closeCh:           make(chan struct{}),
+		programText:     glCreateTextProgram(),
+		programRect:     glCreateRectProgram(),
+		modArchiveItems: make(map[string][]modarchive.DirItem),
+		navStack:        []navLevel{{ctx: ctxLibrary}},
 	}
 }
 
 func (o *Overlay) Close() {
-	close(o.closeCh)
-	// Drain pending results so goroutines don't leak.
-	for {
-		select {
-		case <-o.modArchiveResults:
-		default:
-			goto drained
-		}
-	}
-drained:
 	o.notif.Hide()
 	o.deleteTex(&o.albumsTex)
 	o.deleteTex(&o.tracksTex)
@@ -357,7 +336,7 @@ func (o *Overlay) rebuildFace() {
 
 // SetAlbums updates the album list and rebuilds library-root navigation rows.
 func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
-	if o.libMode == libModeNC {
+	if o.isNC() {
 		return
 	}
 	previousCursor := o.albumCursor
@@ -378,16 +357,17 @@ func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
 	}
 	if listChanged {
 		o.allAlbums = albums
-		o.rootEntries = o.buildRootEntries()
-		// Library rescanned — any drill-down position is now stale.
-		o.navStack = nil
+		// Library rescanned — reset to a fresh library root; any drill-down
+		// position is now stale.
+		o.navStack = []navLevel{{ctx: ctxLibrary, entries: o.buildRootEntries()}}
 	}
 	// While the UI is open, the overlay cursor is independent of the
 	// library's currently playing album. When hidden, keep it synchronized.
 	// Only meaningful at the root level; a cursor deep in a modland
 	// drill-down is left untouched.
-	if (listChanged || !o.uiVisible) && len(o.navStack) == 0 {
+	if (listChanged || !o.uiVisible) && len(o.navStack) == 1 {
 		o.albumCursor = o.rootIndexOf(cursor)
+		o.navStack[0].cursor = o.albumCursor
 	}
 	if listChanged {
 		o.refreshAlbumLabels()
@@ -484,20 +464,47 @@ func (o *Overlay) SetOnline(v bool) {
 		return
 	}
 	o.online = v
-	slog.Info("overlay connectivity changed", "online", v, "mode", o.libMode, "nc_path", o.ncPath, "base_dir", o.baseDir)
-	if o.libMode == libModeNC && o.ncPath == o.baseDir {
-		o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
-		o.albums = labelsOf(o.albumEntries)
-		o.albumCursor = clampCursor(o.albumCursor, len(o.albumEntries))
+	slog.Info("overlay connectivity changed", "online", v, "nc_dir", o.ncDir(), "base_dir", o.baseDir)
+	if o.isNC() && o.ncDir() == o.baseDir {
+		lvl := &o.navStack[len(o.navStack)-1]
+		lvl.entries = o.buildNCDirectoryEntries(o.baseDir)
+		lvl.cursor = clampCursor(lvl.cursor, len(lvl.entries))
+		o.albumEntries = lvl.entries
+		o.albums = labelsOf(lvl.entries)
+		o.albumCursor = lvl.cursor
 		o.albumsDirty = true
 		o.albumsContentDirty = true
 		o.refreshNCPreview()
 		return
 	}
-	if len(o.navStack) == 0 {
-		o.rootEntries = o.buildRootEntries()
+	// Library root — refresh it so local listings stay current.
+	if top := o.topLevel(); top.ctx == ctxLibrary {
+		top.entries = o.buildRootEntries()
+		top.cursor = clampCursor(top.cursor, len(top.entries))
+		o.albumEntries = top.entries
+		o.albums = labelsOf(top.entries)
+		o.albumCursor = top.cursor
 		o.syncPanels()
 	}
 }
 
 func (o *Overlay) SettingsRows() []SettingRow { return o.settingsRows }
+
+// NCSync rebuilds NC entries for the current path after external changes
+// (e.g. file deletion), preserving navigation stack and cursor position.
+func (o *Overlay) NCSync() {
+	if !o.isNC() {
+		return
+	}
+	lvl := &o.navStack[len(o.navStack)-1]
+	lvl.entries = o.buildNCDirectoryEntries(lvl.dirPath)
+	lvl.cursor = clampCursor(lvl.cursor, len(lvl.entries))
+	o.albumEntries = lvl.entries
+	o.albums = labelsOf(lvl.entries)
+	o.albumCursor = lvl.cursor
+	o.albumsDirty = true
+	o.albumsContentDirty = true
+	o.tracksDirty = true
+	o.tracksContentDirty = true
+	o.refreshNCPreview()
+}

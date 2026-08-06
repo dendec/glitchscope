@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -25,7 +26,6 @@ type scrollHold struct {
 // gamepadUp/gamepadDown report D-Pad state (SDL button events don't auto-repeat).
 func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	o.notif.Update(o.uiVisible)
-	o.applyModArchiveResults()
 
 	if !o.uiVisible || !o.panelEntered {
 		return
@@ -174,7 +174,7 @@ func (o *Overlay) cursorUp1() {
 		return
 	}
 	// --- Library page ---
-	if o.libMode == libModeNC {
+	if o.isNC() {
 		if o.focusPanel == 0 {
 			if o.albumCursor > 0 {
 				o.albumCursor--
@@ -249,7 +249,7 @@ func (o *Overlay) cursorDown1() {
 		return
 	}
 	// --- Library page ---
-	if o.libMode == libModeNC {
+	if o.isNC() {
 		if o.focusPanel == 0 {
 			if o.albumCursor < len(o.albums)-1 {
 				o.albumCursor++
@@ -306,7 +306,7 @@ func (o *Overlay) FocusLeft() {
 	case PagePresets:
 		o.focusPanelBy(-1, func() { o.presetsDirty = true })
 	default: // Library
-		if o.libMode == libModeNC {
+		if o.isNC() {
 			if o.focusPanel == 0 {
 				return // already at leftmost
 			}
@@ -340,7 +340,7 @@ func (o *Overlay) FocusRight() {
 	case PagePresets:
 		o.focusPanelBy(1, func() { o.presetsDirty = true })
 	default: // Library
-		if o.libMode == libModeNC {
+		if o.isNC() {
 			if o.focusPanel == 0 {
 				// left → Play
 				o.focusPanel = 1
@@ -367,7 +367,7 @@ func (o *Overlay) backToLeftPanel(markDirty func()) bool {
 		return false
 	}
 	o.focusPanel = 0
-	if o.libMode == libModeNC {
+	if o.isNC() {
 		o.ncRight = ncRightInfo
 	}
 	markDirty()
@@ -415,25 +415,30 @@ func (o *Overlay) Select() bool {
 		return o.currentCategory() != nil && len(o.currentCategory().Presets) > 0
 	}
 
-	// Album panel selected: drill into a non-leaf entry (Modland/ModArchive root or a
-	// format/directory bucket), or switch to the tracks panel for a leaf album.
-	if o.libMode == libModeNC {
-		return o.ncSelect()
-	}
+	// Album panel selected: drill into a non-leaf entry (NC dir, catalog
+	// root/format/directory, local folder) or switch to the tracks panel
+	// for a leaf album. One dispatch — entry kinds drive everything.
 	if o.focusPanel == 0 {
 		if e := o.currentEntry(); e != nil {
-			switch e.kind {
-			case entryModlandRoot:
-				return o.enterModland()
-			case entryFormat:
-				o.pushLevel(o.buildAlbumsInFormatEntries(e.format))
+			switch {
+			case e.IsNCDirectory():
+				o.ncEnterDir(e.dirPath)
 				return false
-			case entryLocalDir:
-				o.pushLevel(o.buildLocalDirEntries(e.dirPath))
+			case e.IsNCFile():
+				return true // play the file
+			case e.kind == entryModlandRoot:
+				o.pushLevel(navLevel{ctx: ctxCatalog, entries: o.buildFormatEntries()})
 				return false
-			case entryModArchiveRoot:
-				return o.enterModArchive()
-			case entryModArchiveDir:
+			case e.kind == entryModArchiveRoot:
+				o.pushLevel(navLevel{ctx: ctxCatalog, entries: o.buildModArchiveEntries(modarchive.BaseURL)})
+				return false
+			case e.kind == entryFormat:
+				o.pushLevel(navLevel{ctx: ctxCatalog, entries: o.buildAlbumsInFormatEntries(e.format)})
+				return false
+			case e.kind == entryLocalDir:
+				o.pushLevel(navLevel{ctx: ctxLibrary, entries: o.buildLocalDirEntries(e.dirPath)})
+				return false
+			case e.kind == entryModArchiveDir:
 				entries := o.buildModArchiveEntries(e.url)
 				if len(entries) == 1 && entries[0].kind == entryModArchiveAlbum {
 					// Keep the parent directory list visible and turn the selected
@@ -448,13 +453,37 @@ func (o *Overlay) Select() bool {
 					return false
 				}
 				if len(entries) > 0 {
-					o.pushLevel(entries)
+					o.pushLevel(navLevel{ctx: ctxCatalog, entries: entries})
 					return false
 				}
+				return false
 			}
 		}
+		// Leaf album (or unknown entry) — move to the tracks panel.
 		o.focusPanel = 1
 		o.tracksDirty = true
+		return false
+	}
+	// Right panel.
+	if o.isNC() {
+		// NC focus machine: Play / Delete buttons.
+		switch o.ncRight {
+		case ncRightPlay:
+			return true // play file or directory (app handles both)
+		case ncRightDelete:
+			if o.ncConfirm {
+				// Delete confirmed — app layer handles actual deletion.
+				o.ncConfirm = false
+				o.ncDeleteConfirmed = true
+				o.tracksDirty = true
+				o.tracksContentDirty = true
+				return false
+			}
+			o.ncConfirm = true
+			o.tracksDirty = true
+			o.tracksContentDirty = true
+			return false
+		}
 		return false
 	}
 	return true // track panel — play the track
@@ -502,7 +531,7 @@ func (o *Overlay) Back() {
 	}
 
 	// NC: cancel delete confirm dialog — focus stays on Delete button.
-	if o.libMode == libModeNC && o.ncConfirm {
+	if o.isNC() && o.ncConfirm {
 		o.ncConfirm = false
 		o.tracksDirty = true
 		o.tracksContentDirty = true
@@ -511,42 +540,35 @@ func (o *Overlay) Back() {
 	if o.backToLeftPanel(func() { o.albumsDirty = true; o.tracksDirty = true }) {
 		return
 	}
-	// NC mode: backspace on left panel = go up one directory.
-	if o.libMode == libModeNC {
-		o.ncBack()
-		return
-	}
-	// Already on the left panel: go up one navigation level (e.g. out of a
-	// modland format/album drill-down) before closing the UI.
+	// On the left panel: go up one navigation level.
 	if o.popLevel() {
 		return
 	}
-	// Provider mode at root — switch back to NC mode instead of closing.
-	if o.libMode == libModeProvider {
-		o.ncSwitchToNC()
+	// At a root level.
+	if o.isNC() {
+		// NC root — close the UI.
+		if o.uiVisible {
+			o.uiVisible = false
+			o.panelEntered = false
+			o.focusPanel = 0
+			o.closeInjectPending = true
+		}
 		return
 	}
-	// Close UI.
-	if o.uiVisible {
-		o.uiVisible = false
-		o.panelEntered = false
-		o.focusPanel = 0
-		o.closeInjectPending = true
-	}
+	// Library root — switch to the NC browser.
+	o.switchToNC(o.baseDir)
 }
 
 func (o *Overlay) TrackCursor() int { return o.trackCursor }
 
 func (o *Overlay) FocusPanel() int { return o.focusPanel }
 
-func (o *Overlay) LibMode() libMode { return o.libMode }
-
-func (o *Overlay) IsNCMode() bool { return o.libMode == libModeNC }
+func (o *Overlay) IsNCMode() bool { return o.isNC() }
 
 // NCSelectedFilePath returns the file path for the selected NC file entry,
 // or empty string if not applicable.
 func (o *Overlay) NCSelectedFilePath() string {
-	if o.libMode != libModeNC {
+	if !o.isNC() {
 		return ""
 	}
 	e := o.currentEntry()
@@ -563,7 +585,7 @@ func (o *Overlay) NCSelectedFilePath() string {
 // For a file: returns the file path. For a directory: returns the dirPath.
 // Returns empty string if nothing to play.
 func (o *Overlay) NCPlaySelected() string {
-	if o.libMode != libModeNC {
+	if !o.isNC() {
 		return ""
 	}
 	e := o.currentEntry()
@@ -608,54 +630,10 @@ func (o *Overlay) NCConsumeDeleteConfirmed() bool {
 	return true
 }
 
-// ncSelect handles Enter/Select in NC mode.
-// Returns true when a file should be played.
-func (o *Overlay) ncSelect() bool {
-	if o.focusPanel == 0 {
-		e := o.currentEntry()
-		if e == nil {
-			return false
-		}
-		switch {
-		case e.IsNCDirectory():
-			o.ncEnterDir(e.dirPath)
-			return false
-		case e.IsNCFile():
-			return true // play the file
-		case e.kind == entryModlandRoot:
-			o.ncSwitchToProvider()
-			return o.enterModland()
-		case e.kind == entryModArchiveRoot:
-			o.ncSwitchToProvider()
-			return o.enterModArchive()
-		}
-		return false
-	}
-	// Right panel.
-	switch o.ncRight {
-	case ncRightPlay:
-		return true // play file or directory (app handles both)
-	case ncRightDelete:
-		if o.ncConfirm {
-			// Delete confirmed — app layer handles actual deletion.
-			o.ncConfirm = false
-			o.ncDeleteConfirmed = true
-			o.tracksDirty = true
-			o.tracksContentDirty = true
-			return false
-		}
-		o.ncConfirm = true
-		o.tracksDirty = true
-		o.tracksContentDirty = true
-		return false
-	}
-	return false
-}
-
 // NCDeletePath returns the path to delete for the current NC selection.
 // Empty string if nothing to delete.
 func (o *Overlay) NCDeletePath() string {
-	if o.libMode != libModeNC {
+	if !o.isNC() {
 		return ""
 	}
 	e := o.currentEntry()

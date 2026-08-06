@@ -58,7 +58,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 			drawPanelBorder(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		}
 		// NC right panel: no cursor highlight, no scrollbar, no marquee.
-		if o.libMode != libModeNC {
+		if !o.isNC() {
 			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
 				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
 				o.drawCursorHighlight(tx, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
@@ -66,7 +66,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		}
 		glDrawOverlayText(o.programText, o.tracksTex, 1,
 			tx, ty, float32(o.tracksTexW), float32(o.tracksTexH), winW, winH, viewW, viewH)
-		if o.libMode != libModeNC {
+		if !o.isNC() {
 			tm := panelH / lh
 			if tm < 1 {
 				tm = 1
@@ -103,7 +103,6 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	// NC mode uses albumCursor/albumsScroll like provider mode.
 	cursor := o.albumCursor
 	scroll := &o.albumsScroll
-	isNC := o.libMode == libModeNC
 
 	prevScroll := *scroll
 	*scroll = scrollOffset(*scroll, cursor, len(o.albums), maxRows)
@@ -129,7 +128,7 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	for i := start; i < end; i++ {
 		name := o.albums[i]
 		prefix := "  "
-		if isNC {
+		if o.isNC() {
 			// NC: highlight by file path match.
 			e := o.albumEntries[i]
 			if e.IsNCFile() && e.filePath == o.playingTrack {
@@ -151,7 +150,7 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.tracksDirty = false
 
-	if o.libMode == libModeNC {
+	if o.isNC() {
 		o.rebuildNCInfoTex(maxW, maxH)
 		o.tracksContentDirty = false
 		return

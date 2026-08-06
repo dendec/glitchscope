@@ -1,13 +1,11 @@
 package ui
 
 import (
-	"errors"
 	"image"
 	"image/color"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/dendec/pmv/internal/player"
@@ -73,11 +71,12 @@ func TestTrackTitleKeepsExtension(t *testing.T) {
 
 func TestSelectModArchiveAlbumKeepsParentEntries(t *testing.T) {
 	targetURL := "http://modarchive.textfiles.com/2014/IT/J/"
+	entries := []navEntry{
+		{label: "2014", kind: entryModArchiveDir, url: targetURL},
+		{label: "other", kind: entryModArchiveDir, url: "other/"},
+	}
 	o := &Overlay{
-		rootEntries: []navEntry{
-			{label: "2014", kind: entryModArchiveDir, url: targetURL},
-			{label: "other", kind: entryModArchiveDir, url: "other/"},
-		},
+		navStack: []navLevel{{ctx: ctxCatalog, entries: entries}},
 		albumEntries: []navEntry{
 			{label: "2014", kind: entryModArchiveDir, url: targetURL},
 			{label: "other", kind: entryModArchiveDir, url: "other/"},
@@ -191,65 +190,35 @@ func TestShadow_zeroRadius(t *testing.T) {
 	}
 }
 
-// --- Overlay.Close cancels goroutines ---
+// --- ModArchive listings resolve synchronously from the local cache ---
 
-func TestOverlayCloseCancelsWorker(t *testing.T) {
-	o := &Overlay{
-		modArchivePending: make(map[string]bool),
-		modArchiveResults: make(chan modArchiveResult, 8),
-		closeCh:           make(chan struct{}),
-	}
-
-	done := make(chan struct{})
-	go func() {
-		r := modArchiveResult{targetURL: "x", err: errors.New("timeout")}
-		select {
-		case o.modArchiveResults <- r:
-		case <-o.closeCh:
-		}
-		close(done)
-	}()
-
-	o.Close()
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("goroutine did not exit after Close()")
-	}
-}
-
-// --- Retry after failed ModArchive fetch ---
-
-func TestModArchiveRetryAfterError(t *testing.T) {
+func TestModArchiveSyncFromCache(t *testing.T) {
 	url := "http://modarchive.textfiles.com/2014/IT/"
 	o := &Overlay{
-		modArchiveItems:   make(map[string][]modarchive.DirItem),
-		modArchivePending: make(map[string]bool),
-		modArchiveResults: make(chan modArchiveResult, 8),
-		closeCh:           make(chan struct{}),
+		baseDir: t.TempDir(),
+		modArchiveItems: map[string][]modarchive.DirItem{
+			url: {{
+				Name:      "j-61m_-_kilobyte_chillout.it.zip",
+				URL:       url + "j-61m_-_kilobyte_chillout.it.zip",
+				Kind:      modarchive.KindFile,
+				CleanName: "j-61m_-_kilobyte_chillout.it",
+			}},
+		},
 	}
 	defer o.Close()
 
-	// Simulate a failed fetch result.
-	o.modArchiveResults <- modArchiveResult{targetURL: url, err: errors.New("network error")}
-	o.applyModArchiveResults()
-
-	// Error should not be cached — items should be absent.
-	if _, ok := o.modArchiveItems[url]; ok {
-		t.Fatal("error result should not be cached in modArchiveItems")
-	}
-	if o.modArchivePending[url] {
-		t.Fatal("pending flag should be cleared after result")
-	}
-
-	// Re-enter: should trigger a new async request.
+	// First access resolves to a leaf album immediately — no async, no retry.
 	entries := o.buildModArchiveEntries(url)
-	if entries != nil {
-		t.Fatalf("expected nil entries before fetch completes, got %d", len(entries))
+	if len(entries) != 1 || entries[0].kind != entryModArchiveAlbum {
+		t.Fatalf("expected one resolved album, got %#v", entries)
 	}
-	if !o.modArchivePending[url] {
-		t.Fatal("retry should have set modArchivePending")
+	if len(o.allAlbums) != 1 {
+		t.Fatalf("expected album appended to allAlbums, got %d", len(o.allAlbums))
+	}
+
+	// Missing listings resolve to nil — empty catalog, honest entry.
+	if o.buildModArchiveEntries("http://example.invalid/") != nil {
+		t.Fatal("uncached listing should resolve to nil")
 	}
 }
 
@@ -279,16 +248,10 @@ func ncTestOverlay(t *testing.T) (*Overlay, string) {
 		t.Fatal(err)
 	}
 	o := &Overlay{
-		baseDir:           dir,
-		libMode:           libModeNC,
-		ncPath:            dir,
-		modArchiveItems:   make(map[string][]modarchive.DirItem),
-		modArchivePending: make(map[string]bool),
-		modArchiveResults: make(chan modArchiveResult, 8),
-		closeCh:           make(chan struct{}),
+		baseDir:         dir,
+		modArchiveItems: make(map[string][]modarchive.DirItem),
 	}
-	o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
-	o.albums = labelsOf(o.albumEntries)
+	o.switchToNC(dir)
 	return o, dir
 }
 
@@ -333,8 +296,8 @@ func TestNCEnterDirAndBack(t *testing.T) {
 	// Enter sub1.
 	sub1 := filepath.Join(dir, "sub1")
 	o.ncEnterDir(sub1)
-	if o.ncPath != sub1 {
-		t.Fatalf("ncPath = %q, want %q", o.ncPath, sub1)
+	if o.ncDir() != sub1 {
+		t.Fatalf("ncDir = %q, want %q", o.ncDir(), sub1)
 	}
 	if len(o.albumEntries) != 3 { // .., sub2/, track2.mod
 		t.Fatalf("expected 3 entries in sub1, got %d: %v", len(o.albumEntries), o.albums)
@@ -345,8 +308,8 @@ func TestNCEnterDirAndBack(t *testing.T) {
 	if o.albumCursor != 0 {
 		t.Fatalf("cursor should be 0 after enter, got %d", o.albumCursor)
 	}
-	if len(o.ncStack) != 1 {
-		t.Fatalf("ncStack depth = %d, want 1", len(o.ncStack))
+	if len(o.navStack) != 2 {
+		t.Fatalf("navStack depth = %d, want 2 (NC root + sub1)", len(o.navStack))
 	}
 
 	// Enter sub2.
@@ -357,30 +320,30 @@ func TestNCEnterDirAndBack(t *testing.T) {
 	}
 
 	// Back to sub1.
-	if !o.ncBack() {
-		t.Fatal("ncBack should return true")
+	if !o.popLevel() {
+		t.Fatal("popLevel should return true")
 	}
-	if o.ncPath != sub1 {
-		t.Fatalf("after back: ncPath = %q, want %q", o.ncPath, sub1)
+	if o.ncDir() != sub1 {
+		t.Fatalf("after back: ncDir = %q, want %q", o.ncDir(), sub1)
 	}
-	if len(o.ncStack) != 1 {
-		t.Fatalf("ncStack depth = %d, want 1", len(o.ncStack))
-	}
-
-	// Back to root.
-	if !o.ncBack() {
-		t.Fatal("ncBack should return true")
-	}
-	if o.ncPath != dir {
-		t.Fatalf("after back: ncPath = %q, want %q", o.ncPath, dir)
-	}
-	if len(o.ncStack) != 0 {
-		t.Fatalf("ncStack depth = %d, want 0", len(o.ncStack))
+	if len(o.navStack) != 2 {
+		t.Fatalf("navStack depth = %d, want 2", len(o.navStack))
 	}
 
-	// Back at root = no-op.
-	if o.ncBack() {
-		t.Fatal("ncBack at root should return false")
+	// Back to NC root.
+	if !o.popLevel() {
+		t.Fatal("popLevel should return true")
+	}
+	if o.ncDir() != dir {
+		t.Fatalf("after back: ncDir = %q, want %q", o.ncDir(), dir)
+	}
+	if len(o.navStack) != 1 {
+		t.Fatalf("navStack depth = %d, want 1 (NC root)", len(o.navStack))
+	}
+
+	// Back at NC root = not poppable.
+	if o.popLevel() {
+		t.Fatal("popLevel at NC root should return false")
 	}
 }
 
@@ -469,46 +432,59 @@ func TestNCDeleteConfirm(t *testing.T) {
 	}
 }
 
-func TestNCProviderRoundTripPreservesState(t *testing.T) {
+func TestNCCatalogRoundTrip(t *testing.T) {
 	o, dir := ncTestOverlay(t)
 	defer o.Close()
-	o.online = true
+	o.SetOnline(true)
 	o.panelEntered = true
 
-	// At NC root, set some scroll position.
-	o.albumCursor = 0
-	o.albumsScroll = 3
+	// Catalog rows sit at the NC root: [sub1/, track3.s3m, Modland/, ModArchive/].
+	if len(o.albumEntries) != 4 {
+		t.Fatalf("expected 4 NC root entries, got %d: %v", len(o.albumEntries), o.albums)
+	}
+	modlandIdx := 2
+	o.albumCursor = modlandIdx
 
-	// Switch to provider (simulates selecting Modland).
-	o.ncSwitchToProvider()
-	if o.libMode != libModeProvider {
-		t.Fatal("should be in provider mode")
+	// Enter Modland — one push, no mode switch; NC root stays under it.
+	if o.Select() {
+		t.Fatal("catalog entry should not start playback")
 	}
-
-	// Return to NC.
-	o.ncSwitchToNC()
-	if o.libMode != libModeNC {
-		t.Fatal("should be back in NC mode")
+	if len(o.navStack) != 2 {
+		t.Fatalf("navStack depth = %d, want 2 (NC root + formats)", len(o.navStack))
 	}
-	if o.ncPath != dir {
-		t.Fatalf("ncPath = %q, want %q", o.ncPath, dir)
-	}
-	if o.albumsScroll != 3 {
-		t.Fatalf("scroll not restored: albumsScroll=%d, want 3", o.albumsScroll)
+	if o.isNC() {
+		t.Fatal("catalog level should not be NC")
 	}
 
-	// Navigate into sub1, then back to root, switch to provider, return.
-	sub1 := filepath.Join(dir, "sub1")
-	o.ncEnterDir(sub1)
-	o.albumCursor = 1
-	o.ncBack()
-	o.albumsScroll = 1
-	o.ncSwitchToProvider()
-	o.ncSwitchToNC()
-	if o.albumsScroll != 1 {
-		t.Fatalf("scroll not restored after round-trip: albumsScroll=%d, want 1", o.albumsScroll)
+	// One Back returns straight to the NC root.
+	o.Back()
+	if len(o.navStack) != 1 || !o.isNC() {
+		t.Fatalf("Back should return to NC root, got depth=%d isNC=%v", len(o.navStack), o.isNC())
 	}
-	if len(o.ncStack) != 0 {
-		t.Fatalf("ncStack should be empty at root, got depth %d", len(o.ncStack))
+	if o.ncDir() != dir {
+		t.Fatalf("ncDir = %q, want %q", o.ncDir(), dir)
+	}
+
+	// Back at NC root closes the UI.
+	o.uiVisible = true
+	o.Back()
+	if o.uiVisible {
+		t.Fatal("Back at NC root should close the UI")
+	}
+}
+
+func TestNCBackFromLibraryRoot(t *testing.T) {
+	o, dir := ncTestOverlay(t)
+	defer o.Close()
+	o.panelEntered = true
+
+	// Library root → Back → NC root.
+	o.switchToLibrary()
+	if o.isNC() {
+		t.Fatal("library root should not be NC")
+	}
+	o.Back()
+	if !o.isNC() || o.ncDir() != dir {
+		t.Fatalf("Back at library root should switch to NC root, got isNC=%v ncDir=%q", o.isNC(), o.ncDir())
 	}
 }
