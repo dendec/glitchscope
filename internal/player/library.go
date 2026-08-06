@@ -37,9 +37,20 @@ type Library struct {
 // NewLibrary scans rootDir for leaf dirs containing audio files.
 func NewLibrary(rootDir string) (*Library, error) {
 	lib := &Library{albumIdx: -1, trackIdx: -1}
+	lib.Albums = scanRoot(rootDir)
+	if len(lib.Albums) > 0 {
+		lib.albumIdx = 0
+		if len(lib.Albums[0].Tracks) > 0 {
+			lib.trackIdx = 0
+		}
+	}
+	return lib, nil
+}
 
+// scanRoot walks rootDir and returns sorted Albums from the filesystem.
+func scanRoot(rootDir string) []Album {
 	dirTracks := map[string][]string{}
-	err := filepath.Walk(rootDir, func(path string, fi os.FileInfo, err error) error {
+	_ = filepath.Walk(rootDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return nil //nolint:nilerr // skip inaccessible — intentional
 		}
@@ -56,32 +67,24 @@ func NewLibrary(rootDir string) (*Library, error) {
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
 	var dirs []string
 	for d := range dirTracks {
 		dirs = append(dirs, d)
 	}
 	sort.Strings(dirs)
+
+	albums := make([]Album, 0, len(dirs))
 	for _, d := range dirs {
 		tracks := dirTracks[d]
 		sort.Strings(tracks)
-		lib.Albums = append(lib.Albums, Album{
+		albums = append(albums, Album{
 			Name:   filepath.Base(d),
 			Path:   d,
 			Tracks: tracks,
 		})
 	}
-
-	if len(lib.Albums) > 0 {
-		lib.albumIdx = 0
-		if len(lib.Albums[0].Tracks) > 0 {
-			lib.trackIdx = 0
-		}
-	}
-	return lib, nil
+	return albums
 }
 
 func (l *Library) AlbumNext() string {
@@ -307,6 +310,37 @@ func (l *Library) AddVirtualAlbums(albums []Album) {
 	if l.albumIdx < 0 && len(l.Albums) > 0 {
 		l.albumIdx = 0
 		if len(l.Albums[0].Tracks) > 0 {
+			l.trackIdx = 0
+		}
+	}
+}
+
+// Rescan re-reads rootDir and rebuilds local albums, preserving virtual
+// (modland/modarchive) albums that were added via AddVirtualAlbums.
+func (l *Library) Rescan(rootDir string) {
+	// Save virtual albums before wiping.
+	var virtuals []Album
+	for _, a := range l.Albums {
+		if IsModland(a.Path) || IsModArchive(a.Path) {
+			virtuals = append(virtuals, a)
+		}
+	}
+
+	l.Albums = scanRoot(rootDir)
+	l.Albums = append(l.Albums, virtuals...)
+
+	// Clamp indices.
+	if l.albumIdx >= len(l.Albums) {
+		l.albumIdx = len(l.Albums) - 1
+	}
+	if l.albumIdx < 0 && len(l.Albums) > 0 {
+		l.albumIdx = 0
+	}
+	if l.albumIdx >= 0 && l.albumIdx < len(l.Albums) {
+		if l.trackIdx >= len(l.Albums[l.albumIdx].Tracks) {
+			l.trackIdx = len(l.Albums[l.albumIdx].Tracks) - 1
+		}
+		if l.trackIdx < 0 && len(l.Albums[l.albumIdx].Tracks) > 0 {
 			l.trackIdx = 0
 		}
 	}

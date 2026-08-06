@@ -2,6 +2,8 @@ package app
 
 import (
 	"math/rand"
+	"path/filepath"
+	"strings"
 
 	"github.com/dendec/pmv/internal/config"
 	"github.com/dendec/pmv/internal/player"
@@ -90,6 +92,13 @@ func (s *playbackState) setPlaylist(tracks []string, index int, album string) bo
 	s.playlistIdx = index
 	s.playlistAlbum = album
 	return true
+}
+
+// clearPlaylist resets the playlist state.
+func (s *playbackState) clearPlaylist() {
+	s.playlist = nil
+	s.playlistIdx = -1
+	s.playlistAlbum = ""
 }
 
 func (s *playbackState) previousAlbum() (string, string, bool) {
@@ -278,4 +287,32 @@ func (s *playbackState) currentAlbumTracks() []trackRef {
 		tracks[trackIdx] = trackRef{path: path, album: album.Name, albumIdx: albumIdx, trackIdx: trackIdx}
 	}
 	return tracks
+}
+
+// prunePlaylist removes entries inside deletedPath and clamps the cursor.
+func (s *playbackState) prunePlaylist(deletedPath string) {
+	if len(s.playlist) == 0 {
+		return
+	}
+	sep := string(filepath.Separator)
+	var kept []string
+	for _, p := range s.playlist {
+		if p == deletedPath || strings.HasPrefix(p, deletedPath+sep) {
+			continue
+		}
+		kept = append(kept, p)
+	}
+	if len(kept) == len(s.playlist) {
+		return
+	}
+	if len(kept) == 0 {
+		s.playlist = nil
+		s.playlistIdx = -1
+		s.playlistAlbum = ""
+		return
+	}
+	s.playlist = kept
+	if s.playlistIdx >= len(s.playlist) {
+		s.playlistIdx = len(s.playlist) - 1
+	}
 }

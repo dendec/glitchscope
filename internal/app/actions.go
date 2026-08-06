@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -86,8 +87,10 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 				}
 			}
 			if a.overlay.NCConsumeDeleteConfirmed() {
-				// TODO(2.4): delete service
-				slog.Info("nc delete confirmed (not implemented)", "path", a.overlay.NCDeletePath())
+				path := a.overlay.NCDeletePath()
+				if path != "" {
+					a.deleteNCPath(path)
+				}
 			}
 		} else if a.overlay.Select() && a.lib != nil && a.pl != nil {
 			if a.overlay.FocusPanel() == 0 {
@@ -357,7 +360,7 @@ func (a *App) playFile(path string) {
 		}
 		return
 	}
-	idx := indexOf(files, path)
+	idx := slices.Index(files, path)
 	if idx < 0 {
 		idx = 0
 	}
@@ -367,14 +370,57 @@ func (a *App) playFile(path string) {
 	}
 }
 
-// indexOf returns the index of s in slice, or -1 if not found.
-func indexOf(slice []string, s string) int {
-	for i, v := range slice {
-		if v == s {
-			return i
+// deleteNCPath validates and deletes a path, then handles post-delete effects:
+// stop playback if playing track is inside, prune playlist, rescan library, sync overlay.
+func (a *App) deleteNCPath(path string) {
+	if a.deleteSvc == nil {
+		return
+	}
+	cleaned := filepath.Clean(path)
+
+	// Stat before deletion to know if it was a file.
+	info, statErr := os.Stat(cleaned)
+	isFile := statErr == nil && !info.IsDir()
+	parentDir := filepath.Dir(cleaned)
+
+	if err := a.deleteSvc.Delete(path); err != nil {
+		slog.Warn("delete failed", "path", path, "error", err)
+		if a.overlay != nil {
+			a.overlay.ShowTrack("delete failed")
+		}
+		return
+	}
+
+	// Stop playback if playing track is inside deleted path.
+	if a.pl != nil {
+		playing := a.pl.TrackPath()
+		if playing != "" && (playing == cleaned || strings.HasPrefix(playing, cleaned+string(filepath.Separator))) {
+			a.pl.Stop()
+			a.playbackState.clearPlaylist()
+		} else {
+			a.prunePlaylist(cleaned)
 		}
 	}
-	return -1
+
+	// Remove parent's .pmv_meta.json for file deletion (stale cache).
+	if isFile {
+		os.Remove(filepath.Join(parentDir, ".pmv_meta.json"))
+	}
+
+	// Rescan library.
+	if a.lib != nil {
+		a.lib.Rescan(a.findMusicDir())
+	}
+
+	// Sync NC overlay.
+	if a.overlay != nil {
+		a.overlay.NCSync()
+	}
+
+	slog.Info("deleted", "path", cleaned)
+	if a.overlay != nil {
+		a.overlay.ShowTrack("deleted")
+	}
 }
 
 // walkAudioFiles recursively collects supported audio files under root,

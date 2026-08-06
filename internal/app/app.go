@@ -55,6 +55,8 @@ type App struct {
 
 	pending      pendingPreset // pending preset name + scheduled load time
 	presetTicker *time.Ticker
+
+	deleteSvc *deleteService
 }
 
 // New creates an App with display initialised. Player/overlay/input/library
@@ -219,6 +221,7 @@ func (a *App) Close() {
 func (a *App) Init() {
 	a.initAudio()
 	a.initLibrary()
+	a.deleteSvc = newDeleteService(baseDir())
 	a.checkConnectivity()
 	a.initInput()
 	a.initPreset()
