@@ -484,7 +484,17 @@ func (o *Overlay) SetOnline(v bool) {
 		return
 	}
 	o.online = v
-	if v && len(o.navStack) == 0 {
+	slog.Info("overlay connectivity changed", "online", v, "mode", o.libMode, "nc_path", o.ncPath, "base_dir", o.baseDir)
+	if o.libMode == libModeNC && o.ncPath == o.baseDir {
+		o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
+		o.albums = labelsOf(o.albumEntries)
+		o.albumCursor = clampCursor(o.albumCursor, len(o.albumEntries))
+		o.albumsDirty = true
+		o.albumsContentDirty = true
+		o.refreshNCPreview()
+		return
+	}
+	if len(o.navStack) == 0 {
 		o.rootEntries = o.buildRootEntries()
 		o.syncPanels()
 	}

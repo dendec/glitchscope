@@ -424,8 +424,7 @@ func (o *Overlay) Select() bool {
 		if e := o.currentEntry(); e != nil {
 			switch e.kind {
 			case entryModlandRoot:
-				o.pushLevel(o.buildFormatEntries())
-				return false
+				return o.enterModland()
 			case entryFormat:
 				o.pushLevel(o.buildAlbumsInFormatEntries(e.format))
 				return false
@@ -433,11 +432,7 @@ func (o *Overlay) Select() bool {
 				o.pushLevel(o.buildLocalDirEntries(e.dirPath))
 				return false
 			case entryModArchiveRoot:
-				entries := o.buildModArchiveEntries("http://modarchive.textfiles.com/")
-				if len(entries) > 0 {
-					o.pushLevel(entries)
-				}
-				return false
+				return o.enterModArchive()
 			case entryModArchiveDir:
 				entries := o.buildModArchiveEntries(e.url)
 				if len(entries) == 1 && entries[0].kind == entryModArchiveAlbum {
@@ -627,9 +622,12 @@ func (o *Overlay) ncSelect() bool {
 			return false
 		case e.IsNCFile():
 			return true // play the file
-		case e.kind == entryModlandRoot || e.kind == entryModArchiveRoot:
+		case e.kind == entryModlandRoot:
 			o.ncSwitchToProvider()
-			return false
+			return o.enterModland()
+		case e.kind == entryModArchiveRoot:
+			o.ncSwitchToProvider()
+			return o.enterModArchive()
 		}
 		return false
 	}

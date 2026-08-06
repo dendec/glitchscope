@@ -79,7 +79,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	if fullscreen {
 		winFlags |= sdl.WINDOW_FULLSCREEN
 	}
-	win, err := sdl.CreateWindow("PMV — Portable Music Visualizer",
+	win, err := sdl.CreateWindow("Portable Music Visualizer",
 		sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		int32(width), int32(height), winFlags)
 	if err != nil {

@@ -287,7 +287,7 @@ func ncTestOverlay(t *testing.T) (*Overlay, string) {
 		modArchiveResults: make(chan modArchiveResult, 8),
 		closeCh:           make(chan struct{}),
 	}
-	o.albumEntries = o.buildNCRootEntries()
+	o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
 	o.albums = labelsOf(o.albumEntries)
 	return o, dir
 }
@@ -297,7 +297,7 @@ func TestNCRootEntries(t *testing.T) {
 	defer o.Close()
 
 	if len(o.albumEntries) != 2 {
-		t.Fatalf("expected 2 entries (sub1/, track3.s3m), got %d: %v", len(o.albumEntries), o.albums)
+		t.Fatalf("expected 2 local entries, got %d: %v", len(o.albumEntries), o.albums)
 	}
 	if o.albumEntries[0].label != "sub1/" {
 		t.Fatalf("expected sub1/, got %q", o.albumEntries[0].label)
@@ -310,6 +310,19 @@ func TestNCRootEntries(t *testing.T) {
 	}
 	if o.albumEntries[1].kind != entryNCFile {
 		t.Fatalf("expected entryNCFile, got %d", o.albumEntries[1].kind)
+	}
+}
+
+func TestNCOnlineAddsProviderEntries(t *testing.T) {
+	o, _ := ncTestOverlay(t)
+	defer o.Close()
+
+	o.SetOnline(true)
+	if len(o.albumEntries) != 4 {
+		t.Fatalf("expected local entries plus two providers, got %d: %v", len(o.albumEntries), o.albums)
+	}
+	if o.albumEntries[2].kind != entryModlandRoot || o.albumEntries[3].kind != entryModArchiveRoot {
+		t.Fatalf("provider entries missing from NC root: %#v", o.albumEntries)
 	}
 }
 

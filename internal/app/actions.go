@@ -3,8 +3,13 @@ package app
 import (
 	"log/slog"
 	"math/rand"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/pmv/internal/formats"
 	"github.com/dendec/pmv/internal/input"
 	"github.com/dendec/pmv/internal/player"
 	"github.com/dendec/pmv/internal/presets"
@@ -71,11 +76,14 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 			}
 		} else if a.overlay.IsNCMode() {
 			if a.overlay.Select() && a.pl != nil {
-				path := a.overlay.NCSelectedFilePath()
+				path := a.overlay.NCPlaySelected()
 				if path != "" {
-					a.playTrack(path, "")
+					if fi, err := os.Stat(path); err == nil && fi.IsDir() {
+						a.playDirectory(path)
+					} else {
+						a.playFile(path)
+					}
 				}
-				// TODO(2.3): NCPlaySelected for directory playback
 			}
 			if a.overlay.NCConsumeDeleteConfirmed() {
 				// TODO(2.4): delete service
@@ -320,4 +328,92 @@ func (a *App) playTrack(path, album string) {
 		return
 	}
 	slog.Info("now loading", "track", path, "album", album)
+}
+
+// playDirectory recursively walks dir, collects supported audio files,
+// replaces the playlist, and starts playback from the first track.
+func (a *App) playDirectory(dirPath string) {
+	files := walkAudioFiles(dirPath)
+	if len(files) == 0 {
+		if a.overlay != nil {
+			a.overlay.ShowTrack("no playable files")
+		}
+		return
+	}
+	album := filepath.Base(dirPath)
+	if a.playbackState.setPlaylist(files, 0, album) {
+		a.playTrack(files[0], album)
+	}
+}
+
+// playFile walks the parent directory of path, builds a sorted playlist,
+// positions the cursor on the selected file, and starts playback.
+func (a *App) playFile(path string) {
+	dir := filepath.Dir(path)
+	files := walkAudioFiles(dir)
+	if len(files) == 0 {
+		if a.overlay != nil {
+			a.overlay.ShowTrack("no playable files")
+		}
+		return
+	}
+	idx := indexOf(files, path)
+	if idx < 0 {
+		idx = 0
+	}
+	album := filepath.Base(dir)
+	if a.playbackState.setPlaylist(files, idx, album) {
+		a.playTrack(files[idx], album)
+	}
+}
+
+// indexOf returns the index of s in slice, or -1 if not found.
+func indexOf(slice []string, s string) int {
+	for i, v := range slice {
+		if v == s {
+			return i
+		}
+	}
+	return -1
+}
+
+// walkAudioFiles recursively collects supported audio files under root,
+// sorted lexically by full path. Skips symlinks, dotfiles, artwork, metadata.
+func walkAudioFiles(root string) []string {
+	var files []string
+	var walk func(dir string)
+	walk = func(dir string) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			slog.Warn("walk dir", "path", dir, "error", err)
+			return
+		}
+		for _, de := range entries {
+			name := de.Name()
+			if strings.HasPrefix(name, ".") {
+				continue
+			}
+			if de.Type()&os.ModeSymlink != 0 {
+				continue
+			}
+			if de.IsDir() {
+				walk(filepath.Join(dir, name))
+				continue
+			}
+			if !de.Type().IsRegular() {
+				continue
+			}
+			if name == ".pmv_meta.json" {
+				continue
+			}
+			ext := strings.ToLower(filepath.Ext(name))
+			if !formats.IsSupportedExt(ext) {
+				continue
+			}
+			files = append(files, filepath.Join(dir, name))
+		}
+	}
+	walk(root)
+	sort.Strings(files)
+	return files
 }

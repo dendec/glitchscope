@@ -502,6 +502,21 @@ func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []moda
 	return nil
 }
 
+// enterModland drills into the Modland format list.
+func (o *Overlay) enterModland() bool {
+	o.pushLevel(o.buildFormatEntries())
+	return false
+}
+
+// enterModArchive drills into the ModArchive root listing, or kicks off a fetch.
+func (o *Overlay) enterModArchive() bool {
+	entries := o.buildModArchiveEntries(modarchive.BaseURL)
+	if len(entries) > 0 {
+		o.pushLevel(entries)
+	}
+	return false
+}
+
 // rootIndexOf finds the root-level row for a real allAlbums index.
 func (o *Overlay) rootIndexOf(albumIdx int) int {
 	for i, e := range o.rootEntries {
@@ -754,7 +769,18 @@ func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
 
 	sort.Slice(dirs, func(i, j int) bool { return dirs[i].label < dirs[j].label })
 	sort.Slice(files, func(i, j int) bool { return files[i].label < files[j].label })
-	return append(entries, append(dirs, files...)...)
+	entries = append(entries, dirs...)
+	entries = append(entries, files...)
+
+	// Remote catalog pseudo-entries appear only at the NC root, after connectivity succeeds.
+	if dirPath == o.baseDir && o.online {
+		entries = append(entries,
+			navEntry{label: "Modland/", kind: entryModlandRoot, albumIdx: -1},
+			navEntry{label: "ModArchive/", kind: entryModArchiveRoot, albumIdx: -1},
+		)
+	}
+
+	return entries
 }
 
 // ncDirIsEmpty reports whether a directory has no supported audio files and
@@ -782,63 +808,6 @@ func ncDirIsEmpty(dirPath string) bool {
 	return true
 }
 
-// buildNCRootEntries builds the top-level NC navigation: local dirs + files + remote.
-func (o *Overlay) buildNCRootEntries() []navEntry {
-	var entries []navEntry
-
-	dirEntries, err := os.ReadDir(o.baseDir)
-	if err != nil {
-		slog.Warn("nc root readdir", "path", o.baseDir, "error", err)
-	} else {
-		var dirs, files []navEntry
-		for _, de := range dirEntries {
-			name := de.Name()
-			if strings.HasPrefix(name, ".") || name == ".pmv_meta.json" {
-				continue
-			}
-			if de.IsDir() {
-				if de.Type()&os.ModeSymlink != 0 {
-					continue
-				}
-				fullPath := filepath.Join(o.baseDir, name)
-				if ncDirIsEmpty(fullPath) {
-					continue
-				}
-				dirs = append(dirs, navEntry{
-					label:    name + "/",
-					kind:     entryNCDir,
-					dirPath:  fullPath,
-					albumIdx: -1,
-				})
-			} else if de.Type().IsRegular() {
-				ext := strings.ToLower(filepath.Ext(name))
-				if formats.SupportedExts[ext] {
-					files = append(files, navEntry{
-						label:    name,
-						kind:     entryNCFile,
-						filePath: filepath.Join(o.baseDir, name),
-						albumIdx: -1,
-					})
-				}
-			}
-		}
-		sort.Slice(dirs, func(i, j int) bool { return dirs[i].label < dirs[j].label })
-		sort.Slice(files, func(i, j int) bool { return files[i].label < files[j].label })
-		entries = append(entries, dirs...)
-		entries = append(entries, files...)
-	}
-
-	// Remote catalog pseudo-entries.
-	if o.online {
-		entries = append(entries,
-			navEntry{label: "Modland/", kind: entryModlandRoot, albumIdx: -1},
-			navEntry{label: "ModArchive/", kind: entryModArchiveRoot, albumIdx: -1},
-		)
-	}
-
-	return entries
-}
-
 // ncSync rebuilds the NC left-panel entries from the current ncPath.
 func (o *Overlay) ncSync() {
 	o.libMode = libModeNC
@@ -846,11 +815,7 @@ func (o *Overlay) ncSync() {
 	if o.ncPath == "" {
 		o.ncPath = o.baseDir
 	}
-	if o.ncPath == o.baseDir {
-		o.albumEntries = o.buildNCRootEntries()
-	} else {
-		o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
-	}
+	o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
 	o.albums = labelsOf(o.albumEntries)
 	o.albumCursor = clampCursor(o.albumCursor, len(o.albumEntries))
 	o.albumsDirty = true
@@ -925,12 +890,11 @@ func (o *Overlay) ncSwitchToNC() {
 	if o.ncPath == "" {
 		o.ncPath = o.baseDir
 	}
+	o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
 	if o.ncPath == o.baseDir {
-		o.albumEntries = o.buildNCRootEntries()
 		o.albumCursor = clampCursor(o.ncRootCursor, len(o.albumEntries))
 		o.albumsScroll = o.ncRootScroll
 	} else {
-		o.albumEntries = o.buildNCDirectoryEntries(o.ncPath)
 		o.albumCursor = clampCursor(o.albumCursor, len(o.albumEntries))
 	}
 	o.albums = labelsOf(o.albumEntries)
