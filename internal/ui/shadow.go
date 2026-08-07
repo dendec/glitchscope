@@ -29,6 +29,14 @@ func shadowRadius(fontSizePx float64) int {
 	return r
 }
 
+func textPadding(fontSizePx float64) int {
+	extra := int(math.Round(fontSizePx * 4 / 14))
+	if extra < 1 {
+		extra = 1
+	}
+	return shadowRadius(fontSizePx) + extra
+}
+
 // applyOutlineShadow paints a solid outline behind glyphs by dilating the
 // coverage mask `radius` times. Caller must leave `radius` px of padding.
 func applyOutlineShadow(rgba *image.RGBA, textColor color.RGBA, radius int) {
@@ -84,7 +92,7 @@ func applyOutlineShadow(rgba *image.RGBA, textColor color.RGBA, radius int) {
 // content size and a draw callback; the outline is applied in-place.
 func newShadowedTextRGBA(contentW, contentH int, fontSizePx float64, textColor color.RGBA, draw func(rgba *image.RGBA, originX, originY int)) (rgba *image.RGBA, texW, texH, padding int) {
 	radius := shadowRadius(fontSizePx)
-	padding = radius + 4
+	padding = textPadding(fontSizePx)
 	texW = contentW + padding*2
 	texH = contentH + padding*2
 	rgba = image.NewRGBA(image.Rect(0, 0, texW, texH))

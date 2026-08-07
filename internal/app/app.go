@@ -229,8 +229,6 @@ func (a *App) Init() {
 		a.playTrack(a.startupFile, "command line")
 	} else if a.startupFile != "" {
 		slog.Warn("startup file skipped, audio unavailable", "path", a.startupFile)
-	} else {
-		a.playFirst()
 	}
 	a.startPresetTicker()
 	if a.overlay != nil {
@@ -396,15 +394,6 @@ func (a *App) initPreset() {
 	}
 	if a.overlay != nil {
 		a.overlay.SetPresetCategories(a.presetCats)
-	}
-}
-
-func (a *App) playFirst() {
-	if a.pl == nil || a.lib == nil {
-		return
-	}
-	if first := a.lib.CurrentTrack(); first != "" {
-		a.playTrack(first, a.lib.CurrentAlbum().Name)
 	}
 }
 

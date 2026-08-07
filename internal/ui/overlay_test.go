@@ -259,20 +259,20 @@ func TestNCRootEntries(t *testing.T) {
 	o, _ := ncTestOverlay(t)
 	defer o.Close()
 
-	if len(o.albumEntries) != 2 {
-		t.Fatalf("expected 2 local entries, got %d: %v", len(o.albumEntries), o.albums)
+	if len(o.albumEntries) != 3 {
+		t.Fatalf("expected parent plus 2 local entries, got %d: %v", len(o.albumEntries), o.albums)
 	}
-	if o.albumEntries[0].label != "sub1/" {
-		t.Fatalf("expected sub1/, got %q", o.albumEntries[0].label)
+	if o.albumEntries[0].label != ".." || o.albumEntries[0].kind != entryParent {
+		t.Fatalf("expected parent entry, got %#v", o.albumEntries[0])
 	}
-	if o.albumEntries[0].kind != entryNCDir {
-		t.Fatalf("expected entryNCDir, got %d", o.albumEntries[0].kind)
+	if o.albumEntries[1].label != "sub1/" || o.albumEntries[1].kind != entryNCDir {
+		t.Fatalf("expected sub1/ directory, got %#v", o.albumEntries[1])
 	}
-	if o.albumEntries[1].label != "track3.s3m" {
-		t.Fatalf("expected track3.s3m, got %q", o.albumEntries[1].label)
+	if o.albumEntries[2].label != "track3.s3m" {
+		t.Fatalf("expected track3.s3m, got %q", o.albumEntries[2].label)
 	}
-	if o.albumEntries[1].kind != entryNCFile {
-		t.Fatalf("expected entryNCFile, got %d", o.albumEntries[1].kind)
+	if o.albumEntries[2].kind != entryNCFile {
+		t.Fatalf("expected entryNCFile, got %d", o.albumEntries[2].kind)
 	}
 }
 
@@ -281,11 +281,13 @@ func TestNCOnlineAddsProviderEntries(t *testing.T) {
 	defer o.Close()
 
 	o.SetOnline(true)
-	if len(o.albumEntries) != 4 {
-		t.Fatalf("expected local entries plus two providers, got %d: %v", len(o.albumEntries), o.albums)
+	if len(o.albumEntries) != 3 {
+		t.Fatalf("expected parent plus local entries in NC root, got %d: %v", len(o.albumEntries), o.albums)
 	}
-	if o.albumEntries[2].kind != entryModlandRoot || o.albumEntries[3].kind != entryModArchiveRoot {
-		t.Fatalf("provider entries missing from NC root: %#v", o.albumEntries)
+	for _, entry := range o.albumEntries {
+		if entry.kind == entrySource || entry.kind == entryParent && entry.label != ".." {
+			t.Fatalf("invalid NC root entry: %#v", o.albumEntries)
+		}
 	}
 }
 
@@ -308,8 +310,8 @@ func TestNCEnterDirAndBack(t *testing.T) {
 	if o.albumCursor != 0 {
 		t.Fatalf("cursor should be 0 after enter, got %d", o.albumCursor)
 	}
-	if len(o.navStack) != 2 {
-		t.Fatalf("navStack depth = %d, want 2 (NC root + sub1)", len(o.navStack))
+	if len(o.navStack) != 3 {
+		t.Fatalf("navStack depth = %d, want 3 (source root + NC root + sub1)", len(o.navStack))
 	}
 
 	// Enter sub2.
@@ -326,8 +328,8 @@ func TestNCEnterDirAndBack(t *testing.T) {
 	if o.ncDir() != sub1 {
 		t.Fatalf("after back: ncDir = %q, want %q", o.ncDir(), sub1)
 	}
-	if len(o.navStack) != 2 {
-		t.Fatalf("navStack depth = %d, want 2", len(o.navStack))
+	if len(o.navStack) != 3 {
+		t.Fatalf("navStack depth = %d, want 3", len(o.navStack))
 	}
 
 	// Back to NC root.
@@ -337,13 +339,21 @@ func TestNCEnterDirAndBack(t *testing.T) {
 	if o.ncDir() != dir {
 		t.Fatalf("after back: ncDir = %q, want %q", o.ncDir(), dir)
 	}
-	if len(o.navStack) != 1 {
-		t.Fatalf("navStack depth = %d, want 1 (NC root)", len(o.navStack))
+	if len(o.navStack) != 2 {
+		t.Fatalf("navStack depth = %d, want 2 (source root + NC root)", len(o.navStack))
 	}
 
-	// Back at NC root = not poppable.
+	// Back at NC root goes to the virtual source root.
+	if !o.popLevel() {
+		t.Fatal("popLevel at NC root should return true")
+	}
+	if o.topLevel().ctx != ctxSourceRoot {
+		t.Fatalf("after NC root: ctx = %v, want source root", o.topLevel().ctx)
+	}
+
+	// The virtual source root is not poppable.
 	if o.popLevel() {
-		t.Fatal("popLevel at NC root should return false")
+		t.Fatal("popLevel at source root should return false")
 	}
 }
 
@@ -433,59 +443,61 @@ func TestNCDeleteConfirm(t *testing.T) {
 }
 
 func TestNCCatalogRoundTrip(t *testing.T) {
-	o, dir := ncTestOverlay(t)
+	o, _ := ncTestOverlay(t)
 	defer o.Close()
 	o.SetOnline(true)
+	o.switchToSourceRoot()
 	o.panelEntered = true
 
-	// Catalog rows sit at the NC root: [sub1/, track3.s3m, Modland/, ModArchive/].
-	if len(o.albumEntries) != 4 {
-		t.Fatalf("expected 4 NC root entries, got %d: %v", len(o.albumEntries), o.albums)
+	if len(o.albumEntries) != 3 {
+		t.Fatalf("expected three source entries, got %d: %v", len(o.albumEntries), o.albums)
 	}
-	modlandIdx := 2
+	modlandIdx := 1
 	o.albumCursor = modlandIdx
 
-	// Enter Modland — one push, no mode switch; NC root stays under it.
+	// Enter Modland from the virtual source root.
 	if o.Select() {
 		t.Fatal("catalog entry should not start playback")
 	}
 	if len(o.navStack) != 2 {
-		t.Fatalf("navStack depth = %d, want 2 (NC root + formats)", len(o.navStack))
+		t.Fatalf("navStack depth = %d, want 2 (source root + formats)", len(o.navStack))
 	}
 	if o.isNC() {
 		t.Fatal("catalog level should not be NC")
 	}
-
-	// One Back returns straight to the NC root.
-	o.Back()
-	if len(o.navStack) != 1 || !o.isNC() {
-		t.Fatalf("Back should return to NC root, got depth=%d isNC=%v", len(o.navStack), o.isNC())
-	}
-	if o.ncDir() != dir {
-		t.Fatalf("ncDir = %q, want %q", o.ncDir(), dir)
+	if len(o.albumEntries) == 0 || o.albumEntries[0].kind != entryParent {
+		t.Fatalf("provider root should start with parent entry: %#v", o.albumEntries)
 	}
 
-	// Back at NC root closes the UI.
+	// Selecting .. returns to the virtual source root just like Back.
+	if o.Select() {
+		t.Fatal("selecting parent unexpectedly started playback")
+	}
+	if len(o.navStack) != 1 || o.topLevel().ctx != ctxSourceRoot {
+		t.Fatalf("selecting parent should return to source root, got depth=%d ctx=%v", len(o.navStack), o.topLevel().ctx)
+	}
+
+	// Back at the virtual source root closes the UI.
 	o.uiVisible = true
 	o.Back()
 	if o.uiVisible {
-		t.Fatal("Back at NC root should close the UI")
+		t.Fatal("Back at source root should close the UI")
 	}
 }
 
 func TestNCBackFromLibraryRoot(t *testing.T) {
-	o, dir := ncTestOverlay(t)
+	o, _ := ncTestOverlay(t)
 	defer o.Close()
 	o.panelEntered = true
 
-	// Library root → Back → NC root.
+	// Library root → Back → virtual source root.
 	o.switchToLibrary()
 	if o.isNC() {
 		t.Fatal("library root should not be NC")
 	}
 	o.Back()
-	if !o.isNC() || o.ncDir() != dir {
-		t.Fatalf("Back at library root should switch to NC root, got isNC=%v ncDir=%q", o.isNC(), o.ncDir())
+	if o.topLevel().ctx != ctxSourceRoot {
+		t.Fatalf("Back at library root should switch to source root, got ctx=%v", o.topLevel().ctx)
 	}
 }
 
@@ -493,18 +505,18 @@ func TestBreadcrumbText(t *testing.T) {
 	o := &Overlay{baseDir: "/music"}
 
 	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/music"}}
-	if got := o.breadcrumbText(); got != "Music" {
-		t.Fatalf("NC root: got %q, want %q", got, "Music")
+	if got := o.breadcrumbText(); got != "/music" {
+		t.Fatalf("NC root: got %q, want %q", got, "/music")
 	}
 
 	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/music"}, {ctx: ctxNC, dirPath: "/music/a/b"}}
-	if got := o.breadcrumbText(); got != "Music / a / b" {
+	if got := o.breadcrumbText(); got != "/music / a / b" {
 		t.Fatalf("NC subdir: got %q", got)
 	}
 
 	// Deep-link collapses the stack to one NC level; crumbs derive from dir.
 	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/music/a/b"}}
-	if got := o.breadcrumbText(); got != "Music / a / b" {
+	if got := o.breadcrumbText(); got != "/music / a / b" {
 		t.Fatalf("NC deep-link: got %q", got)
 	}
 
@@ -512,7 +524,7 @@ func TestBreadcrumbText(t *testing.T) {
 		{ctx: ctxNC, dirPath: "/music"},
 		{ctx: ctxCatalog, label: "Modland"},
 	}
-	if got := o.breadcrumbText(); got != "Music / Modland" {
+	if got := o.breadcrumbText(); got != "/music / Modland" {
 		t.Fatalf("catalog stack: got %q", got)
 	}
 
@@ -520,7 +532,7 @@ func TestBreadcrumbText(t *testing.T) {
 	o.albumEntries = []navEntry{{label: "Author", kind: entryModlandAlbum, albumIdx: 0}}
 	o.albumCursor = 0
 	o.focusPanel = 1
-	if got := o.breadcrumbText(); got != "Music / Modland / Author" {
+	if got := o.breadcrumbText(); got != "/music / Modland / Author" {
 		t.Fatalf("leaf entered: got %q", got)
 	}
 
@@ -529,30 +541,7 @@ func TestBreadcrumbText(t *testing.T) {
 		navLevel{ctx: ctxCatalog, label: "Protracker"},
 		navLevel{ctx: ctxCatalog, label: "Nested"},
 	)
-	if got := o.breadcrumbText(); got != "Music / … / Protracker / Nested / Author" {
+	if got := o.breadcrumbText(); got != "/… / Protracker / Nested / Author" {
 		t.Fatalf("elision: got %q", got)
-	}
-}
-
-func TestBreadcrumbModlandDeepLink(t *testing.T) {
-	o := &Overlay{baseDir: "/music"}
-	o.allAlbums = []player.Album{
-		{Name: "Modland: Protracker/Curt Cool", Path: player.ModlandPrefix + "Protracker/Curt Cool"},
-	}
-	o.FocusPlayingTrack(0, -1)
-	if got := o.breadcrumbText(); got != "Music / Modland / Protracker / Curt Cool" {
-		t.Fatalf("modland deep-link breadcrumb = %q", got)
-	}
-}
-
-func TestBreadcrumbModArchiveDeepLink(t *testing.T) {
-	o := &Overlay{baseDir: "/music"}
-	const url = "http://modarchive.textfiles.com/modarchive_2011_additions/M03/B/"
-	o.allAlbums = []player.Album{
-		{Name: "ModArchive: 2011/M03/B", Path: player.ModArchivePrefix + url},
-	}
-	o.FocusPlayingTrack(0, -1)
-	if got := o.breadcrumbText(); got != "Music / ModArchive / 2011/M03/B" {
-		t.Fatalf("modarchive deep-link breadcrumb = %q", got)
 	}
 }

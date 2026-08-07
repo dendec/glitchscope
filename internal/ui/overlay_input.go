@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -423,17 +422,22 @@ func (o *Overlay) Select() bool {
 	if o.focusPanel == 0 {
 		if e := o.currentEntry(); e != nil {
 			switch {
+			case e.kind == entryParent:
+				o.popLevel()
+				return false
+			case e.kind == entrySource:
+				switch e.source {
+				case sourceMusic:
+					o.switchToNC(o.baseDir)
+				case sourceModland, sourceModArchive:
+					o.switchToProvider(e.source)
+				}
+				return false
 			case e.IsNCDirectory():
 				o.ncEnterDir(e.dirPath)
 				return false
 			case e.IsNCFile():
 				return true // play the file
-			case e.kind == entryModlandRoot:
-				o.pushLevel(navLevel{ctx: ctxCatalog, label: "Modland", entries: o.buildFormatEntries()})
-				return false
-			case e.kind == entryModArchiveRoot:
-				o.pushLevel(navLevel{ctx: ctxCatalog, label: "ModArchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
-				return false
 			case e.kind == entryFormat:
 				o.pushLevel(navLevel{ctx: ctxCatalog, label: e.format, entries: o.buildAlbumsInFormatEntries(e.format)})
 				return false
@@ -546,19 +550,14 @@ func (o *Overlay) Back() {
 	if o.popLevel() {
 		return
 	}
-	// At a root level.
-	if o.isNC() {
-		// NC root — close the UI.
-		if o.uiVisible {
-			o.uiVisible = false
-			o.panelEntered = false
-			o.focusPanel = 0
-			o.closeInjectPending = true
-		}
-		return
+	// Virtual source root — close the UI. Source roots are always the stack
+	// bottom, so every source-level Back reaches this branch after popLevel.
+	if o.topLevel().ctx == ctxSourceRoot && o.uiVisible {
+		o.uiVisible = false
+		o.panelEntered = false
+		o.focusPanel = 0
+		o.closeInjectPending = true
 	}
-	// Library root — switch to the NC browser.
-	o.switchToNC(o.baseDir)
 }
 
 func (o *Overlay) TrackCursor() int { return o.trackCursor }

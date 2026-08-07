@@ -41,12 +41,12 @@ type navEntryKind int
 const (
 	entryLocalAlbum      navEntryKind = iota // real album/folder — leaf, has tracks
 	entryLocalDir                            // real folder — intermediate, drill down
-	entryModlandRoot                         // "Modland" pseudo-folder at the library root
+	entrySource                              // virtual source root entry
 	entryFormat                              // modland format bucket (e.g. "Protracker")
 	entryModlandAlbum                        // modland author/album within a format — leaf, has tracks
-	entryModArchiveRoot                      // "ModArchive" pseudo-folder at the library root
 	entryModArchiveDir                       // ModArchive HTTP directory folder
 	entryModArchiveAlbum                     // ModArchive leaf album containing tracks
+	entryParent                              // parent navigation level
 	entryNCDir                               // NC directory entry
 	entryNCFile                              // NC file entry (leaf)
 )
@@ -55,11 +55,12 @@ const (
 type navEntry struct {
 	label    string
 	kind     navEntryKind
-	albumIdx int    // index into Overlay.allAlbums when kind is a leaf album, else -1
-	format   string // set when kind == entryFormat
-	url      string // set when kind == entryModArchiveDir
-	dirPath  string // set when kind == entryLocalDir or entryNCDir
-	filePath string // set when kind == entryNCFile
+	source   sourceKind // set when kind == entrySource
+	albumIdx int        // index into Overlay.allAlbums when kind is a leaf album, else -1
+	format   string     // set when kind == entryFormat
+	url      string     // set when kind == entryModArchiveDir
+	dirPath  string     // set when kind == entryLocalDir or entryNCDir
+	filePath string     // set when kind == entryNCFile
 }
 
 // navLevel is one visible listing in the unified navigation stack.
@@ -91,66 +92,6 @@ func labelsOf(entries []navEntry) []string {
 	return labels
 }
 
-// FocusPlayingTrack points the cursor at the currently playing album/track,
-// including deep-linking into modland/modarchive drill-down when needed.
-func (o *Overlay) FocusPlayingTrack(albumIdx, trackIdx int) {
-	if albumIdx >= 0 && albumIdx < len(o.allAlbums) {
-		path := o.allAlbums[albumIdx].Path
-		if !strings.HasPrefix(path, player.ModlandPrefix) && !strings.HasPrefix(path, player.ModArchivePrefix) {
-			// Local track — NC filesystem view at the album's directory.
-			albumPath := o.allAlbums[albumIdx].Path
-			o.switchToNC(albumPath)
-			// Find the track file in the entries.
-			if trackIdx >= 0 && trackIdx < len(o.allAlbums[albumIdx].Tracks) {
-				trackPath := o.allAlbums[albumIdx].Tracks[trackIdx]
-				for i, e := range o.albumEntries {
-					if e.IsNCFile() && e.filePath == trackPath {
-						o.albumCursor = i
-						break
-					}
-				}
-			}
-			o.trackCursor = trackIdx
-			o.focusPanel = 0
-			o.panelEntered = true
-			o.albumsDirty = true
-			o.albumsContentDirty = true
-			o.tracksDirty = true
-			o.tracksContentDirty = true
-			return
-		}
-	}
-
-	// Remote or unknown — library root with a drill-down to the album.
-	o.switchToLibrary()
-	o.trackCursor = trackIdx
-
-	if albumIdx >= 0 && albumIdx < len(o.allAlbums) {
-		path := o.allAlbums[albumIdx].Path
-		if strings.HasPrefix(path, player.ModlandPrefix) {
-			o.focusModlandAlbum(albumIdx)
-		} else if strings.HasPrefix(path, player.ModArchivePrefix) {
-			o.focusModArchiveAlbum(albumIdx)
-		} else {
-			o.focusLocalAlbum(albumIdx)
-		}
-	} else {
-		// No playback — start NC mode at baseDir.
-		o.switchToNC(o.baseDir)
-	}
-
-	if e := o.currentEntry(); e != nil && e.IsLeafAlbum() {
-		o.focusPanel = 1
-	} else {
-		o.focusPanel = 0
-	}
-	o.panelEntered = true
-	o.albumsDirty = true
-	o.albumsContentDirty = true
-	o.tracksDirty = true
-	o.tracksContentDirty = true
-}
-
 func (e *navEntry) IsLeafAlbum() bool {
 	if e == nil {
 		return false
@@ -166,74 +107,6 @@ func (e *navEntry) IsNCFile() bool {
 	return e != nil && e.kind == entryNCFile
 }
 
-// focusModlandAlbum drills the nav stack to the format/album containing
-// allAlbums[albumIdx], positioning the cursor on the playing album.
-func (o *Overlay) focusModlandAlbum(albumIdx int) {
-	o.navStack[0].cursor = 0
-	o.navStack[0].scroll = 0
-
-	format, _ := splitModlandName(o.allAlbums[albumIdx].Name)
-
-	formats := o.buildFormatEntries()
-	o.navStack = append(o.navStack, navLevel{ctx: ctxCatalog, label: "Modland", entries: formats, cursor: indexOfEntry(formats, func(e navEntry) bool { return e.format == format })})
-
-	albums := o.buildAlbumsInFormatEntries(format)
-	albumCursor := indexOfEntry(albums, func(e navEntry) bool { return e.albumIdx == albumIdx })
-	o.navStack = append(o.navStack, navLevel{ctx: ctxCatalog, label: format, entries: albums, cursor: albumCursor})
-
-	o.albumCursor = albumCursor
-	o.albumsScroll = 0
-	o.syncPanels()
-}
-
-func (o *Overlay) focusModArchiveAlbum(albumIdx int) {
-	o.navStack[0].cursor = 0
-	o.navStack[0].scroll = 0
-	album := o.allAlbums[albumIdx]
-	remote := player.RemotePath(album.Path)
-	o.navStack = append(o.navStack, navLevel{ctx: ctxCatalog, label: "ModArchive", entries: []navEntry{
-		{label: modarchive.AlbumLabel(remote), kind: entryModArchiveAlbum, albumIdx: albumIdx, url: remote},
-	}})
-	o.albumCursor = 0
-	o.albumsScroll = 0
-	o.syncPanels()
-}
-
-// focusLocalAlbum drills the nav stack down the folder chain holding
-// allAlbums[albumIdx], positioning the cursor on the playing album.
-func (o *Overlay) focusLocalAlbum(albumIdx int) {
-	parts := relParts(o.baseDir, o.allAlbums[albumIdx].Path)
-	if len(parts) <= 1 {
-		// Album at (or is) the library root — no drill needed.
-		o.albumCursor = o.rootIndexOf(albumIdx)
-		o.albumsScroll = 0
-		o.syncPanels()
-		return
-	}
-
-	o.navStack[0].cursor = o.rootLocalDirIndex(filepath.Join(o.baseDir, parts[0]))
-	o.navStack[0].scroll = 0
-
-	dirPath := o.baseDir
-	for i, seg := range parts[:len(parts)-1] {
-		dirPath = filepath.Join(dirPath, seg)
-		entries := o.buildLocalDirEntries(dirPath)
-		cursor := 0
-		if i == len(parts)-2 {
-			cursor = indexOfEntry(entries, func(e navEntry) bool { return e.albumIdx == albumIdx })
-			o.albumCursor = cursor
-		} else {
-			cursor = indexOfEntry(entries, func(e navEntry) bool {
-				return e.kind == entryLocalDir && e.dirPath == filepath.Join(dirPath, parts[i+1])
-			})
-		}
-		o.navStack = append(o.navStack, navLevel{ctx: ctxLibrary, label: seg, entries: entries, cursor: cursor})
-	}
-
-	o.albumsScroll = 0
-	o.syncPanels()
-}
-
 // relParts returns the path segments of path relative to base: nil when path
 // isn't under base, empty for base itself.
 func relParts(base, path string) []string {
@@ -247,25 +120,9 @@ func relParts(base, path string) []string {
 	return strings.Split(filepath.ToSlash(rel), "/")
 }
 
-// rootLocalDirIndex returns the root-level index of a top-level local folder.
-func (o *Overlay) rootLocalDirIndex(dirPath string) int {
-	return indexOfEntry(o.navStack[0].entries, func(e navEntry) bool { return e.kind == entryLocalDir && e.dirPath == dirPath })
-}
-
-// indexOfEntry returns the first entry matching pred, or 0.
-func indexOfEntry(entries []navEntry, pred func(navEntry) bool) int {
-	for i, e := range entries {
-		if pred(e) {
-			return i
-		}
-	}
-	return 0
-}
-
-// buildRootEntries builds the library-root rows from allAlbums: local albums
-// are grouped into top-level folders, with albums sitting directly in the
-// music root shown as leaf rows. Remote catalog rows live only in the NC
-// filesystem root — catalogs are entered from NC.
+// buildRootEntries builds Music rows from allAlbums: local albums are grouped
+// into top-level folders, with albums sitting directly in the Music root shown
+// as leaf rows.
 func (o *Overlay) buildRootEntries() []navEntry {
 	var entries []navEntry
 	seenDirs := map[string]bool{}
@@ -284,6 +141,19 @@ func (o *Overlay) buildRootEntries() []navEntry {
 			seenDirs[dirPath] = true
 			entries = append(entries, navEntry{label: parts[0] + "/", kind: entryLocalDir, albumIdx: -1, dirPath: dirPath})
 		}
+	}
+	return entries
+}
+
+func (o *Overlay) buildSourceEntries() []navEntry {
+	entries := []navEntry{
+		{label: "music/", kind: entrySource, source: sourceMusic, albumIdx: -1},
+	}
+	if o.online {
+		entries = append(entries,
+			navEntry{label: "modland/", kind: entrySource, source: sourceModland, albumIdx: -1},
+			navEntry{label: "modarchive/", kind: entrySource, source: sourceModArchive, albumIdx: -1},
+		)
 	}
 	return entries
 }
@@ -440,12 +310,21 @@ func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []moda
 // rootIndexOf finds the root-level row for a real allAlbums index.
 // The root level is the stack bottom (library root).
 func (o *Overlay) rootIndexOf(albumIdx int) int {
-	for i, e := range o.navStack[0].entries {
+	for i, e := range o.libraryRoot().entries {
 		if e.kind == entryLocalAlbum && e.albumIdx == albumIdx {
 			return i
 		}
 	}
 	return 0
+}
+
+func (o *Overlay) libraryRoot() *navLevel {
+	for i := range o.navStack {
+		if o.navStack[i].ctx == ctxLibrary {
+			return &o.navStack[i]
+		}
+	}
+	return &o.navStack[0]
 }
 
 // currentLevelEntries returns the rows for the currently displayed level.
@@ -493,14 +372,8 @@ func (o *Overlay) refreshPreview() {
 		return
 	}
 	switch e.kind {
-	case entryModlandRoot:
-		o.previewEntries = o.buildFormatEntries()
-		o.previewActive = true
 	case entryFormat:
 		o.previewEntries = o.buildAlbumsInFormatEntries(e.format)
-		o.previewActive = true
-	case entryModArchiveRoot:
-		o.previewEntries = o.buildModArchiveEntries(modarchive.BaseURL)
 		o.previewActive = true
 	case entryModArchiveDir:
 		entries := o.buildModArchiveEntries(e.url)
@@ -541,6 +414,7 @@ func (o *Overlay) refreshPreview() {
 func (o *Overlay) pushLevel(lvl navLevel) {
 	top := &o.navStack[len(o.navStack)-1]
 	top.cursor, top.scroll = o.albumCursor, o.albumsScroll
+	lvl.entries = withParentEntry(lvl.entries)
 	o.navStack = append(o.navStack, lvl)
 	o.albumCursor = lvl.cursor
 	o.albumsScroll = lvl.scroll
@@ -549,6 +423,10 @@ func (o *Overlay) pushLevel(lvl navLevel) {
 	o.albums = labelsOf(lvl.entries)
 	o.marqueeL.invalidate(o)
 	o.syncPanels()
+}
+
+func withParentEntry(entries []navEntry) []navEntry {
+	return append([]navEntry{{label: "..", kind: entryParent, albumIdx: -1}}, entries...)
 }
 
 // popLevel goes up one navigation level. Returns false when already at a
@@ -629,16 +507,6 @@ func (o *Overlay) SelectedTrackPlaylist() (string, []string, int) {
 func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
 	var entries []navEntry
 
-	// Parent directory entry. Not shown at baseDir — nothing above it.
-	if dirPath != o.baseDir {
-		entries = append(entries, navEntry{
-			label:    "..",
-			kind:     entryNCDir,
-			dirPath:  filepath.Dir(dirPath),
-			albumIdx: -1,
-		})
-	}
-
 	dirEntries, err := os.ReadDir(dirPath)
 	if err != nil {
 		slog.Warn("nc readdir", "path", dirPath, "error", err)
@@ -688,14 +556,6 @@ func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
 	entries = append(entries, dirs...)
 	entries = append(entries, files...)
 
-	// Remote catalog pseudo-entries appear only at the NC root, after connectivity succeeds.
-	if dirPath == o.baseDir && o.online {
-		entries = append(entries,
-			navEntry{label: "Modland/", kind: entryModlandRoot, albumIdx: -1},
-			navEntry{label: "ModArchive/", kind: entryModArchiveRoot, albumIdx: -1},
-		)
-	}
-
 	return entries
 }
 
@@ -725,7 +585,7 @@ func ncDirIsEmpty(dirPath string) bool {
 }
 
 // topLevel returns the visible level — the top of the stack. The stack is
-// never empty: its bottom is always a root level (ctxNC or ctxLibrary).
+// never empty: its bottom is always the virtual source root.
 func (o *Overlay) topLevel() *navLevel {
 	return &o.navStack[len(o.navStack)-1]
 }
@@ -748,7 +608,13 @@ func (o *Overlay) ncDir() string {
 // (which fully describes the position, even after a deep-link that collapses
 // the stack); library/catalog levels use their stored label.
 func (o *Overlay) breadcrumbParts() []string {
-	parts := []string{"Music"}
+	if o.topLevel().ctx == ctxSourceRoot {
+		return []string{"/"}
+	}
+	parts := []string{"/"}
+	if o.source == sourceMusic {
+		parts = append(parts, "music")
+	}
 	if o.isNC() {
 		if dir := o.ncDir(); dir != "" {
 			parts = append(parts, relParts(o.baseDir, dir)...)
@@ -777,17 +643,24 @@ func (o *Overlay) breadcrumbText() string {
 		shown = append(shown, parts[len(parts)-3:]...)
 		parts = shown
 	}
+	if len(parts) > 0 && parts[0] == "/" {
+		if len(parts) == 1 {
+			return "/"
+		}
+		return "/" + strings.Join(parts[1:], " / ")
+	}
 	return strings.Join(parts, " / ")
 }
 
-// switchToNC replaces the stack with a single NC root level at dirPath
-// (baseDir when empty). Used for root switching and local deep-links.
+// switchToNC replaces the source stack with a Music source and an NC level
+// at dirPath (baseDir when empty). Used for source selection and local deep-links.
 func (o *Overlay) switchToNC(dirPath string) {
 	if dirPath == "" {
 		dirPath = o.baseDir
 	}
-	lvl := navLevel{ctx: ctxNC, dirPath: dirPath, entries: o.buildNCDirectoryEntries(dirPath)}
-	o.navStack = []navLevel{lvl}
+	lvl := navLevel{ctx: ctxNC, dirPath: dirPath, entries: withParentEntry(o.buildNCDirectoryEntries(dirPath))}
+	o.source = sourceMusic
+	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}, lvl}
 	o.albumEntries = lvl.entries
 	o.albums = labelsOf(lvl.entries)
 	o.albumCursor = 0
@@ -798,11 +671,12 @@ func (o *Overlay) switchToNC(dirPath string) {
 	o.syncPanels()
 }
 
-// switchToLibrary replaces the stack with a single library root level.
-// Used for root switching and remote deep-links.
+// switchToLibrary replaces the source stack with a Music source and a library
+// root level. Used for library refreshes and local deep-links.
 func (o *Overlay) switchToLibrary() {
-	lvl := navLevel{ctx: ctxLibrary, entries: o.buildRootEntries()}
-	o.navStack = []navLevel{lvl}
+	lvl := navLevel{ctx: ctxLibrary, entries: withParentEntry(o.buildRootEntries())}
+	o.source = sourceMusic
+	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}, lvl}
 	o.albumEntries = lvl.entries
 	o.albums = labelsOf(lvl.entries)
 	o.albumCursor = 0
@@ -811,6 +685,29 @@ func (o *Overlay) switchToLibrary() {
 	o.ncRight = ncRightInfo
 	o.marqueeL.invalidate(o)
 	o.syncPanels()
+}
+
+func (o *Overlay) switchToSourceRoot() {
+	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
+	o.source = sourceMusic
+	o.albumEntries = o.navStack[0].entries
+	o.albums = labelsOf(o.albumEntries)
+	o.albumCursor = 0
+	o.albumsScroll = 0
+	o.focusPanel = 0
+	o.marqueeL.invalidate(o)
+	o.syncPanels()
+}
+
+func (o *Overlay) switchToProvider(source sourceKind) {
+	o.source = source
+	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
+	switch source {
+	case sourceModland:
+		o.pushLevel(navLevel{ctx: ctxCatalog, label: "modland", entries: o.buildFormatEntries()})
+	case sourceModArchive:
+		o.pushLevel(navLevel{ctx: ctxCatalog, label: "modarchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
+	}
 }
 
 // ncEnterDir enters a subdirectory in NC mode.

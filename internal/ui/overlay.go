@@ -52,9 +52,18 @@ type PresetCat struct {
 type navCtx int
 
 const (
-	ctxNC      navCtx = iota // NC-local filesystem browser (dirPath set)
-	ctxLibrary               // library root: local albums grouped by directory
-	ctxCatalog               // remote catalog level: formats / albums / modarchive dirs
+	ctxSourceRoot navCtx = iota // virtual source root
+	ctxNC                       // NC-local filesystem browser (dirPath set)
+	ctxLibrary                  // library root: local albums grouped by directory
+	ctxCatalog                  // remote catalog level: formats / albums / modarchive dirs
+)
+
+type sourceKind int
+
+const (
+	sourceMusic sourceKind = iota
+	sourceModland
+	sourceModArchive
 )
 
 // ncRightPanel tracks focus within the NC right panel.
@@ -82,6 +91,7 @@ type Overlay struct {
 	screenW, screenH int
 	fontSize         float64
 	baseDir          string
+	source           sourceKind
 
 	allAlbums      []player.Album
 	navStack       []navLevel
@@ -178,15 +188,17 @@ type Overlay struct {
 	modArchiveItems    map[string][]modarchive.DirItem
 }
 
-// New creates an Overlay. The stack always has a root level; it starts as
-// the library root and is replaced by switchToNC/switchToLibrary.
+// New creates an Overlay. The stack always has a virtual source root.
 func New() *Overlay {
-	return &Overlay{
+	o := &Overlay{
 		programText:     glCreateTextProgram(),
 		programRect:     glCreateRectProgram(),
 		modArchiveItems: make(map[string][]modarchive.DirItem),
-		navStack:        []navLevel{{ctx: ctxLibrary}},
 	}
+	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
+	o.albumEntries = o.navStack[0].entries
+	o.albums = labelsOf(o.albumEntries)
+	return o
 }
 
 func (o *Overlay) Close() {
@@ -346,6 +358,7 @@ func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
 	if o.isNC() {
 		return
 	}
+	atSourceRoot := o.topLevel().ctx == ctxSourceRoot
 	previousCursor := o.albumCursor
 	listChanged := false
 	// Virtual provider albums (modland/modarchive) are overlay-owned and
@@ -364,17 +377,22 @@ func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
 	}
 	if listChanged {
 		o.allAlbums = albums
-		// Library rescanned — reset to a fresh library root; any drill-down
-		// position is now stale.
-		o.navStack = []navLevel{{ctx: ctxLibrary, entries: o.buildRootEntries()}}
+		if atSourceRoot {
+			o.navStack[0].entries = o.buildSourceEntries()
+			o.albumEntries = o.navStack[0].entries
+			o.albums = labelsOf(o.albumEntries)
+		} else {
+			// Library rescanned — reset a stale Music drill-down to its root.
+			o.switchToLibrary()
+		}
 	}
 	// While the UI is open, the overlay cursor is independent of the
 	// library's currently playing album. When hidden, keep it synchronized.
 	// Only meaningful at the root level; a cursor deep in a modland
 	// drill-down is left untouched.
-	if (listChanged || !o.uiVisible) && len(o.navStack) == 1 {
+	if (listChanged || !o.uiVisible) && o.topLevel().ctx == ctxLibrary {
 		o.albumCursor = o.rootIndexOf(cursor)
-		o.navStack[0].cursor = o.albumCursor
+		o.topLevel().cursor = o.albumCursor
 	}
 	if listChanged {
 		o.refreshAlbumLabels()
@@ -464,33 +482,21 @@ func (o *Overlay) SetPresetName(name string) {
 	o.presetNameDirty = true
 }
 
-// SetOnline updates the connectivity flag. When transitioning true, rebuilds
-// root entries so remote catalogs (Modland/ModArchive) appear in the nav list.
+// SetOnline updates the connectivity flag and refreshes the virtual source root.
 func (o *Overlay) SetOnline(v bool) {
 	if o.online == v {
 		return
 	}
 	o.online = v
 	slog.Info("overlay connectivity changed", "online", v, "nc_dir", o.ncDir(), "base_dir", o.baseDir)
-	if o.isNC() && o.ncDir() == o.baseDir {
-		lvl := &o.navStack[len(o.navStack)-1]
-		lvl.entries = o.buildNCDirectoryEntries(o.baseDir)
-		lvl.cursor = clampCursor(lvl.cursor, len(lvl.entries))
-		o.albumEntries = lvl.entries
-		o.albums = labelsOf(lvl.entries)
-		o.albumCursor = lvl.cursor
-		o.albumsDirty = true
-		o.albumsContentDirty = true
-		o.refreshNCPreview()
-		return
-	}
-	// Library root — refresh it so local listings stay current.
-	if top := o.topLevel(); top.ctx == ctxLibrary {
-		top.entries = o.buildRootEntries()
-		top.cursor = clampCursor(top.cursor, len(top.entries))
-		o.albumEntries = top.entries
-		o.albums = labelsOf(top.entries)
-		o.albumCursor = top.cursor
+	root := o.navStack[0]
+	root.entries = o.buildSourceEntries()
+	root.cursor = clampCursor(root.cursor, len(root.entries))
+	o.navStack[0] = root
+	if o.topLevel().ctx == ctxSourceRoot {
+		o.albumEntries = root.entries
+		o.albums = labelsOf(root.entries)
+		o.albumCursor = root.cursor
 		o.syncPanels()
 	}
 }
@@ -504,7 +510,7 @@ func (o *Overlay) NCSync() {
 		return
 	}
 	lvl := &o.navStack[len(o.navStack)-1]
-	lvl.entries = o.buildNCDirectoryEntries(lvl.dirPath)
+	lvl.entries = withParentEntry(o.buildNCDirectoryEntries(lvl.dirPath))
 	lvl.cursor = clampCursor(lvl.cursor, len(lvl.entries))
 	o.albumEntries = lvl.entries
 	o.albums = labelsOf(lvl.entries)

@@ -81,7 +81,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		if lineGap < 1 {
 			lineGap = 1
 		}
-		statusRowH = lh + shadowRadius(o.fontSize) + 4 + lineGap
+		statusRowH = lh + textPadding(o.fontSize) + lineGap
 		if statusRowH > o.bottomTexH {
 			statusRowH = o.bottomTexH
 		}
@@ -112,7 +112,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 
 	if o.uiPage == PageLibrary && o.breadcrumbTex != 0 {
 		glDrawOverlayText(o.programText, o.breadcrumbTex, 1,
-			headerMarginX, float32(lh+indicatorRowH), float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
+			headerMarginX, float32(lh+indicatorRowH-textPadding(o.fontSize)), float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
 	}
 
 	switch o.uiPage {
@@ -445,7 +445,8 @@ func (o *Overlay) renderTextToTexBold(text string, minW int, bold []bool, textCo
 		return 0, 0, 0
 	}
 	lines := strings.Split(text, "\n")
-	lineHeight := o.face.Metrics().Height.Ceil()
+	metrics := o.face.Metrics()
+	lineHeight := metrics.Height.Ceil()
 	bounds := make([]fixed.Rectangle26_6, len(lines))
 	contentW := 0
 	for i, line := range lines {
@@ -454,7 +455,7 @@ func (o *Overlay) renderTextToTexBold(text string, minW int, bold []bool, textCo
 			contentW = width
 		}
 	}
-	padding := shadowRadius(o.fontSize) + 4
+	padding := textPadding(o.fontSize)
 	if minContentW := minW - padding*2; contentW < minContentW {
 		contentW = minContentW
 	}
@@ -467,7 +468,7 @@ func (o *Overlay) renderTextToTexBold(text string, minW int, bold []bool, textCo
 		for i, line := range lines {
 			startDot := fixed.Point26_6{
 				X: fixed.I(originX) - bounds[i].Min.X,
-				Y: fixed.I(originY+i*lineHeight) - bounds[i].Min.Y,
+				Y: fixed.I(originY+i*lineHeight) + metrics.Ascent,
 			}
 			d := &font.Drawer{
 				Dst:  rgba,
@@ -643,7 +644,15 @@ func (o *Overlay) refreshCursorMarqueeTracks(maxTextPx int) {
 func (o *Overlay) drawCursorHighlight(x, y, w, h float32, winW, winH, viewW, viewH int) {
 	tc := o.textColor()
 	r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
-	glDrawFilledRect(o.programRect, x, y, w, h, r, g, b, 0.12, winW, winH, viewW, viewH)
+	// Textures start at the row origin and place glyphs after their scaled
+	// outline padding. Keep the highlight aligned with the glyph row.
+	metrics := o.face.Metrics()
+	lineGap := metrics.Height.Ceil() - metrics.Ascent.Ceil() - metrics.Descent.Ceil()
+	if lineGap < 1 {
+		lineGap = 1
+	}
+	padding := textPadding(o.fontSize) + lineGap
+	glDrawFilledRect(o.programRect, x, y+float32(padding), w, h, r, g, b, 0.12, winW, winH, viewW, viewH)
 }
 
 // renderStatsOnly draws a minimal stats bar (FPS/MEM/CPU) without the full UI.

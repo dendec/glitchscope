@@ -32,13 +32,7 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 		return
 	case input.ActionToggleUI:
 		if a.overlay != nil {
-			wasVisible := a.overlay.UIVisible()
 			a.overlay.ToggleUI() // always show/hide the UI, never cycles pages
-			if !wasVisible && a.overlay.UIVisible() && a.lib != nil {
-				// Opening the playlist screen: start with the cursor on the
-				// track that is currently playing.
-				a.overlay.FocusPlayingTrack(a.lib.CurrentAlbumIndex(), a.lib.CurrentTrackIndex())
-			}
 		}
 		return
 	}

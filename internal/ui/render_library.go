@@ -152,6 +152,13 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.tracksDirty = false
 
+	if e := o.currentEntry(); e != nil && e.kind == entryParent {
+		o.deleteTex(&o.tracksTex)
+		o.marqueeR.invalidate(o)
+		o.tracksContentDirty = false
+		return
+	}
+
 	if o.isNC() {
 		o.rebuildNCInfoTex(maxW, maxH)
 		o.tracksContentDirty = false
