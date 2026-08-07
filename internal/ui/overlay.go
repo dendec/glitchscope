@@ -357,13 +357,12 @@ func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
 	}
 	atSourceRoot := o.topLevel().ctx == ctxSourceRoot
 	previousCursor := o.albumCursor
-	listChanged := false
 	// Virtual provider albums (modland/modarchive) are overlay-owned and
 	// don't exist in the library — ignore them when detecting a rescan,
 	// otherwise creating a ModArchive album resets the nav stack to root.
 	prev := realAlbumsOnly(o.allAlbums)
 	next := realAlbumsOnly(albums)
-	listChanged = len(prev) != len(next)
+	listChanged := len(prev) != len(next)
 	if !listChanged {
 		for i := range next {
 			if prev[i].Name != next[i].Name || prev[i].Path != next[i].Path {

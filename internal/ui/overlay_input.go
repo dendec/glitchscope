@@ -34,8 +34,8 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	state := sdl.GetKeyboardState()
 	now := time.Now()
 
-	o.updateScrollHold(&o.scrollUp, state[sdl.SCANCODE_UP] != 0 || gamepadUp, now, o.cursorUp1)
-	o.updateScrollHold(&o.scrollDown, state[sdl.SCANCODE_DOWN] != 0 || gamepadDown, now, o.cursorDown1)
+	o.updateScrollHold(&o.scrollUp, state[sdl.SCANCODE_UP] != 0 || gamepadUp, now, func() { o.moveCursor(-1) })
+	o.updateScrollHold(&o.scrollDown, state[sdl.SCANCODE_DOWN] != 0 || gamepadDown, now, func() { o.moveCursor(1) })
 	o.updateMarquee(now)
 }
 
@@ -134,95 +134,30 @@ func (o *Overlay) CursorUp() {
 	if !o.panelEntered {
 		return
 	}
-	o.cursorUp1()
-}
-
-func (o *Overlay) cursorUp1() {
-	o.invalidateActiveMarquee()
-	if o.uiPage == PageSettings {
-		if o.settingsEditing {
-			if o.settingsValueCursor > 0 {
-				o.settingsValueCursor--
-				o.settingsDirty = true
-			}
-		} else {
-			if o.settingsCursor > 0 {
-				o.settingsCursor--
-				o.settingsDirty = true
-			}
-		}
-		return
-	}
-	if o.uiPage == PagePresets {
-		switch o.focusPanel {
-		case 0:
-			if o.presetCategoryCursor > 0 {
-				o.presetCategoryCursor--
-				o.presetCursor = 0
-				o.presetsDirty = true
-			}
-		case 1:
-			if cat := o.currentCategory(); cat != nil && o.presetCursor > 0 {
-				o.presetCursor--
-				o.presetsDirty = true
-			}
-		}
-		return
-	}
-	// --- Library page ---
-	if o.isNC() {
-		if o.focusPanel == 0 {
-			if o.albumCursor > 0 {
-				o.albumCursor--
-				o.tracksDirty = true
-				o.albumsDirty = true
-				o.refreshNCPreview()
-			}
-		} else if o.ncRight == ncRightPlay {
-			o.ncRight = ncRightDelete
-			o.tracksDirty = true
-			o.tracksContentDirty = true
-		} else if o.ncRight == ncRightDelete {
-			o.ncRight = ncRightPlay
-			o.tracksDirty = true
-			o.tracksContentDirty = true
-		}
-		return
-	}
-	switch o.focusPanel {
-	case 0:
-		if o.albumCursor > 0 {
-			o.albumCursor--
-			o.trackCursor = 0
-			o.tracksDirty = true
-			o.albumsDirty = true
-		}
-	case 1:
-		if o.trackCursor > 0 {
-			o.trackCursor--
-			o.tracksDirty = true
-		}
-	}
+	o.moveCursor(-1)
 }
 
 func (o *Overlay) CursorDown() {
 	if !o.panelEntered {
 		return
 	}
-	o.cursorDown1()
+	o.moveCursor(1)
 }
 
-func (o *Overlay) cursorDown1() {
+// moveCursor shifts the active cursor by dir (-1 up, +1 down), scoped to the
+// current page and focused panel. Shared by CursorUp/CursorDown so the two
+// directions can't drift out of sync.
+func (o *Overlay) moveCursor(dir int) {
 	o.invalidateActiveMarquee()
 	if o.uiPage == PageSettings {
 		if o.settingsEditing {
 			vals := o.settingsRows[o.settingsCursor].Values
-			if o.settingsValueCursor < len(vals)-1 {
-				o.settingsValueCursor++
+			if next := o.settingsValueCursor + dir; next >= 0 && next < len(vals) {
+				o.settingsValueCursor = next
 				o.settingsDirty = true
 			}
-		} else if o.settingsCursor < len(o.settingsRows)-1 {
-			o.settingsCursor++
+		} else if next := o.settingsCursor + dir; next >= 0 && next < len(o.settingsRows) {
+			o.settingsCursor = next
 			o.settingsDirty = true
 		}
 		return
@@ -230,15 +165,17 @@ func (o *Overlay) cursorDown1() {
 	if o.uiPage == PagePresets {
 		switch o.focusPanel {
 		case 0:
-			if o.presetCategoryCursor < len(o.presetCategories)-1 {
-				o.presetCategoryCursor++
+			if next := o.presetCategoryCursor + dir; next >= 0 && next < len(o.presetCategories) {
+				o.presetCategoryCursor = next
 				o.presetCursor = 0
 				o.presetsDirty = true
 			}
 		case 1:
-			if cat := o.currentCategory(); cat != nil && o.presetCursor < len(cat.Presets)-1 {
-				o.presetCursor++
-				o.presetsDirty = true
+			if cat := o.currentCategory(); cat != nil {
+				if next := o.presetCursor + dir; next >= 0 && next < len(cat.Presets) {
+					o.presetCursor = next
+					o.presetsDirty = true
+				}
 			}
 		}
 		return
@@ -246,18 +183,15 @@ func (o *Overlay) cursorDown1() {
 	// --- Library page ---
 	if o.isNC() {
 		if o.focusPanel == 0 {
-			if o.albumCursor < len(o.albums)-1 {
-				o.albumCursor++
+			if next := o.albumCursor + dir; next >= 0 && next < len(o.albums) {
+				o.albumCursor = next
 				o.tracksDirty = true
 				o.albumsDirty = true
 				o.refreshNCPreview()
 			}
-		} else if o.ncRight == ncRightPlay {
-			o.ncRight = ncRightDelete
-			o.tracksDirty = true
-			o.tracksContentDirty = true
-		} else if o.ncRight == ncRightDelete {
-			o.ncRight = ncRightPlay
+		} else {
+			// Only two buttons — either direction toggles between them.
+			o.ncRight = ncRightPlay + ncRightDelete - o.ncRight
 			o.tracksDirty = true
 			o.tracksContentDirty = true
 		}
@@ -265,15 +199,15 @@ func (o *Overlay) cursorDown1() {
 	}
 	switch o.focusPanel {
 	case 0:
-		if o.albumCursor < len(o.albums)-1 {
-			o.albumCursor++
+		if next := o.albumCursor + dir; next >= 0 && next < len(o.albums) {
+			o.albumCursor = next
 			o.trackCursor = 0
 			o.tracksDirty = true
 			o.albumsDirty = true
 		}
 	case 1:
-		if o.trackCursor < len(o.trackInfos)-1 {
-			o.trackCursor++
+		if next := o.trackCursor + dir; next >= 0 && next < len(o.trackInfos) {
+			o.trackCursor = next
 			o.tracksDirty = true
 		}
 	}
