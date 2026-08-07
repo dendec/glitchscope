@@ -3,6 +3,8 @@ package ui
 import (
 	"log/slog"
 	"math"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dendec/pmv/internal/modarchive"
@@ -427,16 +429,16 @@ func (o *Overlay) Select() bool {
 			case e.IsNCFile():
 				return true // play the file
 			case e.kind == entryModlandRoot:
-				o.pushLevel(navLevel{ctx: ctxCatalog, entries: o.buildFormatEntries()})
+				o.pushLevel(navLevel{ctx: ctxCatalog, label: "Modland", entries: o.buildFormatEntries()})
 				return false
 			case e.kind == entryModArchiveRoot:
-				o.pushLevel(navLevel{ctx: ctxCatalog, entries: o.buildModArchiveEntries(modarchive.BaseURL)})
+				o.pushLevel(navLevel{ctx: ctxCatalog, label: "ModArchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
 				return false
 			case e.kind == entryFormat:
-				o.pushLevel(navLevel{ctx: ctxCatalog, entries: o.buildAlbumsInFormatEntries(e.format)})
+				o.pushLevel(navLevel{ctx: ctxCatalog, label: e.format, entries: o.buildAlbumsInFormatEntries(e.format)})
 				return false
 			case e.kind == entryLocalDir:
-				o.pushLevel(navLevel{ctx: ctxLibrary, entries: o.buildLocalDirEntries(e.dirPath)})
+				o.pushLevel(navLevel{ctx: ctxLibrary, label: filepath.Base(e.dirPath), entries: o.buildLocalDirEntries(e.dirPath)})
 				return false
 			case e.kind == entryModArchiveDir:
 				entries := o.buildModArchiveEntries(e.url)
@@ -453,7 +455,7 @@ func (o *Overlay) Select() bool {
 					return false
 				}
 				if len(entries) > 0 {
-					o.pushLevel(navLevel{ctx: ctxCatalog, entries: entries})
+					o.pushLevel(navLevel{ctx: ctxCatalog, label: strings.TrimSuffix(e.label, "/"), entries: entries})
 					return false
 				}
 				return false

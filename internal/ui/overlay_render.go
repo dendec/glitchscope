@@ -43,6 +43,9 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	if (o.playingTrack != "" || o.loading) && o.bottomDirty {
 		o.rebuildBottomTex(winW, o.face.Metrics().Height.Ceil())
 	}
+	if o.uiPage == PageLibrary {
+		o.rebuildBreadcrumbTex(winW)
+	}
 
 	// Header/footer lines use the same row pitch (lh) as the panels.
 	lh := o.face.Metrics().Height.Ceil()
@@ -59,7 +62,11 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 
 	// The focus border is drawn inset (see drawPanelBorder), so panels can
 	// sit flush against the header/bottom bars with no reserved gap.
-	headerH := lh + indicatorRowH
+	crumbRowH := 0
+	if o.uiPage == PageLibrary {
+		crumbRowH = lh
+	}
+	headerH := lh + indicatorRowH + crumbRowH
 	indicatorY := lh
 
 	// Status row grows to fit the actual texture height, but only enough to
@@ -102,6 +109,11 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	}
 
 	o.renderPageIndicator(winW, winH, viewW, viewH, indicatorY)
+
+	if o.uiPage == PageLibrary && o.breadcrumbTex != 0 {
+		glDrawOverlayText(o.programText, o.breadcrumbTex, 1,
+			headerMarginX, float32(lh+indicatorRowH), float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
+	}
 
 	switch o.uiPage {
 	case PageSettings:
@@ -263,6 +275,26 @@ func (o *Overlay) rebuildStatsTex() {
 	o.statsDirty = false
 	o.deleteTex(&o.statsTex)
 	o.statsTex, o.statsTexW, o.statsTexH = o.renderTextToTex(o.statsLine, o.textColor())
+}
+
+// rebuildBreadcrumbTex re-renders the Library-page breadcrumb path, skipping
+// work while the path hasn't changed since the last build.
+func (o *Overlay) rebuildBreadcrumbTex(winW int) {
+	if o.face == nil {
+		return
+	}
+	text := o.breadcrumbText()
+	if !o.breadcrumbDirty && text == o.breadcrumbTextCache {
+		return
+	}
+	o.breadcrumbDirty = false
+	o.breadcrumbTextCache = text
+	o.deleteTex(&o.breadcrumbTex)
+	if text != "" {
+		maxW := winW - headerMarginX*2
+		text = o.truncateEnd(text, maxW)
+		o.breadcrumbTex, o.breadcrumbTexW, o.breadcrumbTexH = o.renderTextToTex(text, o.textColor())
+	}
 }
 
 func (o *Overlay) rebuildPresetNameTex() {

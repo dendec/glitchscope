@@ -154,6 +154,11 @@ type Overlay struct {
 	presetNameTex                  uint32
 	presetNameTexW, presetNameTexH int
 
+	breadcrumbTex                  uint32
+	breadcrumbTexW, breadcrumbTexH int
+	breadcrumbTextCache            string
+	breadcrumbDirty                bool
+
 	pageIndicatorTex   [3]uint32
 	pageIndicatorTexW  [3]int
 	pageIndicatorTexH  [3]int
@@ -191,6 +196,7 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.bottomTex)
 	o.deleteTex(&o.statsTex)
 	o.deleteTex(&o.presetNameTex)
+	o.deleteTex(&o.breadcrumbTex)
 	o.deleteTex(&o.settingsColL.tex)
 	o.deleteTex(&o.settingsColR.tex)
 	o.deleteTex(&o.presetsColL.tex)
@@ -288,6 +294,7 @@ func (o *Overlay) markAllDirty() {
 	o.settingsDirty = true
 	o.presetsDirty = true
 	o.pageIndicatorDirty = true
+	o.breadcrumbDirty = true
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
 }

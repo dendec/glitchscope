@@ -488,3 +488,71 @@ func TestNCBackFromLibraryRoot(t *testing.T) {
 		t.Fatalf("Back at library root should switch to NC root, got isNC=%v ncDir=%q", o.isNC(), o.ncDir())
 	}
 }
+
+func TestBreadcrumbText(t *testing.T) {
+	o := &Overlay{baseDir: "/music"}
+
+	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/music"}}
+	if got := o.breadcrumbText(); got != "Music" {
+		t.Fatalf("NC root: got %q, want %q", got, "Music")
+	}
+
+	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/music"}, {ctx: ctxNC, dirPath: "/music/a/b"}}
+	if got := o.breadcrumbText(); got != "Music / a / b" {
+		t.Fatalf("NC subdir: got %q", got)
+	}
+
+	// Deep-link collapses the stack to one NC level; crumbs derive from dir.
+	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/music/a/b"}}
+	if got := o.breadcrumbText(); got != "Music / a / b" {
+		t.Fatalf("NC deep-link: got %q", got)
+	}
+
+	o.navStack = []navLevel{
+		{ctx: ctxNC, dirPath: "/music"},
+		{ctx: ctxCatalog, label: "Modland"},
+	}
+	if got := o.breadcrumbText(); got != "Music / Modland" {
+		t.Fatalf("catalog stack: got %q", got)
+	}
+
+	// Leaf album appended when its tracks panel is open.
+	o.albumEntries = []navEntry{{label: "Author", kind: entryModlandAlbum, albumIdx: 0}}
+	o.albumCursor = 0
+	o.focusPanel = 1
+	if got := o.breadcrumbText(); got != "Music / Modland / Author" {
+		t.Fatalf("leaf entered: got %q", got)
+	}
+
+	// Middle elided — root + last three survive.
+	o.navStack = append(o.navStack,
+		navLevel{ctx: ctxCatalog, label: "Protracker"},
+		navLevel{ctx: ctxCatalog, label: "Nested"},
+	)
+	if got := o.breadcrumbText(); got != "Music / … / Protracker / Nested / Author" {
+		t.Fatalf("elision: got %q", got)
+	}
+}
+
+func TestBreadcrumbModlandDeepLink(t *testing.T) {
+	o := &Overlay{baseDir: "/music"}
+	o.allAlbums = []player.Album{
+		{Name: "Modland: Protracker/Curt Cool", Path: player.ModlandPrefix + "Protracker/Curt Cool"},
+	}
+	o.FocusPlayingTrack(0, -1)
+	if got := o.breadcrumbText(); got != "Music / Modland / Protracker / Curt Cool" {
+		t.Fatalf("modland deep-link breadcrumb = %q", got)
+	}
+}
+
+func TestBreadcrumbModArchiveDeepLink(t *testing.T) {
+	o := &Overlay{baseDir: "/music"}
+	const url = "http://modarchive.textfiles.com/modarchive_2011_additions/M03/B/"
+	o.allAlbums = []player.Album{
+		{Name: "ModArchive: 2011/M03/B", Path: player.ModArchivePrefix + url},
+	}
+	o.FocusPlayingTrack(0, -1)
+	if got := o.breadcrumbText(); got != "Music / ModArchive / 2011/M03/B" {
+		t.Fatalf("modarchive deep-link breadcrumb = %q", got)
+	}
+}

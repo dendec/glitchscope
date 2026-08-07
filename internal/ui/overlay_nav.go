@@ -71,6 +71,7 @@ type navLevel struct {
 	cursor  int
 	scroll  int
 	dirPath string // ctxNC: the filesystem directory this level lists
+	label   string // ctxLibrary/ctxCatalog: breadcrumb label for this level
 }
 
 // splitModlandName splits "Modland: Format/Author" into format and author.
@@ -174,11 +175,11 @@ func (o *Overlay) focusModlandAlbum(albumIdx int) {
 	format, _ := splitModlandName(o.allAlbums[albumIdx].Name)
 
 	formats := o.buildFormatEntries()
-	o.navStack = append(o.navStack, navLevel{ctx: ctxCatalog, entries: formats, cursor: indexOfEntry(formats, func(e navEntry) bool { return e.format == format })})
+	o.navStack = append(o.navStack, navLevel{ctx: ctxCatalog, label: "Modland", entries: formats, cursor: indexOfEntry(formats, func(e navEntry) bool { return e.format == format })})
 
 	albums := o.buildAlbumsInFormatEntries(format)
 	albumCursor := indexOfEntry(albums, func(e navEntry) bool { return e.albumIdx == albumIdx })
-	o.navStack = append(o.navStack, navLevel{ctx: ctxCatalog, entries: albums, cursor: albumCursor})
+	o.navStack = append(o.navStack, navLevel{ctx: ctxCatalog, label: format, entries: albums, cursor: albumCursor})
 
 	o.albumCursor = albumCursor
 	o.albumsScroll = 0
@@ -189,8 +190,9 @@ func (o *Overlay) focusModArchiveAlbum(albumIdx int) {
 	o.navStack[0].cursor = 0
 	o.navStack[0].scroll = 0
 	album := o.allAlbums[albumIdx]
-	o.navStack = append(o.navStack, navLevel{ctx: ctxCatalog, entries: []navEntry{
-		{label: album.Name, kind: entryModArchiveAlbum, albumIdx: albumIdx},
+	remote := player.RemotePath(album.Path)
+	o.navStack = append(o.navStack, navLevel{ctx: ctxCatalog, label: "ModArchive", entries: []navEntry{
+		{label: modarchive.AlbumLabel(remote), kind: entryModArchiveAlbum, albumIdx: albumIdx, url: remote},
 	}})
 	o.albumCursor = 0
 	o.albumsScroll = 0
@@ -225,7 +227,7 @@ func (o *Overlay) focusLocalAlbum(albumIdx int) {
 				return e.kind == entryLocalDir && e.dirPath == filepath.Join(dirPath, parts[i+1])
 			})
 		}
-		o.navStack = append(o.navStack, navLevel{ctx: ctxLibrary, entries: entries, cursor: cursor})
+		o.navStack = append(o.navStack, navLevel{ctx: ctxLibrary, label: seg, entries: entries, cursor: cursor})
 	}
 
 	o.albumsScroll = 0
@@ -739,6 +741,43 @@ func (o *Overlay) ncDir() string {
 		return ""
 	}
 	return o.topLevel().dirPath
+}
+
+// breadcrumbParts returns the breadcrumb path components for the current
+// navigation position. NC levels are derived from the current directory
+// (which fully describes the position, even after a deep-link that collapses
+// the stack); library/catalog levels use their stored label.
+func (o *Overlay) breadcrumbParts() []string {
+	parts := []string{"Music"}
+	if o.isNC() {
+		if dir := o.ncDir(); dir != "" {
+			parts = append(parts, relParts(o.baseDir, dir)...)
+		}
+	} else {
+		for i, lvl := range o.navStack {
+			if i > 0 && lvl.label != "" {
+				parts = append(parts, lvl.label)
+			}
+		}
+		if o.focusPanel == 1 {
+			if e := o.currentEntry(); e != nil && e.IsLeafAlbum() {
+				parts = append(parts, e.label)
+			}
+		}
+	}
+	return parts
+}
+
+// breadcrumbText renders the breadcrumb path: root always shown, middle
+// components elided so at most the last three survive.
+func (o *Overlay) breadcrumbText() string {
+	parts := o.breadcrumbParts()
+	if len(parts) > 4 {
+		shown := []string{parts[0], "…"}
+		shown = append(shown, parts[len(parts)-3:]...)
+		parts = shown
+	}
+	return strings.Join(parts, " / ")
 }
 
 // switchToNC replaces the stack with a single NC root level at dirPath
