@@ -87,21 +87,18 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 				}
 			}
 		} else if a.overlay.Select() && a.lib != nil && a.pl != nil {
-			if a.overlay.FocusPanel() == 0 {
+			if a.overlay.IsCatalogMode() {
+				if albumName, path := a.overlay.SelectedCatalogTrack(); path != "" {
+					a.playTrack(path, albumName)
+				}
+			} else if a.overlay.FocusPanel() == 0 {
 				if path := a.lib.SelectAlbum(a.overlay.AlbumCursor()); path != "" {
 					a.playTrack(path, a.lib.CurrentAlbum().Name)
 				}
 			} else {
-				if albumName, tracks, cursor := a.overlay.SelectedTrackPlaylist(); len(tracks) > 0 &&
-					(player.IsModArchive(tracks[0]) || player.IsModland(tracks[0])) {
-					if a.playbackState.setPlaylist(tracks, cursor, albumName) {
-						a.playTrack(tracks[cursor], albumName)
-					}
-				} else {
-					a.lib.SelectAlbum(a.overlay.AlbumCursor())
-					if path := a.lib.SelectTrack(a.overlay.TrackCursor()); path != "" {
-						a.playTrack(path, a.lib.CurrentAlbum().Name)
-					}
+				a.lib.SelectAlbum(a.overlay.AlbumCursor())
+				if path := a.lib.SelectTrack(a.overlay.TrackCursor()); path != "" {
+					a.playTrack(path, a.lib.CurrentAlbum().Name)
 				}
 			}
 		}

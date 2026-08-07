@@ -54,7 +54,6 @@ type navCtx int
 const (
 	ctxSourceRoot navCtx = iota // virtual source root
 	ctxNC                       // NC-local filesystem browser (dirPath set)
-	ctxLibrary                  // library root: local albums grouped by directory
 	ctxCatalog                  // remote catalog level: formats / albums / modarchive dirs
 )
 
@@ -93,30 +92,28 @@ type Overlay struct {
 	baseDir          string
 	source           sourceKind
 
-	allAlbums      []player.Album
-	navStack       []navLevel
-	albumEntries   []navEntry
-	albums         []string
-	albumCursor    int
-	trackInfos     []player.TrackInfo
-	previewEntries []navEntry
-	previewActive  bool
-	trackCursor    int
-	statsLine      string
-	position       float64
-	duration       float64
-	sampleRate     float32
-	bitrate        float64
-	bpm            float64
-	channels       int
-	paused         bool
-	isTracker      bool
-	presetName     string
-	playingAlbum   string
-	playingTrack   string
-	loading        bool
-	loadPercent    int64
-	focusPanel     int // 0=albums, 1=tracks
+	allAlbums    []player.Album
+	navStack     []navLevel
+	albumEntries []navEntry
+	albums       []string
+	albumCursor  int
+	trackInfos   []player.TrackInfo
+	trackCursor  int
+	statsLine    string
+	position     float64
+	duration     float64
+	sampleRate   float32
+	bitrate      float64
+	bpm          float64
+	channels     int
+	paused       bool
+	isTracker    bool
+	presetName   string
+	playingAlbum string
+	playingTrack string
+	loading      bool
+	loadPercent  int64
+	focusPanel   int // 0=albums, 1=tracks
 
 	settingsRows        []SettingRow
 	settingsCursor      int
@@ -353,7 +350,7 @@ func (o *Overlay) rebuildFace() {
 
 // --- Data setters ---
 
-// SetAlbums updates the album list and rebuilds library-root navigation rows.
+// SetAlbums updates the catalog album data used by provider navigation.
 func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
 	if o.isNC() {
 		return
@@ -382,24 +379,16 @@ func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
 			o.albumEntries = o.navStack[0].entries
 			o.albums = labelsOf(o.albumEntries)
 		} else {
-			// Library rescanned — reset a stale Music drill-down to its root.
-			o.switchToLibrary()
+			// A local rescan invalidates the current navigation data. Restart
+			// the filesystem browser at the configured music root.
+			o.switchToNC(o.baseDir)
 		}
-	}
-	// While the UI is open, the overlay cursor is independent of the
-	// library's currently playing album. When hidden, keep it synchronized.
-	// Only meaningful at the root level; a cursor deep in a modland
-	// drill-down is left untouched.
-	if (listChanged || !o.uiVisible) && o.topLevel().ctx == ctxLibrary {
-		o.albumCursor = o.rootIndexOf(cursor)
-		o.topLevel().cursor = o.albumCursor
 	}
 	if listChanged {
 		o.refreshAlbumLabels()
 	}
 	cursorChanged := previousCursor != o.albumCursor
 	if listChanged || cursorChanged {
-		o.refreshPreview()
 		o.albumsDirty = true
 		if listChanged {
 			o.albumsContentDirty = true

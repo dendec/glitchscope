@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/dendec/pmv/internal/player"
 )
@@ -74,9 +73,6 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 				tm = 1
 			}
 			tracksCount := len(o.trackInfos)
-			if o.previewActive {
-				tracksCount = len(o.previewEntries)
-			}
 			drawScrollbar(o, tx+float32(panelW)-sbW, ty, float32(panelH), tracksCount, tm, o.tracksScroll, winW, winH, viewW, viewH)
 			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
 				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
@@ -165,8 +161,17 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 		return
 	}
 
-	if o.previewActive {
-		o.rebuildPreviewTex(maxW, maxH)
+	if o.isCatalog() {
+		o.deleteTex(&o.tracksTex)
+		o.marqueeR.invalidate(o)
+		o.tracksContentDirty = false
+		return
+	}
+
+	e := o.currentEntry()
+	if e == nil || !e.IsLeafAlbum() {
+		o.deleteTex(&o.tracksTex)
+		o.marqueeR.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
@@ -223,32 +228,6 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.tracksContentDirty = false
 }
 
-// rebuildPreviewTex renders the right-panel preview for a non-leaf entry.
-func (o *Overlay) rebuildPreviewTex(maxW, maxH int) {
-	if len(o.previewEntries) == 0 {
-		o.deleteTex(&o.tracksTex)
-		o.marqueeR.invalidate(o)
-		return
-	}
-
-	lh := o.face.Metrics().Height.Ceil()
-	maxRows := maxH / lh
-	if maxRows < 1 {
-		maxRows = 1
-	}
-	maxTextPx := availableRowTextWidth(maxW)
-
-	end := len(o.previewEntries)
-	if end > maxRows {
-		end = maxRows
-	}
-	rows := make([]listRow, end)
-	for i := 0; i < end; i++ {
-		rows[i] = listRow{text: o.previewEntries[i].label}
-	}
-	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
-}
-
 // rebuildNCInfoTex renders the right-panel NC info (file/dir details + buttons).
 func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 	o.deleteTex(&o.tracksTex)
@@ -262,26 +241,10 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		if o.ncInfoDir == o.baseDir {
 			baseName = "Music"
 		}
-		lines = append(lines, baseName, "")
-
-		// List directory contents.
-		dirEntries, err := os.ReadDir(o.ncInfoDir)
-		if err == nil {
-			for _, de := range dirEntries {
-				name := de.Name()
-				if strings.HasPrefix(name, ".") || name == ".pmv_meta.json" {
-					continue
-				}
-				if de.IsDir() {
-					lines = append(lines, "  "+name+"/")
-				} else if de.Type().IsRegular() {
-					ext := strings.ToLower(filepath.Ext(name))
-					if player.IsSupportedExt(ext) {
-						lines = append(lines, "  "+name)
-					}
-				}
-			}
-		}
+		files, dirs := o.ncDirectoryCounts(o.ncInfoDir)
+		lines = append(lines, baseName, "",
+			fmt.Sprintf("  Folders: %d", dirs),
+			fmt.Sprintf("  Playable files: %d", files))
 	} else if o.ncInfoFile != "" {
 		// File info.
 		lines = append(lines, filepath.Base(o.ncInfoFile), "", o.displayTrackPath(o.ncInfoFile), "")

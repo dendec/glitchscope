@@ -98,14 +98,48 @@ func TestSelectModArchiveAlbumKeepsParentEntries(t *testing.T) {
 	if selected := o.Select(); selected {
 		t.Fatal("directory selection unexpectedly started playback")
 	}
-	if o.focusPanel != 1 {
-		t.Fatalf("focusPanel = %d, want tracks panel", o.focusPanel)
+	if len(o.navStack) != 2 {
+		t.Fatalf("navStack depth = %d, want 2", len(o.navStack))
 	}
-	if len(o.albumEntries) != 2 || o.albumEntries[1].label != "other" {
-		t.Fatalf("parent entries were not preserved: %#v", o.albumEntries)
+	if o.focusPanel != 0 {
+		t.Fatalf("focusPanel = %d, want left panel", o.focusPanel)
 	}
-	if !o.albumEntries[0].IsLeafAlbum() {
-		t.Fatalf("selected entry was not resolved to an album: %#v", o.albumEntries[0])
+	if len(o.albumEntries) != 2 || o.albumEntries[1].kind != entryModArchiveAlbum {
+		t.Fatalf("directory contents were not entered as a new level: %#v", o.albumEntries)
+	}
+}
+
+func TestSelectCatalogAlbumEntersTrackLevel(t *testing.T) {
+	entries := []navEntry{{label: "song", kind: entryModlandAlbum, albumIdx: 0}}
+	o := &Overlay{
+		navStack:     []navLevel{{ctx: ctxCatalog, entries: entries}},
+		albumEntries: entries,
+		allAlbums: []player.Album{{
+			Name:   "song",
+			Path:   player.ModlandPrefix + "Protracker/song",
+			Tracks: []string{player.ModlandPrefix + "Protracker/song/song.mod"},
+		}},
+		albumCursor:  0,
+		focusPanel:   0,
+		panelEntered: true,
+	}
+
+	if o.Select() {
+		t.Fatal("catalog album selection unexpectedly started playback")
+	}
+	if o.focusPanel != 0 {
+		t.Fatalf("focusPanel = %d, want left panel", o.focusPanel)
+	}
+	if len(o.navStack) != 2 || len(o.albumEntries) != 2 {
+		t.Fatalf("catalog track level = stack:%d entries:%d, want stack:2 entries:2", len(o.navStack), len(o.albumEntries))
+	}
+	if o.albumEntries[0].kind != entryParent || !o.albumEntries[1].IsCatalogTrack() {
+		t.Fatalf("catalog track entries = %#v, want parent and catalog track", o.albumEntries)
+	}
+	o.CursorDown()
+	name, path := o.SelectedCatalogTrack()
+	if name != "song" || path != player.ModlandPrefix+"Protracker/song/song.mod" {
+		t.Fatalf("selected catalog track = (%q, %q), want song and track path", name, path)
 	}
 }
 
@@ -273,6 +307,26 @@ func TestNCRootEntries(t *testing.T) {
 	}
 	if o.albumEntries[2].kind != entryNCFile {
 		t.Fatalf("expected entryNCFile, got %d", o.albumEntries[2].kind)
+	}
+}
+
+func TestNCDirectoryCounts(t *testing.T) {
+	o, dir := ncTestOverlay(t)
+	defer o.Close()
+
+	files, dirs := o.ncDirectoryCounts(dir)
+	if files != 1 || dirs != 1 {
+		t.Fatalf("root counts = files:%d dirs:%d, want files:1 dirs:1", files, dirs)
+	}
+
+	files, dirs = o.ncDirectoryCounts(filepath.Join(dir, "sub1"))
+	if files != 1 || dirs != 1 {
+		t.Fatalf("sub1 counts = files:%d dirs:%d, want files:1 dirs:1", files, dirs)
+	}
+
+	files, dirs = o.ncDirectoryCounts(filepath.Join(dir, "sub1", "sub2"))
+	if files != 1 || dirs != 0 {
+		t.Fatalf("sub2 counts = files:%d dirs:%d, want files:1 dirs:0", files, dirs)
 	}
 }
 
@@ -485,19 +539,15 @@ func TestNCCatalogRoundTrip(t *testing.T) {
 	}
 }
 
-func TestNCBackFromLibraryRoot(t *testing.T) {
+func TestNCBackFromMusicRoot(t *testing.T) {
 	o, _ := ncTestOverlay(t)
 	defer o.Close()
 	o.panelEntered = true
 
-	// Library root → Back → virtual source root.
-	o.switchToLibrary()
-	if o.isNC() {
-		t.Fatal("library root should not be NC")
-	}
+	// Music root → Back → virtual source root.
 	o.Back()
 	if o.topLevel().ctx != ctxSourceRoot {
-		t.Fatalf("Back at library root should switch to source root, got ctx=%v", o.topLevel().ctx)
+		t.Fatalf("Back at music root should switch to source root, got ctx=%v", o.topLevel().ctx)
 	}
 }
 

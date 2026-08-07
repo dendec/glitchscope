@@ -3,7 +3,6 @@ package ui
 import (
 	"log/slog"
 	"math"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -31,10 +30,6 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	if !o.uiVisible || !o.panelEntered {
 		return
 	}
-
-	// Overlay-owned ModArchive albums can't be resolved via the library's
-	// SetTrackInfos; re-assert their track list each frame.
-	o.refreshVirtualTracks()
 
 	state := sdl.GetKeyboardState()
 	now := time.Now()
@@ -201,7 +196,6 @@ func (o *Overlay) cursorUp1() {
 			o.trackCursor = 0
 			o.tracksDirty = true
 			o.albumsDirty = true
-			o.refreshPreview()
 		}
 	case 1:
 		if o.trackCursor > 0 {
@@ -276,7 +270,6 @@ func (o *Overlay) cursorDown1() {
 			o.trackCursor = 0
 			o.tracksDirty = true
 			o.albumsDirty = true
-			o.refreshPreview()
 		}
 	case 1:
 		if o.trackCursor < len(o.trackInfos)-1 {
@@ -416,9 +409,8 @@ func (o *Overlay) Select() bool {
 		return o.currentCategory() != nil && len(o.currentCategory().Presets) > 0
 	}
 
-	// Album panel selected: drill into a non-leaf entry (NC dir, catalog
-	// root/format/directory, local folder) or switch to the tracks panel
-	// for a leaf album. One dispatch — entry kinds drive everything.
+	// Album panel selected: drill into a non-leaf entry or select a leaf.
+	// One dispatch — entry kinds drive everything.
 	if o.focusPanel == 0 {
 		if e := o.currentEntry(); e != nil {
 			switch {
@@ -438,26 +430,19 @@ func (o *Overlay) Select() bool {
 				return false
 			case e.IsNCFile():
 				return true // play the file
+			case e.IsCatalogTrack():
+				return true // play the catalog track
+			case o.isCatalog() && e.IsLeafAlbum():
+				entries := o.buildCatalogTrackEntries(e.albumIdx)
+				if len(entries) > 0 {
+					o.pushLevel(navLevel{ctx: ctxCatalog, label: e.label, entries: entries})
+				}
+				return false
 			case e.kind == entryFormat:
 				o.pushLevel(navLevel{ctx: ctxCatalog, label: e.format, entries: o.buildAlbumsInFormatEntries(e.format)})
 				return false
-			case e.kind == entryLocalDir:
-				o.pushLevel(navLevel{ctx: ctxLibrary, label: filepath.Base(e.dirPath), entries: o.buildLocalDirEntries(e.dirPath)})
-				return false
 			case e.kind == entryModArchiveDir:
 				entries := o.buildModArchiveEntries(e.url)
-				if len(entries) == 1 && entries[0].kind == entryModArchiveAlbum {
-					// Keep the parent directory list visible and turn the selected
-					// row into the resolved virtual album in place.
-					level := o.currentLevelEntries()
-					level[o.albumCursor] = entries[0]
-					o.refreshAlbumLabels()
-					o.focusPanel = 1
-					o.trackCursor = 0
-					o.refreshPreview()
-					o.tracksDirty = true
-					return false
-				}
 				if len(entries) > 0 {
 					o.pushLevel(navLevel{ctx: ctxCatalog, label: strings.TrimSuffix(e.label, "/"), entries: entries})
 					return false
@@ -465,7 +450,7 @@ func (o *Overlay) Select() bool {
 				return false
 			}
 		}
-		// Leaf album (or unknown entry) — move to the tracks panel.
+		// Local leaf album (or unknown entry) — move to the tracks panel.
 		o.focusPanel = 1
 		o.tracksDirty = true
 		return false
@@ -565,6 +550,8 @@ func (o *Overlay) TrackCursor() int { return o.trackCursor }
 func (o *Overlay) FocusPanel() int { return o.focusPanel }
 
 func (o *Overlay) IsNCMode() bool { return o.isNC() }
+
+func (o *Overlay) IsCatalogMode() bool { return o.isCatalog() }
 
 // NCSelectedFilePath returns the file path for the selected NC file entry,
 // or empty string if not applicable.
