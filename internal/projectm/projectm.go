@@ -5,47 +5,7 @@ package projectm
 #cgo CFLAGS: -I ../../lib/projectm/src/api/include -I ../../lib/projectm/build/src/api/include
 #cgo LDFLAGS: -lGLESv2
 #include <stdlib.h>
-#include <GLES2/gl2.h>
 #include "projectM-4/projectM.h"
-
-// pmClearFeedbackBuffer zeroes projectM's internal feedback framebuffer.
-//
-// projectm_set_window_size() documents that it "resets the OpenGL renderer",
-// which reallocates projectM's internal render targets (including the
-// feedback buffer we stamp notification text into via
-// projectm_opengl_bind_feedback_framebuffer). Freshly (re)allocated GL
-// storage has undefined content until first written, so without this clear
-// stale/garbage GPU memory — sometimes literally the previous frame's text
-// glyphs recycled from freed memory — can bleed into the new buffer.
-static void pmClearFeedbackBuffer(projectm_handle instance) {
-	GLint oldFbo, oldViewport[4], oldScissorBox[4];
-	GLboolean oldScissor, oldColorMask[4];
-	GLfloat oldClearColor[4];
-
-	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFbo);
-	glGetIntegerv(GL_VIEWPORT, oldViewport);
-	glGetIntegerv(GL_SCISSOR_BOX, oldScissorBox);
-	glGetBooleanv(GL_SCISSOR_TEST, &oldScissor);
-	glGetBooleanv(GL_COLOR_WRITEMASK, oldColorMask);
-	glGetFloatv(GL_COLOR_CLEAR_VALUE, oldClearColor);
-
-	projectm_opengl_bind_feedback_framebuffer(instance);
-	glDisable(GL_SCISSOR_TEST);
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	glClearColor(0, 0, 0, 0);
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	glColorMask(oldColorMask[0], oldColorMask[1], oldColorMask[2], oldColorMask[3]);
-	glClearColor(oldClearColor[0], oldClearColor[1], oldClearColor[2], oldClearColor[3]);
-	glScissor(oldScissorBox[0], oldScissorBox[1], oldScissorBox[2], oldScissorBox[3]);
-	glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
-	glBindFramebuffer(GL_FRAMEBUFFER, oldFbo);
-	if (oldScissor) {
-		glEnable(GL_SCISSOR_TEST);
-	} else {
-		glDisable(GL_SCISSOR_TEST);
-	}
-}
 */
 import "C"
 
@@ -94,13 +54,8 @@ func (h *Handle) PCMAddFloat(samples []float32, channels int) {
 }
 
 // SetWindowSize notifies projectM of the viewport dimensions.
-//
-// This resets projectM's internal OpenGL renderer, so the feedback
-// framebuffer is cleared afterward to avoid stale/garbage GPU memory
-// (e.g. leftover injected text) bleeding into the next frame.
 func (h *Handle) SetWindowSize(width, height int) {
 	C.projectm_set_window_size(h.p, C.size_t(width), C.size_t(height))
-	C.pmClearFeedbackBuffer(h.p)
 }
 
 // RenderFrame renders a single visualizer frame. OpenGL context must be current.

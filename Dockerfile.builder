@@ -36,9 +36,13 @@ WORKDIR /build
 COPY lib/projectm lib/projectm
 COPY patches/projectm-feedback.patch /build/patches/projectm-feedback.patch
 RUN cd lib/projectm \
-    && (git apply /build/patches/projectm-feedback.patch 2>/dev/null || true) \
+    && if git apply --check /build/patches/projectm-feedback.patch; then \
+           git apply /build/patches/projectm-feedback.patch; \
+       else \
+           git apply --reverse --check /build/patches/projectm-feedback.patch; \
+       fi \
     && sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
-        config.h.cmake.in 2>/dev/null || true
+        config.h.cmake.in
 
 # --- Build projectM (amd64) ---
 RUN mkdir -p lib/projectm/build-amd64 && cd lib/projectm/build-amd64 && \

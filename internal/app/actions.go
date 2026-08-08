@@ -247,7 +247,7 @@ func (a *App) applySettings(winW, winH int) {
 
 	if a.renderScaleExplicit {
 		if resIndex >= 0 && resIndex < len(resolutions) {
-			a.applyAdaptiveResolution(resolutions[resIndex])
+			a.applyRenderResolution(resolutions[resIndex])
 		}
 		a.resetAdaptiveCounters()
 	} else if resIndex == 0 {
@@ -257,7 +257,7 @@ func (a *App) applySettings(winW, winH int) {
 		a.settings.Graphics.Adaptive = false
 		fixedIdx := resIndex - 1
 		if fixedIdx >= 0 && fixedIdx < len(resolutions) {
-			a.applyAdaptiveResolution(resolutions[fixedIdx])
+			a.applyRenderResolution(resolutions[fixedIdx])
 		}
 		a.resetAdaptiveCounters()
 	}

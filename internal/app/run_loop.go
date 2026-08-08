@@ -63,12 +63,14 @@ func (a *App) Run() {
 
 		if winChanged && prevW > 0 && prevH > 0 {
 			if a.renderScaleExplicit {
-				a.settings.Graphics.RenderWidth = scaledDim(w, a.renderScale)
-				a.settings.Graphics.RenderHeight = scaledDim(h, a.renderScale)
+				a.applyRenderResolution(config.RenderResolution{
+					Width:  scaledDim(w, a.renderScale),
+					Height: scaledDim(h, a.renderScale),
+				})
 			} else if a.settings.Graphics.Adaptive {
 				cur := config.RenderResolution{Width: a.settings.Graphics.RenderWidth, Height: a.settings.Graphics.RenderHeight}
 				if a.adaptive.Configure(w, h, cur) {
-					a.applyAdaptiveResolution(a.adaptive.resolutions[a.adaptive.index])
+					a.applyRenderResolution(a.adaptive.resolutions[a.adaptive.index])
 				} else {
 					slog.Warn("adaptive: empty resolution list on resize", "window", fmt.Sprintf("%dx%d", w, h))
 				}
@@ -77,7 +79,7 @@ func (a *App) Run() {
 				resolutions := config.ComputeResolutions(w, h)
 				saved := config.RenderResolution{Width: a.settings.Graphics.RenderWidth, Height: a.settings.Graphics.RenderHeight}
 				target := config.ClosestResolution(resolutions, saved)
-				a.settings.Graphics.RenderWidth, a.settings.Graphics.RenderHeight = target.Width, target.Height
+				a.applyRenderResolution(target)
 			}
 
 			if a.overlay != nil && a.overlay.IsSettingsPage() {
@@ -89,19 +91,13 @@ func (a *App) Run() {
 
 		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && fpsMeter.Full() {
 			if resolution, direction, changed := a.adaptive.Decide(now, fpsAvg); changed {
-				a.applyAdaptiveResolution(resolution)
+				a.applyRenderResolution(resolution)
 				if direction > 0 {
 					slog.Info("adaptive: step down", "resolution", resolution)
 				} else {
 					slog.Info("adaptive: step up", "resolution", resolution)
 				}
 			}
-		}
-
-		renderW, renderH := a.settings.Graphics.RenderWidth, a.settings.Graphics.RenderHeight
-		if rw, rh := a.rt.Size(); rw != renderW || rh != renderH {
-			a.rt.Resize(renderW, renderH)
-			a.pm.SetWindowSize(renderW, renderH)
 		}
 
 		if a.overlay != nil {
@@ -205,9 +201,12 @@ func (a *App) resetPresetTicker() {
 	a.startPresetTicker()
 }
 
-func (a *App) applyAdaptiveResolution(r config.RenderResolution) {
+func (a *App) applyRenderResolution(r config.RenderResolution) {
 	a.settings.Graphics.RenderWidth = r.Width
 	a.settings.Graphics.RenderHeight = r.Height
+	if currentW, currentH := a.rt.Size(); currentW == r.Width && currentH == r.Height {
+		return
+	}
 	a.rt.Resize(r.Width, r.Height)
 	a.pm.SetWindowSize(r.Width, r.Height)
 }
@@ -221,5 +220,5 @@ func (a *App) resetAdaptiveState(winW, winH int) {
 		slog.Warn("adaptive: empty resolution list", "window", fmt.Sprintf("%dx%d", winW, winH))
 		return
 	}
-	a.applyAdaptiveResolution(a.adaptive.resolutions[0])
+	a.applyRenderResolution(a.adaptive.resolutions[0])
 }

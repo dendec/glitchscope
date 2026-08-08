@@ -31,7 +31,6 @@ PROJECTM_DIR      := lib/projectm
 PROJECTM_BUILD    := $(PROJECTM_DIR)/build
 PROJECTM_LIB      := $(PROJECTM_BUILD)/src/libprojectM/libprojectM-4.a
 PROJECTM_EVAL_LIB := $(PROJECTM_BUILD)/vendor/projectm-eval/projectm-eval/libprojectM_eval.a
-PROJECTM_PATCH    := patches/projectm-feedback.patch
 
 CGO_CXXFLAGS := $(SDL_CFLAGS) -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/opt/gme/amd64/include -I/opt/ayumi/include -I/opt/pt3player/include -I/opt/libstsound/include -I/opt/crsid/include -I/opt/ffmpeg/amd64/include -I/build/lib/soloud/include -I/build/lib/game-music-emu/gme -Wno-write-strings
 CGO_LDFLAGS  := $(SDL_LIBS) /opt/pt3player/amd64/lib/libpt3player.a /opt/ayumi/amd64/lib/libayumi.a /opt/libstsound/amd64/lib/libstsound.a /opt/crsid/amd64/lib/libcrsid.a /opt/ffmpeg/amd64/lib/libavformat.a /opt/ffmpeg/amd64/lib/libavcodec.a /opt/ffmpeg/amd64/lib/libswresample.a /opt/ffmpeg/amd64/lib/libavutil.a $(PROJECTM_LIB) $(PROJECTM_EVAL_LIB) -ldl -lGL -lGLESv2 -lm -pthread /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a /opt/gme/amd64/lib/libgme.a -lvorbisfile -lvorbis -lFLAC -logg -lmpg123 -lz -lstdc++
@@ -155,8 +154,12 @@ deploy: dist-arm64 portable-pmv $(TEXTURES_PMV_FILE)
 	adb push $(PMV_FILE) $(DEVICE_DIR)/presets/presets.pmv
 	# Deploy the optimized texture archive for MilkDrop presets.
 	adb push $(TEXTURES_PMV_FILE) $(DEVICE_DIR)/presets/textures.pmv
+	# Deploy the prebuilt Modland and ModArchive catalogs.
+	adb shell "mkdir -p $(DEVICE_DIR)/.cache/modland $(DEVICE_DIR)/.cache/modarchive"
+	adb push $(ARM64_DIST_DIR)/pmv/.cache/modland/catalog $(DEVICE_DIR)/.cache/modland/catalog
+	adb push $(ARM64_DIST_DIR)/pmv/.cache/modarchive/catalog $(DEVICE_DIR)/.cache/modarchive/catalog
 	adb shell "killall -9 pmv 2>/dev/null; true"
-	@echo "=== Deployed binary + music + presets + textures ==="
+	@echo "=== Deployed binary + music + presets + textures + catalogs ==="
 
 deploy-fast: dist-arm64
 	adb push $(ARM64_DIST_DIR)/pmv/pmv $(DEVICE_DIR)/
