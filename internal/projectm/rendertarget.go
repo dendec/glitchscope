@@ -121,8 +121,10 @@ import "C"
 // libprojectM always draws into framebuffer 0 at SetWindowSize dimensions.
 // We capture that corner with glCopyTexSubImage2D and blit/upscale to the full window.
 type RenderTarget struct {
-	tex, program C.GLuint
-	w, h         int
+	tex, previousTex, program C.GLuint
+	w, h                      int
+	nearest                   bool
+	showPrevious              bool
 }
 
 // NewRenderTarget creates the capture texture and blit shader.
@@ -141,15 +143,29 @@ func (rt *RenderTarget) SetNearest(nearest bool) {
 		value = C.GLboolean(1)
 	}
 	C.rtSetNearest(rt.tex, value)
+	rt.nearest = nearest
 }
 
-// Resize updates the dimensions for the next Capture call.
+// Resize updates the dimensions for the next Capture call while retaining the
+// last image for the first presentation at the new resolution.
 func (rt *RenderTarget) Resize(width, height int) {
-	if width <= 0 || height <= 0 || rt.tex == 0 {
+	if width <= 0 || height <= 0 || rt.tex == 0 || (width == rt.w && height == rt.h) {
 		return
 	}
-	C.rtResizeTexture(rt.tex, C.GLsizei(width), C.GLsizei(height))
+
+	var nextTex C.GLuint
+	C.rtCreateTexture(&nextTex)
+	C.rtResizeTexture(nextTex, C.GLsizei(width), C.GLsizei(height))
+	if rt.nearest {
+		C.rtSetNearest(nextTex, C.GLboolean(1))
+	}
+	if rt.previousTex != 0 {
+		C.rtDestroyTexture(rt.previousTex)
+	}
+	rt.previousTex = rt.tex
+	rt.tex = nextTex
 	rt.w, rt.h = width, height
+	rt.showPrevious = true
 }
 
 // Size returns the current render target dimensions.
@@ -165,13 +181,24 @@ func (rt *RenderTarget) Capture() {
 
 // BlitToScreen draws the captured texture scaled up to fill the viewport.
 func (rt *RenderTarget) BlitToScreen(dstW, dstH int) {
-	C.rtBlit(rt.program, rt.tex, C.GLsizei(dstW), C.GLsizei(dstH))
+	tex := rt.tex
+	if rt.showPrevious && rt.previousTex != 0 {
+		tex = rt.previousTex
+	}
+	C.rtBlit(rt.program, tex, C.GLsizei(dstW), C.GLsizei(dstH))
+	if rt.showPrevious {
+		C.rtDestroyTexture(rt.previousTex)
+		rt.previousTex = 0
+		rt.showPrevious = false
+	}
 }
 
 // Destroy frees the GL resources.
 func (rt *RenderTarget) Destroy() {
 	C.rtDestroyTexture(rt.tex)
 	rt.tex = 0
+	C.rtDestroyTexture(rt.previousTex)
+	rt.previousTex = 0
 	if rt.program != 0 {
 		C.glDeleteProgram(rt.program)
 		rt.program = 0

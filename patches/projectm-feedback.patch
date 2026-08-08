@@ -23,6 +23,18 @@ diff --git a/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp b/src/libprojectM
 index e311cf0..27ffe11 100755
 --- a/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
 +++ b/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
+@@ -81,9 +81,11 @@ void MilkdropPreset::RenderFrame(const libprojectM::Audio::FrameAudioData& audio
+     m_state.renderContext = renderContext;
+ 
+     // Update framebuffer and u/v texture size if needed
++    const auto previousOutput = OutputTexture();
+     if (m_framebuffer.SetSize(renderContext.viewportSizeX, renderContext.viewportSizeY))
+     {
+         m_motionVectorUVMap->SetSize(renderContext.viewportSizeX, renderContext.viewportSizeY);
++        m_flipTexture.Draw(previousOutput, m_framebuffer, m_previousFrameBuffer);
+         m_isFirstFrame = true;
+     }
+ 
 @@ -169,6 +169,11 @@ void MilkdropPreset::RenderFrame(const libprojectM::Audio::FrameAudioData& audio
      m_isFirstFrame = false;
  }
@@ -36,7 +48,7 @@ index e311cf0..27ffe11 100755
  {
      // the composited image is always stored in the "current" framebuffer after a frame is rendered.
 diff --git a/src/libprojectM/Renderer/Framebuffer.cpp b/src/libprojectM/Renderer/Framebuffer.cpp
-index 455cdae..a756092 100644
+index 455cdae..27bbcc7 100644
 --- a/src/libprojectM/Renderer/Framebuffer.cpp
 +++ b/src/libprojectM/Renderer/Framebuffer.cpp
 @@ -89,6 +89,17 @@ bool Framebuffer::SetSize(int width, int height)
@@ -150,3 +162,5 @@ index cbf5f6e..8c12bc0 100644
  void projectm_set_beat_sensitivity(projectm_handle instance, float sensitivity)
  {
      auto projectMInstance = handle_to_instance(instance);
+
+

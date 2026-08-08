@@ -410,7 +410,7 @@ struct hvl_tune *hvl_load_ahx( const uint8 *buf, uint32 buflen, uint32 defstereo
 
   strncpy( ht->ht_Name, (TEXT *)bptr, i );
   if ( i < 128 ) ht->ht_Name[ i ] = 0;
-  nptr = (TEXT *)bptr+strlen( ht->ht_Name )+1;
+  nptr = (const TEXT *)bptr+strlen( ht->ht_Name )+1;
   if ( nptr > (const TEXT *)(buf + buflen) )
   {
     free( ht );
@@ -674,7 +674,7 @@ struct hvl_tune *hvl_LoadTune( const uint8 *buf, uint32 buflen, uint32 freq, uin
 
   strncpy( ht->ht_Name, (TEXT *)bptr, i );
   if ( i < 128 ) ht->ht_Name[ i ] = 0;
-  nptr = (TEXT *)bptr+strlen( ht->ht_Name )+1;
+  nptr = (const TEXT *)bptr+strlen( ht->ht_Name )+1;
   if ( nptr > (const TEXT *)(buf + buflen) )
   {
     free( ht );
