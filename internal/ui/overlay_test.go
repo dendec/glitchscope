@@ -69,7 +69,7 @@ func TestTrackTitleKeepsExtension(t *testing.T) {
 	}
 }
 
-func TestSelectModArchiveAlbumKeepsParentEntries(t *testing.T) {
+func TestSelectModArchiveDirectoryShowsFiles(t *testing.T) {
 	targetURL := "http://modarchive.textfiles.com/2014/IT/J/"
 	entries := []navEntry{
 		{label: "2014", kind: entryModArchiveDir, url: targetURL},
@@ -104,8 +104,33 @@ func TestSelectModArchiveAlbumKeepsParentEntries(t *testing.T) {
 	if o.focusPanel != 0 {
 		t.Fatalf("focusPanel = %d, want left panel", o.focusPanel)
 	}
-	if len(o.albumEntries) != 2 || o.albumEntries[1].kind != entryModArchiveAlbum {
-		t.Fatalf("directory contents were not entered as a new level: %#v", o.albumEntries)
+	if len(o.albumEntries) != 2 || o.albumEntries[1].kind != entryCatalogTrack {
+		t.Fatalf("directory files were not entered as a new level: %#v", o.albumEntries)
+	}
+}
+
+func TestSelectModArchiveEmptyDirectoryEntersLevel(t *testing.T) {
+	targetURL := "http://modarchive.textfiles.com/2014/IT/B/"
+	o := &Overlay{
+		navStack:     []navLevel{{ctx: ctxCatalog, entries: []navEntry{{label: "B/", kind: entryModArchiveDir, url: targetURL}}}},
+		albumEntries: []navEntry{{label: "B/", kind: entryModArchiveDir, url: targetURL}},
+		albums:       []string{"B/"},
+		modArchiveItems: map[string][]modarchive.DirItem{
+			targetURL: {},
+		},
+		allAlbums:   []player.Album{},
+		albumCursor: 0,
+		focusPanel:  0,
+	}
+
+	if o.Select() {
+		t.Fatal("empty directory selection unexpectedly started playback")
+	}
+	if len(o.navStack) != 2 {
+		t.Fatalf("navStack depth = %d, want 2", len(o.navStack))
+	}
+	if len(o.albumEntries) != 1 || o.albumEntries[0].kind != entryParent {
+		t.Fatalf("empty directory level = %#v, want parent entry", o.albumEntries)
 	}
 }
 
@@ -243,8 +268,8 @@ func TestModArchiveSyncFromCache(t *testing.T) {
 
 	// First access resolves to a leaf album immediately — no async, no retry.
 	entries := o.buildModArchiveEntries(url)
-	if len(entries) != 1 || entries[0].kind != entryModArchiveAlbum {
-		t.Fatalf("expected one resolved album, got %#v", entries)
+	if len(entries) != 1 || entries[0].kind != entryCatalogTrack {
+		t.Fatalf("expected one catalog track, got %#v", entries)
 	}
 	if len(o.allAlbums) != 1 {
 		t.Fatalf("expected album appended to allAlbums, got %d", len(o.allAlbums))
@@ -552,29 +577,29 @@ func TestNCBackFromMusicRoot(t *testing.T) {
 }
 
 func TestBreadcrumbText(t *testing.T) {
-	o := &Overlay{baseDir: "/music"}
+	o := &Overlay{baseDir: "/app"}
 
-	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/music"}}
+	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/app/music"}}
 	if got := o.breadcrumbText(); got != "/music" {
 		t.Fatalf("NC root: got %q, want %q", got, "/music")
 	}
 
-	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/music"}, {ctx: ctxNC, dirPath: "/music/a/b"}}
-	if got := o.breadcrumbText(); got != "/music / a / b" {
+	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/app/music"}, {ctx: ctxNC, dirPath: "/app/music/a/b"}}
+	if got := o.breadcrumbText(); got != "/music/a/b" {
 		t.Fatalf("NC subdir: got %q", got)
 	}
 
 	// Deep-link collapses the stack to one NC level; crumbs derive from dir.
-	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/music/a/b"}}
-	if got := o.breadcrumbText(); got != "/music / a / b" {
+	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/app/music/a/b"}}
+	if got := o.breadcrumbText(); got != "/music/a/b" {
 		t.Fatalf("NC deep-link: got %q", got)
 	}
 
 	o.navStack = []navLevel{
-		{ctx: ctxNC, dirPath: "/music"},
+		{ctx: ctxNC, dirPath: "/app/music"},
 		{ctx: ctxCatalog, label: "Modland"},
 	}
-	if got := o.breadcrumbText(); got != "/music / Modland" {
+	if got := o.breadcrumbText(); got != "/music/Modland" {
 		t.Fatalf("catalog stack: got %q", got)
 	}
 
@@ -582,16 +607,17 @@ func TestBreadcrumbText(t *testing.T) {
 	o.albumEntries = []navEntry{{label: "Author", kind: entryModlandAlbum, albumIdx: 0}}
 	o.albumCursor = 0
 	o.focusPanel = 1
-	if got := o.breadcrumbText(); got != "/music / Modland / Author" {
+	if got := o.breadcrumbText(); got != "/music/Modland/Author" {
 		t.Fatalf("leaf entered: got %q", got)
 	}
 
-	// Middle elided — root + last three survive.
+	// Full catalog path remains available; rendering truncates only when it
+	// exceeds the available width.
 	o.navStack = append(o.navStack,
 		navLevel{ctx: ctxCatalog, label: "Protracker"},
 		navLevel{ctx: ctxCatalog, label: "Nested"},
 	)
-	if got := o.breadcrumbText(); got != "/… / Protracker / Nested / Author" {
+	if got := o.breadcrumbText(); got != "/music/Modland/Protracker/Nested/Author" {
 		t.Fatalf("elision: got %q", got)
 	}
 }

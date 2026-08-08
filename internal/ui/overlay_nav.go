@@ -39,15 +39,14 @@ func realAlbumsOnly(list []player.Album) []player.Album {
 type navEntryKind int
 
 const (
-	entrySource          navEntryKind = iota // virtual source root entry
-	entryFormat                              // modland format bucket (e.g. "Protracker")
-	entryModlandAlbum                        // modland author/album within a format — leaf, has tracks
-	entryModArchiveDir                       // ModArchive HTTP directory folder
-	entryModArchiveAlbum                     // ModArchive leaf album containing tracks
-	entryCatalogTrack                        // track in a catalog album
-	entryParent                              // parent navigation level
-	entryNCDir                               // NC directory entry
-	entryNCFile                              // NC file entry (leaf)
+	entrySource        navEntryKind = iota // virtual source root entry
+	entryFormat                            // modland format bucket (e.g. "Protracker")
+	entryModlandAlbum                      // modland author/album within a format — leaf, has tracks
+	entryModArchiveDir                     // ModArchive HTTP directory folder
+	entryCatalogTrack                      // track in a catalog album
+	entryParent                            // parent navigation level
+	entryNCDir                             // NC directory entry
+	entryNCFile                            // NC file entry (leaf)
 )
 
 // navEntry is one row in the library's left (navigation) panel.
@@ -95,7 +94,7 @@ func (e *navEntry) IsLeafAlbum() bool {
 	if e == nil {
 		return false
 	}
-	return e.kind == entryModlandAlbum || e.kind == entryModArchiveAlbum
+	return e.kind == entryModlandAlbum
 }
 
 func (e *navEntry) IsNCDirectory() bool {
@@ -196,13 +195,17 @@ func (o *Overlay) buildCatalogTrackEntries(albumIdx int) []navEntry {
 }
 
 // buildModArchiveEntries returns directory items from the overlay cache or
-// the pre-crawled local index. All listings are cached locally — no fetch.
+// the pre-crawled local index. A missing or empty index is refreshed on demand.
 func (o *Overlay) buildModArchiveEntries(targetURL string) []navEntry {
 	items, ok := o.modArchiveItems[targetURL]
 	if !ok {
 		items, ok = modarchive.FetchDirectoryCached(o.baseDir, targetURL)
 		if !ok {
-			return nil
+			var err error
+			items, err = modarchive.FetchDirectory(o.baseDir, targetURL)
+			if err != nil {
+				return nil
+			}
 		}
 		o.modArchiveItems[targetURL] = items
 	}
@@ -211,7 +214,7 @@ func (o *Overlay) buildModArchiveEntries(targetURL string) []navEntry {
 
 func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []modarchive.DirItem) []navEntry {
 	if len(items) == 0 {
-		return nil
+		return []navEntry{}
 	}
 
 	hasDirs := false
@@ -257,14 +260,7 @@ func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []moda
 		}
 
 		if albumIdx >= 0 {
-			return []navEntry{
-				{
-					label:    modarchive.AlbumLabel(targetURL),
-					kind:     entryModArchiveAlbum,
-					albumIdx: albumIdx,
-					url:      targetURL,
-				},
-			}
+			return o.buildCatalogTrackEntries(albumIdx)
 		}
 	}
 
@@ -495,11 +491,12 @@ func (o *Overlay) breadcrumbParts() []string {
 	}
 	if o.isNC() {
 		if dir := o.ncDir(); dir != "" {
-			parts = append(parts, relParts(o.baseDir, dir)...)
+			musicRoot := filepath.Join(o.baseDir, "music")
+			parts = append(parts, relParts(musicRoot, dir)...)
 		}
 	} else {
 		for i, lvl := range o.navStack {
-			if i > 0 && lvl.label != "" {
+			if i > 0 && lvl.label != "" && lvl.label != ".." {
 				parts = append(parts, lvl.label)
 			}
 		}
@@ -512,22 +509,17 @@ func (o *Overlay) breadcrumbParts() []string {
 	return parts
 }
 
-// breadcrumbText renders the breadcrumb path: root always shown, middle
-// components elided so at most the last three survive.
+// breadcrumbText renders the breadcrumb path. Width truncation is handled by
+// rebuildBreadcrumbTex after the complete path has been assembled.
 func (o *Overlay) breadcrumbText() string {
 	parts := o.breadcrumbParts()
-	if len(parts) > 4 {
-		shown := []string{parts[0], "…"}
-		shown = append(shown, parts[len(parts)-3:]...)
-		parts = shown
-	}
 	if len(parts) > 0 && parts[0] == "/" {
 		if len(parts) == 1 {
 			return "/"
 		}
-		return "/" + strings.Join(parts[1:], " / ")
+		return "/" + strings.Join(parts[1:], "/")
 	}
-	return strings.Join(parts, " / ")
+	return strings.Join(parts, "/")
 }
 
 // switchToNC replaces the source stack with a Music source and an NC level

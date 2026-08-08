@@ -3,6 +3,7 @@ package ui
 import (
 	"log/slog"
 	"math"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -354,7 +355,7 @@ func (o *Overlay) Select() bool {
 			case e.kind == entrySource:
 				switch e.source {
 				case sourceMusic:
-					o.switchToNC(o.baseDir)
+					o.switchToNC(filepath.Join(o.baseDir, "music"))
 				case sourceModland, sourceModArchive:
 					o.switchToProvider(e.source)
 				}
@@ -377,7 +378,7 @@ func (o *Overlay) Select() bool {
 				return false
 			case e.kind == entryModArchiveDir:
 				entries := o.buildModArchiveEntries(e.url)
-				if len(entries) > 0 {
+				if entries != nil {
 					o.pushLevel(navLevel{ctx: ctxCatalog, label: strings.TrimSuffix(e.label, "/"), entries: entries})
 					return false
 				}
