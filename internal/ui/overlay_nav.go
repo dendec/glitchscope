@@ -134,9 +134,9 @@ func (o *Overlay) micLabel() string {
 }
 
 func (o *Overlay) buildSourceEntries() []navEntry {
-	entries := []navEntry{
-		{label: "music/", kind: entrySource, source: sourceMusic, albumIdx: -1},
-		{label: o.micLabel(), kind: entrySource, source: sourceMicrophone, albumIdx: -1},
+	entries := []navEntry{{label: "music/", kind: entrySource, source: sourceMusic, albumIdx: -1}}
+	if len(o.micDevices) > 0 || o.micActive {
+		entries = append(entries, navEntry{label: o.micLabel(), kind: entrySource, source: sourceMicrophone, albumIdx: -1})
 	}
 	if o.online {
 		entries = append(entries,

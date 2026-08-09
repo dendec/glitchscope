@@ -92,7 +92,9 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 		} else {
 			selected := a.overlay.Select()
 			if a.overlay.ConsumeMicMenuRequest() {
-				a.overlay.ShowMicrophoneDevices(mic.InputDevices())
+				devices := mic.InputDevices()
+				a.overlay.SetMicDevices(devices)
+				a.overlay.ShowMicrophoneDevices(devices)
 			} else if device, ok := a.overlay.ConsumeMicDeviceSelection(); ok {
 				a.startMicCapture(device)
 			} else if a.overlay.ConsumeMicStopRequest() {
@@ -356,8 +358,10 @@ func (a *App) startMicCapture(device string) {
 	}
 	a.mic = c
 	if a.overlay != nil {
+		devices := mic.InputDevices()
+		a.overlay.SetMicDevices(devices)
 		a.overlay.SetMicActive(true)
-		a.overlay.ShowMicrophoneDevices(mic.InputDevices())
+		a.overlay.ShowMicrophoneDevices(devices)
 		a.overlay.ShowTrack("microphone: " + device)
 	}
 	slog.Info("mic capture started", "device", device, "backend", c.Backend(), "rate", c.Rate(), "channels", c.Channels())
@@ -370,8 +374,10 @@ func (a *App) stopMicCapture() {
 	a.mic.Close()
 	a.mic = nil
 	if a.overlay != nil {
+		devices := mic.InputDevices()
+		a.overlay.SetMicDevices(devices)
 		a.overlay.SetMicActive(false)
-		a.overlay.ShowMicrophoneDevices(mic.InputDevices())
+		a.overlay.ShowMicrophoneDevices(devices)
 	}
 	slog.Info("mic capture stopped")
 }

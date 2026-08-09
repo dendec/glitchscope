@@ -272,6 +272,7 @@ func (a *App) initAudio() {
 	a.presenter = newOverlayPresenter(a.overlay)
 	a.overlay.SetBaseDir(baseDir())
 	a.overlay.SetShowFPS(a.showFPS)
+	a.overlay.SetMicDevices(mic.InputDevices())
 	w, h := a.window.GLGetDrawableSize()
 	a.overlay.SetScreenSize(int(w), int(h))
 	slog.Info("audio init", "ms", time.Since(t).Milliseconds())

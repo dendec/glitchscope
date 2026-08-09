@@ -197,6 +197,33 @@ func TestMicrophoneDeviceSelection(t *testing.T) {
 	}
 }
 
+func TestMicrophoneSourceHiddenWithoutDevices(t *testing.T) {
+	o := &Overlay{navStack: []navLevel{{ctx: ctxSourceRoot}}}
+	o.SetMicDevices(nil)
+
+	if len(o.albumEntries) != 1 || o.albumEntries[0].source != sourceMusic {
+		t.Fatalf("source entries without devices = %#v, want music only", o.albumEntries)
+	}
+
+	o.micActive = true
+	o.SetMicDevices(nil)
+	if len(o.albumEntries) != 2 || o.albumEntries[1].source != sourceMicrophone {
+		t.Fatalf("source entries during capture = %#v, want music and microphone", o.albumEntries)
+	}
+}
+
+func TestMicrophoneSourceHiddenWhenCaptureStopsAfterDeviceRemoval(t *testing.T) {
+	o := &Overlay{navStack: []navLevel{{ctx: ctxSourceRoot}}}
+	o.SetMicDevices([]string{"USB microphone"})
+	o.SetMicActive(true)
+	o.SetMicDevices(nil)
+	o.SetMicActive(false)
+
+	if len(o.albumEntries) != 1 || o.albumEntries[0].source != sourceMusic {
+		t.Fatalf("source entries after capture stops = %#v, want music only", o.albumEntries)
+	}
+}
+
 // --- scrollOffset ---
 
 func TestScrollOffset_noScrollNeeded(t *testing.T) {
@@ -563,6 +590,7 @@ func TestNCDeleteConfirm(t *testing.T) {
 func TestNCCatalogRoundTrip(t *testing.T) {
 	o, _ := ncTestOverlay(t)
 	defer o.Close()
+	o.SetMicDevices([]string{"test microphone"})
 	o.SetOnline(true)
 	o.switchToSourceRoot()
 	o.panelEntered = true

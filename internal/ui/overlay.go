@@ -186,7 +186,8 @@ type Overlay struct {
 	presetNameDirty    bool
 	presetsDirty       bool
 	online             bool
-	micActive          bool   // microphone capture is running
+	micActive          bool // microphone capture is running
+	micDevices         []string
 	micMenuRequested   bool   // one-shot: microphone source selected
 	micDeviceSelected  string // one-shot: selected SDL capture device name
 	micStopRequested   bool   // one-shot: stop capture selected
@@ -513,6 +514,21 @@ func (o *Overlay) SetMicActive(active bool) {
 		return
 	}
 	o.micActive = active
+	root := o.navStack[0]
+	root.entries = o.buildSourceEntries()
+	root.cursor = clampCursor(root.cursor, len(root.entries))
+	o.navStack[0] = root
+	if o.topLevel().ctx == ctxSourceRoot {
+		o.albumEntries = root.entries
+		o.albums = labelsOf(root.entries)
+		o.albumCursor = root.cursor
+		o.syncPanels()
+	}
+}
+
+// SetMicDevices updates the available capture devices and refreshes the source root.
+func (o *Overlay) SetMicDevices(devices []string) {
+	o.micDevices = append(o.micDevices[:0], devices...)
 	root := o.navStack[0]
 	root.entries = o.buildSourceEntries()
 	root.cursor = clampCursor(root.cursor, len(root.entries))
