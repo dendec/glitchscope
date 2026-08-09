@@ -30,6 +30,13 @@ export LD_LIBRARY_PATH="$GAMEDIR/lib:/usr/lib:$LD_LIBRARY_PATH"
 export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 export SDL_AUDIODRIVER="alsa"
 
+# The handheld's codec exposes its capture PCM with the MIC input route muted
+# after boot. Enable it when these codec controls are available; other devices
+# simply ignore the unsupported controls.
+amixer -c 0 cset numid=12 on >/dev/null 2>&1 || true
+amixer -c 0 cset numid=13 on >/dev/null 2>&1 || true
+amixer -c 0 cset numid=9 160,160 >/dev/null 2>&1 || true
+
 # Display standard PortMaster loading text
 pm_message "Loading PMV... (Compiling shaders)"
 

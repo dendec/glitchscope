@@ -38,14 +38,17 @@ func realAlbumsOnly(list []player.Album) []player.Album {
 type navEntryKind int
 
 const (
-	entrySource        navEntryKind = iota // virtual source root entry
-	entryFormat                            // modland format bucket (e.g. "Protracker")
-	entryModlandAlbum                      // modland author/album within a format — leaf, has tracks
-	entryModArchiveDir                     // ModArchive HTTP directory folder
-	entryCatalogTrack                      // track in a catalog album
-	entryParent                            // parent navigation level
-	entryNCDir                             // NC directory entry
-	entryNCFile                            // NC file entry (leaf)
+	entrySource           navEntryKind = iota // virtual source root entry
+	entryFormat                               // modland format bucket (e.g. "Protracker")
+	entryModlandAlbum                         // modland author/album within a format — leaf, has tracks
+	entryModArchiveDir                        // ModArchive HTTP directory folder
+	entryCatalogTrack                         // track in a catalog album
+	entryParent                               // parent navigation level
+	entryNCDir                                // NC directory entry
+	entryNCFile                               // NC file entry (leaf)
+	entryMicrophoneDevice                     // SDL capture device entry
+	entryMicrophoneStop                       // stops active capture
+	entryInfo                                 // non-selectable informational row
 )
 
 // navEntry is one row in the library's left (navigation) panel.
@@ -59,6 +62,7 @@ type navEntry struct {
 	dirPath  string     // set when kind == entryNCDir
 	filePath string     // set when kind == entryNCFile
 	trackIdx int        // set when kind == entryCatalogTrack
+	device   string     // set when kind == entryMicrophoneDevice
 }
 
 // navLevel is one visible listing in the unified navigation stack.
@@ -121,9 +125,18 @@ func relParts(base, path string) []string {
 	return strings.Split(filepath.ToSlash(rel), "/")
 }
 
+// micLabel shows the microphone source entry.
+func (o *Overlay) micLabel() string {
+	if o.micActive {
+		return "microphone [capturing]/"
+	}
+	return "microphone/"
+}
+
 func (o *Overlay) buildSourceEntries() []navEntry {
 	entries := []navEntry{
 		{label: "music/", kind: entrySource, source: sourceMusic, albumIdx: -1},
+		{label: o.micLabel(), kind: entrySource, source: sourceMicrophone, albumIdx: -1},
 	}
 	if o.online {
 		entries = append(entries,
@@ -132,6 +145,23 @@ func (o *Overlay) buildSourceEntries() []navEntry {
 		)
 	}
 	return entries
+}
+
+// ShowMicrophoneDevices enters the capture-device selection list.
+func (o *Overlay) ShowMicrophoneDevices(devices []string) {
+	entries := make([]navEntry, 0, len(devices)+1)
+	if o.micActive {
+		entries = append(entries, navEntry{label: "stop capture", kind: entryMicrophoneStop, albumIdx: -1})
+	}
+	for _, device := range devices {
+		entries = append(entries, navEntry{label: device, kind: entryMicrophoneDevice, device: device, albumIdx: -1})
+	}
+	if len(entries) == 0 {
+		entries = append(entries, navEntry{label: "no input devices", kind: entryInfo, albumIdx: -1})
+	}
+	o.source = sourceMicrophone
+	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
+	o.pushLevel(navLevel{ctx: ctxMicrophone, label: "microphone", entries: entries})
 }
 
 // buildFormatEntries lists distinct modland formats.

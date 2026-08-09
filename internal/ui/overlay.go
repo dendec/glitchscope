@@ -56,12 +56,14 @@ const (
 	ctxSourceRoot navCtx = iota // virtual source root
 	ctxNC                       // NC-local filesystem browser (dirPath set)
 	ctxCatalog                  // remote catalog level: formats / albums / modarchive dirs
+	ctxMicrophone               // SDL capture-device selection
 )
 
 type sourceKind int
 
 const (
 	sourceMusic sourceKind = iota
+	sourceMicrophone
 	sourceModland
 	sourceModArchive
 )
@@ -184,6 +186,10 @@ type Overlay struct {
 	presetNameDirty    bool
 	presetsDirty       bool
 	online             bool
+	micActive          bool   // microphone capture is running
+	micMenuRequested   bool   // one-shot: microphone source selected
+	micDeviceSelected  string // one-shot: selected SDL capture device name
+	micStopRequested   bool   // one-shot: stop capture selected
 	closeInjectPending bool
 	modArchiveItems    map[string][]modarchive.DirItem
 }
@@ -499,6 +505,53 @@ func (o *Overlay) SetOnline(v bool) {
 }
 
 func (o *Overlay) SettingsRows() []SettingRow { return o.settingsRows }
+
+// SetMicActive records microphone capture state and refreshes the source
+// root label, mirroring SetOnline.
+func (o *Overlay) SetMicActive(active bool) {
+	if o.micActive == active {
+		return
+	}
+	o.micActive = active
+	root := o.navStack[0]
+	root.entries = o.buildSourceEntries()
+	root.cursor = clampCursor(root.cursor, len(root.entries))
+	o.navStack[0] = root
+	if o.topLevel().ctx == ctxSourceRoot {
+		o.albumEntries = root.entries
+		o.albums = labelsOf(root.entries)
+		o.albumCursor = root.cursor
+		o.syncPanels()
+	}
+}
+
+// ConsumeMicMenuRequest reports and clears a request to list input devices.
+func (o *Overlay) ConsumeMicMenuRequest() bool {
+	if !o.micMenuRequested {
+		return false
+	}
+	o.micMenuRequested = false
+	return true
+}
+
+// ConsumeMicDeviceSelection reports and clears the selected SDL capture name.
+func (o *Overlay) ConsumeMicDeviceSelection() (string, bool) {
+	if o.micDeviceSelected == "" {
+		return "", false
+	}
+	device := o.micDeviceSelected
+	o.micDeviceSelected = ""
+	return device, true
+}
+
+// ConsumeMicStopRequest reports and clears a request to stop capture.
+func (o *Overlay) ConsumeMicStopRequest() bool {
+	if !o.micStopRequested {
+		return false
+	}
+	o.micStopRequested = false
+	return true
+}
 
 // NCSync rebuilds NC entries for the current path after external changes
 // (e.g. file deletion), preserving navigation stack and cursor position.

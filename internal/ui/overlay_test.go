@@ -169,6 +169,34 @@ func TestSelectCatalogAlbumEntersTrackLevel(t *testing.T) {
 	}
 }
 
+func TestMicrophoneDeviceSelection(t *testing.T) {
+	o := &Overlay{
+		navStack:     []navLevel{{ctx: ctxSourceRoot}},
+		focusPanel:   0,
+		panelEntered: true,
+	}
+	o.ShowMicrophoneDevices([]string{"USB microphone", "Webcam microphone"})
+
+	if o.topLevel().ctx != ctxMicrophone {
+		t.Fatalf("top context = %v, want microphone", o.topLevel().ctx)
+	}
+	if len(o.albumEntries) != 3 || o.albumEntries[0].kind != entryParent {
+		t.Fatalf("device entries = %#v, want parent and two devices", o.albumEntries)
+	}
+	if o.albumEntries[1].device != "USB microphone" || o.albumEntries[2].device != "Webcam microphone" {
+		t.Fatalf("device entries = %#v, want SDL device names", o.albumEntries)
+	}
+
+	o.CursorDown()
+	if o.Select() {
+		t.Fatal("microphone device selection unexpectedly started playback")
+	}
+	device, ok := o.ConsumeMicDeviceSelection()
+	if !ok || device != "USB microphone" {
+		t.Fatalf("selected device = (%q, %t), want (USB microphone, true)", device, ok)
+	}
+}
+
 // --- scrollOffset ---
 
 func TestScrollOffset_noScrollNeeded(t *testing.T) {
@@ -539,10 +567,10 @@ func TestNCCatalogRoundTrip(t *testing.T) {
 	o.switchToSourceRoot()
 	o.panelEntered = true
 
-	if len(o.albumEntries) != 3 {
-		t.Fatalf("expected three source entries, got %d: %v", len(o.albumEntries), o.albums)
+	if len(o.albumEntries) != 4 {
+		t.Fatalf("expected four source entries, got %d: %v", len(o.albumEntries), o.albums)
 	}
-	modlandIdx := 1
+	modlandIdx := 2
 	o.albumCursor = modlandIdx
 
 	// Enter Modland from the virtual source root.

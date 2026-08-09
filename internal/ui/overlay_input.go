@@ -355,9 +355,19 @@ func (o *Overlay) Select() bool {
 				switch e.source {
 				case sourceMusic:
 					o.switchToNC(o.musicDir)
+				case sourceMicrophone:
+					o.micMenuRequested = true
 				case sourceModland, sourceModArchive:
 					o.switchToProvider(e.source)
 				}
+				return false
+			case e.kind == entryMicrophoneDevice:
+				o.micDeviceSelected = e.device
+				return false
+			case e.kind == entryMicrophoneStop:
+				o.micStopRequested = true
+				return false
+			case e.kind == entryInfo:
 				return false
 			case e.IsNCDirectory():
 				o.ncEnterDir(e.dirPath)

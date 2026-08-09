@@ -14,6 +14,7 @@ import (
 	"github.com/dendec/pmv/internal/config"
 	"github.com/dendec/pmv/internal/filesystem"
 	"github.com/dendec/pmv/internal/input"
+	"github.com/dendec/pmv/internal/mic"
 	"github.com/dendec/pmv/internal/player"
 	"github.com/dendec/pmv/internal/presets"
 	"github.com/dendec/pmv/internal/ui"
@@ -88,19 +89,28 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 					a.deleteNCPath(path)
 				}
 			}
-		} else if a.overlay.Select() && a.lib != nil && a.pl != nil {
-			if a.overlay.IsCatalogMode() {
-				if albumName, path := a.overlay.SelectedCatalogTrack(); path != "" {
-					a.playTrack(path, albumName)
-				}
-			} else if a.overlay.FocusPanel() == 0 {
-				if path := a.lib.SelectAlbum(a.overlay.AlbumCursor()); path != "" {
-					a.playTrack(path, a.lib.CurrentAlbum().Name)
-				}
-			} else {
-				a.lib.SelectAlbum(a.overlay.AlbumCursor())
-				if path := a.lib.SelectTrack(a.overlay.TrackCursor()); path != "" {
-					a.playTrack(path, a.lib.CurrentAlbum().Name)
+		} else {
+			selected := a.overlay.Select()
+			if a.overlay.ConsumeMicMenuRequest() {
+				a.overlay.ShowMicrophoneDevices(mic.InputDevices())
+			} else if device, ok := a.overlay.ConsumeMicDeviceSelection(); ok {
+				a.startMicCapture(device)
+			} else if a.overlay.ConsumeMicStopRequest() {
+				a.stopMicCapture()
+			} else if selected && a.lib != nil && a.pl != nil {
+				if a.overlay.IsCatalogMode() {
+					if albumName, path := a.overlay.SelectedCatalogTrack(); path != "" {
+						a.playTrack(path, albumName)
+					}
+				} else if a.overlay.FocusPanel() == 0 {
+					if path := a.lib.SelectAlbum(a.overlay.AlbumCursor()); path != "" {
+						a.playTrack(path, a.lib.CurrentAlbum().Name)
+					}
+				} else {
+					a.lib.SelectAlbum(a.overlay.AlbumCursor())
+					if path := a.lib.SelectTrack(a.overlay.TrackCursor()); path != "" {
+						a.playTrack(path, a.lib.CurrentAlbum().Name)
+					}
 				}
 			}
 		}
@@ -312,6 +322,8 @@ func (a *App) applySettings(winW, winH int) {
 
 // playTrack starts playback of a track and shows the notification.
 func (a *App) playTrack(path, album string) {
+	a.stopMicCapture() // any playback wins over microphone input
+
 	if a.overlay != nil {
 		label := album
 		if album != "" {
@@ -324,6 +336,44 @@ func (a *App) playTrack(path, album string) {
 		return
 	}
 	slog.Info("now loading", "track", path, "album", album)
+}
+
+// startMicCapture starts capture from one selected input device. Capture feeds the
+// visualizer directly — the mic stream is not played through the speakers
+// (feedback) and SoLoud playback is stopped while capturing.
+func (a *App) startMicCapture(device string) {
+	a.stopMicCapture()
+	if a.pl != nil {
+		a.pl.Stop()
+	}
+	c, err := mic.OpenDevice(device)
+	if err != nil {
+		slog.Warn("mic open failed", "device", device, "error", err)
+		if a.overlay != nil {
+			a.overlay.ShowTrack("microphone unavailable")
+		}
+		return
+	}
+	a.mic = c
+	if a.overlay != nil {
+		a.overlay.SetMicActive(true)
+		a.overlay.ShowMicrophoneDevices(mic.InputDevices())
+		a.overlay.ShowTrack("microphone: " + device)
+	}
+	slog.Info("mic capture started", "device", device, "backend", c.Backend(), "rate", c.Rate(), "channels", c.Channels())
+}
+
+func (a *App) stopMicCapture() {
+	if a.mic == nil {
+		return
+	}
+	a.mic.Close()
+	a.mic = nil
+	if a.overlay != nil {
+		a.overlay.SetMicActive(false)
+		a.overlay.ShowMicrophoneDevices(mic.InputDevices())
+	}
+	slog.Info("mic capture stopped")
 }
 
 // playDirectory recursively walks dir, collects supported audio files,

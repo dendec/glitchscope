@@ -14,6 +14,7 @@ import (
 	"github.com/dendec/pmv/internal/archive"
 	"github.com/dendec/pmv/internal/config"
 	"github.com/dendec/pmv/internal/input"
+	"github.com/dendec/pmv/internal/mic"
 	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/dendec/pmv/internal/modland"
 	"github.com/dendec/pmv/internal/player"
@@ -34,6 +35,8 @@ type App struct {
 	inp     *input.Input
 	playbackState
 	presenter overlayPresenter
+
+	mic *mic.Capture // active microphone capture, nil when off
 
 	modlandSizes map[string]int64 // remote path → expected size for downloads
 
@@ -73,7 +76,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 		presenter:           newOverlayPresenter(nil),
 	}
 
-	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK); err != nil {
+	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK | sdl.INIT_AUDIO); err != nil {
 		return nil, fmt.Errorf("sdl init: %w", err)
 	}
 
@@ -199,6 +202,10 @@ func (a *App) Close() {
 	}
 	if a.pl != nil {
 		a.pl.Close()
+	}
+	if a.mic != nil {
+		a.mic.Close()
+		a.mic = nil
 	}
 	if a.inp != nil {
 		a.inp.Close()

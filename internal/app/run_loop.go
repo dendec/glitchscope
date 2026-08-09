@@ -142,7 +142,11 @@ func (a *App) Run() {
 			}
 		}
 
-		if a.pl != nil {
+		if a.mic != nil {
+			if wave := a.mic.Read(); len(wave) > 0 {
+				a.pm.PCMAddFloat(wave, projectm.Mono)
+			}
+		} else if a.pl != nil {
 			if wave := a.pl.GetWave(); wave != nil {
 				a.pm.PCMAddFloat(wave, projectm.Mono)
 			}
@@ -156,7 +160,7 @@ func (a *App) Run() {
 			}
 		}
 
-		if a.pl != nil && a.lib != nil && a.pl.Voice() != 0 && a.pl.TrackFinished() {
+		if a.pl != nil && a.lib != nil && a.mic == nil && a.pl.Voice() != 0 && a.pl.TrackFinished() {
 			a.autoAdvance()
 		}
 
