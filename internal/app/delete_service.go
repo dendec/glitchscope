@@ -1,11 +1,14 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dendec/pmv/internal/filesystem"
 )
 
 var (
@@ -20,18 +23,22 @@ var (
 // baseDir is resolved once at startup; all deletes must be inside it.
 type deleteService struct {
 	resolvedBase string
+	baseErr      error
 }
 
 func newDeleteService(baseDir string) *deleteService {
 	resolved, err := filepath.EvalSymlinks(baseDir)
 	if err != nil {
-		resolved = filepath.Clean(baseDir)
+		return &deleteService{resolvedBase: filepath.Clean(baseDir), baseErr: fmt.Errorf("resolve library root: %w", err)}
 	}
 	return &deleteService{resolvedBase: resolved}
 }
 
 // Validate checks that path is a safe deletion target inside the library.
 func (ds *deleteService) Validate(path string) error {
+	if ds.baseErr != nil {
+		return ds.baseErr
+	}
 	if path == "" {
 		return errDeleteEmpty
 	}
@@ -75,14 +82,13 @@ func (ds *deleteService) FileCount(path string) (int, error) {
 		return 1, nil
 	}
 	count := 0
-	_ = filepath.Walk(cleaned, func(_ string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return nil //nolint:nilerr // skip inaccessible entries
-		}
-		if !fi.IsDir() {
-			count++
-		}
-		return nil
+	report := filesystem.Walk(context.Background(), cleaned, filesystem.Options{
+		Include: func(entry filesystem.Entry) bool { return entry.IsRegular() },
+	}, func(filesystem.Entry) {
+		count++
 	})
+	if report.Status != filesystem.StatusOK {
+		return 0, fmt.Errorf("count files: %w", report.Err())
+	}
 	return count, nil
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/pmv/internal/filesystem"
 	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/dendec/pmv/internal/player"
 	"golang.org/x/image/font"
@@ -90,6 +91,7 @@ type Overlay struct {
 	screenW, screenH int
 	fontSize         float64
 	baseDir          string
+	musicDir         string // resolved local music root, may differ from baseDir/"music"
 	source           sourceKind
 
 	allAlbums    []player.Album
@@ -143,6 +145,7 @@ type Overlay struct {
 	ncInfoFile        string       // selected file path for right-panel info
 	ncInfoDir         string       // selected dir path for right-panel info
 	ncInfoIsDir       bool         // selected entry is a directory
+	ncListingStatus   filesystem.Status
 
 	theme        config.Theme
 	transparency float32
@@ -270,6 +273,12 @@ func (o *Overlay) SetBaseDir(dir string) {
 	o.baseDir = dir
 }
 
+// SetMusicDir records the resolved local music root (see App.findMusicDir),
+// used by NC navigation instead of assuming baseDir/"music" exists.
+func (o *Overlay) SetMusicDir(dir string) {
+	o.musicDir = dir
+}
+
 func (o *Overlay) SetSettingsRows(rows []SettingRow, cursor int) {
 	o.settingsRows = rows
 	o.settingsCursor = cursor
@@ -380,7 +389,7 @@ func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
 		} else {
 			// A local rescan invalidates the current navigation data. Restart
 			// the filesystem browser at the configured music root.
-			o.switchToNC(o.baseDir)
+			o.switchToNC(o.musicDir)
 		}
 	}
 	if listChanged {

@@ -14,6 +14,13 @@ func TestDeleteValidateEmpty(t *testing.T) {
 	}
 }
 
+func TestDeleteUnavailableBaseFailsLoudly(t *testing.T) {
+	ds := newDeleteService(filepath.Join(t.TempDir(), "missing"))
+	if err := ds.Validate(filepath.Join(ds.resolvedBase, "track.mp3")); err == nil {
+		t.Fatal("unavailable library root should make deletion unavailable")
+	}
+}
+
 func TestDeleteValidateDot(t *testing.T) {
 	ds := newDeleteService(t.TempDir())
 	if err := ds.Validate("."); !errors.Is(err, errDeleteDot) {

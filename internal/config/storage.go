@@ -46,8 +46,8 @@ func LoadSettings(path string) (Settings, error) {
 		} `json:"ui"`
 	}
 	if err := json.NewDecoder(f).Decode(&raw); err != nil {
-		slog.Warn("settings: malformed JSON, using defaults", "path", path, "error", err)
-		return DefaultSettings(), nil
+		slog.Warn("settings: malformed JSON", "path", path, "error", err)
+		return DefaultSettings(), fmt.Errorf("settings decode: %w", err)
 	}
 
 	s := DefaultSettings()
@@ -86,8 +86,9 @@ func LoadSettings(path string) (Settings, error) {
 		}
 	}
 
-	if err := s.Graphics.Validate(); err != nil {
-		return DefaultSettings(), nil // fallback on invalid data
+	if err := s.Validate(); err != nil {
+		slog.Warn("settings: invalid values", "path", path, "error", err)
+		return DefaultSettings(), fmt.Errorf("settings validate: %w", err)
 	}
 	return s, nil
 }
@@ -98,10 +99,7 @@ func SaveSettings(path string, s Settings) error {
 		return fmt.Errorf("settings mkdir: %w", err)
 	}
 
-	if err := s.Graphics.Validate(); err != nil {
-		return fmt.Errorf("settings validate: %w", err)
-	}
-	if err := s.UI.Transparency.Validate(); err != nil {
+	if err := s.Validate(); err != nil {
 		return fmt.Errorf("settings validate: %w", err)
 	}
 

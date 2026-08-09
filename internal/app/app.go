@@ -222,6 +222,9 @@ func (a *App) Init() {
 	a.initAudio()
 	a.initLibrary()
 	a.deleteSvc = newDeleteService(baseDir())
+	if a.deleteSvc.baseErr != nil {
+		slog.Error("delete service unavailable", "error", a.deleteSvc.baseErr)
+	}
 	a.checkConnectivity()
 	a.initInput()
 	a.initPreset()
@@ -269,6 +272,9 @@ func (a *App) initAudio() {
 
 func (a *App) initLibrary() {
 	musicDir := a.findMusicDir()
+	if a.overlay != nil {
+		a.overlay.SetMusicDir(musicDir)
+	}
 	t := time.Now()
 	lib, err := player.NewLibrary(musicDir)
 	if err != nil {

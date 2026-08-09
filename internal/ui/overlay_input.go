@@ -3,7 +3,6 @@ package ui
 import (
 	"log/slog"
 	"math"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -355,7 +354,7 @@ func (o *Overlay) Select() bool {
 			case e.kind == entrySource:
 				switch e.source {
 				case sourceMusic:
-					o.switchToNC(filepath.Join(o.baseDir, "music"))
+					o.switchToNC(o.musicDir)
 				case sourceModland, sourceModArchive:
 					o.switchToProvider(e.source)
 				}

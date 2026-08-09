@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dendec/pmv/internal/filesystem"
 	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/dendec/pmv/internal/player"
 )
@@ -332,6 +333,16 @@ func TestNCRootEntries(t *testing.T) {
 	}
 	if o.albumEntries[2].kind != entryNCFile {
 		t.Fatalf("expected entryNCFile, got %d", o.albumEntries[2].kind)
+	}
+}
+
+func TestNCMissingRootReportsFailed(t *testing.T) {
+	o, dir := ncTestOverlay(t)
+	defer o.Close()
+
+	o.switchToNC(filepath.Join(dir, "missing"))
+	if got := o.NCListingStatus(); got != filesystem.StatusFailed {
+		t.Fatalf("NC listing status = %s, want failed", got)
 	}
 }
 

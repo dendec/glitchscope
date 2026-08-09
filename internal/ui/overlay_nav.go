@@ -1,13 +1,12 @@
 package ui
 
 import (
-	"log/slog"
-	"os"
+	"context"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/dendec/pmv/internal/formats"
+	"github.com/dendec/pmv/internal/filesystem"
 	"github.com/dendec/pmv/internal/modarchive"
 	"github.com/dendec/pmv/internal/player"
 )
@@ -368,26 +367,37 @@ func (o *Overlay) SelectedCatalogTrack() (string, string) {
 // Hides: dotfiles, .pmv_meta.json, artwork, symlinks, empty dirs.
 func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
 	var entries []navEntry
-
-	dirEntries, err := os.ReadDir(dirPath)
-	if err != nil {
-		slog.Warn("nc readdir", "path", dirPath, "error", err)
+	var dirEntries []filesystem.Entry
+	o.ncListingStatus = filesystem.StatusOK
+	report := filesystem.Walk(context.Background(), dirPath, filesystem.Options{
+		Descend: func(filesystem.Entry) bool { return false },
+	}, func(entry filesystem.Entry) {
+		dirEntries = append(dirEntries, entry)
+	})
+	o.ncListingStatus = report.Status
+	if report.Status == filesystem.StatusFailed {
 		return entries
 	}
 
 	var dirs, files []navEntry
-	for _, de := range dirEntries {
-		name := de.Name()
+	for _, entry := range dirEntries {
+		name := entry.Name
 		if strings.HasPrefix(name, ".") || name == ".pmv_meta.json" {
 			continue
 		}
-		if de.IsDir() {
+		if entry.IsDir() {
 			fullPath := filepath.Join(dirPath, name)
-			if de.Type()&os.ModeSymlink != 0 {
+			if entry.IsSymlink() {
 				continue // v1: skip all symlinks
 			}
 			// Skip empty directories (no supported audio + no subdirs).
-			if ncDirIsEmpty(fullPath) {
+			empty, status := ncDirIsEmpty(fullPath)
+			if status != filesystem.StatusOK {
+				if o.ncListingStatus == filesystem.StatusOK {
+					o.ncListingStatus = filesystem.StatusPartial
+				}
+			}
+			if empty && status == filesystem.StatusOK {
 				continue
 			}
 			dirs = append(dirs, navEntry{
@@ -398,11 +408,10 @@ func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
 			})
 			continue
 		}
-		if !de.Type().IsRegular() {
+		if !entry.IsRegular() {
 			continue
 		}
-		ext := strings.ToLower(filepath.Ext(name))
-		if !formats.SupportedExts[ext] {
+		if !filesystem.IsAudioFile(entry) {
 			continue
 		}
 		files = append(files, navEntry{
@@ -435,27 +444,32 @@ func (o *Overlay) ncDirectoryCounts(dirPath string) (files, dirs int) {
 
 // ncDirIsEmpty reports whether a directory has no supported audio files and
 // no non-hidden subdirectories. Used to prune empty leaf dirs from the tree.
-func ncDirIsEmpty(dirPath string) bool {
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		return true
+func ncDirIsEmpty(dirPath string) (bool, filesystem.Status) {
+	var entries []filesystem.Entry
+	report := filesystem.Walk(context.Background(), dirPath, filesystem.Options{
+		Descend: func(filesystem.Entry) bool { return false },
+	}, func(entry filesystem.Entry) {
+		entries = append(entries, entry)
+	})
+	if report.Status != filesystem.StatusOK {
+		return false, report.Status
 	}
-	for _, de := range entries {
-		name := de.Name()
+	for _, entry := range entries {
+		name := entry.Name
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
-		if de.IsDir() {
-			return false
+		if entry.IsSymlink() {
+			continue
 		}
-		if de.Type().IsRegular() {
-			ext := strings.ToLower(filepath.Ext(name))
-			if formats.SupportedExts[ext] {
-				return false
-			}
+		if entry.IsDir() {
+			return false, filesystem.StatusOK
+		}
+		if filesystem.IsAudioFile(entry) {
+			return false, filesystem.StatusOK
 		}
 	}
-	return true
+	return true, filesystem.StatusOK
 }
 
 // topLevel returns the visible level — the top of the stack. The stack is
@@ -475,6 +489,13 @@ func (o *Overlay) ncDir() string {
 		return ""
 	}
 	return o.topLevel().dirPath
+}
+
+func (o *Overlay) NCListingStatus() filesystem.Status {
+	if !o.isNC() {
+		return filesystem.StatusOK
+	}
+	return o.ncListingStatus
 }
 
 // breadcrumbParts returns the breadcrumb path components for the current
@@ -523,8 +544,12 @@ func (o *Overlay) breadcrumbText() string {
 }
 
 // switchToNC replaces the source stack with a Music source and an NC level
-// at dirPath (baseDir when empty). Used for source selection and local deep-links.
+// at dirPath (musicDir, falling back to baseDir, when empty). Used for source
+// selection and local deep-links.
 func (o *Overlay) switchToNC(dirPath string) {
+	if dirPath == "" {
+		dirPath = o.musicDir
+	}
 	if dirPath == "" {
 		dirPath = o.baseDir
 	}

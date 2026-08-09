@@ -37,7 +37,10 @@ func TestWalkAudioFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	files := walkAudioFiles(root)
+	files, err := walkAudioFiles(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(files) != 3 {
 		t.Fatalf("walkAudioFiles returned %d files, want 3: %v", len(files), files)
 	}
@@ -57,9 +60,19 @@ func TestWalkAudioFiles(t *testing.T) {
 
 func TestWalkAudioFilesEmptyDir(t *testing.T) {
 	root := t.TempDir()
-	files := walkAudioFiles(root)
+	files, err := walkAudioFiles(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(files) != 0 {
 		t.Fatalf("walkAudioFiles on empty dir returned %d files, want 0", len(files))
+	}
+}
+
+func TestWalkAudioFilesMissingRootReturnsError(t *testing.T) {
+	_, err := walkAudioFiles(filepath.Join(t.TempDir(), "missing"))
+	if err == nil {
+		t.Fatal("missing root should return an error")
 	}
 }
 
@@ -76,7 +89,10 @@ func TestWalkAudioFilesSymlinksSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	files := walkAudioFiles(root)
+	files, err := walkAudioFiles(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(files) != 1 {
 		t.Fatalf("walkAudioFiles returned %d files, want 1 (symlink skipped): %v", len(files), files)
 	}

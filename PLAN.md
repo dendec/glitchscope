@@ -1,5 +1,10 @@
 # PMV — Portable Music Visualizer
 
+> Этот файл сохранён как исторический roadmap ранней версии. Нормативная
+> архитектура находится в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), а
+> актуальные UI-требования — в [docs/UI-PLAN.md](docs/UI-PLAN.md). Разделы
+> ниже не следует использовать для восстановления текущих модулей.
+
 Аудиоплеер с MilkDrop-совместимой визуализацией для портативных игровых
 консолей (PortMaster: TrimUI Smart Pro, Anbernic и др.).
 

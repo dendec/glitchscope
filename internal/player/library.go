@@ -1,12 +1,15 @@
 package player
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/dendec/pmv/internal/filesystem"
 	"github.com/dendec/pmv/internal/openmpt"
 	"github.com/dendec/pmv/internal/soloud"
 	"github.com/dendec/pmv/internal/xmp"
@@ -37,7 +40,11 @@ type Library struct {
 // NewLibrary scans rootDir for leaf dirs containing audio files.
 func NewLibrary(rootDir string) (*Library, error) {
 	lib := &Library{albumIdx: -1, trackIdx: -1}
-	lib.Albums = scanRoot(rootDir)
+	var err error
+	lib.Albums, err = scanRoot(rootDir)
+	if err != nil {
+		return nil, err
+	}
 	if len(lib.Albums) > 0 {
 		lib.albumIdx = 0
 		if len(lib.Albums[0].Tracks) > 0 {
@@ -48,25 +55,22 @@ func NewLibrary(rootDir string) (*Library, error) {
 }
 
 // scanRoot walks rootDir and returns sorted Albums from the filesystem.
-func scanRoot(rootDir string) []Album {
+func scanRoot(rootDir string) ([]Album, error) {
 	dirTracks := map[string][]string{}
-	_ = filepath.Walk(rootDir, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return nil //nolint:nilerr // skip inaccessible — intentional
-		}
-		if fi.IsDir() {
-			if shouldSkipDir(path) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		ext := strings.ToLower(filepath.Ext(path))
-		if SupportedExts[ext] {
-			dir := filepath.Dir(path)
-			dirTracks[dir] = append(dirTracks[dir], path)
-		}
-		return nil
+	report := filesystem.Walk(context.Background(), rootDir, filesystem.Options{
+		Include: filesystem.IsAudioFile,
+		Descend: func(entry filesystem.Entry) bool {
+			return !entry.IsSymlink() && !shouldSkipDir(entry.Path)
+		},
+	}, func(entry filesystem.Entry) {
+		dirTracks[filepath.Dir(entry.Path)] = append(dirTracks[filepath.Dir(entry.Path)], entry.Path)
 	})
+	if report.Status != filesystem.StatusOK {
+		for _, issue := range report.Issues {
+			slog.Warn("library scan issue", "path", issue.Path, "error", issue.Err, "status", report.Status)
+		}
+		return nil, fmt.Errorf("scan music directory: %w", report.Err())
+	}
 
 	var dirs []string
 	for d := range dirTracks {
@@ -84,7 +88,7 @@ func scanRoot(rootDir string) []Album {
 			Tracks: tracks,
 		})
 	}
-	return albums
+	return albums, nil
 }
 
 func (l *Library) AlbumNext() string {
@@ -317,7 +321,11 @@ func (l *Library) AddVirtualAlbums(albums []Album) {
 
 // Rescan re-reads rootDir and rebuilds local albums, preserving virtual
 // (modland/modarchive) albums that were added via AddVirtualAlbums.
-func (l *Library) Rescan(rootDir string) {
+func (l *Library) Rescan(rootDir string) error {
+	localAlbums, err := scanRoot(rootDir)
+	if err != nil {
+		return err
+	}
 	// Save virtual albums before wiping.
 	var virtuals []Album
 	for _, a := range l.Albums {
@@ -326,7 +334,7 @@ func (l *Library) Rescan(rootDir string) {
 		}
 	}
 
-	l.Albums = scanRoot(rootDir)
+	l.Albums = localAlbums
 	l.Albums = append(l.Albums, virtuals...)
 
 	// Clamp indices.
@@ -344,4 +352,5 @@ func (l *Library) Rescan(rootDir string) {
 			l.trackIdx = 0
 		}
 	}
+	return nil
 }

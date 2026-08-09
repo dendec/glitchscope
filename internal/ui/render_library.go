@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dendec/pmv/internal/filesystem"
 	"github.com/dendec/pmv/internal/player"
 )
 
@@ -148,15 +149,15 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.tracksDirty = false
 
-	if e := o.currentEntry(); e != nil && e.kind == entryParent {
-		o.deleteTex(&o.tracksTex)
-		o.marqueeR.invalidate(o)
+	if o.isNC() {
+		o.rebuildNCInfoTex(maxW, maxH)
 		o.tracksContentDirty = false
 		return
 	}
 
-	if o.isNC() {
-		o.rebuildNCInfoTex(maxW, maxH)
+	if e := o.currentEntry(); e != nil && e.kind == entryParent {
+		o.deleteTex(&o.tracksTex)
+		o.marqueeR.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
@@ -234,6 +235,13 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 	o.marqueeR.invalidate(o)
 
 	var lines []string
+	if status := o.NCListingStatus(); status != filesystem.StatusOK {
+		if status == filesystem.StatusPartial {
+			lines = append(lines, "! Part of catalog unavailable", "")
+		} else {
+			lines = append(lines, "! Catalog unavailable", "")
+		}
+	}
 
 	if o.ncInfoIsDir && o.ncInfoDir != "" {
 		// Directory info.
@@ -256,8 +264,17 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 				lines = append(lines, fmt.Sprintf("  %.1f KB", float64(size)/1024))
 			}
 		}
-	} else {
+	} else if len(lines) == 0 {
 		o.tracksTex, o.tracksTexW, o.tracksTexH = 0, 0, 0
+		return
+	} else {
+		// No selected file/dir (e.g. cursor on ".."), but still show the banner.
+		maxTextPx := availableRowTextWidth(maxW)
+		var rows []listRow
+		for _, line := range lines {
+			rows = append(rows, listRow{text: line})
+		}
+		o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
 		return
 	}
 

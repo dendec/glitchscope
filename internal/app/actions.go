@@ -1,16 +1,18 @@
 package app
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/dendec/pmv/internal/config"
-	"github.com/dendec/pmv/internal/formats"
+	"github.com/dendec/pmv/internal/filesystem"
 	"github.com/dendec/pmv/internal/input"
 	"github.com/dendec/pmv/internal/player"
 	"github.com/dendec/pmv/internal/presets"
@@ -327,7 +329,14 @@ func (a *App) playTrack(path, album string) {
 // playDirectory recursively walks dir, collects supported audio files,
 // replaces the playlist, and starts playback from the first track.
 func (a *App) playDirectory(dirPath string) {
-	files := walkAudioFiles(dirPath)
+	files, err := walkAudioFiles(dirPath)
+	if err != nil {
+		slog.Warn("walk directory failed", "path", dirPath, "error", err)
+		if a.overlay != nil {
+			a.overlay.ShowTrack(audioScanMessage(err))
+		}
+		return
+	}
 	if len(files) == 0 {
 		if a.overlay != nil {
 			a.overlay.ShowTrack("no playable files")
@@ -344,7 +353,14 @@ func (a *App) playDirectory(dirPath string) {
 // positions the cursor on the selected file, and starts playback.
 func (a *App) playFile(path string) {
 	dir := filepath.Dir(path)
-	files := walkAudioFiles(dir)
+	files, err := walkAudioFiles(dir)
+	if err != nil {
+		slog.Warn("walk directory failed", "path", dir, "error", err)
+		if a.overlay != nil {
+			a.overlay.ShowTrack(audioScanMessage(err))
+		}
+		return
+	}
 	if len(files) == 0 {
 		if a.overlay != nil {
 			a.overlay.ShowTrack("no playable files")
@@ -359,6 +375,22 @@ func (a *App) playFile(path string) {
 	if a.playbackState.setPlaylist(files, idx, album) {
 		a.playTrack(files[idx], album)
 	}
+}
+
+type audioScanError struct {
+	status filesystem.Status
+	err    error
+}
+
+func (e *audioScanError) Error() string { return fmt.Sprintf("audio scan %s: %v", e.status, e.err) }
+func (e *audioScanError) Unwrap() error { return e.err }
+
+func audioScanMessage(err error) string {
+	var scanErr *audioScanError
+	if errors.As(err, &scanErr) && scanErr.status == filesystem.StatusPartial {
+		return "directory scan incomplete"
+	}
+	return "directory scan failed"
 }
 
 // deleteNCPath validates and deletes a path, then handles post-delete effects:
@@ -400,7 +432,13 @@ func (a *App) deleteNCPath(path string) {
 
 	// Rescan library.
 	if a.lib != nil {
-		a.lib.Rescan(a.findMusicDir())
+		if err := a.lib.Rescan(a.findMusicDir()); err != nil {
+			slog.Error("library rescan failed after delete", "path", cleaned, "error", err)
+			if a.overlay != nil {
+				a.overlay.ShowTrack("library rescan failed")
+			}
+			return
+		}
 	}
 
 	// Sync NC overlay.
@@ -416,41 +454,21 @@ func (a *App) deleteNCPath(path string) {
 
 // walkAudioFiles recursively collects supported audio files under root,
 // sorted lexically by full path. Skips symlinks, dotfiles, artwork, metadata.
-func walkAudioFiles(root string) []string {
+func walkAudioFiles(root string) ([]string, error) {
 	var files []string
-	var walk func(dir string)
-	walk = func(dir string) {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			slog.Warn("walk dir", "path", dir, "error", err)
-			return
+	report := filesystem.Walk(context.Background(), root, filesystem.Options{
+		Include: filesystem.IsAudioFile,
+		Descend: func(entry filesystem.Entry) bool {
+			return !strings.HasPrefix(entry.Name, ".")
+		},
+	}, func(entry filesystem.Entry) {
+		files = append(files, entry.Path)
+	})
+	if report.Status != filesystem.StatusOK {
+		for _, issue := range report.Issues {
+			slog.Warn("audio scan issue", "path", issue.Path, "error", issue.Err, "status", report.Status)
 		}
-		for _, de := range entries {
-			name := de.Name()
-			if strings.HasPrefix(name, ".") {
-				continue
-			}
-			if de.Type()&os.ModeSymlink != 0 {
-				continue
-			}
-			if de.IsDir() {
-				walk(filepath.Join(dir, name))
-				continue
-			}
-			if !de.Type().IsRegular() {
-				continue
-			}
-			if name == ".pmv_meta.json" {
-				continue
-			}
-			ext := strings.ToLower(filepath.Ext(name))
-			if !formats.IsSupportedExt(ext) {
-				continue
-			}
-			files = append(files, filepath.Join(dir, name))
-		}
+		return nil, &audioScanError{status: report.Status, err: fmt.Errorf("walk %s: %w", root, report.Err())}
 	}
-	walk(root)
-	sort.Strings(files)
-	return files
+	return files, nil
 }

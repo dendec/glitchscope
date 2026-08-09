@@ -159,6 +159,16 @@ func DefaultPlayback() PlaybackSettings {
 	return PlaybackSettings{ShuffleMode: ShuffleOff, Repeat: RepeatOff}
 }
 
+func (p PlaybackSettings) Validate() error {
+	if p.ShuffleMode < ShuffleOff || p.ShuffleMode > ShuffleAll {
+		return fmt.Errorf("invalid shuffle mode %d", p.ShuffleMode)
+	}
+	if p.Repeat < RepeatOff || p.Repeat > RepeatAll {
+		return fmt.Errorf("invalid repeat mode %d", p.Repeat)
+	}
+	return nil
+}
+
 // PresetInterval returns the auto-switch interval in seconds (0 = off).
 type PresetInterval int
 
@@ -189,6 +199,15 @@ func (p PresetInterval) String() string {
 
 func AllPresetIntervals() []PresetInterval {
 	return []PresetInterval{PresetOff, Preset15s, Preset30s, Preset60s, Preset2m}
+}
+
+func (p PresetInterval) Validate() error {
+	for _, valid := range AllPresetIntervals() {
+		if p == valid {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid preset interval %d", p)
 }
 
 // Theme selects the UI color scheme.
@@ -283,4 +302,23 @@ func DefaultSettings() Settings {
 		PresetInterval: PresetOff,
 		UI:             DefaultUI(),
 	}
+}
+
+func (s Settings) Validate() error {
+	if err := s.Graphics.Validate(); err != nil {
+		return fmt.Errorf("graphics: %w", err)
+	}
+	if err := s.Playback.Validate(); err != nil {
+		return fmt.Errorf("playback: %w", err)
+	}
+	if err := s.PresetInterval.Validate(); err != nil {
+		return fmt.Errorf("preset interval: %w", err)
+	}
+	if s.UI.Theme < ThemeDark || s.UI.Theme > ThemeLight {
+		return fmt.Errorf("ui theme: invalid theme %d", s.UI.Theme)
+	}
+	if err := s.UI.Transparency.Validate(); err != nil {
+		return fmt.Errorf("ui transparency: %w", err)
+	}
+	return nil
 }

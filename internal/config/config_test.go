@@ -38,6 +38,33 @@ func TestGraphicsValidate(t *testing.T) {
 	}
 }
 
+func TestSettingsValidateCoversAllDomains(t *testing.T) {
+	valid := DefaultSettings()
+	if err := valid.Validate(); err != nil {
+		t.Fatal("default settings should be valid:", err)
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*Settings)
+	}{
+		{"shuffle", func(s *Settings) { s.Playback.ShuffleMode = 99 }},
+		{"repeat", func(s *Settings) { s.Playback.Repeat = 99 }},
+		{"preset interval", func(s *Settings) { s.PresetInterval = 99 }},
+		{"theme", func(s *Settings) { s.UI.Theme = 99 }},
+		{"transparency", func(s *Settings) { s.UI.Transparency = 101 }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			settings := valid
+			tt.mutate(&settings)
+			if err := settings.Validate(); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
 func TestUpscaleFilterStrings(t *testing.T) {
 	if FilterSmooth.String() != "Smooth" {
 		t.Fatal("Smooth string mismatch")
@@ -155,8 +182,8 @@ func TestLoadSettingsMalformed(t *testing.T) {
 		t.Fatal(err)
 	}
 	s, err := LoadSettings(p)
-	if err != nil {
-		t.Fatal("malformed file should not error:", err)
+	if err == nil {
+		t.Fatal("malformed file should return an error")
 	}
 	if s != DefaultSettings() {
 		t.Fatal("malformed file should return defaults")
