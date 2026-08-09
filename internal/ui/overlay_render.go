@@ -663,13 +663,6 @@ func (o *Overlay) renderStatsOnly(winW, winH int) {
 	if o.statsDirty {
 		o.rebuildStatsTex()
 	}
-	lh := o.face.Metrics().Height.Ceil()
-	hR, hG, hB := o.panelBgRGB()
-	statsBarW := float32(winW)
-	if o.statsTex != 0 {
-		statsBarW = float32(headerMarginX + o.statsTexW)
-	}
-	glDrawFilledRect(o.programRect, 0, 0, statsBarW, float32(lh), hR, hG, hB, o.bgAlpha(), winW, winH, winW, winH)
 	if o.statsTex != 0 {
 		glDrawOverlayText(o.programText, o.statsTex, 1,
 			headerMarginX, float32(-textPadding(o.fontSize)), float32(o.statsTexW), float32(o.statsTexH), winW, winH, winW, winH)
