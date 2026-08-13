@@ -60,7 +60,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 				break
 			}
 		}
-		o.rebuildMarqueeLine(&o.marqueeL, prefix+cat.Name, maxTextPx)
+		o.rebuildMarqueeLine(&o.marqueeL, prefix+cat.Name, maxTextPx, true)
 	}
 
 	// Right panel — presets in current category.
@@ -98,7 +98,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 			if p == o.presetName {
 				mark = "▸ "
 			}
-			o.rebuildMarqueeLine(&o.marqueeR, mark+name, maxTextPx)
+			o.rebuildMarqueeLine(&o.marqueeR, mark+name, maxTextPx, true)
 		}
 	}
 

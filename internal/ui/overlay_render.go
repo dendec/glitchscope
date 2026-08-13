@@ -104,15 +104,19 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	glDrawFilledRect(o.programRect, 0, 0, float32(winW), float32(headerH), hR, hG, hB, o.bgAlpha(), winW, winH, viewW, viewH)
 
 	if o.statsTex != 0 {
-		glDrawOverlayText(o.programText, o.statsTex, 1,
-			headerMarginX, float32(-textPadding(o.fontSize)), float32(o.statsTexW), float32(o.statsTexH), winW, winH, viewW, viewH)
+		if !o.drawMarquee(&o.statsMarquee, headerMarginX, float32(-textPadding(o.fontSize)), float32(winW-headerMarginX*2), float32(o.statsTexH), winW, winH, viewW, viewH) {
+			glDrawOverlayText(o.programText, o.statsTex, 1,
+				headerMarginX, float32(-textPadding(o.fontSize)), float32(o.statsTexW), float32(o.statsTexH), winW, winH, viewW, viewH)
+		}
 	}
 
 	o.renderPageIndicator(winW, winH, viewW, viewH, indicatorY)
 
 	if o.uiPage == PageLibrary && o.breadcrumbTex != 0 {
-		glDrawOverlayText(o.programText, o.breadcrumbTex, 1,
-			headerMarginX, float32(lh+indicatorRowH-textPadding(o.fontSize)), float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
+		if !o.drawMarquee(&o.breadcrumbMarquee, headerMarginX, float32(lh+indicatorRowH-textPadding(o.fontSize)), float32(winW-headerMarginX*2), float32(o.breadcrumbTexH), winW, winH, viewW, viewH) {
+			glDrawOverlayText(o.programText, o.breadcrumbTex, 1,
+				headerMarginX, float32(lh+indicatorRowH-textPadding(o.fontSize)), float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
+		}
 	}
 
 	switch o.uiPage {
@@ -131,13 +135,30 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		glDrawFilledRect(o.programRect, 0, by, float32(winW), float32(bottomH), bR, bG, bB, o.bgAlpha(), winW, winH, viewW, viewH)
 
 		if o.presetNameTex != 0 {
-			glDrawOverlayText(o.programText, o.presetNameTex, 1,
-				headerMarginX, by, float32(o.presetNameTexW), float32(o.presetNameTexH), winW, winH, viewW, viewH)
+			if !o.drawMarquee(&o.presetNameMarquee, headerMarginX, by, float32(winW-headerMarginX*2), float32(o.presetNameTexH), winW, winH, viewW, viewH) {
+				glDrawOverlayText(o.programText, o.presetNameTex, 1,
+					headerMarginX, by, float32(o.presetNameTexW), float32(o.presetNameTexH), winW, winH, viewW, viewH)
+			}
 		}
-		if o.bottomTex != 0 {
+		if o.bottomTex != 0 || o.bottomPrefixTex != 0 {
 			statusY := by + float32(presetLineH)
-			glDrawOverlayText(o.programText, o.bottomTex, 1,
-				0, statusY, float32(o.bottomTexW), float32(o.bottomTexH), winW, winH, viewW, viewH)
+			if o.bottomPrefixTex != 0 {
+				glDrawOverlayText(o.programText, o.bottomPrefixTex, 1,
+					0, statusY, float32(o.bottomPrefixTexW), float32(o.bottomPrefixTexH), winW, winH, viewW, viewH)
+				if o.bottomMarquee.tex != 0 && float32(o.bottomMarquee.texW) > float32(o.bottomTitleW) {
+					o.drawMarquee(&o.bottomMarquee, float32(o.bottomTitleX), statusY, float32(o.bottomTitleW), float32(o.bottomTexH), winW, winH, viewW, viewH)
+				} else if o.bottomTex != 0 {
+					glDrawOverlayText(o.programText, o.bottomTex, 1,
+						float32(o.bottomTitleX), statusY, float32(o.bottomTexW), float32(o.bottomTexH), winW, winH, viewW, viewH)
+				}
+				if o.bottomSuffixTex != 0 {
+					glDrawOverlayText(o.programText, o.bottomSuffixTex, 1,
+						float32(o.bottomTitleX+o.bottomTitleW), statusY, float32(o.bottomSuffixTexW), float32(o.bottomSuffixTexH), winW, winH, viewW, viewH)
+				}
+			} else {
+				glDrawOverlayText(o.programText, o.bottomTex, 1,
+					0, statusY, float32(o.bottomTexW), float32(o.bottomTexH), winW, winH, viewW, viewH)
+			}
 		}
 	}
 
@@ -274,7 +295,10 @@ func drawListColumn(o *Overlay, x, y, w, h float32, t listTex, bordered bool, wi
 func (o *Overlay) rebuildStatsTex() {
 	o.statsDirty = false
 	o.deleteTex(&o.statsTex)
-	o.statsTex, o.statsTexW, o.statsTexH = o.renderTextToTex(o.statsLine, o.textColor())
+	maxW := o.screenW - headerMarginX*2
+	display := o.truncateEnd(o.statsLine, maxW)
+	o.statsTex, o.statsTexW, o.statsTexH = o.renderTextToTex(display, o.textColor())
+	o.rebuildMarqueeLine(&o.statsMarquee, o.statsLine, maxW, false)
 }
 
 // rebuildBreadcrumbTex re-renders the Library-page breadcrumb path, skipping
@@ -292,15 +316,21 @@ func (o *Overlay) rebuildBreadcrumbTex(winW int) {
 	o.deleteTex(&o.breadcrumbTex)
 	if text != "" {
 		maxW := winW - headerMarginX*2
-		text = o.truncateEnd(text, maxW)
-		o.breadcrumbTex, o.breadcrumbTexW, o.breadcrumbTexH = o.renderTextToTex(text, o.textColor())
+		display := o.truncateEnd(text, maxW)
+		o.breadcrumbTex, o.breadcrumbTexW, o.breadcrumbTexH = o.renderTextToTex(display, o.textColor())
+		o.rebuildMarqueeLine(&o.breadcrumbMarquee, text, maxW, false)
+	} else {
+		o.breadcrumbMarquee.invalidate(o)
 	}
 }
 
 func (o *Overlay) rebuildPresetNameTex() {
 	o.presetNameDirty = false
 	o.deleteTex(&o.presetNameTex)
-	o.presetNameTex, o.presetNameTexW, o.presetNameTexH = o.renderTextToTex(o.presetName, o.textColor())
+	maxW := o.screenW - headerMarginX*2
+	display := o.truncateEnd(o.presetName, maxW)
+	o.presetNameTex, o.presetNameTexW, o.presetNameTexH = o.renderTextToTex(display, o.textColor())
+	o.rebuildMarqueeLine(&o.presetNameMarquee, o.presetName, maxW, false)
 }
 
 func (o *Overlay) displayTrackPath(path string) string {
@@ -337,6 +367,10 @@ func (o *Overlay) displayTrackPath(path string) string {
 func (o *Overlay) rebuildBottomTex(w, botH int) {
 	o.bottomDirty = false
 	o.deleteTex(&o.bottomTex)
+	o.deleteTex(&o.bottomPrefixTex)
+	o.deleteTex(&o.bottomSuffixTex)
+	o.bottomTitleX = 0
+	o.bottomTitleW = 0
 
 	if o.playingTrack == "" && !o.loading {
 		return
@@ -345,8 +379,6 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	title := ""
 	if o.playingTrack != "" {
 		title = o.displayTrackPath(o.playingTrack)
-		maxTitleW := w - int(o.fontSize*14)
-		title = o.truncateEnd(title, maxTitleW)
 	}
 
 	// Loading indicator.
@@ -358,7 +390,7 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 		if o.loadPercent >= 0 {
 			text += fmt.Sprintf("  %d%%", o.loadPercent)
 		}
-		o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(text, o.textColor())
+		o.rebuildBottomText(text, w)
 		return
 	}
 
@@ -395,14 +427,33 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 		}
 	}
 
-	text := fmt.Sprintf("%s %s  %s", status, title, pos)
+	suffix := fmt.Sprintf("  %s", pos)
 	if o.duration > 0 {
-		text = fmt.Sprintf("%s %s  %s/%s", status, title, pos, dur)
+		suffix = fmt.Sprintf("  %s/%s", pos, dur)
 	}
 	if info != "" {
-		text += "  " + info
+		suffix += "  " + info
 	}
-	o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(text, o.textColor())
+	prefix := status + " "
+	o.bottomTitleX = font.MeasureString(o.face, prefix).Ceil()
+	o.bottomTitleW = w - o.bottomTitleX - font.MeasureString(o.face, suffix).Ceil()
+	if o.bottomTitleW < 1 {
+		o.bottomTitleW = 1
+	}
+	displayTitle := o.truncateEnd(title, o.bottomTitleW)
+	o.bottomPrefixTex, o.bottomPrefixTexW, o.bottomPrefixTexH = o.renderTextToTex(prefix, o.textColor())
+	o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(displayTitle, o.textColor())
+	o.bottomSuffixTex, o.bottomSuffixTexW, o.bottomSuffixTexH = o.renderTextToTex(suffix, o.textColor())
+	o.rebuildMarqueeLine(&o.bottomMarquee, title, o.bottomTitleW, false)
+}
+
+func (o *Overlay) rebuildBottomText(text string, maxW int) {
+	o.deleteTex(&o.bottomTex)
+	display := o.truncateEnd(text, maxW)
+	o.bottomTex, o.bottomTexW, o.bottomTexH = o.renderTextToTex(display, o.textColor())
+	if o.loading {
+		o.rebuildMarqueeLine(&o.bottomMarquee, text, maxW, false)
+	}
 }
 
 // truncateEnd shortens s to fit maxPx, appending ellipsis.
@@ -551,46 +602,35 @@ func (o *Overlay) rebuildPageIndicatorTextures() {
 
 // --- Marquee draw ---
 
-// rebuildMarqueeLine builds a single-line texture for the focused item if
-// fullText doesn't fit. Returns true if texture was built.
-func (o *Overlay) rebuildMarqueeLine(m *marqueeState, fullText string, maxPx int) bool {
-	o.deleteTex(&m.tex)
-	if o.face == nil || fullText == "" || maxPx <= 0 {
-		return false
-	}
-	if font.MeasureString(o.face, fullText).Ceil() <= maxPx {
-		return false
-	}
-	m.tex, m.texW, m.texH = o.renderTextToTexBold(fullText, 0, []bool{true}, o.textColor())
-	return true
-}
-
 // drawMarqueeCol draws the marquee overlay for one column if active.
 func (o *Overlay) drawMarqueeCol(m *marqueeState, clipX, clipY, clipW, clipH float32, lh int, rowY float32, winW, winH, viewW, viewH int) bool {
 	if m.tex == 0 {
 		return false
 	}
 
-	maxOffset := float32(m.texW) - clipW
-	if maxOffset <= 0 {
+	borderW := float32(o.borderWidthPx())
+	clipX += borderW
+	clipY += borderW
+	clipW -= borderW * 2
+	clipH -= borderW * 2
+	if clipW <= 0 || clipH <= 0 || float32(m.texW) <= clipW {
 		return false
 	}
-	// Wrap offset: pause at end, then reset.
-	offset := m.offset
-	cycle := maxOffset + float32(marqueePauseAt.Seconds())*marqueeSpeed
-	if cycle > 0 {
-		offset = float32(math.Mod(float64(offset), float64(cycle)))
-	}
-	if offset > maxOffset {
-		offset = maxOffset // pause at end
-	}
-	// Semi-transparent background.
-	pR, pG, pB := o.panelBgRGB()
-	glDrawFilledRect(o.programRect, clipX, rowY, clipW, float32(lh), pR, pG, pB, o.bgAlpha(), winW, winH, viewW, viewH)
-	// Marquee text on top.
+	offset := marqueeOffset(m.offset, m.texW, int(clipW))
 	glDrawOverlayTextClipped(o.programText, m.tex, 1,
 		clipX-offset, rowY, float32(m.texW), float32(m.texH),
 		clipX, clipY, clipW, clipH,
+		winW, winH, viewW, viewH)
+	return true
+}
+
+func (o *Overlay) drawMarquee(m *marqueeState, x, y, w, h float32, winW, winH, viewW, viewH int) bool {
+	if m.tex == 0 || float32(m.texW) <= w {
+		return false
+	}
+	offset := marqueeOffset(m.offset, m.texW, int(w))
+	glDrawOverlayTextClipped(o.programText, m.tex, 1,
+		x-offset, y, float32(m.texW), float32(m.texH), x, y, w, h,
 		winW, winH, viewW, viewH)
 	return true
 }
@@ -619,7 +659,7 @@ func (o *Overlay) refreshCursorMarquee(m *marqueeState, albums []string, cursor 
 	if name == o.playingAlbum {
 		prefix = "▸ "
 	}
-	o.rebuildMarqueeLine(m, prefix+name, maxTextPx)
+	o.rebuildMarqueeLine(m, prefix+name, maxTextPx, false)
 }
 
 // refreshCursorMarqueeTracks is the tracks-panel equivalent.
@@ -637,7 +677,7 @@ func (o *Overlay) refreshCursorMarqueeTracks(maxTextPx int) {
 	if info.Path == o.playingTrack {
 		prefix = "▸ "
 	}
-	o.rebuildMarqueeLine(&o.marqueeR, prefix+title+suffix, maxTextPx)
+	o.rebuildMarqueeLine(&o.marqueeR, prefix+title+suffix, maxTextPx, false)
 }
 
 // drawCursorHighlight draws a subtle highlight behind the focused row.

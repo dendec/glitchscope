@@ -152,19 +152,28 @@ type Overlay struct {
 	theme        config.Theme
 	transparency float32
 
-	marqueeL marqueeState
-	marqueeR marqueeState
+	marqueeL          marqueeState
+	marqueeR          marqueeState
+	statsMarquee      marqueeState
+	breadcrumbMarquee marqueeState
+	presetNameMarquee marqueeState
+	bottomMarquee     marqueeState
 
-	albumsTex                      uint32
-	albumsTexW, albumsTexH         int
-	tracksTex                      uint32
-	tracksTexW, tracksTexH         int
-	bottomTex                      uint32
-	bottomTexW, bottomTexH         int
-	statsTex                       uint32
-	statsTexW, statsTexH           int
-	presetNameTex                  uint32
-	presetNameTexW, presetNameTexH int
+	albumsTex                          uint32
+	albumsTexW, albumsTexH             int
+	tracksTex                          uint32
+	tracksTexW, tracksTexH             int
+	bottomTex                          uint32
+	bottomTexW, bottomTexH             int
+	bottomPrefixTex                    uint32
+	bottomPrefixTexW, bottomPrefixTexH int
+	bottomSuffixTex                    uint32
+	bottomSuffixTexW, bottomSuffixTexH int
+	bottomTitleX, bottomTitleW         int
+	statsTex                           uint32
+	statsTexW, statsTexH               int
+	presetNameTex                      uint32
+	presetNameTexW, presetNameTexH     int
 
 	breadcrumbTex                  uint32
 	breadcrumbTexW, breadcrumbTexH int
@@ -213,6 +222,8 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.albumsTex)
 	o.deleteTex(&o.tracksTex)
 	o.deleteTex(&o.bottomTex)
+	o.deleteTex(&o.bottomPrefixTex)
+	o.deleteTex(&o.bottomSuffixTex)
 	o.deleteTex(&o.statsTex)
 	o.deleteTex(&o.presetNameTex)
 	o.deleteTex(&o.breadcrumbTex)
@@ -222,6 +233,10 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.presetsColR.tex)
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
+	o.statsMarquee.invalidate(o)
+	o.breadcrumbMarquee.invalidate(o)
+	o.presetNameMarquee.invalidate(o)
+	o.bottomMarquee.invalidate(o)
 	for i := range o.pageIndicatorTex {
 		o.deleteTex(&o.pageIndicatorTex[i])
 	}
@@ -322,6 +337,10 @@ func (o *Overlay) markAllDirty() {
 	o.breadcrumbDirty = true
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
+	o.statsMarquee.invalidate(o)
+	o.breadcrumbMarquee.invalidate(o)
+	o.presetNameMarquee.invalidate(o)
+	o.bottomMarquee.invalidate(o)
 }
 
 // SetScreenSize updates screen dimensions and recomputes font size.

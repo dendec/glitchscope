@@ -37,7 +37,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 	o.marqueeL.invalidate(o)
 	if o.panelEntered && !o.settingsEditing && o.settingsCursor >= o.albumsScroll && o.settingsCursor < leftEnd {
 		row := o.settingsRows[o.settingsCursor]
-		o.rebuildMarqueeLine(&o.marqueeL, row.Label, maxTextPx)
+		o.rebuildMarqueeLine(&o.marqueeL, row.Label, maxTextPx, true)
 	}
 
 	// Rebuild right column (values) with scroll window.
@@ -75,7 +75,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 		selIdx := o.settingsValueCursor
 		if selIdx >= o.tracksScroll && selIdx < rightEnd {
 			mark := "▸ "
-			o.rebuildMarqueeLine(&o.marqueeR, mark+row.Values[selIdx], maxTextPx)
+			o.rebuildMarqueeLine(&o.marqueeR, mark+row.Values[selIdx], maxTextPx, true)
 		}
 	}
 
