@@ -4,7 +4,9 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 
 	"github.com/dendec/pmv/internal/app"
 )
@@ -51,6 +53,13 @@ func main() {
 		return
 	}
 	defer a.Close()
+	quitSignals := make(chan os.Signal, 1)
+	signal.Notify(quitSignals, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(quitSignals)
+	go func() {
+		<-quitSignals
+		a.RequestQuit()
+	}()
 
 	if *flagBenchWorker {
 		a.RunBenchmarkWorker(*flagBenchFrames)

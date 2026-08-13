@@ -20,7 +20,7 @@ index 0a061f7..64a5a87 100644
  } // extern "C"
  #endif
 diff --git a/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp b/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
-index e311cf0..27ffe11 100755
+index e311cf0..ec691ff 100755
 --- a/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
 +++ b/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
 @@ -81,9 +81,11 @@ void MilkdropPreset::RenderFrame(const libprojectM::Audio::FrameAudioData& audio
@@ -35,7 +35,7 @@ index e311cf0..27ffe11 100755
          m_isFirstFrame = true;
      }
  
-@@ -169,6 +169,11 @@ void MilkdropPreset::RenderFrame(const libprojectM::Audio::FrameAudioData& audio
+@@ -169,6 +171,11 @@ void MilkdropPreset::RenderFrame(const libprojectM::Audio::FrameAudioData& audio
      m_isFirstFrame = false;
  }
  
@@ -47,43 +47,6 @@ index e311cf0..27ffe11 100755
  auto MilkdropPreset::OutputTexture() const -> std::shared_ptr<Renderer::Texture>
  {
      // the composited image is always stored in the "current" framebuffer after a frame is rendered.
-diff --git a/src/libprojectM/Renderer/Framebuffer.cpp b/src/libprojectM/Renderer/Framebuffer.cpp
-index 455cdae..27bbcc7 100644
---- a/src/libprojectM/Renderer/Framebuffer.cpp
-+++ b/src/libprojectM/Renderer/Framebuffer.cpp
-@@ -89,6 +89,17 @@ bool Framebuffer::SetSize(int width, int height)
-     m_width = width;
-     m_height = height;
- 
-+    // Newly allocated texture storage is undefined until explicitly written.
-+    GLboolean scissorEnabled;
-+    GLboolean colorMask[4];
-+    GLfloat clearColor[4];
-+    glGetBooleanv(GL_SCISSOR_TEST, &scissorEnabled);
-+    glGetBooleanv(GL_COLOR_WRITEMASK, colorMask);
-+    glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-+    glDisable(GL_SCISSOR_TEST);
-+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-+    glClearColor(0.0F, 0.0F, 0.0F, 0.0F);
-+
-     for (auto& attachments : m_attachments)
-     {
-         Bind(attachments.first);
-@@ -97,6 +108,14 @@ bool Framebuffer::SetSize(int width, int height)
-             texture.second->SetSize(width, height);
-             glFramebufferTexture2D(GL_FRAMEBUFFER, texture.first, GL_TEXTURE_2D, texture.second->Texture()->TextureID(), 0);
-         }
-+        glClear(GL_COLOR_BUFFER_BIT);
-+    }
-+
-+    glColorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
-+    glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-+    if (scissorEnabled)
-+    {
-+        glEnable(GL_SCISSOR_TEST);
-     }
-     glBindFramebuffer(GL_FRAMEBUFFER, 0);
- 
 diff --git a/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp b/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp
 index cd55339..008ae64 100644
 --- a/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp
@@ -162,5 +125,5 @@ index cbf5f6e..8c12bc0 100644
  void projectm_set_beat_sensitivity(projectm_handle instance, float sensitivity)
  {
      auto projectMInstance = handle_to_instance(instance);
-
+index 455cdae..27bbcc7 100644
 

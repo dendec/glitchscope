@@ -1,0 +1,32 @@
+diff --git a/src/libprojectM/Renderer/TransitionShaderManager.cpp b/src/libprojectM/Renderer/TransitionShaderManager.cpp
+index 28ea1fb..0605855 100644
+--- a/src/libprojectM/Renderer/TransitionShaderManager.cpp
++++ b/src/libprojectM/Renderer/TransitionShaderManager.cpp
+@@ -8,14 +8,20 @@ namespace libprojectM {
+ namespace Renderer {
+ 
+ TransitionShaderManager::TransitionShaderManager()
+-    : m_transitionShaders({CompileTransitionShader(kTransitionShaderBuiltInCircleGlsl330),
+-                           CompileTransitionShader(kTransitionShaderBuiltInPlasmaGlsl330),
+-                           CompileTransitionShader(kTransitionShaderBuiltInSimpleBlendGlsl330),
+-                           CompileTransitionShader(kTransitionShaderBuiltInSweepGlsl330),
+-                           CompileTransitionShader(kTransitionShaderBuiltInWarpGlsl330),
+-                           CompileTransitionShader(kTransitionShaderBuiltInZoomBlurGlsl330)})
+-    , m_mersenneTwister(m_randomDevice())
++    : m_mersenneTwister(m_randomDevice())
+ {
++    for (const auto& source : {kTransitionShaderBuiltInCircleGlsl330,
++                               kTransitionShaderBuiltInPlasmaGlsl330,
++                               kTransitionShaderBuiltInSimpleBlendGlsl330,
++                               kTransitionShaderBuiltInSweepGlsl330,
++                               kTransitionShaderBuiltInWarpGlsl330,
++                               kTransitionShaderBuiltInZoomBlurGlsl330})
++    {
++        if (auto shader = CompileTransitionShader(source))
++        {
++            m_transitionShaders.emplace_back(shader);
++        }
++    }
+ }
+ 
+ auto TransitionShaderManager::RandomTransition() -> std::shared_ptr<Shader>

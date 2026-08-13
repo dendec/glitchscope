@@ -4,6 +4,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 )
 
 // RenderResolution represents a fixed render size.
@@ -70,19 +71,21 @@ func AllFilters() []UpscaleFilter { return []UpscaleFilter{FilterSmooth, FilterP
 
 // GraphicsSettings is the persisted user-tunable graphics parameters.
 type GraphicsSettings struct {
-	RenderWidth   int           `json:"render_width"`
-	RenderHeight  int           `json:"render_height"`
-	UpscaleFilter UpscaleFilter `json:"upscale_filter"`
-	Adaptive      bool          `json:"adaptive"`
+	RenderWidth     int           `json:"render_width"`
+	RenderHeight    int           `json:"render_height"`
+	UpscaleFilter   UpscaleFilter `json:"upscale_filter"`
+	Adaptive        bool          `json:"adaptive"`
+	BeatSensitivity float64       `json:"beat_sensitivity"`
 }
 
 // DefaultGraphics returns sensible defaults.
 func DefaultGraphics() GraphicsSettings {
 	return GraphicsSettings{
-		RenderWidth:   320,
-		RenderHeight:  240,
-		UpscaleFilter: FilterPixel,
-		Adaptive:      true,
+		RenderWidth:     320,
+		RenderHeight:    240,
+		UpscaleFilter:   FilterPixel,
+		Adaptive:        true,
+		BeatSensitivity: 1,
 	}
 }
 
@@ -93,7 +96,14 @@ func (g *GraphicsSettings) Validate() error {
 	if g.UpscaleFilter < FilterSmooth || g.UpscaleFilter > FilterPixel {
 		return fmt.Errorf("invalid upscale filter %d", g.UpscaleFilter)
 	}
+	if math.IsNaN(g.BeatSensitivity) || math.IsInf(g.BeatSensitivity, 0) || g.BeatSensitivity < 0 || g.BeatSensitivity > 2 {
+		return fmt.Errorf("beat sensitivity must be 0..2, got %v", g.BeatSensitivity)
+	}
 	return nil
+}
+
+func AllBeatSensitivities() []float64 {
+	return []float64{0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2}
 }
 
 // RepeatMode controls what happens when a track finishes.
@@ -151,8 +161,28 @@ func AllShuffleModes() []ShuffleMode {
 
 // PlaybackSettings holds shuffle/repeat configuration.
 type PlaybackSettings struct {
-	ShuffleMode ShuffleMode `json:"shuffle_mode"`
-	Repeat      RepeatMode  `json:"repeat"`
+	ShuffleMode  ShuffleMode      `json:"shuffle_mode"`
+	Repeat       RepeatMode       `json:"repeat"`
+	LastPosition PlaybackPosition `json:"last_position"`
+}
+
+// PlaybackPosition identifies the track and offset to restore on next launch.
+type PlaybackPosition struct {
+	Path    string  `json:"path"`
+	Seconds float64 `json:"seconds"`
+}
+
+func (p PlaybackPosition) Validate() error {
+	if p.Path == "" {
+		if p.Seconds != 0 {
+			return fmt.Errorf("playback position requires a path")
+		}
+		return nil
+	}
+	if math.IsNaN(p.Seconds) || math.IsInf(p.Seconds, 0) || p.Seconds < 0 {
+		return fmt.Errorf("playback position must be non-negative, got %v", p.Seconds)
+	}
+	return nil
 }
 
 func DefaultPlayback() PlaybackSettings {
@@ -166,22 +196,28 @@ func (p PlaybackSettings) Validate() error {
 	if p.Repeat < RepeatOff || p.Repeat > RepeatAll {
 		return fmt.Errorf("invalid repeat mode %d", p.Repeat)
 	}
+	if err := p.LastPosition.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 
-// PresetInterval returns the auto-switch interval in seconds (0 = off).
+// PresetInterval selects the preset auto-switch mode.
 type PresetInterval int
 
 const (
-	PresetOff PresetInterval = 0
-	Preset15s PresetInterval = 15
-	Preset30s PresetInterval = 30
-	Preset60s PresetInterval = 60
-	Preset2m  PresetInterval = 120
+	PresetAuto PresetInterval = -1
+	PresetOff  PresetInterval = 0
+	Preset15s  PresetInterval = 15
+	Preset30s  PresetInterval = 30
+	Preset60s  PresetInterval = 60
+	Preset2m   PresetInterval = 120
 )
 
 func (p PresetInterval) String() string {
 	switch p {
+	case PresetAuto:
+		return "Auto"
 	case PresetOff:
 		return "Off"
 	case Preset15s:
@@ -198,7 +234,7 @@ func (p PresetInterval) String() string {
 }
 
 func AllPresetIntervals() []PresetInterval {
-	return []PresetInterval{PresetOff, Preset15s, Preset30s, Preset60s, Preset2m}
+	return []PresetInterval{PresetOff, PresetAuto, Preset15s, Preset30s, Preset60s, Preset2m}
 }
 
 func (p PresetInterval) Validate() error {
@@ -299,7 +335,7 @@ func DefaultSettings() Settings {
 	return Settings{
 		Graphics:       DefaultGraphics(),
 		Playback:       DefaultPlayback(),
-		PresetInterval: PresetOff,
+		PresetInterval: PresetAuto,
 		UI:             DefaultUI(),
 	}
 }

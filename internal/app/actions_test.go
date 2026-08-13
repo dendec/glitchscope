@@ -222,6 +222,34 @@ func TestPlayFileEmptyParentPreservesPlaylist(t *testing.T) {
 	}
 }
 
+func TestCanRestorePosition(t *testing.T) {
+	local := filepath.Join(t.TempDir(), "track.ogg")
+	createFile(t, local)
+
+	tests := []struct {
+		name        string
+		position    config.PlaybackPosition
+		allowRemote bool
+		want        bool
+	}{
+		{"empty", config.PlaybackPosition{}, false, false},
+		{"missing local", config.PlaybackPosition{Path: filepath.Join(t.TempDir(), "missing.mp3")}, false, false},
+		{"local file", config.PlaybackPosition{Path: local}, false, true},
+		{"offline modland", config.PlaybackPosition{Path: "modland:MODS/test.mod"}, false, false},
+		{"online modland", config.PlaybackPosition{Path: "modland:MODS/test.mod"}, true, true},
+		{"offline modarchive", config.PlaybackPosition{Path: "modarchive:https://example.test/song.zip"}, false, false},
+		{"online modarchive", config.PlaybackPosition{Path: "modarchive:https://example.test/song.zip"}, true, true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := canRestorePosition(test.position, test.allowRemote); got != test.want {
+				t.Fatalf("canRestorePosition(%+v, %t) = %t, want %t", test.position, test.allowRemote, got, test.want)
+			}
+		})
+	}
+}
+
 func createFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

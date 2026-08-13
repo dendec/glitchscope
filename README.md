@@ -60,11 +60,16 @@ Settings are automatically saved to `config.json` next to the binary:
   "graphics": {
     "render_width": 320,
     "render_height": 240,
-    "upscale_filter": "pixel"
+    "upscale_filter": "pixel",
+    "beat_sensitivity": 1
   },
   "playback": {
     "shuffle_mode": 0,
-    "repeat": 0
+    "repeat": 0,
+    "last_position": {
+      "path": "/path/to/track.ogg",
+      "seconds": 42.5
+    }
   },
   "preset_interval": 30,
   "ui": {

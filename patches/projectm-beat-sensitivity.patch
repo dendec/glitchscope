@@ -1,0 +1,16 @@
+diff --git a/src/libprojectM/ProjectM.cpp b/src/libprojectM/ProjectM.cpp
+--- a/src/libprojectM/ProjectM.cpp
++++ b/src/libprojectM/ProjectM.cpp
+@@ -104,5 +104,12 @@ void ProjectM::RenderFrame()
+     // Update and retrieve audio data
+     m_audioStorage.UpdateFrameAudioData(m_timeKeeper->SecondsSinceLastFrame(), m_frameCount);
+     auto audioData = m_audioStorage.GetFrameAudioData();
++
++    audioData.bass *= m_beatSensitivity;
++    audioData.mid *= m_beatSensitivity;
++    audioData.treb *= m_beatSensitivity;
++    audioData.bassAtt *= m_beatSensitivity;
++    audioData.midAtt *= m_beatSensitivity;
++    audioData.trebAtt *= m_beatSensitivity;
+ 
+     // Check if the preset isn't locked, and we've not already notified the user

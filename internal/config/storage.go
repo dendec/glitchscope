@@ -30,14 +30,19 @@ func LoadSettings(path string) (Settings, error) {
 
 	var raw struct {
 		Graphics *struct {
-			RenderWidth   *int           `json:"render_width"`
-			RenderHeight  *int           `json:"render_height"`
-			UpscaleFilter *UpscaleFilter `json:"upscale_filter"`
-			Adaptive      *bool          `json:"adaptive"`
+			RenderWidth     *int           `json:"render_width"`
+			RenderHeight    *int           `json:"render_height"`
+			UpscaleFilter   *UpscaleFilter `json:"upscale_filter"`
+			Adaptive        *bool          `json:"adaptive"`
+			BeatSensitivity *float64       `json:"beat_sensitivity"`
 		} `json:"graphics"`
 		Playback *struct {
-			ShuffleMode *ShuffleMode `json:"shuffle_mode"`
-			Repeat      *RepeatMode  `json:"repeat"`
+			ShuffleMode  *ShuffleMode `json:"shuffle_mode"`
+			Repeat       *RepeatMode  `json:"repeat"`
+			LastPosition *struct {
+				Path    *string  `json:"path"`
+				Seconds *float64 `json:"seconds"`
+			} `json:"last_position"`
 		} `json:"playback"`
 		PresetInterval *PresetInterval `json:"preset_interval"`
 		UI             *struct {
@@ -65,6 +70,9 @@ func LoadSettings(path string) (Settings, error) {
 		if raw.Graphics.Adaptive != nil {
 			s.Graphics.Adaptive = *raw.Graphics.Adaptive
 		}
+		if raw.Graphics.BeatSensitivity != nil {
+			s.Graphics.BeatSensitivity = *raw.Graphics.BeatSensitivity
+		}
 	}
 	if raw.Playback != nil {
 		if raw.Playback.ShuffleMode != nil {
@@ -72,6 +80,14 @@ func LoadSettings(path string) (Settings, error) {
 		}
 		if raw.Playback.Repeat != nil {
 			s.Playback.Repeat = *raw.Playback.Repeat
+		}
+		if raw.Playback.LastPosition != nil {
+			if raw.Playback.LastPosition.Path != nil {
+				s.Playback.LastPosition.Path = *raw.Playback.LastPosition.Path
+			}
+			if raw.Playback.LastPosition.Seconds != nil {
+				s.Playback.LastPosition.Seconds = *raw.Playback.LastPosition.Seconds
+			}
 		}
 	}
 	if raw.PresetInterval != nil {

@@ -35,6 +35,9 @@ func (a *App) Run() {
 	var prevW, prevH int
 
 	for range ticker.C {
+		if a.quit.Load() {
+			return
+		}
 		now := time.Now()
 		dt := now.Sub(lastFrame).Seconds()
 		lastFrame = now
@@ -142,6 +145,10 @@ func (a *App) Run() {
 			}
 		}
 
+		if a.settings.PresetInterval == config.PresetAuto && a.presetSwitch.Swap(false) {
+			a.randPreset()
+		}
+
 		if a.mic != nil {
 			if wave := a.mic.Read(); len(wave) > 0 {
 				a.pm.PCMAddFloat(wave, projectm.Mono)
@@ -157,7 +164,16 @@ func (a *App) Run() {
 				if a.overlay != nil {
 					a.overlay.ShowTrack(" playback error")
 				}
+				a.resumePath = ""
+				a.resumeSeconds = 0
+			} else if a.resumeAttempted && a.resumePath != "" && a.pl.TrackPath() == a.resumePath && a.pl.IsValidVoice() {
+				if err := a.pl.Seek(a.resumeSeconds); err != nil {
+					slog.Warn("restore playback position", "path", a.resumePath, "error", err)
+				}
+				a.resumePath = ""
+				a.resumeSeconds = 0
 			}
+			a.restoreSavedPosition(a.online.Load())
 		}
 
 		if a.pl != nil && a.lib != nil && a.mic == nil && a.pl.Voice() != 0 && a.pl.TrackFinished() {
@@ -191,7 +207,7 @@ func (a *App) autoAdvance() {
 
 func (a *App) startPresetTicker() {
 	interval := a.settings.PresetInterval
-	if interval == config.PresetOff {
+	if interval <= config.PresetOff {
 		return
 	}
 	a.presetTicker = time.NewTicker(time.Duration(interval) * time.Second)

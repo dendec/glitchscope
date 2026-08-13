@@ -6,6 +6,21 @@ package projectm
 #cgo LDFLAGS: -lGLESv2
 #include <stdlib.h>
 #include "projectM-4/projectM.h"
+
+extern void pmvProjectMPresetSwitchRequested(bool isHardCut);
+
+static void pmvPresetSwitchRequested(bool isHardCut, void* userData) {
+	(void)userData;
+	pmvProjectMPresetSwitchRequested(isHardCut);
+}
+
+static void pmvSetPresetSwitchRequestedCallback(projectm_handle instance) {
+	projectm_set_preset_switch_requested_event_callback(instance, pmvPresetSwitchRequested, NULL);
+}
+
+static void pmvClearPresetSwitchRequestedCallback(projectm_handle instance) {
+	projectm_set_preset_switch_requested_event_callback(instance, NULL, NULL);
+}
 */
 import "C"
 
@@ -15,6 +30,15 @@ import (
 )
 
 const Mono = C.PROJECTM_MONO
+
+var presetSwitchRequestedHandler func(bool)
+
+//export pmvProjectMPresetSwitchRequested
+func pmvProjectMPresetSwitchRequested(isHardCut C.bool) {
+	if presetSwitchRequestedHandler != nil {
+		presetSwitchRequestedHandler(bool(isHardCut))
+	}
+}
 
 // Handle wraps the opaque projectM instance handle.
 type Handle struct {
@@ -93,4 +117,24 @@ func (h *Handle) BindFeedbackFramebuffer() {
 // SetSoftCutDuration sets the transition duration for smooth preset cuts.
 func (h *Handle) SetSoftCutDuration(seconds float64) {
 	C.projectm_set_soft_cut_duration(h.p, C.double(seconds))
+}
+
+// SetHardCutEnabled enables or disables beat-driven preset switch requests.
+func (h *Handle) SetHardCutEnabled(enabled bool) {
+	C.projectm_set_hard_cut_enabled(h.p, C.bool(enabled))
+}
+
+// SetPresetSwitchRequestedHandler registers the preset switch request handler.
+func (h *Handle) SetPresetSwitchRequestedHandler(handler func(bool)) {
+	presetSwitchRequestedHandler = handler
+	if handler == nil {
+		C.pmvClearPresetSwitchRequestedCallback(h.p)
+		return
+	}
+	C.pmvSetPresetSwitchRequestedCallback(h.p)
+}
+
+// SetBeatSensitivity adjusts the beat reaction multiplier in the range 0..2.
+func (h *Handle) SetBeatSensitivity(sensitivity float64) {
+	C.projectm_set_beat_sensitivity(h.p, C.float(sensitivity))
 }

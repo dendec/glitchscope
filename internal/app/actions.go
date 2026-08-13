@@ -252,7 +252,7 @@ func (a *App) applyPresetName(name string) {
 // applySettings reads confirmed settings rows and applies changes.
 func (a *App) applySettings(winW, winH int) {
 	rows := a.overlay.SettingsRows()
-	if len(rows) < 7 {
+	if len(rows) < 8 {
 		return
 	}
 
@@ -297,6 +297,10 @@ func (a *App) applySettings(winW, winH int) {
 	presetIntervals := config.AllPresetIntervals()
 	if rows[ui.SettingPresetTimer].Index >= 0 && rows[ui.SettingPresetTimer].Index < len(presetIntervals) {
 		a.settings.PresetInterval = presetIntervals[rows[ui.SettingPresetTimer].Index]
+		a.pm.SetHardCutEnabled(a.settings.PresetInterval == config.PresetAuto)
+		if a.settings.PresetInterval != config.PresetAuto {
+			a.presetSwitch.Store(false)
+		}
 		a.resetPresetTicker()
 	}
 
@@ -308,6 +312,12 @@ func (a *App) applySettings(winW, winH int) {
 	transparencies := config.AllTransparencies()
 	if rows[ui.SettingTransparency].Index >= 0 && rows[ui.SettingTransparency].Index < len(transparencies) {
 		a.settings.UI.Transparency = transparencies[rows[ui.SettingTransparency].Index]
+	}
+
+	beatSensitivities := config.AllBeatSensitivities()
+	if index := rows[ui.SettingBeatSensitivity].Index; index >= 0 && index < len(beatSensitivities) {
+		a.settings.Graphics.BeatSensitivity = beatSensitivities[index]
+		a.pm.SetBeatSensitivity(a.settings.Graphics.BeatSensitivity)
 	}
 
 	a.overlay.SetTheme(a.settings.UI.Theme, int(a.settings.UI.Transparency))

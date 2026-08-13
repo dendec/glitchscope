@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/dendec/pmv/internal/archive"
@@ -56,8 +57,14 @@ type App struct {
 
 	adaptive resolutionState
 
-	pending      pendingPreset // pending preset name + scheduled load time
-	presetTicker *time.Ticker
+	pending         pendingPreset // pending preset name + scheduled load time
+	presetTicker    *time.Ticker
+	resumePath      string
+	resumeSeconds   float64
+	resumeAttempted bool
+	online          atomic.Bool
+	quit            atomic.Bool
+	presetSwitch    atomic.Bool
 
 	deleteSvc *deleteService
 }
@@ -178,6 +185,13 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	rt.SetNearest(gs.Graphics.UpscaleFilter.IsNearest())
 	a.rt = rt
 	a.settings = &gs
+	a.pm.SetBeatSensitivity(gs.Graphics.BeatSensitivity)
+	a.pm.SetHardCutEnabled(gs.PresetInterval == config.PresetAuto)
+	a.pm.SetPresetSwitchRequestedHandler(func(bool) {
+		if a.settings.PresetInterval == config.PresetAuto {
+			a.presetSwitch.Store(true)
+		}
+	})
 
 	slog.Info("render size", "window", fmt.Sprintf("%dx%d", int(w), int(h)),
 		"internal", fmt.Sprintf("%dx%d", renderW, renderH), "scale", renderScale)
@@ -191,6 +205,10 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 }
 
 func (a *App) Close() {
+	a.savePlaybackPosition()
+	if a.pm != nil {
+		a.pm.SetPresetSwitchRequestedHandler(nil)
+	}
 	if a.presetTicker != nil {
 		a.presetTicker.Stop()
 	}
@@ -239,6 +257,8 @@ func (a *App) Init() {
 		a.playTrack(a.startupFile, "command line")
 	} else if a.startupFile != "" {
 		slog.Warn("startup file skipped, audio unavailable", "path", a.startupFile)
+	} else {
+		a.restoreSavedPosition(false)
 	}
 	a.startPresetTicker()
 	if a.overlay != nil {
@@ -317,10 +337,59 @@ func (a *App) checkConnectivity() {
 		}
 		resp.Body.Close()
 		slog.Info("connectivity check: online", "status", resp.StatusCode)
+		a.online.Store(true)
 		if a.overlay != nil {
 			a.overlay.SetOnline(true)
 		}
 	}()
+}
+
+func (a *App) restoreSavedPosition(allowRemote bool) {
+	if a.pl == nil || a.startupFile != "" || a.resumeAttempted {
+		return
+	}
+	position := a.settings.Playback.LastPosition
+	if !canRestorePosition(position, allowRemote) {
+		if position.Path != "" && !player.IsModland(position.Path) && !player.IsModArchive(position.Path) {
+			a.resumeAttempted = true
+		}
+		return
+	}
+	a.resumeAttempted = true
+	a.resumePath = position.Path
+	a.resumeSeconds = position.Seconds
+	a.playTrack(position.Path, "")
+}
+
+func canRestorePosition(position config.PlaybackPosition, allowRemote bool) bool {
+	if position.Path == "" {
+		return false
+	}
+	if player.IsModland(position.Path) || player.IsModArchive(position.Path) {
+		return allowRemote
+	}
+	info, err := os.Stat(position.Path)
+	return err == nil && !info.IsDir()
+}
+
+func (a *App) savePlaybackPosition() {
+	if a.settings == nil {
+		return
+	}
+	position := config.PlaybackPosition{}
+	if a.pl != nil && (a.pl.IsValidVoice() || a.pl.Loading()) {
+		position.Path = a.pl.TrackPath()
+		position.Seconds = a.pl.Position()
+	}
+	a.settings.Playback.LastPosition = position
+	if err := config.SaveSettings(a.settingsPath, *a.settings); err != nil {
+		slog.Warn("settings save on exit", "error", err)
+	}
+}
+
+// RequestQuit makes the main loop return so its deferred cleanup can run.
+func (a *App) RequestQuit() {
+	a.quit.Store(true)
 }
 
 func (a *App) loadModlandFromCache() {

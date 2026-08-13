@@ -35,11 +35,37 @@ WORKDIR /build
 # Apply patch & prepare projectM
 COPY lib/projectm lib/projectm
 COPY patches/projectm-feedback.patch /build/patches/projectm-feedback.patch
+COPY patches/projectm-beat-sensitivity.patch /build/patches/projectm-beat-sensitivity.patch
+COPY patches/projectm-transition-shaders.patch /build/patches/projectm-transition-shaders.patch
+COPY patches/projectm-transition-framebuffer.patch /build/patches/projectm-transition-framebuffer.patch
 RUN cd lib/projectm \
-    && if git apply --check /build/patches/projectm-feedback.patch; then \
+    && if git apply --check /build/patches/projectm-feedback.patch >/dev/null 2>&1; then \
            git apply /build/patches/projectm-feedback.patch; \
+    elif git apply --reverse --check /build/patches/projectm-feedback.patch >/dev/null 2>&1; then \
+           :; \
        else \
-           git apply --reverse --check /build/patches/projectm-feedback.patch; \
+           echo 'projectm-feedback.patch does not apply' >&2; exit 1; \
+       fi \
+    && if git apply --check /build/patches/projectm-beat-sensitivity.patch >/dev/null 2>&1; then \
+           git apply /build/patches/projectm-beat-sensitivity.patch; \
+    elif git apply --reverse --check /build/patches/projectm-beat-sensitivity.patch >/dev/null 2>&1; then \
+           :; \
+       else \
+           echo 'projectm-beat-sensitivity.patch does not apply' >&2; exit 1; \
+       fi \
+    && if git apply --check /build/patches/projectm-transition-shaders.patch >/dev/null 2>&1; then \
+           git apply /build/patches/projectm-transition-shaders.patch; \
+       elif git apply --reverse --check /build/patches/projectm-transition-shaders.patch >/dev/null 2>&1; then \
+           :; \
+       else \
+           echo 'projectm-transition-shaders.patch does not apply' >&2; exit 1; \
+       fi \
+    && if git apply --check /build/patches/projectm-transition-framebuffer.patch >/dev/null 2>&1; then \
+           git apply /build/patches/projectm-transition-framebuffer.patch; \
+       elif git apply --reverse --check /build/patches/projectm-transition-framebuffer.patch >/dev/null 2>&1; then \
+           :; \
+       else \
+           echo 'projectm-transition-framebuffer.patch does not apply' >&2; exit 1; \
        fi \
     && sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
         config.h.cmake.in
@@ -57,7 +83,8 @@ RUN mkdir -p lib/projectm/build-amd64 && cd lib/projectm/build-amd64 && \
 
 RUN mkdir -p /opt/projectm/amd64/lib \
     && cp lib/projectm/build-amd64/src/libprojectM/libprojectM-4.a /opt/projectm/amd64/lib/ \
-    && cp lib/projectm/build-amd64/vendor/projectm-eval/projectm-eval/libprojectM_eval.a /opt/projectm/amd64/lib/
+    && cp lib/projectm/build-amd64/vendor/projectm-eval/projectm-eval/libprojectM_eval.a /opt/projectm/amd64/lib/ \
+    && nm -C /opt/projectm/amd64/lib/libprojectM-4.a | grep -E ' T libprojectM::ProjectM::BindFeedbackFramebuffer\(\)'
 
 # --- Build projectM (arm64, cross-compiled) ---
 RUN echo 'set(CMAKE_SYSTEM_NAME Linux)\n\

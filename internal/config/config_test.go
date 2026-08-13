@@ -234,6 +234,36 @@ func TestSaveLoadRoundTripAdaptive(t *testing.T) {
 	}
 }
 
+func TestSaveLoadPlaybackPositionAndBeatSensitivity(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	original := DefaultSettings()
+	original.Graphics.BeatSensitivity = 1.5
+	original.Playback.LastPosition = PlaybackPosition{Path: "/music/album/track.ogg", Seconds: 42.5}
+
+	if err := SaveSettings(path, original); err != nil {
+		t.Fatal("save:", err)
+	}
+	got, err := LoadSettings(path)
+	if err != nil {
+		t.Fatal("load:", err)
+	}
+	if got.Graphics.BeatSensitivity != original.Graphics.BeatSensitivity {
+		t.Fatalf("beat sensitivity = %v, want %v", got.Graphics.BeatSensitivity, original.Graphics.BeatSensitivity)
+	}
+	if got.Playback.LastPosition != original.Playback.LastPosition {
+		t.Fatalf("last position = %+v, want %+v", got.Playback.LastPosition, original.Playback.LastPosition)
+	}
+}
+
+func TestSettingsRejectInvalidPlaybackPosition(t *testing.T) {
+	settings := DefaultSettings()
+	settings.Playback.LastPosition = PlaybackPosition{Seconds: 1}
+	if err := settings.Validate(); err == nil {
+		t.Fatal("expected invalid playback position to be rejected")
+	}
+}
+
 func TestLoadSettingsAdaptivePartial(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "settings.json")

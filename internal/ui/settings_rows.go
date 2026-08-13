@@ -1,16 +1,21 @@
 package ui
 
-import "github.com/dendec/pmv/internal/config"
+import (
+	"fmt"
+
+	"github.com/dendec/pmv/internal/config"
+)
 
 // Settings row indices — shared between BuildSettingsRows and applySettings.
 const (
-	SettingResolution   = 0
-	SettingFilter       = 1
-	SettingShuffle      = 2
-	SettingRepeat       = 3
-	SettingPresetTimer  = 4
-	SettingTheme        = 5
-	SettingTransparency = 6
+	SettingResolution      = 0
+	SettingFilter          = 1
+	SettingShuffle         = 2
+	SettingRepeat          = 3
+	SettingPresetTimer     = 4
+	SettingTheme           = 5
+	SettingTransparency    = 6
+	SettingBeatSensitivity = 7
 )
 
 // BuildSettingsRows creates SettingRow entries from the current config.
@@ -107,6 +112,16 @@ func BuildSettingsRows(s config.Settings, winW, winH int, renderScaleExplicit bo
 		}
 	}
 
+	beatSensitivities := config.AllBeatSensitivities()
+	beatValues := make([]string, len(beatSensitivities))
+	beatIndex := 0
+	for i, sensitivity := range beatSensitivities {
+		beatValues[i] = fmt.Sprintf("%.2g", sensitivity)
+		if sensitivity == s.Graphics.BeatSensitivity {
+			beatIndex = i
+		}
+	}
+
 	return []SettingRow{
 		{Label: "Render resolution", Values: resValues, Index: resIndex},
 		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
@@ -115,5 +130,6 @@ func BuildSettingsRows(s config.Settings, winW, winH int, renderScaleExplicit bo
 		{Label: "Preset auto-switch", Values: presetValues, Index: presetIndex},
 		{Label: "Theme", Values: themeValues, Index: themeIndex},
 		{Label: "Transparency", Values: transValues, Index: transIndex},
+		{Label: "Beat sensitivity", Values: beatValues, Index: beatIndex},
 	}
 }
