@@ -493,16 +493,7 @@ func (o *Overlay) SetOnline(v bool) {
 	}
 	o.online = v
 	slog.Info("overlay connectivity changed", "online", v, "nc_dir", o.ncDir(), "base_dir", o.baseDir)
-	root := o.navStack[0]
-	root.entries = o.buildSourceEntries()
-	root.cursor = clampCursor(root.cursor, len(root.entries))
-	o.navStack[0] = root
-	if o.topLevel().ctx == ctxSourceRoot {
-		o.albumEntries = root.entries
-		o.albums = labelsOf(root.entries)
-		o.albumCursor = root.cursor
-		o.syncPanels()
-	}
+	o.refreshSourceRoot()
 }
 
 func (o *Overlay) SettingsRows() []SettingRow { return o.settingsRows }
@@ -514,31 +505,13 @@ func (o *Overlay) SetMicActive(active bool) {
 		return
 	}
 	o.micActive = active
-	root := o.navStack[0]
-	root.entries = o.buildSourceEntries()
-	root.cursor = clampCursor(root.cursor, len(root.entries))
-	o.navStack[0] = root
-	if o.topLevel().ctx == ctxSourceRoot {
-		o.albumEntries = root.entries
-		o.albums = labelsOf(root.entries)
-		o.albumCursor = root.cursor
-		o.syncPanels()
-	}
+	o.refreshSourceRoot()
 }
 
 // SetMicDevices updates the available capture devices and refreshes the source root.
 func (o *Overlay) SetMicDevices(devices []string) {
 	o.micDevices = append(o.micDevices[:0], devices...)
-	root := o.navStack[0]
-	root.entries = o.buildSourceEntries()
-	root.cursor = clampCursor(root.cursor, len(root.entries))
-	o.navStack[0] = root
-	if o.topLevel().ctx == ctxSourceRoot {
-		o.albumEntries = root.entries
-		o.albums = labelsOf(root.entries)
-		o.albumCursor = root.cursor
-		o.syncPanels()
-	}
+	o.refreshSourceRoot()
 }
 
 // ConsumeMicMenuRequest reports and clears a request to list input devices.

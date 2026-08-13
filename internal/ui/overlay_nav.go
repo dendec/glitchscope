@@ -147,6 +147,25 @@ func (o *Overlay) buildSourceEntries() []navEntry {
 	return entries
 }
 
+// refreshSourceRoot rebuilds the virtual source root while preserving its
+// navigation state. When visible, the UI fields are the source of truth.
+func (o *Overlay) refreshSourceRoot() {
+	root := o.navStack[0]
+	root.entries = o.buildSourceEntries()
+	if o.topLevel().ctx == ctxSourceRoot {
+		root.cursor = o.albumCursor
+		root.scroll = o.albumsScroll
+	}
+	root.cursor = clampCursor(root.cursor, len(root.entries))
+	o.navStack[0] = root
+
+	if o.topLevel().ctx == ctxSourceRoot {
+		o.albumCursor = root.cursor
+		o.albumsScroll = root.scroll
+		o.syncPanels()
+	}
+}
+
 // ShowMicrophoneDevices enters the capture-device selection list.
 func (o *Overlay) ShowMicrophoneDevices(devices []string) {
 	entries := make([]navEntry, 0, len(devices)+1)
@@ -160,8 +179,13 @@ func (o *Overlay) ShowMicrophoneDevices(devices []string) {
 		entries = append(entries, navEntry{label: "no input devices", kind: entryInfo, albumIdx: -1})
 	}
 	o.source = sourceMicrophone
-	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
+	o.refreshSourceRoot()
+	root := o.navStack[0]
+	o.navStack = []navLevel{root}
+	o.albumCursor = root.cursor
+	o.albumsScroll = root.scroll
 	o.pushLevel(navLevel{ctx: ctxMicrophone, label: "microphone", entries: entries})
+	o.focusPanel = 0
 }
 
 // buildFormatEntries lists distinct modland formats.

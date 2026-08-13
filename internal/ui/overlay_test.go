@@ -197,6 +197,27 @@ func TestMicrophoneDeviceSelection(t *testing.T) {
 	}
 }
 
+func TestMicrophoneDeviceRefreshKeepsSourceCursor(t *testing.T) {
+	o := &Overlay{navStack: []navLevel{{ctx: ctxSourceRoot}}, panelEntered: true}
+	o.SetMicDevices([]string{"USB microphone", "Webcam microphone"})
+	o.albumCursor = 1
+	o.ShowMicrophoneDevices([]string{"USB microphone", "Webcam microphone"})
+	o.albumCursor = 2 // select the second device after the parent entry
+	o.navStack[len(o.navStack)-1].cursor = 2
+
+	o.ShowMicrophoneDevices([]string{"USB microphone", "Webcam microphone"})
+	if o.navStack[0].cursor != 1 {
+		t.Fatalf("source cursor after device refresh = %d, want 1", o.navStack[0].cursor)
+	}
+	if o.albumCursor != 0 {
+		t.Fatalf("device cursor after refresh = %d, want 0", o.albumCursor)
+	}
+	o.Back()
+	if o.albumCursor != 1 || o.currentEntry().source != sourceMicrophone {
+		t.Fatalf("cursor after leaving microphone menu = %d (%#v), want source microphone at 1", o.albumCursor, o.currentEntry())
+	}
+}
+
 func TestMicrophoneSourceHiddenWithoutDevices(t *testing.T) {
 	o := &Overlay{navStack: []navLevel{{ctx: ctxSourceRoot}}}
 	o.SetMicDevices(nil)
