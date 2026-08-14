@@ -29,7 +29,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 	for i := o.albumsScroll; i < leftEnd; i++ {
 		row := o.settingsRows[i]
 		isCursor := i == o.settingsCursor && o.panelEntered
-		leftRows = append(leftRows, listRow{text: row.Label, active: isCursor, bold: isCursor && !o.settingsEditing})
+		leftRows = append(leftRows, listRow{text: row.Label, active: isCursor})
 	}
 	o.rebuildListRows(&o.settingsColL, leftRows, maxTextPx, panelW)
 
@@ -63,7 +63,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 				mark = "▸ "
 			}
 			line := mark + row.Values[i]
-			rightRows = append(rightRows, listRow{text: line, active: isCursor, bold: isCursor})
+			rightRows = append(rightRows, listRow{text: line, active: isCursor})
 		}
 	}
 	o.rebuildListRows(&o.settingsColR, rightRows, maxTextPx, panelW)
@@ -95,14 +95,16 @@ func (o *Overlay) drawSettingsTextures(winW, winH, viewW, viewH int, panelW, pan
 
 	textW := float32(availableRowTextWidth(panelW))
 
-	drawListColumn(o, lx, ly, colW, colH, o.settingsColL, o.panelEntered && !o.settingsEditing, winW, winH, viewW, viewH)
+	drawListColumn(o, lx, ly, colW, colH, o.settingsColL, o.panelEntered && !o.settingsEditing,
+		o.settingsCursor, o.albumsScroll, lh, winW, winH, viewW, viewH)
 	drawScrollbar(o, lx+colW-sbW, ly, colH, len(o.settingsRows), maxRows, o.albumsScroll, winW, winH, viewW, viewH)
 	if o.panelEntered && !o.settingsEditing && len(o.settingsRows) > 0 {
 		rowY := ly + float32((o.settingsCursor-o.albumsScroll)*lh)
 		o.drawMarqueeCol(&o.marqueeL, lx, ly, textW, colH, lh, rowY, winW, winH, viewW, viewH)
 	}
 
-	drawListColumn(o, rx, ry, colW, colH, o.settingsColR, o.panelEntered && o.settingsEditing, winW, winH, viewW, viewH)
+	drawListColumn(o, rx, ry, colW, colH, o.settingsColR, o.panelEntered && o.settingsEditing,
+		o.settingsValueCursor, o.tracksScroll, lh, winW, winH, viewW, viewH)
 	rightTotal := 0
 	if o.panelEntered && o.settingsEditing && o.settingsCursor < len(o.settingsRows) {
 		rightTotal = len(o.settingsRows[o.settingsCursor].Values)

@@ -277,10 +277,14 @@ func (o *Overlay) renderListRows(rows []listRow, maxTextW, minW int) (uint32, in
 	return o.renderTextToTexBold(strings.Join(lines, "\n"), minW, bold, o.textColor())
 }
 
-// drawListColumn draws one column of a two-column list: background,
+// drawListColumn draws one column of a two-column list: background, cursor,
 // optional focus border, and cached text.
-func drawListColumn(o *Overlay, x, y, w, h float32, t listTex, bordered bool, winW, winH, viewW, viewH int) {
+func drawListColumn(o *Overlay, x, y, w, h float32, t listTex, bordered bool, cursor, scroll, lh int, winW, winH, viewW, viewH int) {
 	drawPanelBg(o, x, y, w, h, winW, winH, viewW, viewH)
+	if bordered && cursor >= scroll && cursor < scroll+int(h)/lh {
+		rowY := y + float32((cursor-scroll)*lh)
+		o.drawCursorHighlight(x, rowY, w, float32(lh), winW, winH, viewW, viewH)
+	}
 	if bordered {
 		drawPanelBorder(o, x, y, w, h, winW, winH, viewW, viewH)
 	}
@@ -646,38 +650,6 @@ func availableRowTextWidth(panelW int) int {
 		return 1
 	}
 	return width
-}
-
-// refreshCursorMarquee rebuilds only the marquee for the album cursor row
-// when scroll hasn't changed — avoids full texture re-render.
-func (o *Overlay) refreshCursorMarquee(m *marqueeState, albums []string, cursor int, focusAlbum bool, maxTextPx int) {
-	if !focusAlbum || cursor < 0 || cursor >= len(albums) {
-		return
-	}
-	name := albums[cursor]
-	prefix := "  "
-	if name == o.playingAlbum {
-		prefix = "▸ "
-	}
-	o.rebuildMarqueeLine(m, prefix+name, maxTextPx, false)
-}
-
-// refreshCursorMarqueeTracks is the tracks-panel equivalent.
-func (o *Overlay) refreshCursorMarqueeTracks(maxTextPx int) {
-	if o.focusPanel != 1 || o.trackCursor < 0 || o.trackCursor >= len(o.trackInfos) {
-		return
-	}
-	info := o.trackInfos[o.trackCursor]
-	title := player.TrackTitle(info.Path)
-	suffix := ""
-	if info.Duration > 0 {
-		suffix = "  " + formatDuration(info.Duration)
-	}
-	prefix := "  "
-	if info.Path == o.playingTrack {
-		prefix = "▸ "
-	}
-	o.rebuildMarqueeLine(&o.marqueeR, prefix+title+suffix, maxTextPx, false)
 }
 
 // drawCursorHighlight draws a subtle highlight behind the focused row.

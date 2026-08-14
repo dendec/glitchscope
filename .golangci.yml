@@ -1,38 +1,61 @@
+version: "2"
 linters:
+  default: standard
   enable:
-    # ── catches real bugs ──
-    - errorlint      # fmt.Errorf %w usage, error type/assertion checks
-    - nilerr         # returning nil when err != nil
-    - bodyclose      # unclosed HTTP response bodies
-    - fatcontext     # context.Value in loops, nested contexts
-    - copyloopvar    # pre-Go1.22 loop variable copy patterns
-
-    # ── formatting & hygiene ──
-    - gofumpt        # stricter gofmt (auto-fix: golangci-lint run --fix)
-    - misspell       # typos in comments/strings
-
-    # ── style (low noise) ──
-    - gocritic       # catches real performance/style issues
-
-linters-settings:
-  errorlint:
-    errorf: true
-    asserts: true
-    comparison: true
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-    disabled-checks:
-      - hugeParam          # CGO structs are large by nature
-      - rangeValCopy       # not relevant for this codebase
-      - ifElseChain        # style preference
-      - dupSubExpr         # CGO calls trigger false positives (C.xmp_get_*)
-
+    - bodyclose
+    - copyloopvar
+    - errorlint
+    - fatcontext
+    - gocritic
+    - misspell
+    - nilerr
+    - unused
+  settings:
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    gocritic:
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+        - ifElseChain
+        - dupSubExpr
+      enabled-tags:
+        - diagnostic
+        - performance
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - gocritic
+        path: _test\.go
+      # Keep explicit embedded-state selectors readable at call sites.
+      - linters:
+          - staticcheck
+        text: "QF1008"
+      # A single-kind conditional is clearer than introducing a switch here.
+      - linters:
+          - staticcheck
+        text: "QF1003"
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    # Test files — relaxed rules
-    - path: _test\.go
-      linters: [gocritic]
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - gofumpt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

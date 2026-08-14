@@ -45,7 +45,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 		}
 		line := prefix + cat.Name
 		isCursor := i == o.presetCategoryCursor && o.panelEntered && o.focusPanel == 0
-		leftRows = append(leftRows, listRow{text: line, active: isCursor, bold: isCursor})
+		leftRows = append(leftRows, listRow{text: line, active: isCursor})
 	}
 	o.rebuildListRows(&o.presetsColL, leftRows, maxTextPx, panelW)
 
@@ -81,7 +81,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 			isCursor := i == o.presetCursor && o.panelEntered && o.focusPanel == 1
 			name := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
 			line := mark + name
-			rightRows = append(rightRows, listRow{text: line, active: isCursor, bold: isCursor})
+			rightRows = append(rightRows, listRow{text: line, active: isCursor})
 		}
 	} else {
 		o.presetsScrollR = 0
@@ -118,7 +118,8 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 
 	textW := float32(availableRowTextWidth(panelW))
 
-	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelEntered && o.focusPanel == 0, winW, winH, viewW, viewH)
+	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelEntered && o.focusPanel == 0,
+		o.presetCategoryCursor, o.presetsScrollL, lh, winW, winH, viewW, viewH)
 	drawScrollbar(o, lx+colW-sbW, ly, colH, len(o.presetCategories), maxRows, o.presetsScrollL, winW, winH, viewW, viewH)
 	if o.panelEntered && o.focusPanel == 0 && len(o.presetCategories) > 0 {
 		rowY := ly + float32((o.presetCategoryCursor-o.presetsScrollL)*lh)
@@ -129,7 +130,8 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 	if cat := o.currentCategory(); cat != nil {
 		rightTotal = len(cat.Presets)
 	}
-	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, o.panelEntered && o.focusPanel == 1, winW, winH, viewW, viewH)
+	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, o.panelEntered && o.focusPanel == 1,
+		o.presetCursor, o.presetsScrollR, lh, winW, winH, viewW, viewH)
 	drawScrollbar(o, rx+colW-sbW, ry, colH, rightTotal, maxRows, o.presetsScrollR, winW, winH, viewW, viewH)
 	if o.panelEntered && o.focusPanel == 1 && rightTotal > 0 {
 		rowY := ry + float32((o.presetCursor-o.presetsScrollR)*lh)

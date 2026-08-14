@@ -319,8 +319,8 @@ COPY go.mod go.sum* ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Install golangci-lint using container Go toolchain
-RUN GOBIN=/usr/local/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+# Install a reproducible golangci-lint version using the container Go toolchain
+RUN GOBIN=/usr/local/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 
 # Copy SoLoud headers
 COPY lib/soloud lib/soloud
