@@ -612,6 +612,7 @@ func (o *Overlay) drawMarqueeCol(m *marqueeState, clipX, clipY, clipW, clipH flo
 		return false
 	}
 
+	textX := clipX
 	borderW := float32(o.borderWidthPx())
 	clipX += borderW
 	clipY += borderW
@@ -622,7 +623,7 @@ func (o *Overlay) drawMarqueeCol(m *marqueeState, clipX, clipY, clipW, clipH flo
 	}
 	offset := marqueeOffset(m.offset, m.texW, int(clipW))
 	glDrawOverlayTextClipped(o.programText, m.tex, 1,
-		clipX-offset, rowY, float32(m.texW), float32(m.texH),
+		textX-offset, rowY, float32(m.texW), float32(m.texH),
 		clipX, clipY, clipW, clipH,
 		winW, winH, viewW, viewH)
 	return true
