@@ -3,11 +3,11 @@ package ui
 import "testing"
 
 func TestHelpTopicsLoadFromAsset(t *testing.T) {
-	if len(helpTopics) != 10 {
-		t.Fatalf("loaded %d Help topics, want 10", len(helpTopics))
+	if len(helpTopics) != 6 {
+		t.Fatalf("loaded %d Help topics, want 6", len(helpTopics))
 	}
-	if helpTopics[HelpLibrary].Title != "Library" || len(helpTopics[HelpLibrary].Lines) == 0 {
-		t.Fatalf("Library topic was not loaded from asset: %+v", helpTopics[HelpLibrary])
+	if helpTopics[HelpQuickStart].Title != "Quick Start" || len(helpTopics[HelpQuickStart].Lines) == 0 {
+		t.Fatalf("Quick Start topic was not loaded from asset: %+v", helpTopics[HelpQuickStart])
 	}
 	if len(helpTopics[HelpFormats].Children) != 3 || len(helpTopics[HelpCatalogs].Children) != 2 {
 		t.Fatalf("hierarchical Help entries were not loaded: formats=%d catalogs=%d", len(helpTopics[HelpFormats].Children), len(helpTopics[HelpCatalogs].Children))
@@ -16,16 +16,16 @@ func TestHelpTopicsLoadFromAsset(t *testing.T) {
 
 func TestHelpLinesUseKeyboardMappingByDefault(t *testing.T) {
 	o := &Overlay{}
-	lines := o.helpLines(helpTopic(HelpGettingStarted))
-	if lines[2] != "Press Enter to open or play." || lines[4] != "Press Backspace to return or cancel." {
+	lines := o.helpLines(helpTopic(HelpQuickStart))
+	if lines[3] != "Enter confirms or plays the focused item." || lines[5] != "Arrows move between panels or scroll." {
 		t.Fatalf("keyboard Help mapping = %v", lines)
 	}
 }
 
 func TestHelpLinesUseGamepadMappingWhenConnected(t *testing.T) {
 	o := &Overlay{controllerConnected: true}
-	lines := o.helpLines(helpTopic(HelpControls))
-	if lines[0] != "B selects, opens, or plays the focused item." || lines[1] != "A returns, cancels, or closes the current panel." {
+	lines := o.helpLines(helpTopic(HelpQuickStart))
+	if lines[3] != "B confirms. A returns." || lines[5] != "Right stick seeks. L1 and R1 switch presets. X picks a random preset." {
 		t.Fatalf("gamepad Help mapping = %v", lines)
 	}
 }
@@ -48,10 +48,10 @@ func TestPageCycleIncludesHelp(t *testing.T) {
 }
 
 func TestHelpTopicChangeResetsContentPosition(t *testing.T) {
-	o := &Overlay{helpView: HelpViewState{TopicCursor: int(HelpLibrary), ContentTop: 4}}
+	o := &Overlay{helpView: HelpViewState{TopicCursor: int(HelpQuickStart), ContentTop: 4}}
 	o.helpMoveTopic(1)
-	if o.helpView.TopicCursor != int(HelpDelete) || o.helpView.ContentTop != 0 {
-		t.Fatalf("help state = %+v, want topic %d at top", o.helpView, HelpDelete)
+	if o.helpView.TopicCursor != int(HelpFormats) || o.helpView.ContentTop != 0 {
+		t.Fatalf("help state = %+v, want topic %d at top", o.helpView, HelpFormats)
 	}
 }
 
@@ -74,16 +74,16 @@ func TestHelpContentScrollStopsAtLastVisiblePage(t *testing.T) {
 		helpVisibleRows: 3,
 		panelEntered:    true,
 		helpView: HelpViewState{
-			TopicCursor: int(HelpGettingStarted),
-			ContentTop:  3,
+			TopicCursor: int(HelpQuickStart),
+			ContentTop:  12,
 		},
 		uiPage: PageHelp,
 	}
 	o.CursorDown()
-	if o.helpView.ContentTop != 3 {
-		t.Fatalf("ContentTop = %d, want 3", o.helpView.ContentTop)
+	if o.helpView.ContentTop != 12 {
+		t.Fatalf("ContentTop = %d, want 12", o.helpView.ContentTop)
 	}
-	for range 3 {
+	for range 12 {
 		o.CursorUp()
 	}
 	if o.helpView.ContentTop != 0 {

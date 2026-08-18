@@ -30,6 +30,9 @@ const (
 	ActionCursorUp
 	ActionCursorDown
 	ActionRandomPreset
+	// Seek actions.
+	ActionSeekForward
+	ActionSeekBackward
 )
 
 const axisDeadZone int16 = 8000
@@ -42,6 +45,7 @@ type Input struct {
 	// Axis tracking for repeat prevention.
 	lAxisY int16
 	lAxisX int16
+	rAxisX int16
 }
 
 // New creates an Input handler and opens the first game controller.
@@ -124,6 +128,19 @@ func (in *Input) HasController() bool {
 	return in.controller != nil
 }
 
+// RightStickX returns the current right stick X axis value (deadzone-filtered).
+// Positive = right, negative = left. Returns 0 when no controller is connected.
+func (in *Input) RightStickX() float64 {
+	if in.controller == nil {
+		return 0
+	}
+	v := float64(in.controller.Axis(sdl.CONTROLLER_AXIS_RIGHTX))
+	if v > -float64(axisDeadZone) && v < float64(axisDeadZone) {
+		return 0
+	}
+	return v / 32767.0
+}
+
 // tryOpenController opens the first available game controller.
 func (in *Input) tryOpenController() {
 	if sdl.NumJoysticks() > 0 {
@@ -136,6 +153,7 @@ func (in *Input) tryOpenController() {
 		in.joyIdx = 0
 		in.lAxisY = 0
 		in.lAxisX = 0
+		in.rAxisX = 0
 		slog.Info("game controller opened")
 	}
 }
@@ -170,6 +188,10 @@ func keyToAction(key sdl.Keycode) Action {
 		return ActionSelect
 	case sdl.K_BACKSPACE:
 		return ActionBack
+	case sdl.K_COMMA:
+		return ActionSeekBackward
+	case sdl.K_PERIOD:
+		return ActionSeekForward
 	}
 	return ActionNone
 }
@@ -236,6 +258,22 @@ func axisToAction(in *Input, e *sdl.ControllerAxisEvent) Action {
 			in.lAxisX = 0
 		} else {
 			in.lAxisX = e.Value
+		}
+
+	case sdl.CONTROLLER_AXIS_RIGHTX:
+		// Right stick X: seek forward/backward
+		if e.Value > axisDeadZone && in.rAxisX <= axisDeadZone {
+			in.rAxisX = e.Value
+			return ActionSeekForward
+		}
+		if e.Value < -axisDeadZone && in.rAxisX >= -axisDeadZone {
+			in.rAxisX = e.Value
+			return ActionSeekBackward
+		}
+		if e.Value > -axisDeadZone && e.Value < axisDeadZone {
+			in.rAxisX = 0
+		} else {
+			in.rAxisX = e.Value
 		}
 	}
 	return ActionNone

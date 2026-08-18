@@ -25,7 +25,7 @@ func helpTopic(id HelpTopicID) HelpTopic {
 	if int(id) >= 0 && int(id) < len(helpTopics) {
 		return helpTopics[id]
 	}
-	return helpTopics[HelpGettingStarted]
+	return helpTopics[HelpQuickStart]
 }
 
 func helpTopicCount() int { return len(helpTopics) }
@@ -36,7 +36,8 @@ func wrapHelpLines(lines []string, face font.Face, maxTextW int) []string {
 	}
 	wrapped := make([]string, 0, len(lines))
 	for _, line := range lines {
-		words := strings.Fields(line)
+		clean := strings.ReplaceAll(line, "**", "")
+		words := strings.Fields(clean)
 		if len(words) == 0 {
 			wrapped = append(wrapped, "")
 			continue
@@ -76,20 +77,23 @@ func wrapHelpLines(lines []string, face font.Face, maxTextW int) []string {
 }
 
 func (o *Overlay) helpLines(topic HelpTopic) []string {
-	selectLabel, backLabel, navigateLabel, focusLabel, pagesLabel := "Enter", "Backspace", "Arrows", "Left/Right", "P"
-	if o.controllerConnected {
-		selectLabel, backLabel, navigateLabel, focusLabel, pagesLabel = "B", "A", "D-pad", "D-pad", "L1/R1"
-	}
-	replacer := strings.NewReplacer(
-		"{select}", selectLabel,
-		"{back}", backLabel,
-		"{navigate}", navigateLabel,
-		"{focus}", focusLabel,
-		"{pages}", pagesLabel,
-	)
-	lines := make([]string, len(topic.Lines))
-	for i, line := range topic.Lines {
-		lines[i] = replacer.Replace(line)
+	lines := make([]string, 0, len(topic.Lines))
+	inWrongSection := false
+	for _, line := range topic.Lines {
+		if line == "**Keyboard:**" || line == "**Gamepad:**" {
+			isGamepadSection := line == "**Gamepad:**"
+			if o.controllerConnected != isGamepadSection {
+				inWrongSection = true
+				continue
+			}
+			inWrongSection = false
+			lines = append(lines, line)
+			continue
+		}
+		if inWrongSection {
+			continue
+		}
+		lines = append(lines, line)
 	}
 	return lines
 }

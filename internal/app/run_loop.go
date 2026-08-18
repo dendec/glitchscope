@@ -129,6 +129,20 @@ func (a *App) Run() {
 			}
 		}
 
+		// Continuous seeking via right analog stick.
+		if a.pl != nil {
+			if rx := a.inp.RightStickX(); rx != 0 {
+				seekDelta := rx * 10 * dt // ±10 sec/sec at full deflection
+				target := a.pl.Position() + seekDelta
+				if target < 0 {
+					target = 0
+				} else if dur := a.pl.Duration(); dur > 0 && target > dur {
+					target = dur
+				}
+				_ = a.pl.Seek(target)
+			}
+		}
+
 		if a.pending.name != "" && now.After(a.pending.at) {
 			if d, err := presets.Read(a.pending.name); err == nil {
 				a.pm.LoadPresetData(string(d), true)

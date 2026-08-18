@@ -38,6 +38,20 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 			a.overlay.ToggleUI() // always show/hide the UI, never cycles pages
 		}
 		return
+	case input.ActionSeekForward:
+		if a.pl != nil {
+			if err := a.pl.Seek(min(a.pl.Position()+5, a.pl.Duration())); err != nil {
+				slog.Debug("seek forward", "error", err)
+			}
+		}
+		return
+	case input.ActionSeekBackward:
+		if a.pl != nil {
+			if err := a.pl.Seek(max(a.pl.Position()-5, 0)); err != nil {
+				slog.Debug("seek backward", "error", err)
+			}
+		}
+		return
 	}
 
 	if a.overlay != nil && a.overlay.UIVisible() {

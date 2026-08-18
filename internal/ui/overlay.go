@@ -40,16 +40,12 @@ const (
 type HelpTopicID int
 
 const (
-	HelpGettingStarted HelpTopicID = iota
-	HelpControls
-	HelpLibrary
-	HelpDelete
-	HelpSettings
-	HelpPresets
+	HelpQuickStart HelpTopicID = iota
 	HelpFormats
 	HelpCatalogs
 	HelpDevice
 	HelpAbout
+	HelpLicenses
 )
 
 type HelpTopic struct {
@@ -66,12 +62,12 @@ type HelpEntry struct {
 }
 
 type HelpViewState struct {
-	TopicCursor     int
-	EntryCursor     int
-	EntryTop        int
-	ContentTop      int
-	InChildren      bool
-	InGrandChildren bool
+	TopicCursor      int
+	EntryCursor      int
+	EntryTop         int
+	ContentTop       int
+	InChildren       bool
+	InGrandChildren  bool
 	GrandChildCursor int
 	GrandChildTop    int
 }

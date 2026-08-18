@@ -495,8 +495,7 @@ func (o *Overlay) renderTextToTex(text string, textColor color.RGBA) (uint32, in
 }
 
 // renderTextToTexBold renders text with faux-bold for lines marked in bold.
-// Bold is achieved by redrawing offset by one pixel — used instead of a
-// glyph marker to indicate the currently playing row.
+// Supports inline bold via **text** markers within lines.
 func (o *Overlay) renderTextToTexBold(text string, minW int, bold []bool, textColor color.RGBA) (uint32, int, int) {
 	if o.face == nil {
 		return 0, 0, 0
@@ -507,7 +506,8 @@ func (o *Overlay) renderTextToTexBold(text string, minW int, bold []bool, textCo
 	bounds := make([]fixed.Rectangle26_6, len(lines))
 	contentW := 0
 	for i, line := range lines {
-		bounds[i], _ = font.BoundString(o.face, line)
+		clean := strings.ReplaceAll(line, "**", "")
+		bounds[i], _ = font.BoundString(o.face, clean)
 		if width := (bounds[i].Max.X - bounds[i].Min.X).Ceil(); width > contentW {
 			contentW = width
 		}
@@ -527,17 +527,39 @@ func (o *Overlay) renderTextToTexBold(text string, minW int, bold []bool, textCo
 				X: fixed.I(originX) - bounds[i].Min.X,
 				Y: fixed.I(originY+i*lineHeight) + metrics.Ascent,
 			}
-			d := &font.Drawer{
-				Dst:  rgba,
-				Src:  image.NewUniform(textColor),
-				Face: o.face,
-				Dot:  startDot,
-			}
-			d.DrawString(line)
-			if i < len(bold) && bold[i] {
-				// Faux bold: redraw one pixel to the right.
-				d.Dot = startDot
-				d.Dot.X += fixed.I(1)
+			isLineBold := i < len(bold) && bold[i]
+			hasMarkers := strings.Contains(line, "**")
+			if isLineBold || hasMarkers {
+				segments := strings.Split(line, "**")
+				d := &font.Drawer{
+					Dst:  rgba,
+					Src:  image.NewUniform(textColor),
+					Face: o.face,
+					Dot:  startDot,
+				}
+				for j, seg := range segments {
+					if seg == "" {
+						continue
+					}
+					segStart := d.Dot
+					if j%2 == 1 || isLineBold {
+						d.DrawString(seg)
+						d.Dot = segStart
+						d.Dot.X += fixed.I(1)
+						d.DrawString(seg)
+						d.Dot = segStart
+						d.Dot.X += fixed.I(font.MeasureString(o.face, seg).Ceil())
+					} else {
+						d.DrawString(seg)
+					}
+				}
+			} else {
+				d := &font.Drawer{
+					Dst:  rgba,
+					Src:  image.NewUniform(textColor),
+					Face: o.face,
+					Dot:  startDot,
+				}
 				d.DrawString(line)
 			}
 		}

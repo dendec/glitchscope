@@ -1,66 +1,31 @@
 [
   {
     "id": 0,
-    "title": "Getting started",
+    "title": "Quick Start",
     "lines": [
-      "Choose Music in Library.",
-      "Select a folder or file.",
-      "Press {select} to open or play.",
-      "Use {focus} to move between panels.",
-      "Press {back} to return or cancel."
+      "PMV is a music visualizer and tracker module player.",
+      "",
+      "**Keyboard:**",
+      "Enter confirms or plays the focused item.",
+      "Backspace returns or cancels.",
+      "Arrows move between panels or scroll.",
+      "Left/Right switch between panels.",
+      "P cycles through screens.",
+      "Space plays or pauses.",
+      "Comma and period seek backward and forward.",
+      "N and P switch presets. R picks a random preset.",
+      "B shows or hides the overlay. Tab shows or hides the UI.",
+      "Esc or Q quits.",
+      "",
+      "**Gamepad:**",
+      "B confirms. A returns.",
+      "Y plays or pauses.",
+      "Right stick seeks. L1 and R1 switch presets. X picks a random preset.",
+      "Start shows or hides the UI. Back shows or hides the overlay."
     ]
   },
   {
     "id": 1,
-    "title": "Controls",
-    "lines": [
-      "{select} selects, opens, or plays the focused item.",
-      "{back} returns, cancels, or closes the current panel.",
-      "{navigate} navigate lists and change values.",
-      "{focus} changes the focused panel.",
-      "{pages} cycles pages."
-    ]
-  },
-  {
-    "id": 2,
-    "title": "Library",
-    "lines": [
-      "Music opens the local music library.",
-      "Modland and ModArchive provide remote catalogs.",
-      "Open a folder to browse its contents.",
-      "Select a track and press {select} to play it."
-    ]
-  },
-  {
-    "id": 3,
-    "title": "Delete",
-    "lines": [
-      "Delete is available for supported local files.",
-      "A confirmation is required before removing a file.",
-      "Press {back} to cancel a pending deletion."
-    ]
-  },
-  {
-    "id": 4,
-    "title": "Settings",
-    "lines": [
-      "Use {navigate} to choose a setting.",
-      "Use {focus} to edit the selected value.",
-      "Press {select} to apply a value.",
-      "Press {back} while editing to cancel the change."
-    ]
-  },
-  {
-    "id": 5,
-    "title": "Presets",
-    "lines": [
-      "Choose a category on the left.",
-      "Choose a preset on the right.",
-      "Press {select} to apply the selected preset."
-    ]
-  },
-  {
-    "id": 6,
     "title": "Formats",
     "children": [
       {"title": "Audio", "children": [
@@ -168,22 +133,17 @@
         {"title": ".hes", "lines": ["HES (Home Entertainment System) format preserves music from the NEC PC Engine/TurboGrafx-16 by storing the HuC6280 CPU driver code and data for the console's Yamaha YM2608-derived PSG, which provides 6 pulse-wave channels and 1 noise/DA channel (plus optional wavetable from the CD-ROM Super System). The format was developed for PC Engine emulation and is used in archives and emulators like MagicEngine, with a dedicated collection of several hundred tracks catalogued at Zophar's Domain and similar sites."]},
         {"title": ".kss", "lines": ["KSS (Konami SCC Sound) format stores music data for MSX, Sega Master System, and Sega Game Gear, supporting the Konami SCC wavetable synthesis chip (5 channels) alongside the standard PSG (SN76489/SN76496) and the MSX AY-3-8910. Originally developed as the MPK format by the MSX community, KSS packages the Z80 driver code and ROM data for multiple sound chips in a single file, making it a versatile multi-system format used in MSX emulation and chiptune archives."]},
         {"title": ".sap", "lines": ["SAP (Sound Artist Player) format stores music data for the Atari 8-bit family, targeting the POKEY sound chip which provides 4 independently programmable channels with selectable waveforms (pure, buzz, distorted, high-pass filtered). Created by the Atari 8-bit music preservation community, SAP files contain the 6502 driver code and POKEY register data and are played back through emulation. The format is supported by Atari 8-bit emulators like Altirra and is used in dedicated Atari music archives."]},
-        {"title": ".vgm", "lines": ["VGM (Video Game Music) is a log format that records the actual register write commands sent to multiple sound chips across a wide range of arcade, console, and computer systems—including the Sega Genesis YM2612, SN76489, and numerous others—rather than storing CPU driver code. Unlike code-based formats like NSF or SID, VGM captures chip interactions in real time, making it system-agnostic and highly accurate for cross-platform music preservation. Supported chips span dozens of platforms, and the format is maintained by the VGMRips community with extensive archives for Master System, Genesis, arcade boards, and more."]},
+        {"title": ".vgm", "lines": ["VGM (Video Game Music) is a log format that records the actual register write commands sent to multiple sound chips across a wide range of arcade, console, and computer systemsincluding the Sega Genesis YM2612, SN76489, and numerous othersrather than storing CPU driver code. Unlike code-based formats like NSF or SID, VGM captures chip interactions in real time, making it system-agnostic and highly accurate for cross-platform music preservation. Supported chips span dozens of platforms, and the format is maintained by the VGMRips community with extensive archives for Master System, Genesis, arcade boards, and more."]},
         {"title": ".vgz", "lines": ["VGZ is the gzip-compressed variant of the VGM format, reducing file sizes significantly while maintaining identical playback through the same register-logging mechanism. The extension avoids double-dot filename issues that some operating systems have with .vgm.gz, ensuring VGZ files launch VGM players rather than generic archiver programs. VGZ is the preferred distribution format for VGM archives due to its smaller footprint, supported by all major VGM players like VGMPlay and in_mgv."]},
         {"title": ".sid", "lines": ["SID files preserve Commodore 64 music by storing the 6510 CPU driver code and data for the MOS Technology 6581/8580 SID chip, a 3-voice synthesizer with ADSR envelope controls, ring modulation, oscillator sync, a multimode analog filter (lowpass, bandpass, highpass), and four waveforms per voice (triangle, sawtooth, pulse, noise). The format exists in PSID (standard) and RSID (requiring full C64 hardware emulation) variants, and is the foundation of the High Voltage SID Collection (HVSC) with over 57,000 tracks. SID files are played through emulators like JSidplay2, VICE, and HardSID hardware, and are central to the demoscene and chiptune listening community."]},
         {"title": ".rsid", "lines": ["RSID is an enhanced SID file variant designed for music that requires more complete Commodore 64 hardware emulation, including CIA timer interactions, raster interrupts, and other advanced techniques that standard PSID files cannot represent. RSID files use a stricter header that mandates full C64 emulation (CPU, VIC-II, CIA chips) rather than the minimal SID-only approach of PSID. The format is used by modern SID composers who push beyond simple register-based playback, and is supported by advanced players like JSidplay2 and the reSID engine."]},
         {"title": ".vtx", "lines": ["VTX files store chiptune music for the Yamaha AY-3-8910/YM2149 PSG and the Yamaha YM2612 FM synthesis chip used in the Sega Genesis/Mega Drive, using a vector-based encoding that captures register states rather than CPU code. Developed as part of the Vortex Tracker II ecosystem, VTX files are compact and designed for playback through emulation of these specific Yamaha sound chips. The format is used primarily in the Russian and Eastern European chiptune scenes, where Vortex Tracker II remains a popular composition tool."]},
-        {"title": ".pt3", "lines": ["PT3 (ProTracker 3) files are the native format of Vortex Tracker II, a tracker application for composing music using the Yamaha AY-3-8910/YM2149 PSG chip emulated via the YM2149 core. PT3 stores patterns, instruments, and effects data in a compact binary format optimized for the 3-channel square-wave plus noise capabilities of the AY/YM chip. Originating from the Soviet/Russian chiptune scene, PT3 is widely used for ZX Spectrum 128k and MSX music composition and is supported by players like Vortex Tracker II,AY Emu, and various cross-platform replayers."]},
-        {"title": ".ym", "lines": ["YM files store music data for the Atari ST's Yamaha YM2149 sound chip (a variant of the AY-3-8910) by capturing register states at fixed intervals rather than using a CPU driver, making them a time-based log format for the 3-channel PSG. The format was developed by the Atari ST demoscene and music preservation community and is used in YM emulators like ST-Sound (STSound) by Antoine Rousseau. YM files are popular in Atari ST music archives and the demoscene, with thousands of tracks preserved from the 16-bit computer era."]},
-        {"title": ".lh", "lines": ["LH is a file archive format created by Haruhiko Okumura as part of the LHA/LZH compression family, widely used in Japan and on retro computing platforms including the MSX, Sharp X68000, and Amiga. In the context of chiptune music, .lh archives were commonly used to compress and distribute tracker music files, module files, and game music rips across BBS systems and early internet communities. The format is closely related to .lha and represents an earlier variant of the same compression scheme, with .lha becoming the dominant standard for LH-archived chiptune distributions."]},
-        {"title": ".lha", "lines": ["LHA (Lempel-Ziv-Huffman-Archiver) is a lossless compression archive format created by Yoshizaki Haruyasu, dominant in Japanese computing and retro systems like the MSX, Sharp X68000, PC-98, and Amiga. In chiptune and tracker music contexts, .lha archives were the standard method for packaging and distributing module files, game music rips, and sound driver collections across bulletin boards, Amiga disk magazines, and MSX software networks. The format's efficient compression ratio made it ideal for distributing large chiptune libraries over bandwidth-limited connections, and .lha remains widely used in the Japanese retro computing and doujin music scenes."]},
-        {"title": ".ahx", "lines": ["AHX (Amiga Hacker eXchange) is a chiptune tracker format created by Wiliam W. in 1995 that generates music entirely through software synthesis—using no samples at all—producing characteristic Amiga-style square and pulse waves with ADSR envelopes, arpeggios, and effects through two channels (stereo with volume separation). AHX files are extremely compact, typically 1-4KB, and produce a distinctive lo-fi chiptune sound reminiscent of C64 SID music but created on the Amiga platform. The format requires Amiga Kickstart 2.0 and 2MB RAM, and remains actively used in the Amiga demoscene and chiptune communities, with cross-platform replayers available for modern systems."]},
-        {"title": ".hvl", "lines": ["HVL (Hively Tracker) files store chiptune music created in Hively Tracker, a cross-platform tracker that emulates the custom sound hardware of the Atari ST's YM2149 PSG combined with delta modulation techniques for enhanced audio output. Hively Tracker produces music using YM2149 square waves with software-driven effects, supporting advanced features like custom instrument envelopes and channel effects beyond the native chip capabilities. The format is used in the modern Atari ST and cross-platform chiptune scenes, with Hively Tracker available for Windows, Linux, macOS, and AmigaOS, bridging retro hardware emulation with contemporary composition tools."]}
+        {"title": ".pt3", "lines": ["PT3 (ProTracker 3) files are the native format of Vortex Tracker II, a tracker application for composing music using the Yamaha AY-3-8910/YM2149 PSG chip emulated via the YM2149 core. PT3 stores patterns, instruments, and effects data in a compact binary format optimized for the 3-channel square-wave plus noise capabilities of the AY/YM chip. Originating from the Soviet/Russian chiptune scene, PT3 is widely used for ZX Spectrum 128k and MSX music composition and is supported by players like Vortex Tracker II,AY Emu, and various cross-platform replayers."]}
       ]}
     ]
   },
   {
-    "id": 7,
+    "id": 2,
     "title": "Catalogs",
     "children": [
       {"title": "Modland", "lines": ["Online tracker music catalog with format and author folders.", "Tracks are downloaded to the local cache before playback."]},
@@ -191,7 +151,7 @@
     ]
   },
   {
-    "id": 8,
+    "id": 3,
     "title": "Device",
     "lines": [
       "The overlay is designed for desktop and PortMaster screens.",
@@ -199,10 +159,15 @@
     ]
   },
   {
-    "id": 9,
+    "id": 4,
     "title": "About",
     "lines": [
       "PMV is a music visualizer and player."
     ]
+  },
+  {
+    "id": 5,
+    "title": "Licenses",
+    "lines": []
   }
 ]
