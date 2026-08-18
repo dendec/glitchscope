@@ -1,7 +1,7 @@
 package ui
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"strings"
 
@@ -11,38 +11,29 @@ import (
 //go:embed assets/help.json
 var helpData []byte
 
-var licenseTexts = map[string][]string{
-	"MIT": {
-		"Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the Software), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.",
-		"The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.",
-	},
-	"BSD-2-Clause": {
-		"Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:",
-		"1. Redistributions retain the copyright notice.",
-		"2. Redistributions in binary form reproduce the copyright notice in documentation.",
-	},
-	"BSD-3-Clause": {
-		"Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:",
-		"1. Redistributions retain the copyright notice.",
-		"2. Redistributions in binary form reproduce the copyright notice in documentation.",
-		"3. Neither the names of the contributors may be used to endorse products without prior written permission.",
-	},
-	"LGPL-2.1": {
-		"This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.",
-	},
-	"LGPL-2.1+": {
-		"This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.",
-		"Some files may be under GPL v2+ or BSD/X11/MIT licenses.",
-	},
-	"zlib/libpng": {
-		"Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:",
-		"1. The origin of this software must not be misrepresented.",
-		"2. Altered source versions must be plainly marked as such.",
-		"3. This notice may not be removed or altered from any source distribution.",
-	},
-	"WTFPL": {
-		"Do what the fuck you want with the code, but please mention the original author.",
-	},
+//go:embed assets/licenses/*
+var licenseFS embed.FS
+
+var licenseTexts = loadLicenseTexts()
+
+func loadLicenseTexts() map[string][]string {
+	entries, err := licenseFS.ReadDir("assets/licenses")
+	if err != nil {
+		return nil
+	}
+	texts := make(map[string][]string, len(entries))
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		data, err := licenseFS.ReadFile("assets/licenses/" + e.Name())
+		if err != nil {
+			continue
+		}
+		lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+		texts[e.Name()] = lines
+	}
+	return texts
 }
 
 var helpTopics = loadHelpTopics()

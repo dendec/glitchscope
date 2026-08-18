@@ -170,7 +170,7 @@
     "title": "Licenses",
     "children": [
       {"title": "projectM", "lines": ["LGPL-2.1", "https://github.com/projectM-visualizer/projectm", "Copyright (C) 2003-2009 projectM Team"]},
-      {"title": "SoLoud", "lines": ["zlib/libpng", "https://github.com/jarikomppa/soloud", "Copyright (c) 2013-2018 Jari Komppa"]},
+      {"title": "SoLoud", "lines": ["zlib", "https://github.com/jarikomppa/soloud", "Copyright (c) 2013-2018 Jari Komppa"]},
       {"title": "FFmpeg", "lines": ["LGPL-2.1+", "https://ffmpeg.org/", "Copyright (c) FFmpeg developers"]},
       {"title": "libxmp", "lines": ["MIT", "https://github.com/libxmp/libxmp", "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"]},
       {"title": "libopenmpt", "lines": ["BSD-3-Clause", "https://github.com/OpenMPT/openmpt", "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"]},
