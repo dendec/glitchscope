@@ -119,6 +119,11 @@ func (in *Input) DPadDownHeld() bool {
 	return in.controller.Button(sdl.CONTROLLER_BUTTON_DPAD_DOWN) != 0
 }
 
+// HasController reports whether a game controller is currently connected.
+func (in *Input) HasController() bool {
+	return in.controller != nil
+}
+
 // tryOpenController opens the first available game controller.
 func (in *Input) tryOpenController() {
 	if sdl.NumJoysticks() > 0 {

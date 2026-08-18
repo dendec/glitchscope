@@ -188,6 +188,7 @@ func (a *App) Run() {
 
 		if a.overlay != nil {
 			rw, rh := a.rt.Size()
+			a.overlay.SetControllerConnected(a.inp.HasController())
 			a.overlay.Update(a.inp.DPadUpHeld(), a.inp.DPadDownHeld())
 			a.overlay.Draw(w, h)
 			a.pm.BindFeedbackFramebuffer()

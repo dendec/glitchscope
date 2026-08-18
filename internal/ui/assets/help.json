@@ -1,0 +1,202 @@
+[
+  {
+    "id": 0,
+    "title": "Getting started",
+    "lines": [
+      "Choose Music in Library.",
+      "Select a folder or file.",
+      "Press {select} to open or play.",
+      "Use {focus} to move between panels.",
+      "Press {back} to return or cancel."
+    ]
+  },
+  {
+    "id": 1,
+    "title": "Controls",
+    "lines": [
+      "{select} selects, opens, or plays the focused item.",
+      "{back} returns, cancels, or closes the current panel.",
+      "{navigate} navigate lists and change values.",
+      "{focus} changes the focused panel.",
+      "{pages} cycles pages."
+    ]
+  },
+  {
+    "id": 2,
+    "title": "Library",
+    "lines": [
+      "Music opens the local music library.",
+      "Modland and ModArchive provide remote catalogs.",
+      "Open a folder to browse its contents.",
+      "Select a track and press {select} to play it."
+    ]
+  },
+  {
+    "id": 3,
+    "title": "Delete",
+    "lines": [
+      "Delete is available for supported local files.",
+      "A confirmation is required before removing a file.",
+      "Press {back} to cancel a pending deletion."
+    ]
+  },
+  {
+    "id": 4,
+    "title": "Settings",
+    "lines": [
+      "Use {navigate} to choose a setting.",
+      "Use {focus} to edit the selected value.",
+      "Press {select} to apply a value.",
+      "Press {back} while editing to cancel the change."
+    ]
+  },
+  {
+    "id": 5,
+    "title": "Presets",
+    "lines": [
+      "Choose a category on the left.",
+      "Choose a preset on the right.",
+      "Press {select} to apply the selected preset."
+    ]
+  },
+  {
+    "id": 6,
+    "title": "Formats",
+    "children": [
+      {"title": ".aac", "lines": ["AAC is a lossy audio codec developed by Fraunhofer, Dolby, Sony, and others for MPEG-2 and MPEG-4 in the 1990s. It improves on MP3 at similar bitrates and is used in streaming, phones, digital radio, and video."]},
+      {"title": ".ac3", "lines": ["AC-3, or Dolby Digital, was developed by Dolby Laboratories in the early 1990s for multichannel cinema sound. It became a standard for DVDs, digital television, Blu-ray, streaming, and home theater."]},
+      {"title": ".eac3", "lines": ["E-AC-3, or Dolby Digital Plus, was developed by Dolby as a more efficient successor to AC-3 in the 2000s. It is used for multichannel television, Blu-ray, streaming services, and modern home theater."]},
+      {"title": ".mp1", "lines": ["MPEG-1 Layer I was standardized by the Moving Picture Experts Group in the early 1990s as a simple perceptual audio codec. It was used in early digital broadcasting and Video CD systems and is now mainly archival."]},
+      {"title": ".mp2", "lines": ["MPEG-1 Layer II was standardized by MPEG in the early 1990s and optimized for broadcast-quality audio. It remains common in digital radio, television, contribution links, and older Video CD material."]},
+      {"title": ".mp3", "lines": ["MPEG-1 Layer III was developed by MPEG with major contributions from Fraunhofer and standardized in the 1990s. MP3 transformed online music, portable players, podcasts, and software distribution through compact lossy files."]},
+      {"title": ".ogg", "lines": ["Ogg is an open multimedia container created by the Xiph.Org Foundation in the 1990s. It commonly carries Vorbis, Opus, or FLAC streams and is used in games, web audio, and open-source media."]},
+      {"title": ".oga", "lines": ["OGA is an Ogg container extension introduced by Xiph.Org for audio-only files. It may contain Vorbis, FLAC, or other codecs and is used where open, metadata-friendly audio distribution is preferred."]},
+      {"title": ".opus", "lines": ["Opus was developed by the IETF with contributions from Skype and Xiph.Org and standardized in 2012. Its low latency and wide bitrate range make it useful for voice chat, WebRTC, music streaming, and games."]},
+      {"title": ".flac", "lines": ["FLAC was created by Josh Coalson and released as an open codec in 2001. It compresses PCM without losing samples and is widely used for archival masters, hi-fi libraries, and lossless downloads."]},
+      {"title": ".wav", "lines": ["WAV was introduced by Microsoft and IBM in 1991 as a RIFF-based audio container. It commonly stores uncompressed PCM and remains a standard for recording, editing, broadcast, games, and measurement."]},
+      {"title": ".rf64", "lines": ["RF64 was developed by the European Broadcasting Union as a WAV-compatible extension beyond the four-gigabyte RIFF limit. It is used for long multichannel recordings in broadcast, film, and professional audio production."]},
+      {"title": ".aiff", "lines": ["AIFF was designed by Apple and Electronic Arts in 1988 from the IFF model. It usually stores uncompressed PCM and is used in professional audio, sampling, interchange, and older Macintosh workflows."]},
+      {"title": ".aif", "lines": ["AIF is the common shortened filename extension for Apple's AIFF container, introduced in 1988. It carries the same professional PCM audio used in recording studios, samplers, editors, and legacy Mac software."]},
+      {"title": ".aifc", "lines": ["AIFF-C was introduced by Apple in the early 1990s to add compressed and extensible variants to AIFF. It appears in professional production files, sound libraries, and older Macintosh applications."]},
+      {"title": ".caf", "lines": ["Core Audio Format was introduced by Apple with Mac OS X for very large files and flexible metadata. CAF is used by Apple audio software, instruments, sound effects, and recording applications."]},
+      {"title": ".m4a", "lines": ["M4A is an audio-only filename convention for ISO Base Media files, derived from MPEG-4 and QuickTime in the 1990s and 2000s. It commonly contains AAC or ALAC music in phones, stores, and streaming libraries."]},
+      {"title": ".m4b", "lines": ["M4B is an MPEG-4 audio file convention associated with audiobooks and podcasts, developed from Apple's QuickTime and MPEG-4 work. It supports chapters and bookmarking and is used by audiobook players and stores."]},
+      {"title": ".mp4", "lines": ["MP4 is an ISO Base Media container standardized by MPEG in the late 1990s and based on QuickTime. It can hold audio, video, subtitles, and metadata and is ubiquitous in cameras, phones, streaming, and downloads."]},
+      {"title": ".mov", "lines": ["MOV is Apple's QuickTime container, created in 1991 for synchronized digital media. It is used in video editing, cameras, production interchange, and older Apple media workflows, and may contain many audio codecs."]},
+      {"title": ".mka", "lines": ["MKA is Matroska's audio-only container extension, created by the open Matroska project in the early 2000s. It supports rich metadata and multiple tracks and is used for archival audio, albums, and concert recordings."]},
+      {"title": ".mkv", "lines": ["MKV is Matroska's flexible open multimedia container, begun in 2002 by independent developers. It supports multiple audio, video, subtitle, and chapter tracks and is widely used for video archives and releases."]},
+      {"title": ".webm", "lines": ["WebM was introduced by Google in 2010 as an open web-oriented container based on Matroska. It commonly carries VP8/VP9/AV1 video and Vorbis or Opus audio in browsers, streaming, and games."]},
+      {"title": ".wma", "lines": ["WMA is Microsoft's lossy Windows Media Audio codec, developed in the late 1990s for streaming and local playback. It was used in Windows libraries, portable players, online stores, and legacy broadcasts."]},
+      {"title": ".asf", "lines": ["ASF is Microsoft's Advanced Systems Format container, developed in the late 1990s for Windows Media streaming. It carries WMA or WMV and is found in legacy Windows files, broadcasts, and downloaded media."]},
+      {"title": ".amr", "lines": ["AMR was standardized by 3GPP around 1999 for efficient mobile speech coding. Its narrowband and wideband modes were used in GSM/3G telephony, voicemail, MMS, and cellular voice recordings."]},
+      {"title": ".ape", "lines": ["Monkey's Audio, usually stored as APE, was created by Matthew T. Ashland around 2000 as a lossless codec. It is used mainly by enthusiasts and archival music collections where exact reconstruction matters."]},
+      {"title": ".tta", "lines": ["True Audio, or TTA, was created in the early 2000s as an open lossless codec using predictive compression. It is used in archival and enthusiast music libraries, especially where software compatibility is available."]},
+      {"title": ".wv", "lines": ["WavPack was created by David Bryant in the 1990s as a lossless audio codec with hybrid and lossy modes. It is used for archiving, high-resolution music, portable distribution, and restoration workflows."]},
+      {"title": ".mpc", "lines": ["Musepack was developed in the late 1990s by Andree Buschmann and later contributors as a high-quality lossy codec based on MPEG ideas. It is favored in enthusiast archives and older high-bitrate music collections."]},
+      {"title": ".ts", "lines": ["MPEG Transport Stream was standardized by MPEG in the mid-1990s to multiplex media over unreliable links. It is used by digital television, IPTV, broadcast equipment, and cameras, often carrying AAC or MPEG audio."]},
+      {"title": ".m2ts", "lines": ["M2TS is the Blu-ray-oriented form of MPEG Transport Stream, adopted in the 2000s for optical media and AVCHD. It carries multiplexed video, audio, and subtitles from Blu-ray discs and cameras."]},
+      {"title": ".ra", "lines": ["RealAudio was developed by RealNetworks in the mid-1990s for low-bandwidth internet streaming. It helped establish online radio and spoken-word delivery and now survives mostly in legacy archives."]},
+      {"title": ".rm", "lines": ["RealMedia is RealNetworks' multimedia container from the mid-1990s, designed for streaming over slow connections. It was used for internet video, radio, and news before modern web media displaced it."]},
+      {"title": ".mod", "lines": ["MOD began with Karsten Obarski's Ultimate Soundtracker on the Commodore Amiga in 1987. It stores patterns, samples, and playback commands and remains important in demoscene music, games, and chiptune archives."]},
+      {"title": ".xm", "lines": ["XM was introduced by Triton's FastTracker 2 in 1994 as an extended tracker module format. It added flexible instruments and pattern features and is used in demoscene music, game soundtracks, and tracker composition."]},
+      {"title": ".it", "lines": ["IT was created by Jeffrey Lim for Impulse Tracker in 1995. It supports detailed pattern effects, instruments, envelopes, and samples and became a major format for PC tracker music and game audio."]},
+      {"title": ".s3m", "lines": ["S3M was created by Future Crew for Scream Tracker 3 in 1991. It evolved MOD-style sample sequencing for DOS sound cards and remains common in demoscene archives and retro game music."]},
+      {"title": ".mptm", "lines": ["MPTM is OpenMPT's native tracker module format, developed in the 2000s by the OpenMPT community. It extends classic module ideas for modern composition and is used by current tracker musicians."]},
+      {"title": ".stm", "lines": ["STM was the original Scream Tracker module format, created by Future Crew for DOS in the late 1980s. It stores compact sample patterns and is now mainly used for historical playback and demoscene preservation."]},
+      {"title": ".nst", "lines": ["NST is commonly associated with NoiseTracker modules from the Commodore Amiga era, beginning in the late 1980s. These compact sample-and-pattern songs are preserved in tracker archives and retro music collections."]},
+      {"title": ".wow", "lines": ["WOW is a module format associated with the Grave Composer tracker for DOS in the early 1990s. It was designed for compact pattern music and is now encountered mostly in preserved PC tracker archives."]},
+      {"title": ".ult", "lines": ["ULT was created for UltraTracker on DOS in the early 1990s. It stores samples and pattern commands and is used today mainly to replay preserved PC tracker songs and demoscene material."]},
+      {"title": ".669", "lines": ["669 was created for Composer 669 and Unis 669 on DOS in the early 1990s. It contains pattern-based sample music and survives in game, demo, and tracker archives."]},
+      {"title": ".mtm", "lines": ["MTM was introduced by Digital Productions' MultiTracker in the early 1990s for DOS. It combines samples with reusable patterns and is used today for archival playback and format conversion."]},
+      {"title": ".med", "lines": ["MED was developed for the OctaMED tracker on the Commodore Amiga, beginning in the late 1980s. It supports pattern composition and is preserved in Amiga music, game soundtracks, and demoscene archives."]},
+      {"title": ".far", "lines": ["FAR was created for Farandole Composer on DOS in the early 1990s. It stores tracker patterns and samples and is now primarily used by archives and compatibility players preserving PC module music."]},
+      {"title": ".mdl", "lines": ["MDL was created for DigiTrakker on DOS in the 1990s. It is a sample-based tracker format used for compact compositions and is now found mainly in historical module collections."]},
+      {"title": ".ams", "lines": ["AMS is associated with Velvet Studio, a DOS tracker from the mid-1990s. It stores patterns, instruments, and samples and is used today for preserving songs from that PC tracker scene."]},
+      {"title": ".dsm", "lines": ["DSM was used by the DSMI and later DSI tracker ecosystem on DOS in the 1990s. It contains sample-based pattern music and is mainly encountered in retro software and demoscene archives."]},
+      {"title": ".amf", "lines": ["AMF is a family of tracker formats, notably the Advanced Module Format used by DSMI tools in the 1990s. Its sample patterns are used today for compatibility playback and preservation of PC tracker songs."]},
+      {"title": ".okt", "lines": ["OKT was created for Oktalyzer on the Commodore Amiga in the late 1980s. It arranged samples across multiple channels and remains useful for studying and replaying early Amiga tracker music."]},
+      {"title": ".dmf", "lines": ["DMF was created for DigiTrakker on DOS in the 1990s. It stores tracker patterns and samples and is used in preserved PC module libraries and conversion tools."]},
+      {"title": ".ptm", "lines": ["PTM was used by Poly Tracker on DOS in the early 1990s. It provides sample-based pattern sequencing and is now mostly relevant to retro tracker archives and compatibility players."]},
+      {"title": ".psm", "lines": ["PSM was used by Epic MegaGames' MASI music tools and later ProTracker Studio in the 1990s. It is encountered in PC game music, tracker archives, and preservation projects."]},
+      {"title": ".mt2", "lines": ["MT2 is MadTracker 2's module format, developed by Yannick Delwiche in the late 1990s and 2000s. It supports modern tracker effects and is used by tracker composers and legacy collections."]},
+      {"title": ".dbm", "lines": ["DBM was created for DigiBooster on the Amiga in the 1990s and later versions. It stores editable module songs and is used in Amiga music preservation and tracker playback."]},
+      {"title": ".abk", "lines": ["ABK is a family of Amiga music-bank and tracker files used by games and music tools during the late 1980s and 1990s. It is now chiefly encountered in Amiga software and game-music preservation."]},
+      {"title": ".digi", "lines": ["DIGI files belong to early Amiga digital-audio and tracker tools from the late 1980s. They carry compact sampled music and are used today to preserve Amiga demos, games, and compositions."]},
+      {"title": ".dtt", "lines": ["DTT is a rare tracker-related format associated with older Amiga and PC music tools. Its surviving files are primarily used by archives and compatibility players for retro music preservation."]},
+      {"title": ".flx", "lines": ["FLX is an uncommon tracker format from the DOS and Amiga music scene of the 1990s. It stores sample-based songs and is now used mainly for archival replay and format conversion."]},
+      {"title": ".gtk", "lines": ["GTK is a tracker module format associated with the Graoumf Tracker project for DOS in the 1990s. It is used for compact pattern music and survives in PC tracker archives."]},
+      {"title": ".imf", "lines": ["IMF commonly denotes id Music Format files used by DOS games for AdLib and OPL-based music in the late 1980s and 1990s. They are important to game-music preservation and emulation."]},
+      {"title": ".liq", "lines": ["LIQ is a rare tracker format from the 1990s PC music ecosystem. It preserves sample-and-pattern compositions and is mainly used by archival players and retro music collections."]},
+      {"title": ".masi", "lines": ["MASI files come from the MASI music tools used in the 1990s PC game and tracker scene. They preserve compact module-style songs and are now primarily handled by compatibility software."]},
+      {"title": ".mgt", "lines": ["MGT is a module format from the 1990s tracker scene, associated with less common PC music tools. It is used today for archival playback of preserved pattern-and-sample songs."]},
+      {"title": ".mmd", "lines": ["MMD is an OctaMED module format developed for Amiga music creation in the 1990s. It stores patterns, samples, and instruments and is used in Amiga archives and modern compatibility players."]},
+      {"title": ".mmdc", "lines": ["MMDC is a compressed or extended OctaMED-family module variant from the Amiga tracker ecosystem. It is used to preserve compact Amiga compositions and replay them outside the original tools."]},
+      {"title": ".mmcmp", "lines": ["MMCMP is a compression format created by Matthias Krampe in the 1990s for shrinking tracker modules without changing their musical data. It is used inside archived module files and by unpacking players."]},
+      {"title": ".muse", "lines": ["MUSE is a rare tracker-related music format from the 1990s computer-music scene. Its surviving files are used mainly in archives and compatibility players that preserve uncommon module collections."]},
+      {"title": ".nt", "lines": ["NT commonly identifies NoiseTracker modules from the late-1980s Amiga scene. They contain sample-based patterns and are used today for replaying early tracker and demoscene music."]},
+      {"title": ".pmd", "lines": ["PMD is a module format associated with older PC and Japanese computer music tools from the 1990s. It is mainly used for preserving game, demo, and tracker songs in compatibility players."]},
+      {"title": ".ppm", "lines": ["PPM is a ProTracker-style module format used by some 1990s tracker tools. It preserves sample patterns and is encountered today in demoscene archives and conversion projects."]},
+      {"title": ".pru", "lines": ["PRU is a rare tracker format from the classic computer-music era, documented in module compatibility libraries. Its modern use is archival playback of preserved songs from niche trackers."]},
+      {"title": ".pt36", "lines": ["PT36 is a ProTracker-family module variant from the 1990s. It stores compact patterns and samples and is used mainly by preservation software and retro music archives."]},
+      {"title": ".rh", "lines": ["RH is an uncommon tracker format from the 1990s computer-music ecosystem. It survives as compact pattern-and-sample music and is chiefly used by archival players."]},
+      {"title": ".rtm", "lines": ["RTM was created for Real Tracker on DOS in the 1990s. It stores editable sample-based songs and is now used primarily for retro tracker playback and preservation."]},
+      {"title": ".sfx", "lines": ["SFX is a family of compact sound-effect and tracker files used by DOS and Amiga games and tools in the 1980s and 1990s. These files are now valuable to game-audio preservation."]},
+      {"title": ".sfx2", "lines": ["SFX2 is a later variant of the SFX game-sound format family from the DOS and Amiga era. It is used by compatibility players to replay preserved effects and short musical cues."]},
+      {"title": ".stim", "lines": ["STIM is a rare tracker or sound-effect format from the 1990s PC scene. Its surviving files are used mainly by archival tools that preserve niche game and demo audio."]},
+      {"title": ".stx", "lines": ["STX is the extended Scream Tracker module format, created for early DOS trackers in the early 1990s. It is used for preserving sample-based demoscene music and legacy game audio."]},
+      {"title": ".tcb", "lines": ["TCB is a rare module format from the late-1980s and 1990s tracker scene. It preserves compact pattern music and is now primarily used by compatibility players and archives."]},
+      {"title": ".tdd", "lines": ["TDD is an uncommon tracker format from the 1990s computer-music scene. Its modern role is preservation of editable sample-and-pattern songs from niche composition tools."]},
+      {"title": ".tp", "lines": ["TP is a tracker module format used by smaller DOS and Amiga music programs in the 1990s. It is encountered mainly in preserved demo music and format-conversion libraries."]},
+      {"title": ".uni", "lines": ["UNI is the internal module format used by MikMod and related tracker software in the 1990s. It represents pattern-based sampled music and is used in cross-platform playback and archives."]},
+      {"title": ".xd", "lines": ["XD is a rare module format from the 1990s tracker ecosystem. It stores compact pattern-and-sample songs and is supported today mainly for historical compatibility."]},
+      {"title": ".ay", "lines": ["AY files preserve music programs for the AY-3-8910 sound chip used in the ZX Spectrum, Amstrad CPC, and Atari ST. They are popular in chiptune archives and emulator-based replay."]},
+      {"title": ".nsf", "lines": ["NSF is the Nintendo Sound Format, created in the 1990s to preserve NES music playback code and data. It is used by game-music historians, emulators, and soundtrack archives."]},
+      {"title": ".nsfe", "lines": ["NSFe is an extended NSF container created by the NES music preservation community to add metadata and track organization. It is used for curated NES soundtrack archives and replay."]},
+      {"title": ".spc", "lines": ["SPC files capture the sound RAM and state of the Super Nintendo SPC700 audio system. They became common in the 1990s emulation scene and are used for SNES soundtrack preservation."]},
+      {"title": ".gbs", "lines": ["GBS is the Game Boy Sound format, created to preserve music driver data from Game Boy games. It is used by emulators, chiptune listeners, and archival game-music collections."]},
+      {"title": ".hes", "lines": ["HES files preserve PC Engine and TurboGrafx-16 music for the HuC6280 sound hardware. They are used by console-music archives and emulators to replay game soundtracks."]},
+      {"title": ".kss", "lines": ["KSS files preserve music from MSX and related Japanese computers and consoles, including their sound-chip programs. They are used by emulation communities and retro soundtrack archives."]},
+      {"title": ".sap", "lines": ["SAP is an Atari 8-bit music format that preserves programs for the POKEY sound chip. It is used by Atari computer enthusiasts, chiptune historians, and emulators."]},
+      {"title": ".vgm", "lines": ["VGM was created by Ville Skymning in 2003 to log writes to arcade and console sound chips with accurate timing. It is used for chip-music preservation, emulation, and soundtrack analysis."]},
+      {"title": ".vgz", "lines": ["VGZ is a gzip-compressed VGM file, introduced to reduce the size of chip-log music. It is widely used by chiptune archives and players for arcade and console soundtracks."]},
+      {"title": ".sid", "lines": ["SID files preserve Commodore 64 music written for the MOS 6581 or 8580 SID chip, introduced with the C64 in 1982. They are staples of demoscene archives and chip-music listening."]},
+      {"title": ".rsid", "lines": ["RSID is the stricter Real SID playback variant of the Commodore 64 SID format, defined by the PSID specification. It preserves songs requiring accurate C64 initialization and is used by SID emulators and archives."]},
+      {"title": ".vtx", "lines": ["VTX files preserve music for Yamaha AY-3-8910-family chips, especially from ZX Spectrum and Atari ST trackers. They are used in chiptune archives and accurate sound-chip players."]},
+      {"title": ".pt3", "lines": ["PT3 is a ProTracker 3 format created for ZX Spectrum music using the AY-3-8910 chip. It is used by Spectrum composers, emulators, and modern chiptune preservation projects."]},
+      {"title": ".ym", "lines": ["YM files store logged or replayable music for Yamaha sound chips in Atari ST and other computers. They are used by chiptune historians, emulators, and archives of 1980s and 1990s computer music."]},
+      {"title": ".lh", "lines": ["LH is a filename extension used by LHA-family archives and some compact Amiga music files. In preserved collections it is associated with software distribution and playback of classic computer music."]},
+      {"title": ".lha", "lines": ["LHA is an archive format created by Haruyasu Yoshizaki in 1988, especially popular on Amiga and DOS. It is used to distribute compact software and music collections and can contain tracker files."]},
+      {"title": ".ahx", "lines": ["AHX is an Amiga tracker format created for chip-oriented synthesis rather than large PCM samples. It is used for compact demoscene compositions and remains popular in Amiga music archives."]},
+      {"title": ".hvl", "lines": ["HVL is the HivelyTracker Amiga module format, developed in the 2000s as a continuation of the AHX tradition. It is used for synthesized chiptune and modern demoscene music."]},
+      {"title": ".spx", "lines": ["Speex was created by Jean-Marc Valin at Xiph.Org in 2003 for low-bitrate speech. It was used in internet telephony, voice chat, and accessibility tools before Opus became the broader successor."]},
+      {"title": ".mo3", "lines": ["MO3 is a tracker module format developed by Ian Luck for the BASSMOD engine. It stores samples encoded with MP3 or Ogg Vorbis, and can use lossless encoding, reducing module size while preserving playback quality; it is used for compact tracker music."]},
+      {"title": ".ktm", "lines": ["KTM is the module format of Klystrack, a tracker created for chiptune composition in the 2000s. It stores synthesized instruments and patterns and is used for compact retro-style game and demoscene music."]},
+      {"title": ".ims", "lines": ["IMS is a module format associated with Imago Orpheus, a DOS tracker from the 1990s. It stores patterns, instruments, and samples and is now encountered mainly in preserved PC tracker collections."]},
+      {"title": ".mdc", "lines": ["MDC is a tracker module format associated with the Digitrakker and related PC music tools of the 1990s. It preserves sample-based compositions and is used today by archival players and converters."]},
+      {"title": ".txn", "lines": ["TXN is a rare tracker module format documented by module playback libraries for older PC music tools. Its modern application is compatibility playback and preservation of otherwise obscure tracker songs."]}
+    ]
+  },
+  {
+    "id": 7,
+    "title": "Catalogs",
+    "children": [
+      {"title": "Modland", "lines": ["Online tracker music catalog with format and author folders.", "Tracks are downloaded to the local cache before playback."]},
+      {"title": "ModArchive", "lines": ["Online module archive exposed as browsable directories.", "Catalog contents may be unavailable while the network or cache is unavailable."]}
+    ]
+  },
+  {
+    "id": 8,
+    "title": "Device",
+    "lines": [
+      "The overlay is designed for desktop and PortMaster screens.",
+      "Connected controllers use their physical button labels."
+    ]
+  },
+  {
+    "id": 9,
+    "title": "About",
+    "lines": [
+      "PMV is a music visualizer and player."
+    ]
+  }
+]

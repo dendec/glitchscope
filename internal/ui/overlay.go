@@ -34,7 +34,43 @@ const (
 	PageLibrary UIPage = iota
 	PageSettings
 	PagePresets
+	PageHelp
 )
+
+type HelpTopicID int
+
+const (
+	HelpGettingStarted HelpTopicID = iota
+	HelpControls
+	HelpLibrary
+	HelpDelete
+	HelpSettings
+	HelpPresets
+	HelpFormats
+	HelpCatalogs
+	HelpDevice
+	HelpAbout
+)
+
+type HelpTopic struct {
+	ID       HelpTopicID
+	Title    string
+	Lines    []string
+	Children []HelpEntry
+}
+
+type HelpEntry struct {
+	Title string
+	Lines []string
+}
+
+type HelpViewState struct {
+	TopicCursor int
+	EntryCursor int
+	EntryTop    int
+	ContentTop  int
+	InChildren  bool
+}
 
 // SettingRow describes one line in the settings page.
 type SettingRow struct {
@@ -79,9 +115,10 @@ const (
 
 // Overlay manages UI and notification rendering.
 type Overlay struct {
-	programText uint32
-	programRect uint32
-	face        font.Face
+	controllerConnected bool
+	programText         uint32
+	programRect         uint32
+	face                font.Face
 
 	notif Notifier
 
@@ -126,6 +163,11 @@ type Overlay struct {
 	settingsDirty       bool
 	settingsColL        listTex
 	settingsColR        listTex
+	helpView            HelpViewState
+	helpColL            listTex
+	helpColR            listTex
+	helpDirty           bool
+	helpVisibleRows     int
 
 	presetCategories     []PresetCat
 	presetCategoryCursor int
@@ -180,9 +222,9 @@ type Overlay struct {
 	breadcrumbTextCache            string
 	breadcrumbDirty                bool
 
-	pageIndicatorTex   [3]uint32
-	pageIndicatorTexW  [3]int
-	pageIndicatorTexH  [3]int
+	pageIndicatorTex   [4]uint32
+	pageIndicatorTexW  [4]int
+	pageIndicatorTexH  [4]int
 	pageIndicatorDirty bool
 	textureCacheReady  bool
 
@@ -231,6 +273,8 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.settingsColR.tex)
 	o.deleteTex(&o.presetsColL.tex)
 	o.deleteTex(&o.presetsColR.tex)
+	o.deleteTex(&o.helpColL.tex)
+	o.deleteTex(&o.helpColR.tex)
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
 	o.statsMarquee.invalidate(o)
@@ -295,6 +339,15 @@ func (o *Overlay) SetBaseDir(dir string) {
 	o.baseDir = dir
 }
 
+// SetControllerConnected updates the active Help control mapping.
+func (o *Overlay) SetControllerConnected(connected bool) {
+	if o.controllerConnected == connected {
+		return
+	}
+	o.controllerConnected = connected
+	o.helpDirty = true
+}
+
 // SetMusicDir records the resolved local music root (see App.findMusicDir),
 // used by NC navigation instead of assuming baseDir/"music" exists.
 func (o *Overlay) SetMusicDir(dir string) {
@@ -333,6 +386,7 @@ func (o *Overlay) markAllDirty() {
 	o.presetNameDirty = true
 	o.settingsDirty = true
 	o.presetsDirty = true
+	o.helpDirty = true
 	o.pageIndicatorDirty = true
 	o.breadcrumbDirty = true
 	o.marqueeL.invalidate(o)

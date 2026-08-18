@@ -90,7 +90,7 @@ func (o *Overlay) ToggleUI() {
 	slog.Debug("ui visibility", "visible", o.uiVisible)
 }
 
-// NextScreen cycles Library → Settings → Presets → Library.
+// NextScreen cycles Library → Settings → Presets → Help → Library.
 func (o *Overlay) NextScreen() {
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
@@ -102,6 +102,8 @@ func (o *Overlay) NextScreen() {
 		o.uiPage = PagePresets
 		o.syncPresetCursors()
 	case PagePresets:
+		o.uiPage = PageHelp
+	case PageHelp:
 		o.uiPage = PageLibrary
 	}
 	o.panelEntered = true
@@ -109,19 +111,20 @@ func (o *Overlay) NextScreen() {
 	o.markAllDirty()
 }
 
-// PrevScreen cycles Library → Presets → Settings → Library.
+// PrevScreen cycles Library → Help → Presets → Settings → Library.
 func (o *Overlay) PrevScreen() {
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
 	switch o.uiPage {
 	case PageLibrary:
-		o.uiPage = PagePresets
-		o.syncPresetCursors()
+		o.uiPage = PageHelp
 	case PagePresets:
 		o.uiPage = PageSettings
 	case PageSettings:
 		o.uiPage = PageLibrary
+	case PageHelp:
+		o.uiPage = PagePresets
 	}
 	o.panelEntered = true
 	o.settingsEditing = false
@@ -149,6 +152,24 @@ func (o *Overlay) CursorDown() {
 // directions can't drift out of sync.
 func (o *Overlay) moveCursor(dir int) {
 	o.invalidateActiveMarquee()
+	if o.uiPage == PageHelp {
+		if o.focusPanel == 0 {
+			if o.helpView.InChildren {
+				o.helpMoveEntry(dir)
+			} else {
+				o.helpMoveTopic(dir)
+			}
+		} else {
+			topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+			next := o.helpView.ContentTop + dir
+			maxTop := o.helpMaxContentTop(topic)
+			if next >= 0 && next <= maxTop {
+				o.helpView.ContentTop = next
+				o.helpDirty = true
+			}
+		}
+		return
+	}
 	if o.uiPage == PageSettings {
 		if o.settingsEditing {
 			vals := o.settingsRows[o.settingsCursor].Values
@@ -213,6 +234,11 @@ func (o *Overlay) moveCursor(dir int) {
 	}
 }
 
+func (o *Overlay) helpTextWidth() int {
+	panelW := o.screenW * panelWidthPct / 100
+	return availableRowTextWidth(panelW)
+}
+
 // focusPanelBy shifts focusPanel by delta, clamped to [0,1].
 func (o *Overlay) focusPanelBy(delta int, markDirty func()) {
 	next := o.focusPanel + delta
@@ -226,6 +252,11 @@ func (o *Overlay) focusPanelBy(delta int, markDirty func()) {
 
 func (o *Overlay) FocusLeft() {
 	switch o.uiPage {
+	case PageHelp:
+		if o.focusPanel == 1 {
+			o.focusPanel = 0
+			o.helpDirty = true
+		}
 	case PageSettings:
 		if o.panelEntered && o.settingsEditing {
 			o.settingsEditing = false
@@ -257,6 +288,11 @@ func (o *Overlay) FocusLeft() {
 
 func (o *Overlay) FocusRight() {
 	switch o.uiPage {
+	case PageHelp:
+		if o.focusPanel == 0 {
+			o.focusPanel = 1
+			o.helpDirty = true
+		}
 	case PageSettings:
 		if o.panelEntered && !o.settingsEditing {
 			o.settingsEditing = true
@@ -305,6 +341,19 @@ func (o *Overlay) backToLeftPanel(markDirty func()) bool {
 // Select enters the focused panel or confirms item selection.
 // Returns true when an item was selected.
 func (o *Overlay) Select() bool {
+	if o.uiPage == PageHelp {
+		if !o.panelEntered {
+			o.panelEntered = true
+			o.focusPanel = 0
+		} else if o.focusPanel == 0 && !o.helpView.InChildren {
+			o.enterHelpChildren()
+		} else if o.focusPanel == 0 {
+			o.focusPanel = 1
+			o.helpView.ContentTop = 0
+		}
+		return false
+	}
+
 	if o.uiPage == PageSettings {
 		if !o.panelEntered {
 			// Enter settings page: activate left panel.
@@ -425,6 +474,28 @@ func (o *Overlay) Select() bool {
 }
 
 func (o *Overlay) Back() {
+	if o.uiPage == PageHelp {
+		if o.panelEntered && o.focusPanel == 1 {
+			o.focusPanel = 0
+			o.helpDirty = true
+			return
+		}
+		if o.helpView.InChildren {
+			o.helpView.InChildren = false
+			o.helpView.EntryCursor = 0
+			o.helpView.EntryTop = 0
+			o.helpView.ContentTop = 0
+			o.helpDirty = true
+			return
+		}
+		o.uiPage = PageLibrary
+		o.focusPanel = 0
+		o.panelEntered = false
+		o.albumsDirty = true
+		o.tracksDirty = true
+		return
+	}
+
 	if o.uiPage == PageSettings {
 		if o.settingsEditing {
 			// Cancel editing: revert value cursor.

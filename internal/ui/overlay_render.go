@@ -124,6 +124,8 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		o.renderSettingsPanels(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 	case PagePresets:
 		o.renderPresetsPanels(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
+	case PageHelp:
+		o.renderHelpPanels(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 	default:
 		o.renderLibraryPanels(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 	}
@@ -565,7 +567,7 @@ func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH, y int) {
 	if o.pageIndicatorDirty {
 		o.rebuildPageIndicatorTextures()
 	}
-	pages := []string{"Library", "Settings", "Presets"}
+	pages := []string{"Library", "Settings", "Presets", "Help"}
 	gap := int(o.fontSize * pageIndicatorGapFactor)
 
 	// Compute total width.
@@ -592,7 +594,7 @@ func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH, y int) {
 
 func (o *Overlay) rebuildPageIndicatorTextures() {
 	o.pageIndicatorDirty = false
-	pages := []string{"Library", "Settings", "Presets"}
+	pages := []string{"Library", "Settings", "Presets", "Help"}
 	textColor := o.textColor()
 	for i, name := range pages {
 		o.deleteTex(&o.pageIndicatorTex[i])

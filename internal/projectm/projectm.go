@@ -8,6 +8,7 @@ package projectm
 #include "projectM-4/projectM.h"
 
 extern void pmvProjectMPresetSwitchRequested(bool isHardCut);
+extern void projectm_opengl_bind_feedback_framebuffer(projectm_handle instance);
 
 static void pmvPresetSwitchRequested(bool isHardCut, void* userData) {
 	(void)userData;
