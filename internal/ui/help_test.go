@@ -12,6 +12,9 @@ func TestHelpTopicsLoadFromAsset(t *testing.T) {
 	if len(helpTopics[HelpFormats].Children) != 3 || len(helpTopics[HelpCatalogs].Children) != 2 {
 		t.Fatalf("hierarchical Help entries were not loaded: formats=%d catalogs=%d", len(helpTopics[HelpFormats].Children), len(helpTopics[HelpCatalogs].Children))
 	}
+	if len(helpTopics[HelpLicenses].Children) != 14 {
+		t.Fatalf(" Licenses children = %d, want 14", len(helpTopics[HelpLicenses].Children))
+	}
 }
 
 func TestHelpLinesUseKeyboardMappingByDefault(t *testing.T) {
