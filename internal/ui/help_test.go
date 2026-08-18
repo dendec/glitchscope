@@ -9,7 +9,7 @@ func TestHelpTopicsLoadFromAsset(t *testing.T) {
 	if helpTopics[HelpLibrary].Title != "Library" || len(helpTopics[HelpLibrary].Lines) == 0 {
 		t.Fatalf("Library topic was not loaded from asset: %+v", helpTopics[HelpLibrary])
 	}
-	if len(helpTopics[HelpFormats].Children) == 0 || len(helpTopics[HelpCatalogs].Children) != 2 {
+	if len(helpTopics[HelpFormats].Children) != 3 || len(helpTopics[HelpCatalogs].Children) != 2 {
 		t.Fatalf("hierarchical Help entries were not loaded: formats=%d catalogs=%d", len(helpTopics[HelpFormats].Children), len(helpTopics[HelpCatalogs].Children))
 	}
 }
@@ -58,13 +58,13 @@ func TestHelpTopicChangeResetsContentPosition(t *testing.T) {
 func TestHelpEntryChangeResetsContentPosition(t *testing.T) {
 	o := &Overlay{helpView: HelpViewState{
 		TopicCursor: int(HelpFormats),
-		EntryCursor: 20,
+		EntryCursor: 0,
 		ContentTop:  8,
 		InChildren:  true,
 	}}
 	o.helpMoveEntry(1)
-	if o.helpView.EntryCursor != 21 || o.helpView.ContentTop != 0 {
-		t.Fatalf("help state = %+v, want entry 21 at top", o.helpView)
+	if o.helpView.EntryCursor != 1 || o.helpView.ContentTop != 0 {
+		t.Fatalf("help state = %+v, want entry 1 at top", o.helpView)
 	}
 }
 

@@ -102,15 +102,38 @@ func (o *Overlay) helpMoveTopic(dir int) {
 		o.helpView.EntryTop = 0
 		o.helpView.ContentTop = 0
 		o.helpView.InChildren = false
+		o.helpView.InGrandChildren = false
+		o.helpView.GrandChildCursor = 0
+		o.helpView.GrandChildTop = 0
 		o.helpDirty = true
 	}
 }
 
 func (o *Overlay) helpMoveEntry(dir int) {
 	topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+	if o.helpView.InGrandChildren {
+		o.helpMoveGrandChild(dir)
+		return
+	}
 	next := o.helpView.EntryCursor + dir
 	if next >= 0 && next < len(topic.Children) {
 		o.helpView.EntryCursor = next
+		o.helpView.EntryTop = 0
+		o.helpView.ContentTop = 0
+		o.helpDirty = true
+	}
+}
+
+func (o *Overlay) helpMoveGrandChild(dir int) {
+	topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+	if o.helpView.EntryCursor < 0 || o.helpView.EntryCursor >= len(topic.Children) {
+		return
+	}
+	cat := topic.Children[o.helpView.EntryCursor]
+	next := o.helpView.GrandChildCursor + dir
+	if next >= 0 && next < len(cat.Children) {
+		o.helpView.GrandChildCursor = next
+		o.helpView.GrandChildTop = 0
 		o.helpView.ContentTop = 0
 		o.helpDirty = true
 	}
@@ -125,13 +148,45 @@ func (o *Overlay) enterHelpChildren() {
 	o.helpView.EntryCursor = 0
 	o.helpView.EntryTop = 0
 	o.helpView.ContentTop = 0
+	o.helpView.InGrandChildren = false
+	o.helpView.GrandChildCursor = 0
+	o.helpView.GrandChildTop = 0
+	o.helpDirty = true
+}
+
+func (o *Overlay) enterHelpGrandChildren() {
+	topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+	if o.helpView.EntryCursor < 0 || o.helpView.EntryCursor >= len(topic.Children) {
+		return
+	}
+	cat := topic.Children[o.helpView.EntryCursor]
+	if len(cat.Children) == 0 {
+		return
+	}
+	o.helpView.InGrandChildren = true
+	o.helpView.GrandChildCursor = 0
+	o.helpView.GrandChildTop = 0
+	o.helpView.ContentTop = 0
 	o.helpDirty = true
 }
 
 func (o *Overlay) helpContentRowCount(topic HelpTopic) int {
 	lineCount := len(wrapHelpLines(o.helpLines(topic), o.face, o.helpTextWidth()))
-	if o.helpView.InChildren && o.helpView.EntryCursor >= 0 && o.helpView.EntryCursor < len(topic.Children) {
-		lineCount = len(wrapHelpLines(o.helpLines(HelpTopic{Lines: topic.Children[o.helpView.EntryCursor].Lines}), o.face, o.helpTextWidth())) + 1
+	if o.helpView.InGrandChildren {
+		if o.helpView.EntryCursor >= 0 && o.helpView.EntryCursor < len(topic.Children) {
+			cat := topic.Children[o.helpView.EntryCursor]
+			if o.helpView.GrandChildCursor >= 0 && o.helpView.GrandChildCursor < len(cat.Children) {
+				entry := cat.Children[o.helpView.GrandChildCursor]
+				lineCount = len(wrapHelpLines(o.helpLines(HelpTopic{Lines: entry.Lines}), o.face, o.helpTextWidth())) + 1
+			}
+		}
+	} else if o.helpView.InChildren && o.helpView.EntryCursor >= 0 && o.helpView.EntryCursor < len(topic.Children) {
+		entry := topic.Children[o.helpView.EntryCursor]
+		if len(entry.Children) > 0 {
+			lineCount = len(entry.Children)
+		} else {
+			lineCount = len(wrapHelpLines(o.helpLines(HelpTopic{Lines: entry.Lines}), o.face, o.helpTextWidth())) + 1
+		}
 	}
 	return 1 + lineCount
 }

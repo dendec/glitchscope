@@ -154,7 +154,9 @@ func (o *Overlay) moveCursor(dir int) {
 	o.invalidateActiveMarquee()
 	if o.uiPage == PageHelp {
 		if o.focusPanel == 0 {
-			if o.helpView.InChildren {
+			if o.helpView.InGrandChildren {
+				o.helpMoveGrandChild(dir)
+			} else if o.helpView.InChildren {
 				o.helpMoveEntry(dir)
 			} else {
 				o.helpMoveTopic(dir)
@@ -347,6 +349,18 @@ func (o *Overlay) Select() bool {
 			o.focusPanel = 0
 		} else if o.focusPanel == 0 && !o.helpView.InChildren {
 			o.enterHelpChildren()
+		} else if o.focusPanel == 0 && o.helpView.InChildren && !o.helpView.InGrandChildren {
+			// check if current entry has sub-entries (categories with children)
+			topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+			if o.helpView.EntryCursor >= 0 && o.helpView.EntryCursor < len(topic.Children) {
+				entry := topic.Children[o.helpView.EntryCursor]
+				if len(entry.Children) > 0 {
+					o.enterHelpGrandChildren()
+				} else {
+					o.focusPanel = 1
+					o.helpView.ContentTop = 0
+				}
+			}
 		} else if o.focusPanel == 0 {
 			o.focusPanel = 1
 			o.helpView.ContentTop = 0
@@ -477,6 +491,14 @@ func (o *Overlay) Back() {
 	if o.uiPage == PageHelp {
 		if o.panelEntered && o.focusPanel == 1 {
 			o.focusPanel = 0
+			o.helpDirty = true
+			return
+		}
+		if o.helpView.InGrandChildren {
+			o.helpView.InGrandChildren = false
+			o.helpView.GrandChildCursor = 0
+			o.helpView.GrandChildTop = 0
+			o.helpView.ContentTop = 0
 			o.helpDirty = true
 			return
 		}

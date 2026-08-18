@@ -60,16 +60,20 @@ type HelpTopic struct {
 }
 
 type HelpEntry struct {
-	Title string
-	Lines []string
+	Title    string
+	Lines    []string
+	Children []HelpEntry `json:"children,omitempty"`
 }
 
 type HelpViewState struct {
-	TopicCursor int
-	EntryCursor int
-	EntryTop    int
-	ContentTop  int
-	InChildren  bool
+	TopicCursor     int
+	EntryCursor     int
+	EntryTop        int
+	ContentTop      int
+	InChildren      bool
+	InGrandChildren bool
+	GrandChildCursor int
+	GrandChildTop    int
 }
 
 // SettingRow describes one line in the settings page.
