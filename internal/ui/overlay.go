@@ -244,6 +244,7 @@ type Overlay struct {
 	micStopRequested   bool   // one-shot: stop capture selected
 	closeInjectPending bool
 	modArchiveItems    map[string][]modarchive.DirItem
+	deviceInfo         *DeviceInfo
 }
 
 // New creates an Overlay. The stack always has a virtual source root.
@@ -415,6 +416,12 @@ func (o *Overlay) SetScreenSize(w, h int) {
 		o.rebuildFace()
 	}
 	o.markAllDirty()
+}
+
+// SetDeviceInfo stores device info for the Device help page.
+func (o *Overlay) SetDeviceInfo(info *DeviceInfo) {
+	o.deviceInfo = info
+	o.helpDirty = true
 }
 
 func (o *Overlay) rebuildFace() {

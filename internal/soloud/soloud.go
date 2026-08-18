@@ -552,3 +552,33 @@ func (s *Soloud) GetSamplerate(voice uint) float32 {
 func (s *Soloud) StopAll() {
 	C.Soloud_stopAll(s.p)
 }
+
+// GetVersion returns the SoLoud version.
+func (s *Soloud) GetVersion() uint {
+	return uint(C.Soloud_getVersion(s.p))
+}
+
+// GetBackendId returns the active audio backend identifier.
+func (s *Soloud) GetBackendId() uint {
+	return uint(C.Soloud_getBackendId(s.p))
+}
+
+// GetBackendString returns a human-readable audio backend name.
+func (s *Soloud) GetBackendString() string {
+	return C.GoString(C.Soloud_getBackendString(s.p))
+}
+
+// GetBackendChannels returns the number of channels the audio backend uses.
+func (s *Soloud) GetBackendChannels() uint {
+	return uint(C.Soloud_getBackendChannels(s.p))
+}
+
+// GetBackendSamplerate returns the audio backend sample rate in Hz.
+func (s *Soloud) GetBackendSamplerate() uint {
+	return uint(C.Soloud_getBackendSamplerate(s.p))
+}
+
+// GetBackendBufferSize returns the audio backend buffer size in samples.
+func (s *Soloud) GetBackendBufferSize() uint {
+	return uint(C.Soloud_getBackendBufferSize(s.p))
+}

@@ -118,6 +118,9 @@ func wrapHelpLines(lines []string, face font.Face, maxTextW int) []string {
 }
 
 func (o *Overlay) helpLines(topic HelpTopic) []string {
+	if topic.ID == HelpDevice {
+		return o.deviceInfoLines()
+	}
 	lines := make([]string, 0, len(topic.Lines))
 	inWrongSection := false
 	for _, line := range topic.Lines {
@@ -137,6 +140,13 @@ func (o *Overlay) helpLines(topic HelpTopic) []string {
 		lines = append(lines, line)
 	}
 	return lines
+}
+
+func (o *Overlay) deviceInfoLines() []string {
+	if o.deviceInfo == nil {
+		return []string{"Collecting device information..."}
+	}
+	return o.deviceInfo.DeviceInfoLines()
 }
 
 func (o *Overlay) helpMoveTopic(dir int) {

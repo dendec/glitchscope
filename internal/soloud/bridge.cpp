@@ -90,6 +90,30 @@ float Soloud_getInfo(void * aClassPtr, unsigned int aVoiceHandle, unsigned int a
 	return ((Soloud *)aClassPtr)->getInfo(aVoiceHandle, aInfoKey);
 }
 
+unsigned int Soloud_getVersion(void * aClassPtr) {
+	return ((Soloud *)aClassPtr)->getVersion();
+}
+
+unsigned int Soloud_getBackendId(void * aClassPtr) {
+	return ((Soloud *)aClassPtr)->getBackendId();
+}
+
+const char * Soloud_getBackendString(void * aClassPtr) {
+	return ((Soloud *)aClassPtr)->getBackendString();
+}
+
+unsigned int Soloud_getBackendChannels(void * aClassPtr) {
+	return ((Soloud *)aClassPtr)->getBackendChannels();
+}
+
+unsigned int Soloud_getBackendSamplerate(void * aClassPtr) {
+	return ((Soloud *)aClassPtr)->getBackendSamplerate();
+}
+
+unsigned int Soloud_getBackendBufferSize(void * aClassPtr) {
+	return ((Soloud *)aClassPtr)->getBackendBufferSize();
+}
+
 double Wav_getLength(void * aClassPtr) {
 	return ((Wav *)aClassPtr)->getLength();
 }

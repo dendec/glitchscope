@@ -153,10 +153,7 @@
   {
     "id": 3,
     "title": "Device",
-    "lines": [
-      "The overlay is designed for desktop and PortMaster screens.",
-      "Connected controllers use their physical button labels."
-    ]
+    "lines": []
   },
   {
     "id": 4,

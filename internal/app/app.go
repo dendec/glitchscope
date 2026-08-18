@@ -295,6 +295,16 @@ func (a *App) initAudio() {
 	a.overlay.SetMicDevices(mic.InputDevices())
 	w, h := a.window.GLGetDrawableSize()
 	a.overlay.SetScreenSize(int(w), int(h))
+	info := ui.CollectDeviceInfo(a.window)
+	if a.pl != nil {
+		backend, sr, ch, buf, ver := a.pl.BackendInfo()
+		info.AudioBackend = backend
+		info.AudioSamplerate = sr
+		info.AudioChannels = ch
+		info.AudioBuffer = buf
+		info.SoloudVersion = ver
+	}
+	a.overlay.SetDeviceInfo(info)
 	slog.Info("audio init", "ms", time.Since(t).Milliseconds())
 }
 

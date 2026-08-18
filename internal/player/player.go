@@ -555,6 +555,19 @@ func (p *Player) Channels() int {
 	return p.channels
 }
 
+// BackendInfo returns SoLoud audio backend details.
+func (p *Player) BackendInfo() (backend string, samplerate, channels, bufferSize uint, soloudVersion uint) {
+	if p.s == nil {
+		return
+	}
+	backend = p.s.GetBackendString()
+	samplerate = p.s.GetBackendSamplerate()
+	channels = p.s.GetBackendChannels()
+	bufferSize = p.s.GetBackendBufferSize()
+	soloudVersion = p.s.GetVersion()
+	return
+}
+
 func (p *Player) IsTracker() bool {
 	return p.isTracker
 }
