@@ -1,12 +1,12 @@
 diff --git a/src/libprojectM/ProjectM.cpp b/src/libprojectM/ProjectM.cpp
 --- a/src/libprojectM/ProjectM.cpp
 +++ b/src/libprojectM/ProjectM.cpp
-@@ -167,7 +174,7 @@ void ProjectM::RenderFrame()
+@@ -167,7 +167,7 @@ void ProjectM::RenderFrame()
      m_activePreset->RenderFrame(audioData, renderContext);
  
      // ToDo: Allow external apps to provide a custom target framebuffer.
 -    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 +    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+     glViewport(0, 0, renderContext.viewportSizeX, renderContext.viewportSizeY);
  
-     if (m_transition != nullptr && m_transitioningPreset != nullptr)
-     {
+ #ifdef USE_GLES
