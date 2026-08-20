@@ -57,6 +57,12 @@ type App struct {
 
 	adaptive resolutionState
 
+	// appCtx/appCancel govern background work tied to the app lifetime.
+	// Cancelled in Close() so in-flight goroutines (e.g. connectivity check)
+	// stop promptly instead of firing after teardown.
+	appCtx    context.Context
+	appCancel context.CancelFunc
+
 	pending         pendingPreset // pending preset name + scheduled load time
 	presetTicker    *time.Ticker
 	resumePath      string
@@ -82,6 +88,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 		modlandSizes:        make(map[string]int64),
 		presenter:           newOverlayPresenter(nil),
 	}
+	a.appCtx, a.appCancel = context.WithCancel(context.Background())
 
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK | sdl.INIT_AUDIO); err != nil {
 		return nil, fmt.Errorf("sdl init: %w", err)
@@ -205,6 +212,11 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 }
 
 func (a *App) Close() {
+	// Abort background work (e.g. the connectivity probe) before tearing down
+	// resources it may observe, so no in-flight goroutine touches a freed overlay.
+	if a.appCancel != nil {
+		a.appCancel()
+	}
 	a.savePlaybackPosition()
 	if a.pm != nil {
 		a.pm.SetPresetSwitchRequestedHandler(nil)
@@ -331,9 +343,11 @@ func (a *App) initLibrary() {
 
 // checkConnectivity probes the network in the background. On success it
 // enables the remote catalogs (Modland/ModArchive) in the navigation tree.
+// The probe is tied to the app context so it is aborted promptly on Close
+// and never writes to the overlay after it has been torn down.
 func (a *App) checkConnectivity() {
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(a.appCtx, 5*time.Second)
 		defer cancel()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://modland.antarctica.no/", nil)
 		if err != nil {
@@ -348,7 +362,7 @@ func (a *App) checkConnectivity() {
 		resp.Body.Close()
 		slog.Info("connectivity check: online", "status", resp.StatusCode)
 		a.online.Store(true)
-		if a.overlay != nil {
+		if a.overlay != nil && ctx.Err() == nil {
 			a.overlay.SetOnline(true)
 		}
 	}()

@@ -3,6 +3,7 @@ package ui
 import (
 	"embed"
 	"encoding/json"
+	"log/slog"
 	"strings"
 
 	"golang.org/x/image/font"
@@ -41,7 +42,10 @@ var helpTopics = loadHelpTopics()
 func loadHelpTopics() []HelpTopic {
 	var topics []HelpTopic
 	if err := json.Unmarshal(helpData, &topics); err != nil {
-		panic("invalid embedded Help asset: " + err.Error())
+		// A malformed embedded asset would otherwise crash at startup. Degrade
+		// gracefully: log it and leave the help page empty instead of panicking.
+		slog.Error("invalid embedded Help asset; help page disabled", "error", err)
+		return nil
 	}
 	for i := range topics {
 		for j := range topics[i].Children {
@@ -63,6 +67,9 @@ func expandLicenseEntry(e *HelpEntry) {
 }
 
 func helpTopic(id HelpTopicID) HelpTopic {
+	if len(helpTopics) == 0 {
+		return HelpTopic{}
+	}
 	if int(id) >= 0 && int(id) < len(helpTopics) {
 		return helpTopics[id]
 	}

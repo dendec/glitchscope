@@ -144,9 +144,19 @@ func loadSource(localPath string) loadResult {
 		}, true, 2)
 	}
 	if isFfmpegExt(ext) {
-		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
-			return soloud.NewFfmpeg(data)
-		}, false, 0) // channels determined after load
+		// Stream large audio files (MP3/FLAC/WAV/Ogg/…) from disk instead of
+		// reading them fully into memory — important on low-RAM handhelds.
+		src, err := soloud.NewFfmpegFile(localPath)
+		if err != nil {
+			return loadResult{path: localPath, err: err}
+		}
+		return loadResult{
+			src:       src,
+			path:      localPath,
+			duration:  src.GetLength(),
+			channels:  src.GetChannels(),
+			isTracker: false,
+		}
 	}
 
 	// WAV and other formats loaded via SoLoud's file loader.

@@ -108,7 +108,11 @@ make catalog          # build modland + modarchive catalogs + validate
 - `make test` and `make lint` intentionally run in the builder so results don't
   depend on local cgo availability. `make dist` additionally exercises the full
   amd64 packaging path.
-- CI is not yet configured; these Make targets are the de-facto gate.
+- **Fast local checks:** `scripts/dtest.sh test|lint` runs the same checks
+  directly against an *existing* `pmv-builder` image without rebuilding it
+  (use when the image is already present). It feeds the cgo env vars into the
+  container exactly like the Makefile does.
+- CI runs `make lint` and `make test` on GitHub Actions (`.github/workflows/ci.yml`).
 
 ### Native dev caveat
 The sandbox/host here is read-only for Go tooling and lacks the `/opt` cgo

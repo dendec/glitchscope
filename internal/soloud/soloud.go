@@ -10,6 +10,7 @@ package soloud
 void *Ffmpeg_create(void);
 void Ffmpeg_destroy(void *source);
 int Ffmpeg_loadMem(void *source, const unsigned char *data, unsigned int length);
+int Ffmpeg_loadFile(void *source, const char *path);
 unsigned int Ffmpeg_getLengthMs(void *source);
 unsigned int Ffmpeg_getChannels(void *source);
 unsigned int Ffmpeg_getSampleRate(void *source);
@@ -290,7 +291,7 @@ func NewYm(data []byte) (*Ym, error) {
 	return &Ym{p: p}, nil
 }
 
-// NewFfmpeg creates an FFmpeg source from audio data.
+// NewFfmpeg creates an FFmpeg source from in-memory audio data.
 func NewFfmpeg(data []byte) (*Ffmpeg, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("ffmpeg: empty data")
@@ -302,6 +303,26 @@ func NewFfmpeg(data []byte) (*Ffmpeg, error) {
 	if C.Ffmpeg_loadMem(p, (*C.uchar)(unsafe.Pointer(&data[0])), C.uint(len(data))) != 0 {
 		C.Ffmpeg_destroy(p)
 		return nil, fmt.Errorf("ffmpeg: load failed")
+	}
+	return &Ffmpeg{p: p}, nil
+}
+
+// NewFfmpegFile creates an FFmpeg source that decodes an audio file by
+// streaming it from disk, so the whole file is never loaded into memory. This
+// matters on low-memory handhelds for large FLAC/MP3/WAV files.
+func NewFfmpegFile(path string) (*Ffmpeg, error) {
+	if path == "" {
+		return nil, fmt.Errorf("ffmpeg: empty path")
+	}
+	p := C.Ffmpeg_create()
+	if p == nil {
+		return nil, fmt.Errorf("ffmpeg: create failed")
+	}
+	cpath := C.CString(path)
+	defer C.free(unsafe.Pointer(cpath))
+	if C.Ffmpeg_loadFile(p, cpath) != 0 {
+		C.Ffmpeg_destroy(p)
+		return nil, fmt.Errorf("ffmpeg: load file %q failed", path)
 	}
 	return &Ffmpeg{p: p}, nil
 }

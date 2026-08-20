@@ -1,6 +1,7 @@
 #include "ffmpeg_source.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <new>
 #include <vector>
@@ -18,28 +19,67 @@ namespace {
 constexpr int kOutputRate = 44100;
 constexpr int kIOBufferSize = 32 * 1024;
 
-struct MemoryReader {
-    const unsigned char *data;
-    size_t size;
-    size_t position;
+struct InputContext {
+    const unsigned char *data = nullptr;  // memory-backed input
+    size_t size = 0;
+    size_t position = 0;
+    FILE *file = nullptr;                 // non-null when file-backed
+    AVFormatContext *format = nullptr;
+    AVIOContext *io = nullptr;
 };
 
 int readPacket(void *opaque, unsigned char *buffer, int bufferSize) {
-    auto *reader = static_cast<MemoryReader *>(opaque);
-    if (reader->position >= reader->size) {
+    auto *input = static_cast<InputContext *>(opaque);
+    if (input->file) {
+        size_t count = fread(buffer, 1, static_cast<size_t>(bufferSize), input->file);
+        if (count == 0) {
+            return ferror(input->file) ? AVERROR(EIO) : AVERROR_EOF;
+        }
+        return static_cast<int>(count);
+    }
+    if (input->position >= input->size) {
         return AVERROR_EOF;
     }
-    size_t count = std::min(reader->size - reader->position,
+    size_t count = std::min(input->size - input->position,
                             static_cast<size_t>(bufferSize));
-    std::memcpy(buffer, reader->data + reader->position, count);
-    reader->position += count;
+    std::memcpy(buffer, input->data + input->position, count);
+    input->position += count;
     return static_cast<int>(count);
 }
 
 int64_t seekPacket(void *opaque, int64_t offset, int whence) {
-    auto *reader = static_cast<MemoryReader *>(opaque);
+    auto *input = static_cast<InputContext *>(opaque);
     if (whence == AVSEEK_SIZE) {
-        return static_cast<int64_t>(reader->size);
+        if (input->file) {
+            long current = ftell(input->file);
+            if (fseek(input->file, 0, SEEK_END) != 0) {
+                return AVERROR(EINVAL);
+            }
+            long end = ftell(input->file);
+            fseek(input->file, current, SEEK_SET);
+            return end;
+        }
+        return static_cast<int64_t>(input->size);
+    }
+    if (input->file) {
+        int whenceMode = SEEK_SET;
+        switch (whence & ~AVSEEK_FORCE) {
+        case SEEK_SET:
+            whenceMode = SEEK_SET;
+            break;
+        case SEEK_CUR:
+            whenceMode = SEEK_CUR;
+            break;
+        case SEEK_END:
+            whenceMode = SEEK_END;
+            break;
+        default:
+            return AVERROR(EINVAL);
+        }
+        if (fseek(input->file, offset, whenceMode) != 0) {
+            return AVERROR(EINVAL);
+        }
+        return static_cast<int64_t>(ftell(input->file));
     }
 
     int64_t position = 0;
@@ -48,27 +88,22 @@ int64_t seekPacket(void *opaque, int64_t offset, int whence) {
         position = offset;
         break;
     case SEEK_CUR:
-        position = static_cast<int64_t>(reader->position) + offset;
+        position = static_cast<int64_t>(input->position) + offset;
         break;
     case SEEK_END:
-        position = static_cast<int64_t>(reader->size) + offset;
+        position = static_cast<int64_t>(input->size) + offset;
         break;
     default:
         return AVERROR(EINVAL);
     }
-    if (position < 0 || position > static_cast<int64_t>(reader->size)) {
+    if (position < 0 || position > static_cast<int64_t>(input->size)) {
         return AVERROR(EINVAL);
     }
-    reader->position = static_cast<size_t>(position);
+    input->position = static_cast<size_t>(position);
     return position;
 }
 
-struct InputContext {
-    MemoryReader reader{};
-    AVFormatContext *format = nullptr;
-    AVIOContext *io = nullptr;
-};
-
+// Frees the AVIO/format resources and, for file-backed inputs, the FILE handle.
 void closeInput(InputContext *input) {
     if (!input) {
         return;
@@ -79,42 +114,78 @@ void closeInput(InputContext *input) {
     if (input->io) {
         avio_context_free(&input->io);
     }
+    if (input->file) {
+        fclose(input->file);
+        input->file = nullptr;
+    }
 }
 
-bool openInput(const unsigned char *data, size_t length, InputContext *input) {
-    input->reader = {data, length, 0};
-    input->format = avformat_alloc_context();
-    if (!input->format) {
-        return false;
-    }
-
+bool setupIO(InputContext *input) {
     unsigned char *ioBuffer = static_cast<unsigned char *>(av_malloc(kIOBufferSize));
     if (!ioBuffer) {
-        closeInput(input);
         return false;
     }
     input->io = avio_alloc_context(
         ioBuffer,
         kIOBufferSize,
         0,
-        &input->reader,
+        input,
         readPacket,
         nullptr,
         seekPacket);
     if (!input->io) {
         av_free(ioBuffer);
+        return false;
+    }
+    return true;
+}
+
+// Opens the input with FFmpeg's custom IO and probes the format. On failure it
+// frees everything (including the FILE handle) and returns false.
+bool finishOpen(InputContext *input) {
+    input->format = avformat_alloc_context();
+    if (!input->format) {
         closeInput(input);
         return false;
     }
     input->format->pb = input->io;
     input->format->flags |= AVFMT_FLAG_CUSTOM_IO;
-
     if (avformat_open_input(&input->format, nullptr, nullptr, nullptr) < 0 ||
         avformat_find_stream_info(input->format, nullptr) < 0) {
         closeInput(input);
         return false;
     }
     return true;
+}
+
+bool openMemInput(const unsigned char *data, size_t length, InputContext *input) {
+    input->data = data;
+    input->size = length;
+    input->position = 0;
+    input->file = nullptr;
+    input->format = nullptr;
+    input->io = nullptr;
+    if (!setupIO(input)) {
+        return false;
+    }
+    return finishOpen(input);
+}
+
+bool openFileInput(const char *path, InputContext *input) {
+    input->data = nullptr;
+    input->size = 0;
+    input->position = 0;
+    input->format = nullptr;
+    input->io = nullptr;
+    input->file = fopen(path, "rb");
+    if (!input->file) {
+        return false;
+    }
+    if (!setupIO(input)) {
+        closeInput(input);
+        return false;
+    }
+    return finishOpen(input);
 }
 
 int findAudioStream(AVFormatContext *format) {
@@ -137,8 +208,13 @@ namespace SoLoud {
 class FfmpegInstance : public AudioSourceInstance {
 public:
     explicit FfmpegInstance(FfmpegSource *parent) : mParent(parent) {
-        if (!parent->mData ||
-            !openInput(parent->mData, parent->mDataLength, &mInput)) {
+        bool opened = false;
+        if (parent->mPath) {
+            opened = openFileInput(parent->mPath, &mInput);
+        } else if (parent->mData) {
+            opened = openMemInput(parent->mData, parent->mDataLength, &mInput);
+        }
+        if (!opened) {
             return;
         }
         mFormat = mInput.format;
@@ -303,17 +379,21 @@ private:
 };
 
 FfmpegSource::FfmpegSource()
-    : mData(nullptr), mDataLength(0), mSampleRate(kOutputRate), mChannels(2), mDurationUs(0) {
+    : mData(nullptr), mDataLength(0), mPath(nullptr), mSampleRate(kOutputRate),
+      mChannels(2), mDurationUs(0) {
     mBaseSamplerate = static_cast<float>(mSampleRate);
     mChannels = 2;
 }
 
-FfmpegSource::~FfmpegSource() { delete[] mData; }
+FfmpegSource::~FfmpegSource() {
+    delete[] mData;
+    delete[] mPath;
+}
 
 result FfmpegSource::loadMem(const unsigned char *data, unsigned int length, bool) {
     if (!data || length == 0) return FILE_LOAD_FAILED;
     InputContext input;
-    if (!openInput(data, length, &input)) return FILE_LOAD_FAILED;
+    if (!openMemInput(data, length, &input)) return FILE_LOAD_FAILED;
     int streamIndex = findAudioStream(input.format);
     if (streamIndex < 0) {
         closeInput(&input);
@@ -330,6 +410,36 @@ result FfmpegSource::loadMem(const unsigned char *data, unsigned int length, boo
     delete[] mData;
     mData = copy;
     mDataLength = length;
+    delete[] mPath;
+    mPath = nullptr;
+    mDurationUs = durationUs;
+    return SO_NO_ERROR;
+}
+
+// loadFile keeps only the path; each playback instance streams the file from
+// disk via custom AVIO, so the whole file is never held in memory.
+result FfmpegSource::loadFile(const char *path) {
+    if (!path || !*path) return INVALID_PARAMETER;
+    InputContext input;
+    if (!openFileInput(path, &input)) return FILE_LOAD_FAILED;
+    int streamIndex = findAudioStream(input.format);
+    if (streamIndex < 0) {
+        closeInput(&input);
+        return FILE_LOAD_FAILED;
+    }
+    int64_t durationUs = streamDurationUs(input.format, streamIndex);
+    closeInput(&input);
+
+    const size_t pathLen = std::strlen(path);
+    char *pathCopy = new (std::nothrow) char[pathLen + 1];
+    if (!pathCopy) return OUT_OF_MEMORY;
+    std::memcpy(pathCopy, path, pathLen + 1);
+
+    delete[] mData;
+    mData = nullptr;
+    mDataLength = 0;
+    delete[] mPath;
+    mPath = pathCopy;
     mDurationUs = durationUs;
     return SO_NO_ERROR;
 }
@@ -345,6 +455,9 @@ void *Ffmpeg_create() { return new (std::nothrow) SoLoud::FfmpegSource(); }
 void Ffmpeg_destroy(void *source) { delete static_cast<SoLoud::FfmpegSource *>(source); }
 int Ffmpeg_loadMem(void *source, const unsigned char *data, unsigned int length) {
     return static_cast<SoLoud::FfmpegSource *>(source)->loadMem(data, length) == SoLoud::SO_NO_ERROR ? 0 : 1;
+}
+int Ffmpeg_loadFile(void *source, const char *path) {
+    return static_cast<SoLoud::FfmpegSource *>(source)->loadFile(path) == SoLoud::SO_NO_ERROR ? 0 : 1;
 }
 unsigned int Ffmpeg_getLengthMs(void *source) {
     return static_cast<unsigned int>(static_cast<SoLoud::FfmpegSource *>(source)->getLengthSeconds() * 1000.0);
