@@ -2,8 +2,9 @@ package ui
 
 /*
 #cgo LDFLAGS: -lGLESv2
+#cgo CFLAGS: -I/opt/projectm/include
 #include <GLES2/gl2.h>
-#include "../../lib/projectm/build/src/api/include/projectM-4/version.h"
+#include <projectM-4/version.h>
 
 static const char *glGetStringWrapper(GLenum name) {
 	return (const char *)glGetString(name);
