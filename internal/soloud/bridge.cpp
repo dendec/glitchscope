@@ -122,4 +122,8 @@ unsigned int Wav_getChannels(void * aClassPtr) {
 	return ((Wav *)aClassPtr)->mChannels;
 }
 
+int Wav_loadRawWaveEx(void * aClassPtr, float * aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels, int aCopy, int aTakeOwnership) {
+	return ((Wav *)aClassPtr)->loadRawWave(aMem, aLength, aSamplerate, aChannels, !!aCopy, !!aTakeOwnership);
+}
+
 } // extern "C"

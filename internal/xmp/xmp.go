@@ -99,3 +99,63 @@ func TryLoad(data []byte) error {
 	C.xmp_release_module(ctx)
 	return nil
 }
+
+// Render decodes up to maxFrames frames of a tracker module into interleaved
+// float32 stereo and returns the number of frames actually rendered. The SoLoud
+// Xmp binding cannot seek backward (and forward only by coarse sample-discard),
+// so pre-rendering a bounded buffer lets the player seek exactly in both
+// directions. Rendering stops at end-of-song or when maxFrames is reached,
+// whichever comes first. Returns (interleaved, channels, frames, err).
+func Render(data []byte, samplerate, maxFrames int) ([]float32, int, int, error) {
+	if len(data) == 0 {
+		return nil, 0, 0, fmt.Errorf("xmp: empty data")
+	}
+	if maxFrames <= 0 {
+		return nil, 0, 0, nil
+	}
+	ctx := C.xmp_create_context()
+	if ctx == nil {
+		return nil, 0, 0, fmt.Errorf("xmp: create context failed")
+	}
+	defer C.xmp_free_context(ctx)
+
+	if C.xmp_load_module_from_memory(ctx, unsafe.Pointer(&data[0]), C.long(len(data))) != 0 {
+		return nil, 0, 0, fmt.Errorf("xmp: load module failed")
+	}
+	defer C.xmp_release_module(ctx)
+
+	if C.xmp_start_player(ctx, C.int(samplerate), 0) != 0 {
+		return nil, 0, 0, fmt.Errorf("xmp: start player failed")
+	}
+	defer C.xmp_end_player(ctx)
+
+	out := make([]float32, 0, maxFrames*2)
+	frames := 0
+	for frames < maxFrames {
+		if C.xmp_play_frame(ctx) < 0 {
+			break // genuine end of song
+		}
+		var fi C.struct_xmp_frame_info
+		C.xmp_get_frame_info(ctx, &fi)
+		// fi.buffer holds the interleaved 16-bit stereo samples produced by the
+		// last frame command; fi.buffer_size is its size in bytes (4 per frame).
+		bytesAvail := int(fi.buffer_size)
+		if bytesAvail < 4 {
+			break
+		}
+		n := bytesAvail / 4
+		if frames+n > maxFrames {
+			n = maxFrames - frames
+		}
+		src := (*[1 << 28]int16)(unsafe.Pointer(fi.buffer))[: n*2 : n*2]
+		for i := 0; i < n; i++ {
+			out = append(out, float32(src[i*2])/32768.0, float32(src[i*2+1])/32768.0)
+		}
+		frames += n
+		// Stop once we've played the whole nominal song length.
+		if fi.total_time > 0 && fi.time >= fi.total_time {
+			break
+		}
+	}
+	return out, 2, frames, nil
+}

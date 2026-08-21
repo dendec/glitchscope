@@ -108,4 +108,34 @@ unsigned int SidSource_getTrackCount(void *source) { return (unsigned int)static
 const char *SidSource_getTitle(void *source) { return static_cast<SoLoud::SidSource *>(source)->getTitle(); }
 const char *SidSource_getAuthor(void *source) { return static_cast<SoLoud::SidSource *>(source)->getAuthor(); }
 unsigned int SidSource_getSampleRate(void *source) { return 44100; }
+
+// Sid_render decodes up to maxFrames frames of a SID tune into mono float32
+// samples. The SID binding does not implement seek or rewind at all, so
+// rendering a bounded buffer lets the player seek exactly in both directions.
+// Stops at end-of-stream or when maxFrames is reached.
+// Returns the number of frames actually rendered.
+unsigned int Sid_render(const unsigned char *data, unsigned int length,
+                        float *out, unsigned int maxFrames) {
+    if (!data || !length || !out || maxFrames == 0) return 0;
+    SidCodec *codec = Sid_create();
+    if (!codec || Sid_loadMem(codec, data, length)) {
+        if (codec) Sid_destroy(codec);
+        return 0;
+    }
+    std::vector<short> tmp(8192);
+    unsigned int rendered = 0;
+    while (rendered < maxFrames) {
+        unsigned int n = maxFrames - rendered;
+        if (n > 8192) n = 8192;
+        const int got = Sid_read(codec, (int)n, tmp.data());
+        if (got <= 0) break;
+        for (int i = 0; i < got; ++i) {
+            out[rendered + i] = static_cast<float>(tmp[i]) / 32768.0f;
+        }
+        rendered += static_cast<unsigned int>(got);
+        if (got < static_cast<int>(n)) break; // end of stream reached
+    }
+    Sid_destroy(codec);
+    return rendered;
+}
 }

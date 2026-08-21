@@ -17,6 +17,22 @@ import (
 	"github.com/dendec/pmv/internal/xmp"
 )
 
+// Pre-render (decode-to-buffer) playback for tracker/chip formats whose native
+// decoders have no reliable bidirectional seek (openmpt/xmp only seek forward
+// coarsely, SID has none, and libstsound's YM seek is sub-format dependent).
+// The track is decoded once, up front in the async load goroutine, into a
+// memory-backed Wav so seeking is exact in both directions.
+const (
+	// renderSampleRate is the rate at which tracker/chip tracks are rendered.
+	renderSampleRate = 44100
+	// maxRenderSeconds bounds how much of a track is pre-rendered. Longer
+	// tracks fall back to native streaming (backward seek restarts) rather
+	// than consuming an unbounded amount of RAM on low-power handhelds.
+	// 360s covers essentially all chip tracks (YM/SID etc.) at a worst case of
+	// ~124 MiB for stereo float32 PCM (~0.17 MiB/s per channel-pair).
+	maxRenderSeconds = 360.0
+)
+
 // loadResult holds the outcome of loading a single audio source.
 type loadResult struct {
 	src        soloud.AudioSource
@@ -134,9 +150,9 @@ func loadSource(localPath string) loadResult {
 		}, true, 2)
 	}
 	if isSidExt(ext) {
-		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
+		return loadChip(localPath, ext, 1, func(data []byte) (soloud.AudioSource, error) {
 			return soloud.NewSid(data)
-		}, true, 1)
+		})
 	}
 	if isAyumiExt(ext) {
 		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
@@ -149,9 +165,9 @@ func loadSource(localPath string) loadResult {
 		}, true, 2)
 	}
 	if isYmExt(ext) {
-		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
+		return loadChip(localPath, ext, 2, func(data []byte) (soloud.AudioSource, error) {
 			return soloud.NewYm(data)
-		}, true, 2)
+		})
 	}
 	if isFfmpegExt(ext) {
 		// Stream large audio files (MP3/FLAC/WAV/Ogg/…) from disk instead of
@@ -211,6 +227,46 @@ func loadFromBytes(path, ext string, factory func([]byte) (soloud.AudioSource, e
 	return r
 }
 
+// loadChip loads a single-chip format (SID, YM) whose native decoder has no
+// reliable bidirectional seek: it renders the track into a seekable Wav when it
+// fits within the pre-render cap, else keeps native streaming. defChannels is
+// the native output channel count used when the source reports none.
+func loadChip(path, ext string, defChannels int, factory func([]byte) (soloud.AudioSource, error)) loadResult {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return loadResult{path: path, err: fmt.Errorf("%s read %s: %w", ext, path, err)}
+	}
+	src, err := factory(data)
+	if err != nil {
+		return loadResult{path: path, err: fmt.Errorf("%s %s: %w", ext, path, err)}
+	}
+	dur := src.(interface{ GetLength() float64 }).GetLength()
+	trackCount := 0
+	if tc, ok := src.(interface{ GetTrackCount() int }); ok {
+		trackCount = tc.GetTrackCount()
+	}
+	channels := defChannels
+	if ch, ok := src.(interface{ GetChannels() int }); ok {
+		channels = ch.GetChannels()
+	}
+	repl, newDur, newCh, replaced := renderToSeekable(src, data, dur, channels)
+	if replaced {
+		src.Destroy()
+		src = repl
+		dur = newDur
+		channels = newCh
+	}
+
+	return loadResult{
+		src:        src,
+		path:       path,
+		duration:   dur,
+		channels:   channels,
+		isTracker:  true,
+		trackCount: trackCount,
+	}
+}
+
 // loadTracker loads a tracker file, trying openmpt first, then xmp.
 func loadTracker(path, ext string) loadResult {
 	data, err := os.ReadFile(path)
@@ -223,7 +279,7 @@ func loadTracker(path, ext string) loadResult {
 		ompt, err := soloud.NewOpenmpt(data)
 		if err == nil {
 			bpm, ch, dur, _ := openmpt.GetTrackerMeta(data)
-			return loadResult{src: ompt, path: path, bpm: bpm, channels: ch, duration: dur, isTracker: true}
+			return finishTrackerLoad(ompt, data, path, bpm, ch, dur)
 		}
 		slog.Debug("openmpt fallback to xmp", "ext", ext, "err", err)
 	}
@@ -236,7 +292,20 @@ func loadTracker(path, ext string) loadResult {
 	if err != nil {
 		slog.Warn("tracker meta", "path", path, "err", err)
 	}
-	return loadResult{src: mod, path: path, bpm: bpm, channels: ch, duration: dur, isTracker: true}
+	return finishTrackerLoad(mod, data, path, bpm, ch, dur)
+}
+
+// finishTrackerLoad renders a tracker source into a seekable Wav when possible,
+// else keeps native streaming, and assembles the loadResult.
+func finishTrackerLoad(src soloud.AudioSource, data []byte, path string, bpm float64, channels int, duration float64) loadResult {
+	repl, newDur, newCh, replaced := renderToSeekable(src, data, duration, channels)
+	if replaced {
+		src.Destroy()
+		src = repl
+		channels = newCh
+		duration = newDur
+	}
+	return loadResult{src: src, path: path, bpm: bpm, channels: channels, duration: duration, isTracker: true}
 }
 
 // PlayFile loads and plays an audio file. Only one file at a time.
@@ -460,6 +529,109 @@ func sourceSeeksBoth(src soloud.AudioSource) bool {
 	default:
 		return true
 	}
+}
+
+// maxRenderFrames returns how many frames to pre-render for a track of the
+// given duration (seconds). Returns 0 when the track is too long to pre-render
+// (caller falls back to native streaming). An unknown (<=0) duration defaults
+// to the cap so we never over-allocate, since tracker files are typically
+// short.
+func maxRenderFrames(duration float64) int {
+	if duration > maxRenderSeconds {
+		return 0
+	}
+	if duration < 0 {
+		duration = 0
+	}
+	frames := int(duration * renderSampleRate)
+	if frames <= 0 {
+		frames = int(maxRenderSeconds * renderSampleRate)
+	}
+	if cap := int(maxRenderSeconds * renderSampleRate); frames > cap {
+		frames = cap
+	}
+	return frames
+}
+
+// interleavedToPlanar converts interleaved float32 PCM (samples[c*n…] per
+// channel c is produced by decoders as LRLRLR…) into the planar layout SoLoud's
+// in-memory Wav expects (channel c spans planar[c*n … (c+1)*n)). Pure function.
+func interleavedToPlanar(interleaved []float32, channels int) []float32 {
+	nframes := len(interleaved) / channels
+	planar := make([]float32, nframes*channels)
+	for i := 0; i < nframes; i++ {
+		for c := 0; c < channels; c++ {
+			planar[c*nframes+i] = interleaved[i*channels+c]
+		}
+	}
+	return planar
+}
+
+// renderer is a decoder callback that writes up to maxFrames frames into an
+// interleaved (or mono, when channels==1) float32 slice and reports the actual
+// frame count. One per supported non-bidirectional format.
+type renderer func(maxFrames int) (samples []float32, channels, frames int, err error)
+
+// rendererFor returns a renderer for the given source type, or nil if the
+// source already seeks natively in both directions and needs no pre-render.
+func rendererFor(src soloud.AudioSource, data []byte) renderer {
+	switch src.(type) {
+	case *soloud.Openmpt:
+		return func(mf int) ([]float32, int, int, error) {
+			return openmpt.Render(data, renderSampleRate, mf)
+		}
+	case *soloud.Xmp:
+		return func(mf int) ([]float32, int, int, error) {
+			return xmp.Render(data, renderSampleRate, mf)
+		}
+	case *soloud.Ym:
+		return func(mf int) ([]float32, int, int, error) {
+			return soloud.RenderYm(data, mf)
+		}
+	case *soloud.Sid:
+		return func(mf int) ([]float32, int, int, error) {
+			return soloud.RenderSid(data, mf)
+		}
+	default:
+		return nil
+	}
+}
+
+// renderToSeekable pre-renders a non-bidirectional source (openmpt/xmp/YM/SID)
+// into a memory-backed Wav so the player can seek exactly in both directions.
+// If the source already seeks natively, or the track is longer than
+// maxRenderSeconds, it returns src unchanged. On success the returned Wav
+// replaces src and the caller must destroy the original src.
+func renderToSeekable(src soloud.AudioSource, data []byte, duration float64, channels int) (replacement soloud.AudioSource, newDuration float64, newChannels int, replaced bool) {
+	render := rendererFor(src, data)
+	if render == nil {
+		return src, duration, channels, false
+	}
+	mf := maxRenderFrames(duration)
+	if mf <= 0 {
+		// Over the cap: keep native streaming (backward seek restarts).
+		return src, duration, channels, false
+	}
+	samples, rendCh, frames, err := render(mf)
+	if err != nil || frames <= 0 {
+		slog.Warn("render-to-buffer failed, using native playback", "err", err, "frames", frames)
+		return src, duration, channels, false
+	}
+	if rendCh < 1 {
+		slog.Warn("render-to-buffer bad channels", "channels", rendCh)
+		return src, duration, channels, false
+	}
+	planar := interleavedToPlanar(samples, rendCh)
+	wav, err := soloud.NewWavFromSamples(planar, renderSampleRate, rendCh)
+	if err != nil {
+		slog.Warn("render-to-buffer wav build failed, using native playback", "err", err)
+		return src, duration, channels, false
+	}
+	slog.Info("pre-rendered track for exact seeking",
+		"seconds", float64(frames)/renderSampleRate, "frames", frames, "channels", rendCh)
+	newDuration = wav.GetLength()
+	newChannels = wav.GetChannels()
+	return wav, newDuration, newChannels, true
 }
 
 func (p *Player) GetWave() []float32 {

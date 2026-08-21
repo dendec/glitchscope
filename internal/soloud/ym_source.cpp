@@ -135,4 +135,44 @@ unsigned int Ym_getLengthMs(void *source) {
     return static_cast<unsigned int>(static_cast<SoLoud::YmSource *>(source)->getLengthSeconds() * 1000.0);
 }
 unsigned int Ym_getSampleRate(void *) { return 44100; }
+
+// Ym_render decodes up to maxFrames frames of a YM/LHARC tune into interleaved
+// float32 stereo. libstsound's native YM seek is unreliable (sub-format
+// dependent), so rendering a bounded buffer lets the player seek exactly in
+// both directions. Stops at end-of-song or when maxFrames is reached.
+// Returns the number of frames actually rendered.
+unsigned int Ym_render(const unsigned char *data, unsigned int length,
+                       float *outL, float *outR, unsigned int maxFrames) {
+    if (!data || !length || !outL || !outR || maxFrames == 0) return 0;
+    YMMUSIC *m = ymMusicCreate();
+    if (!m || !ymMusicLoadMemory(m, const_cast<unsigned char *>(data), length)) {
+        if (m) ymMusicDestroy(m);
+        return 0;
+    }
+    ymMusicSetLoopMode(m, YMFALSE);
+    const bool mono = ymMusicIsMono(m) != 0;
+    ymMusicPlay(m);
+    std::vector<ymsample> tmp(8192 * (mono ? 1 : 2));
+    unsigned int rendered = 0;
+    while (rendered < maxFrames && !ymMusicIsOver(m)) {
+        unsigned int n = maxFrames - rendered;
+        if (n > 8192) n = 8192;
+        if (!ymMusicCompute(m, tmp.data(), static_cast<ymint>(n))) break;
+        if (mono) {
+            for (unsigned int i = 0; i < n; ++i) {
+                const float v = static_cast<float>(tmp[i]) / 32768.0f;
+                outL[rendered + i] = v;
+                outR[rendered + i] = v;
+            }
+        } else {
+            for (unsigned int i = 0; i < n; ++i) {
+                outL[rendered + i] = static_cast<float>(tmp[i * 2]) / 32768.0f;
+                outR[rendered + i] = static_cast<float>(tmp[i * 2 + 1]) / 32768.0f;
+            }
+        }
+        rendered += n;
+    }
+    ymMusicDestroy(m);
+    return rendered;
+}
 }

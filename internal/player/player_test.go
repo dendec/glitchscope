@@ -546,3 +546,82 @@ func TestPlayFileAsyncContextCancelledOnNewTrack(t *testing.T) {
 
 	close(dl1Done)
 }
+
+// TestMaxRenderFrames verifies the pre-render cap: durations within the cap
+// produce the right frame counts, an unknown duration defaults to the cap, and
+// tracks longer than the cap yield 0 (fall back to native streaming).
+func TestMaxRenderFrames(t *testing.T) {
+	capFrames := int(maxRenderSeconds * renderSampleRate)
+
+	if got := maxRenderFrames(maxRenderSeconds); got != capFrames {
+		t.Fatalf("duration == cap: got %d, want %d", got, capFrames)
+	}
+	if got := maxRenderFrames(maxRenderSeconds / 2); got != capFrames/2 {
+		t.Fatalf("duration half-capped: got %d, want %d", got, capFrames/2)
+	}
+	// Unknown/short durations fall back to the cap so we never over-allocate.
+	if got := maxRenderFrames(0); got != capFrames {
+		t.Fatalf("duration 0: got %d, want %d", got, capFrames)
+	}
+	if got := maxRenderFrames(-5); got != capFrames {
+		t.Fatalf("negative duration: got %d, want %d", got, capFrames)
+	}
+	// Over the cap -> skip pre-render.
+	if got := maxRenderFrames(maxRenderSeconds + 1); got != 0 {
+		t.Fatalf("duration over cap: got %d, want 0", got)
+	}
+	// A realistic chip track (e.g. the YM used to diagnose this: 185.68s) must
+	// stay within the cap, or it silently falls back to the unreliable native
+	// YM seek. If this fails the cap was lowered below common chip lengths.
+	if got := maxRenderFrames(185.68); got <= 0 {
+		t.Fatalf("typical 185.68s chip track not pre-rendered (got %d); cap too low?", got)
+	}
+}
+
+// TestInterleavedToPlanar verifies the interleave -> planar conversion that
+// feeds SoLoud's in-memory Wav, which stores channels as contiguous runs.
+func TestInterleavedToPlanar(t *testing.T) {
+	// Two channels, 3 frames: L0 R0 L1 R1 L2 R2.
+	interleaved := []float32{0, 10, 1, 11, 2, 12}
+	planar := interleavedToPlanar(interleaved, 2)
+	want := []float32{0, 1, 2, 10, 11, 12}
+	for i := range want {
+		if planar[i] != want[i] {
+			t.Fatalf("planar[%d] = %v, want %v", i, planar[i], want[i])
+		}
+	}
+	// Mono is a no-op pass-through (1 channel).
+	mono := []float32{0.5, 1.5, 2.5}
+	if got := interleavedToPlanar(mono, 1); len(got) != len(mono) {
+		t.Fatalf("mono planar length = %d, want %d", len(got), len(mono))
+	}
+}
+
+// TestRenderToSeekableSkipsSeekableSources verifies that sources with native
+// bidirectional seek are returned unchanged (no renderer).
+func TestRenderToSeekableSkipsSeekableSources(t *testing.T) {
+	src := &soloud.Wav{}
+	replacement, _, _, replaced := renderToSeekable(src, nil, 30, 2)
+	if replaced {
+		t.Fatal("seekable source should not be replaced")
+	}
+	if replacement != soloud.AudioSource(src) {
+		t.Fatal("replacement should be the original source")
+	}
+}
+
+// TestRenderToSeekableOverCapFallback verifies that a renderable source whose
+// track exceeds the pre-render cap is left untouched (native streaming).
+func TestRenderToSeekableOverCapFallback(t *testing.T) {
+	src := &soloud.Sid{}
+	replacement, dur, ch, replaced := renderToSeekable(src, []byte{1, 2, 3}, maxRenderSeconds+1, 1)
+	if replaced {
+		t.Fatal("over-cap track should not be replaced")
+	}
+	if replacement != soloud.AudioSource(src) {
+		t.Fatal("replacement should be the original source")
+	}
+	if dur != maxRenderSeconds+1 || ch != 1 {
+		t.Fatalf("over-cap duration/channels changed: %v/%v", dur, ch)
+	}
+}

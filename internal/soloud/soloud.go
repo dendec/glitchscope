@@ -35,6 +35,7 @@ int SidSource_loadMem(void *source, const unsigned char *data, unsigned int leng
 unsigned int SidSource_getLengthMs(void *source);
 unsigned int SidSource_getTrackCount(void *source);
 unsigned int SidSource_getSampleRate(void *source);
+unsigned int Sid_render(const unsigned char *data, unsigned int length, float *out, unsigned int maxFrames);
 void *Ayumi_create(void);
 void Ayumi_destroy(void *source);
 int Ayumi_loadMem(void *source, const unsigned char *data, unsigned int length);
@@ -50,6 +51,7 @@ void Ym_destroy(void *source);
 int Ym_loadMem(void *source, const unsigned char *data, unsigned int length);
 unsigned int Ym_getLengthMs(void *source);
 unsigned int Ym_getSampleRate(void *source);
+unsigned int Ym_render(const unsigned char *data, unsigned int length, float *outL, float *outR, unsigned int maxFrames);
 */
 import "C"
 
@@ -148,6 +150,35 @@ func LoadWav(path string) (*Wav, error) {
 	if r != 0 {
 		C.Wav_destroy(p)
 		return nil, fmt.Errorf("wav load: %d", r)
+	}
+	return &Wav{p: p}, nil
+}
+
+// NewWavFromSamples builds a memory-backed Wav audio source from decoded
+// planar float32 PCM (channel c spans samples[c*n .. (c+1)*n)). SoLoud copies
+// the samples, so callers may free their buffer after this returns. This is
+// how pre-rendered tracker/chip tracks are played back so that seeking is
+// exact and bidirectional regardless of the native decoder's seek support.
+func NewWavFromSamples(planar []float32, sampleRate float64, channels int) (*Wav, error) {
+	if len(planar) == 0 || sampleRate <= 0 || channels < 1 {
+		return nil, fmt.Errorf("wav from samples: bad params (len=%d sr=%g ch=%d)", len(planar), sampleRate, channels)
+	}
+	if channels*int(len(planar)/channels) != len(planar) {
+		return nil, fmt.Errorf("wav from samples: %d samples not divisible by %d channels", len(planar), channels)
+	}
+	p := C.Wav_create()
+	r := int(C.Wav_loadRawWaveEx(
+		p,
+		(*C.float)(unsafe.Pointer(&planar[0])),
+		C.uint(len(planar)),
+		C.float(sampleRate),
+		C.uint(channels),
+		1, // aCopy = true
+		0, // aTakeOwnership = false
+	))
+	if r != 0 {
+		C.Wav_destroy(p)
+		return nil, fmt.Errorf("wav from samples: loadRawWaveEx: %d", r)
 	}
 	return &Wav{p: p}, nil
 }
@@ -490,6 +521,55 @@ func (s *Soloud) PlayHvl(h *Hvl) uint {
 // PlayFfmpeg starts playing an FFmpeg source.
 func (s *Soloud) PlayFfmpeg(f *Ffmpeg) uint {
 	return uint(C.Soloud_play(s.p, (*C.AudioSource)(f.p)))
+}
+
+// RenderYm decodes up to maxFrames frames of a YM/LHARC tune into interleaved
+// float32 stereo. Returns (interleaved, channels, frames, err). Used to build a
+// seekable pre-rendered Wav because libstsound's native YM seek is unreliable.
+func RenderYm(data []byte, maxFrames int) ([]float32, int, int, error) {
+	if len(data) == 0 || maxFrames <= 0 {
+		return nil, 0, 0, nil
+	}
+	left := make([]float32, maxFrames)
+	right := make([]float32, maxFrames)
+	frames := int(C.Ym_render(
+		(*C.uchar)(unsafe.Pointer(&data[0])),
+		C.uint(len(data)),
+		(*C.float)(unsafe.Pointer(&left[0])),
+		(*C.float)(unsafe.Pointer(&right[0])),
+		C.uint(maxFrames),
+	))
+	if frames <= 0 {
+		return nil, 0, 0, fmt.Errorf("ym render: no frames decoded")
+	}
+	left = left[:frames]
+	right = right[:frames]
+	interleaved := make([]float32, frames*2)
+	for i := 0; i < frames; i++ {
+		interleaved[i*2] = left[i]
+		interleaved[i*2+1] = right[i]
+	}
+	return interleaved, 2, frames, nil
+}
+
+// RenderSid decodes up to maxFrames frames of a SID tune into mono float32
+// samples. Returns (mono, channels, frames, err). SID has no native seek at
+// all, so the pre-rendered buffer is what makes seeking possible.
+func RenderSid(data []byte, maxFrames int) ([]float32, int, int, error) {
+	if len(data) == 0 || maxFrames <= 0 {
+		return nil, 0, 0, nil
+	}
+	mono := make([]float32, maxFrames)
+	frames := int(C.Sid_render(
+		(*C.uchar)(unsafe.Pointer(&data[0])),
+		C.uint(len(data)),
+		(*C.float)(unsafe.Pointer(&mono[0])),
+		C.uint(maxFrames),
+	))
+	if frames <= 0 {
+		return nil, 0, 0, fmt.Errorf("sid render: no frames decoded")
+	}
+	return mono[:frames], 1, frames, nil
 }
 
 func (g *Gme) GetLength() float64 {

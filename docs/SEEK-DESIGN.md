@@ -1,6 +1,6 @@
 # Seek / перемотка — design
 
-Status: proposed (agreed with maintainer on 2 open decisions).
+Status: implemented (velocity/acceleration drivetrain + pre-render layer).
 
 ## Goal
 
@@ -68,13 +68,49 @@ a garbled fast-forward (not pitch-shifted).
 
 ### Handling formats without backward seek
 
-A backward seek on SID and trackers currently returns `NOT_IMPLEMENTED` and is
-silently dropped (only a debug log). Design: when the player knows a source
-cannot seek backward, a backward seek **restarts from 0** (stop + re-seek to
-the exact fraction is not possible without decoder support, so restart is the
-safe, predictable fallback). Implement by reporting seek capability from the
-source and, on unsupported-backward, calling `Seek(0)` (which for these
-sources means rewind) instead of erroring silently.
+A backward seek on SID and trackers previously returned `NOT_IMPLEMENTED` and a
+backward seek **restarted from 0**. That is still the last-resort fallback, but
+the primary fix is now **pre-rendering** (see next section), which gives exact
+bidirectional seek to formats whose native decoders can't do it.
+
+## Pre-render (decode-to-buffer) layer
+
+Openmpt/Xmp only seek forward (and only by coarse, CPU-heavy sample-discard),
+SID has no seek at all, and libstsound's YM seek is sub-format dependent /
+unreliable. Rather than fight each native decoder, the player **pre-renders**
+these formats into a memory-backed SoLoud `Wav` once, during the existing async
+load, and plays from that buffer. A `Wav` seeks exactly in both directions, so
+MOD/IT/YM/SID (and any other tracker) get identical, precise scrubbing.
+
+| Piece | Location |
+|---|---|
+| `NewWavFromSamples` (memory Wav from planar PCM) | `internal/soloud/soloud.go` |
+| `Render` (libopenmpt -> interleaved PCM) | `internal/openmpt/openmpt.go` |
+| `Render` (libxmp -> interleaved PCM) | `internal/xmp/xmp.go` |
+| `RenderYm`, `RenderSid` (libstsound / cRSID -> PCM) | `internal/soloud` |
+| `maxRenderFrames`, `interleavedToPlanar`, `renderToSeekable` | `internal/player/player.go` |
+
+**Cap and fallback.** A track is only pre-rendered if its duration is within
+`maxRenderSeconds` (`360s`, ~124 MB of float32 stereo at 44.1 kHz). Longer tracks
+keep native streaming to bound RAM on low-power handhelds (backward seek then
+restarts). The cap is set above typical chip-track lengths (e.g. a common YM
+tune is ~186s) so they pre-render and seek exactly rather than silently falling
+back to the unreliable native YM seek. Unknown-duration tracks default to the
+cap. Rendering runs in the background load goroutine, so the UI shows the
+loading indicator, never stalls.
+
+**Seek matrix with pre-render** — for pre-rendered tracks all formats become
+exact/bidirectional; the "implementation" column applies only to the over-cap
+native fallback:
+
+| Source | forward | backward | native implementation |
+|---|---|---|---|
+| FFmpeg / Wav (lossy & PCM) | exact | exact | `avformat_seek_file`, dr_* / stb_vorbis |
+| GME / HVL / PT3 / Ayumi | exact | exact | re-seek / `gme_seek` |
+| **Openmpt / Xmp / YM / SID (pre-rendered)** | **exact** | **exact** | `Wav` buffer seek |
+| Openmpt / Xmp (over cap, native) | coarse | restart | sample-discard; `rewind()` = NOT_IMPLEMENTED |
+| SID (over cap, native) | none | none | `seek()`/`rewind()` = NOT_IMPLEMENTED |
+
 
 ## Velocity + acceleration drivetrain (app layer)
 
@@ -113,15 +149,21 @@ if heldMax && holdTime > 0.4s:                        // extreme deflection held
 ## Files touched
 
 - `internal/player/player.go` — position clock, seek-capability reporting,
-  backward-seek fallback.
+  backward-seek fallback, **pre-render layer** (`maxRenderFrames`,
+  `interleavedToPlanar`, `renderToSeekable`, wired into `loadTracker`/`loadChip`).
 - `internal/app/run_loop.go` — velocity + acceleration drivetrain.
 - `internal/app/actions.go` — discrete hold-aware seek.
 - `internal/input/input.go` — expose held-seek button state if keyboard polling
   is the mechanism (or reuse `sdl.GetKeyboardState` in run_loop directly).
+- `internal/soloud/soloud.go` — `NewWavFromSamples` (memory Wav from PCM),
+  `RenderYm`, `RenderSid` render entry points.
+- `internal/openmpt/openmpt.go`, `internal/xmp/xmp.go` — `Render` decoders.
+- `internal/soloud/{ym,sid}_source.cpp` — C render loops.
 - `internal/player/*_test.go`, `internal/app/*_test.go` — pure-logic tests.
 
 ## Verification
 
 `make lint` + `scripts/dtest.sh test` (sequential docker jobs; shared
-go-build cache is fragile). Unit tests cover the position clock and the
-velocity/acceleration math; the SDL/GL path is not unit-tested.
+go-build cache is fragile). Unit tests cover the position clock, the
+velocity/acceleration math, the pre-render cap decision and the
+interleave→planar conversion; the SDL/GL path is not unit-tested.
