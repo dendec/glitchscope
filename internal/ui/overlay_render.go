@@ -90,7 +90,8 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	if o.presetNameTex != 0 {
 		presetLineH = lh
 	}
-	bottomH := presetLineH + statusRowH
+	hintRowH := o.hintRowHeight()
+	bottomH := presetLineH + statusRowH + hintRowH
 
 	panelY := headerH
 	panelH := winH - panelY - bottomH
@@ -133,8 +134,9 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	showBar := o.playingTrack != "" || o.loading || o.presetNameTex != 0
 	if showBar {
 		by := float32(winH - bottomH)
+		barBackdropH := float32(presetLineH + statusRowH)
 		bR, bG, bB := o.panelBgRGB()
-		glDrawFilledRect(o.programRect, 0, by, float32(winW), float32(bottomH), bR, bG, bB, o.bgAlpha(), winW, winH, viewW, viewH)
+		glDrawFilledRect(o.programRect, 0, by, float32(winW), barBackdropH, bR, bG, bB, o.bgAlpha(), winW, winH, viewW, viewH)
 
 		if o.presetNameTex != 0 {
 			if !o.drawMarquee(&o.presetNameMarquee, headerMarginX, by, float32(winW-headerMarginX*2), float32(o.presetNameTexH), winW, winH, viewW, viewH) {
@@ -172,7 +174,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		}
 		tc := o.textColor()
 		r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
-		barY := float32(winH - barH)
+		barY := float32(winH - hintRowH - barH)
 		glDrawFilledRect(o.programRect, 0, barY, float32(winW), float32(barH), r, g, b, 0.15, winW, winH, viewW, viewH)
 		progress := o.position / o.duration
 		if progress > 1 {
@@ -183,6 +185,9 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		}
 		glDrawFilledRect(o.programRect, 0, barY, float32(float64(winW)*progress), float32(barH), r, g, b, 0.7, winW, winH, viewW, viewH)
 	}
+
+	// Context action-hints footer: always shown across pages, at the very bottom.
+	o.renderActionHints(winW, winH, viewW, viewH)
 }
 
 // --- Panel drawing helpers ---

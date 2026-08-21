@@ -222,6 +222,10 @@ type Overlay struct {
 	breadcrumbTextCache            string
 	breadcrumbDirty                bool
 
+	hintTex            uint32
+	hintTexW, hintTexH int
+	hintTextCache      string
+
 	pageIndicatorTex   [4]uint32
 	pageIndicatorTexW  [4]int
 	pageIndicatorTexH  [4]int
@@ -270,6 +274,7 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.statsTex)
 	o.deleteTex(&o.presetNameTex)
 	o.deleteTex(&o.breadcrumbTex)
+	o.deleteTex(&o.hintTex)
 	o.deleteTex(&o.settingsColL.tex)
 	o.deleteTex(&o.settingsColR.tex)
 	o.deleteTex(&o.presetsColL.tex)
@@ -390,6 +395,9 @@ func (o *Overlay) markAllDirty() {
 	o.helpDirty = true
 	o.pageIndicatorDirty = true
 	o.breadcrumbDirty = true
+	// The hint-footer texture must be forced to rebuild on font size / theme
+	// / resize changes, even if its text string is unchanged.
+	o.hintTextCache = ""
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
 	o.statsMarquee.invalidate(o)
