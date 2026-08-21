@@ -73,6 +73,8 @@ type App struct {
 	presetSwitch    atomic.Bool
 
 	deleteSvc *deleteService
+
+	seek seekControl // continuous-seek drivetrain state
 }
 
 // New creates an App with display initialised. Player/overlay/input/library

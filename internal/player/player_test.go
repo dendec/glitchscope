@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/dendec/pmv/internal/soloud"
 )
 
 // writeMinWav creates a minimal silent WAV file (0.1 s, mono, 44100 Hz, 16-bit).
@@ -408,6 +410,73 @@ func TestCheckPendingReturnsCorrectState(t *testing.T) {
 type testErr struct{ msg string }
 
 func (e *testErr) Error() string { return e.msg }
+
+// TestSourceSeeksBoth verifies the per-source seek-capability classification
+// (which backing decoders can seek in both directions).
+func TestSourceSeeksBoth(t *testing.T) {
+	seekBoth := []soloud.AudioSource{
+		&soloud.Ffmpeg{}, &soloud.Wav{}, &soloud.Gme{},
+		&soloud.Hvl{}, &soloud.Pt3{}, &soloud.Ym{}, &soloud.Ayumi{},
+	}
+	seekForwardOnly := []soloud.AudioSource{
+		&soloud.Sid{}, &soloud.Openmpt{}, &soloud.Xmp{},
+	}
+	for _, src := range seekBoth {
+		if !sourceSeeksBoth(src) {
+			t.Errorf("sourceSeeksBoth(%T) = false, want true", src)
+		}
+	}
+	for _, src := range seekForwardOnly {
+		if sourceSeeksBoth(src) {
+			t.Errorf("sourceSeeksBoth(%T) = true, want false", src)
+		}
+	}
+	if sourceSeeksBoth(nil) {
+		t.Error("sourceSeeksBoth(nil) = true, want false")
+	}
+}
+
+// TestPositionValidWithoutEngine verifies the authoritative position clock is
+// stable when there is no live voice: it returns the recorded position without
+// advancing (the nil-engine test seam never has a voice).
+func TestPositionValidWithoutEngine(t *testing.T) {
+	p := newTestPlayer(t)
+	if got := p.Position(); got != 0 {
+		t.Fatalf("Position with no source = %v, want 0", got)
+	}
+	p.posMu.Lock()
+	p.posValid = true
+	p.pos = 42
+	p.posLast = time.Now()
+	p.posMu.Unlock()
+	p.floatCheck(t, 42)
+}
+
+func (p *Player) floatCheck(t *testing.T, want float64) {
+	t.Helper()
+	if got := p.Position(); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+// TestAdvancePositionClock verifies the authoritative clock advances only
+// while playing and never jumps by an idle span (pause or stall).
+func TestAdvancePositionClock(t *testing.T) {
+	if got := advancePositionClock(10, false, 5); got != 10 {
+		t.Fatalf("paused clock advanced: %v, want 10", got)
+	}
+	if got := advancePositionClock(10, true, 0.5); got != 10.5 {
+		t.Fatalf("playing clock = %v, want 10.5", got)
+	}
+	// A long stall while playing is capped.
+	if got := advancePositionClock(10, true, 60); got != 20 {
+		t.Fatalf("stall clock = %v, want 20", got)
+	}
+	// Negative dt (clock skew) never rewinds.
+	if got := advancePositionClock(10, true, -1); got != 10 {
+		t.Fatalf("negative dt rewound: %v, want 10", got)
+	}
+}
 
 func TestPlayFileAsyncContextCancelledOnStop(t *testing.T) {
 	p := newTestPlayer(t)

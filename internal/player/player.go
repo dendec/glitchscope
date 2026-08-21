@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/dendec/pmv/internal/openmpt"
 	"github.com/dendec/pmv/internal/soloud"
@@ -40,6 +41,15 @@ type Player struct {
 	currentBitrate  float64
 	channels        int
 	isTracker       bool
+
+	// Authoritative playback clock. SoLoud's getStreamTime does not jump to the
+	// seek target (it only advances by wall clock each mix), so we track our own
+	// position: set on Seek, advanced lazily on Position() while playing.
+	posMu    sync.Mutex
+	pos      float64
+	posLast  time.Time
+	posValid bool
+	seekBoth bool // true when the current source can seek both directions
 
 	// Downloader optionally fetches a remote file to a local path (e.g. for modland).
 	// The context is cancelled when a new track is requested or playback is stopped.
@@ -423,11 +433,32 @@ func (p *Player) replaceSource(src soloud.AudioSource) {
 		p.current.Destroy()
 		p.current = nil
 	}
+	p.posMu.Lock()
+	p.pos = 0
+	p.posLast = time.Now()
+	p.posValid = src != nil
+	p.seekBoth = src != nil && sourceSeeksBoth(src)
+	p.posMu.Unlock()
 	if src != nil {
 		p.current = src
 		if p.s != nil {
 			p.voice = p.s.PlaySource(src)
 		}
+	}
+}
+
+// sourceSeeksBoth reports whether a source's decoder can seek in both
+// directions. FFmpeg, Wav, GME, HVL, PT3, YM and Ayumi re-seek exactly; SID
+// returns NOT_IMPLEMENTED for seek entirely, and the openmpt/xmp tracker
+// sources only expose SoLoud's generic forward-only sample-discard seek.
+func sourceSeeksBoth(src soloud.AudioSource) bool {
+	switch src.(type) {
+	case *soloud.Sid, *soloud.Openmpt, *soloud.Xmp:
+		return false
+	case nil:
+		return false
+	default:
+		return true
 	}
 }
 
@@ -497,6 +528,11 @@ func (p *Player) Stop() {
 		p.current.Destroy()
 		p.current = nil
 	}
+	p.posMu.Lock()
+	p.posValid = false
+	p.pos = 0
+	p.seekBoth = false
+	p.posMu.Unlock()
 	p.currentPath = ""
 	p.loading.Store(false)
 	p.loadPercent.Store(-1)
@@ -533,18 +569,76 @@ func (p *Player) Close() {
 }
 
 func (p *Player) Position() float64 {
-	if p.voice == 0 {
+	p.posMu.Lock()
+	defer p.posMu.Unlock()
+
+	// Once a source is gone (or we're loading), position is meaningless.
+	if !p.posValid {
 		return 0
 	}
-	return p.s.GetStreamTime(p.voice)
+	// Refresh posLast on every read so a resume after pause (or a long stall)
+	// doesn't jump the clock by the whole idle span. The clock only advances
+	// while playing a live, unpaused voice.
+	now := time.Now()
+	p.pos = advancePositionClock(p.pos, p.voice != 0 && p.s != nil && !p.s.GetPause(p.voice), now.Sub(p.posLast).Seconds())
+	p.posLast = now
+	return p.pos
 }
 
-// Seek moves the current track position in seconds.
+// advancePositionClock advances the authoritative position by dt seconds when
+// the voice is playing; an idle (paused/stalled) span never advances the
+// clock, and a single dt is capped to avoid a giant wall-clock jump.
+func advancePositionClock(pos float64, playing bool, dt float64) float64 {
+	if !playing {
+		return pos
+	}
+	if dt < 0 {
+		dt = 0
+	}
+	if dt > 10 {
+		dt = 10
+	}
+	return pos + dt
+}
+
+// Seek moves the current track position in seconds and updates the
+// authoritative clock so Position() reflects the jump immediately.
 func (p *Player) Seek(seconds float64) error {
 	if !p.IsValidVoice() {
 		return fmt.Errorf("no active voice")
 	}
-	return p.s.Seek(p.voice, seconds)
+	if seconds < 0 {
+		seconds = 0
+	}
+	if dur := p.Duration(); dur > 0 && seconds > dur {
+		seconds = dur
+	}
+
+	p.posMu.Lock()
+	defer p.posMu.Unlock()
+
+	// Formats that cannot seek backward (SID, openmpt/xmp trackers) restart
+	// from the beginning instead of failing silently: their seek()/rewind()
+	// return NOT_IMPLEMENTED, so we replay the source to get a fresh decoder.
+	if !p.seekBoth && seconds < p.pos {
+		if p.current != nil && p.s != nil {
+			p.s.StopAll()
+			p.voice = p.s.PlaySource(p.current)
+			p.pos = 0
+			p.posLast = time.Now()
+			p.posValid = true
+			return nil
+		}
+		return fmt.Errorf("cannot seek backward on this source")
+	}
+
+	if err := p.s.Seek(p.voice, seconds); err != nil {
+		return err
+	}
+	p.pos = seconds
+	p.posLast = time.Now()
+	p.posValid = true
+	return nil
 }
 
 func (p *Player) Duration() float64 {

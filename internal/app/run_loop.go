@@ -129,17 +129,27 @@ func (a *App) Run() {
 			}
 		}
 
-		// Continuous seeking via right analog stick.
+		// Continuous seeking: velocity scales with stick deflection (or a held
+		// ,/. key) and accelerates when held at max for long enough. The
+		// discrete ±5s on a single ,/. press is still handled by the action.
 		if a.pl != nil {
-			if rx := a.inp.RightStickX(); rx != 0 {
-				seekDelta := rx * 10 * dt // ±10 sec/sec at full deflection
-				target := a.pl.Position() + seekDelta
-				if target < 0 {
-					target = 0
-				} else if dur := a.pl.Duration(); dur > 0 && target > dur {
-					target = dur
+			state := sdl.GetKeyboardState()
+			var velocity float64
+			switch {
+			case state[sdl.SCANCODE_PERIOD] != 0:
+				velocity = seekSpeed(1.0, a.seek.UpdateHold(1.0, now))
+			case state[sdl.SCANCODE_COMMA] != 0:
+				velocity = seekSpeed(-1.0, a.seek.UpdateHold(1.0, now))
+			default:
+				rx := a.inp.RightStickX()
+				velocity = seekSpeed(rx, a.seek.UpdateHold(rx, now))
+			}
+			if target := a.seek.Target(a.pl.Position(), velocity, dt); target >= 0 {
+				if err := a.pl.Seek(target); err != nil {
+					// Backend rejected the seek (e.g. unsupported source) — stop
+					// trying so we don't churn the decoder every frame.
+					a.seek.lastDir = 0
 				}
-				_ = a.pl.Seek(target)
 			}
 		}
 
