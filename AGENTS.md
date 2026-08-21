@@ -196,6 +196,15 @@ mechanical wrappers. Keep them thin — put business logic in the caller.
   background goroutine, publishes to `pendingCh`, and `CheckPending()` picks it up
   **once per frame**. Stale results are identified by `requestID` and destroyed,
   never applied. `PlayFile` is the synchronous path (used by tests/benchmark).
+- **Seek & pre-render layer** (`internal/player/player.go`, see
+  `docs/SEEK-DESIGN.md`): formats whose native decoder can't seek cleanly in
+  both directions (openmpt, xmp, YM, SID) are **pre-rendered once at load**
+  into an in-memory planar float32 `Wav` at `renderSampleRate = 44100`. The
+  Wav then replaces the native source and gives exact bidirectional seek.
+  `maxRenderSeconds = 360` caps the render (worst-case ~124 MiB stereo) — tracks
+  longer than the cap fall back to native streaming (`sourceSeeksBoth`). The
+  cap is a loaded constant guarded by `TestMaxRenderFrames`, so raising it
+  requires touching the constant, the regression guard, and the doc together.
 - **SoLoud voice** (`voice uint`): `0` means "no active voice"; guard all
   voice-scoped calls (`Pause`/`Resume`/`Position`/`Seek`) with `IsValidVoice()`.
 - **Mic capture** takes priority and stops SoLoud playback to avoid feedback
@@ -248,6 +257,9 @@ mechanical wrappers. Keep them thin — put business logic in the caller.
 - `docs/UI-PLAN.md`, `docs/UI-HELP-PLAN.md`, `docs/NAV-MODE-SWITCH.md`,
   `docs/PLAN*.md` — feature/design plans. Read the relevant one before touching
   UI/navigation/player features.
+- `docs/SEEK-DESIGN.md` — the seek/перемотка architecture (accelerating seek
+  drivetrain + pre-render layer). Read it before touching seeking or the
+  tracker/chip pre-render path in `internal/player`.
 - `README.md` — user-facing features and build instructions.
 - Keep docs in sync with behavior; a change is "complete" only when its
   implementation, tests, and docs are all updated together.
