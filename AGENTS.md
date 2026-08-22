@@ -28,7 +28,7 @@ runs on any Linux/Windows desktop.
 | Path | Purpose |
 |---|---|
 | `cmd/glitchscope/` | Main entrypoint. CLI flags, SDL/GL/SoLoud/projectM init, main loop. |
-| `cmd/glitchscope-pack/` | Packs preset/texture directories into `.pmv` archives. |
+| `cmd/glitchscope-pack/` | Packs preset/texture directories into `.gsa` archives. |
 | `cmd/modland-catalog/` `cmd/modarchive-catalog/` | Build remote music catalogs from Modland / ModArchive. |
 | `cmd/validate-catalog/` | Validates a downloaded catalog by loading each format. |
 | `cmd/texture-report/` | Reports texture usage of presets (CSV). |
@@ -38,7 +38,7 @@ runs on any Linux/Windows desktop.
 | `internal/config/` | Persisted settings types, validation, atomic JSON storage. |
 | `internal/filesystem/` | Shared directory walk with `OK` / `Partial` / `Failed` statuses. |
 | `internal/{soloud,projectm,openmpt,xmp,mic}` | Thin cgo bindings over the C/C++ libs (SoLoud, projectM, openmpt, xmp, ALSA mic capture). |
-| `internal/{presets,modland,modarchive,archive,input,prof,formats}` | Presets store, remote catalogs, `.pmv` archive reader, input mapping, profiling, format detection. |
+| `internal/{presets,modland,modarchive,archive,input,prof,formats}` | Presets store, remote catalogs, `.gsa` archive reader, input mapping, profiling, format detection. |
 | `lib/` | git submodules — the C/C++ sources. **Never modify these.** |
 | `portmaster/` | PortMaster packaging (launcher, `port.json`, `gameinfo.xml`). |
 | `docs/` | Architecture + feature/design plans (see §8). |
@@ -185,7 +185,7 @@ mechanical wrappers. Keep them thin — put business logic in the caller.
 - **Presets:** a preset name with a leading `!` is a *transition* preset used for
   smooth cross-fades (`softCutDuration = 2.5s`); normal presets exclude them.
   Preset switching has a single DRY entry point: `App.transitionPreset` /
-  `applyPresetName` in `internal/app/actions.go`. Presets are stored in a `.pmv`
+  `applyPresetName` in `internal/app/actions.go`. Presets are stored in a `.gsa`
   archive; `internal/presets` is the store.
 - **Adaptive resolution** (`internal/app/adaptive.go`, `resolution_state.go`):
   a policy steps the internal render resolution down/up to keep FPS in band

@@ -139,7 +139,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	extractedDir, extractErr := os.MkdirTemp("", "glitchscope-textures-")
 	if extractErr == nil {
 		a.textureDir = extractedDir
-		textureArchive, archiveErr := archive.Open(filepath.Join(presetDirPath(), "textures.pmv"), 10000)
+		textureArchive, archiveErr := archive.Open(filepath.Join(presetDirPath(), "textures.gsa"), 10000)
 		if archiveErr == nil {
 			_, extractErr = textureArchive.Extract(extractedDir)
 			_ = textureArchive.Close()

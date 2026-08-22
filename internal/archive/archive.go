@@ -1,4 +1,4 @@
-// Package archive reads indexed zstd-compressed archives (.pmv format).
+// Package archive reads indexed zstd-compressed archives (.gsa format).
 package archive
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	magic       = "PMV\x00"
+	magic       = "GSA\x00"
 	maxNameSize = 4096
 )
 

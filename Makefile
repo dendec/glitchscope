@@ -12,13 +12,13 @@ GOFLAGS  := CGO_ENABLED=1
 
 PRESETS_REPO       := https://github.com/projectM-visualizer/presets-cream-of-the-crop.git
 PRESETS_DIR        := dist/presets-cream-of-the-crop
-PMV_FILE           := dist/presets.pmv
-FULL_PMV_FILE      := dist/presets-all.pmv
+GSA_FILE           := dist/presets.gsa
+FULL_GSA_FILE      := dist/presets-all.gsa
 BENCHMARK_CSV      := docs/benchmark/render-scale-0.5_mesh-8.csv
 TEXTURES_REPO      := https://github.com/projectM-visualizer/presets-milkdrop-texture-pack.git
 TEXTURES_DIR       := dist/presets-milkdrop-texture-pack
 OPTIMIZED_TEXTURES := dist/textures-optimized
-TEXTURES_PMV_FILE  := dist/textures.pmv
+TEXTURES_GSA_FILE  := dist/textures.gsa
 TEXTURE_REPORT     := docs/texture-usage-report.csv
 PORTS_DIR          := /userdata/roms/ports
 DEVICE_DIR         := $(PORTS_DIR)/glitchscope
@@ -77,7 +77,7 @@ modland-catalog: $(MODLAND_CATALOG)
 modarchive-catalog: $(MODARCHIVE_CATALOG)
 
 # Docker build (amd64)
-dist: builder $(PMV_FILE) $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
+dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t glitchscope:amd64 -f Dockerfile .
 	@rm -rf $(X64_DIST_DIR)
 	@mkdir -p $(X64_DIST_DIR)
@@ -85,11 +85,11 @@ dist: builder $(PMV_FILE) $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_C
 	docker create --name glitchscope-extract-x64 glitchscope:amd64
 	docker cp glitchscope-extract-x64:/dist/glitchscope/. $(X64_DIST_DIR)/
 	docker rm glitchscope-extract-x64
-	@# Replace test presets with the real .pmv archive.
+	@# Replace test presets with the real .gsa archive.
 	rm -rf $(X64_DIST_DIR)/presets/*
-	cp $(PMV_FILE) $(X64_DIST_DIR)/presets/presets.pmv
+	cp $(GSA_FILE) $(X64_DIST_DIR)/presets/presets.gsa
 	rm -rf $(X64_DIST_DIR)/textures
-	cp $(TEXTURES_PMV_FILE) $(X64_DIST_DIR)/presets/textures.pmv
+	cp $(TEXTURES_GSA_FILE) $(X64_DIST_DIR)/presets/textures.gsa
 	cp -r test_data/* $(X64_DIST_DIR)/
 	@mkdir -p $(X64_DIST_DIR)/.cache/modland $(X64_DIST_DIR)/.cache/modarchive
 	@cp $(MODLAND_CATALOG) $(X64_DIST_DIR)/.cache/modland/catalog
@@ -100,7 +100,7 @@ dist: builder $(PMV_FILE) $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_C
 # ARM64 cross-build via Docker
 DOCKER_IMAGE_ARM64 := glitchscope:arm64
 
-dist-arm64: builder portable-glitchscope $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
+dist-arm64: builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)
@@ -109,9 +109,9 @@ dist-arm64: builder portable-glitchscope $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG)
 	docker cp glitchscope-extract:/dist/. $(ARM64_DIST_DIR)/
 	docker rm glitchscope-extract
 	rm -rf $(ARM64_DIST_DIR)/glitchscope/presets/*
-	cp $(PMV_FILE) $(ARM64_DIST_DIR)/glitchscope/presets/presets.pmv
+	cp $(GSA_FILE) $(ARM64_DIST_DIR)/glitchscope/presets/presets.gsa
 	rm -rf $(ARM64_DIST_DIR)/glitchscope/textures
-	cp $(TEXTURES_PMV_FILE) $(ARM64_DIST_DIR)/glitchscope/presets/textures.pmv
+	cp $(TEXTURES_GSA_FILE) $(ARM64_DIST_DIR)/glitchscope/presets/textures.gsa
 	cp -r test_data/* $(ARM64_DIST_DIR)/
 	@mkdir -p $(ARM64_DIST_DIR)/glitchscope/.cache/modland $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive
 	@cp $(MODLAND_CATALOG) $(ARM64_DIST_DIR)/glitchscope/.cache/modland/catalog
@@ -120,7 +120,7 @@ dist-arm64: builder portable-glitchscope $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG)
 	@ls -lhR $(ARM64_DIST_DIR)/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
-dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
+dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	@rm -rf dist/portmaster_build
 	@mkdir -p dist/portmaster_build/glitchscope/presets dist/portmaster_build/glitchscope/licenses
 	cp portmaster/GlitchScope.sh dist/portmaster_build/
@@ -131,8 +131,8 @@ dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_PMV_FILE) $(MODLAND_
 	@RELEASE_DATE=$$(date +%Y%m%d)T000000; \
 	printf '<gameList>\n    <game>\n        <path>./GlitchScope.sh</path>\n        <name>GlitchScope</name>\n        <desc>GlitchScope — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/glitchscope/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./glitchscope/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/glitchscope/gameinfo.xml
 	cp $(ARM64_DIST_DIR)/glitchscope/glitchscope dist/portmaster_build/glitchscope/
-	cp $(PMV_FILE) dist/portmaster_build/glitchscope/presets/presets.pmv
-	cp $(TEXTURES_PMV_FILE) dist/portmaster_build/glitchscope/presets/textures.pmv
+	cp $(GSA_FILE) dist/portmaster_build/glitchscope/presets/presets.gsa
+	cp $(TEXTURES_GSA_FILE) dist/portmaster_build/glitchscope/presets/textures.gsa
 	@mkdir -p dist/portmaster_build/glitchscope/.cache/modland dist/portmaster_build/glitchscope/.cache/modarchive
 	@cp $(MODLAND_CATALOG) dist/portmaster_build/glitchscope/.cache/modland/catalog
 	@cp $(MODARCHIVE_CATALOG) dist/portmaster_build/glitchscope/.cache/modarchive/catalog
@@ -143,17 +143,17 @@ dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_PMV_FILE) $(MODLAND_
 	@echo "=== Generated dist/glitchscope.zip ==="
 	@ls -lh dist/glitchscope.zip
 
-deploy: dist-arm64 portable-glitchscope $(TEXTURES_PMV_FILE)
+deploy: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE)
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push $(ARM64_DIST_DIR)/glitchscope/glitchscope $(DEVICE_DIR)/
 	adb push portmaster/GlitchScope.sh $(PORTS_DIR)/
 	adb shell "mkdir -p $(DEVICE_DIR)/music"
 	adb push test_data/* $(DEVICE_DIR)/music
-	# Deploy presets as single .pmv archive (fast on FAT32).
+	# Deploy presets as single .gsa archive (fast on FAT32).
 	adb shell "mkdir -p $(DEVICE_DIR)/presets"
-	adb push $(PMV_FILE) $(DEVICE_DIR)/presets/presets.pmv
+	adb push $(GSA_FILE) $(DEVICE_DIR)/presets/presets.gsa
 	# Deploy the optimized texture archive for MilkDrop presets.
-	adb push $(TEXTURES_PMV_FILE) $(DEVICE_DIR)/presets/textures.pmv
+	adb push $(TEXTURES_GSA_FILE) $(DEVICE_DIR)/presets/textures.gsa
 	# Deploy the prebuilt Modland and ModArchive catalogs.
 	adb shell "mkdir -p $(DEVICE_DIR)/.cache/modland $(DEVICE_DIR)/.cache/modarchive"
 	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modland/catalog $(DEVICE_DIR)/.cache/modland/catalog
@@ -199,10 +199,10 @@ optimize-textures: textures
 	./scripts/optimize-textures.sh $(TEXTURES_DIR)/textures $(OPTIMIZED_TEXTURES) docs/texture-optimization.csv
 
 texture-archive:
-	@rm -f $(TEXTURES_PMV_FILE)
-	$(MAKE) $(TEXTURES_PMV_FILE)
+	@rm -f $(TEXTURES_GSA_FILE)
+	$(MAKE) $(TEXTURES_GSA_FILE)
 
-$(TEXTURES_PMV_FILE):
+$(TEXTURES_GSA_FILE):
 	@if [ ! -f "$@" ]; then \
 		mkdir -p $(dir $@); \
 		if [ ! -d "$(OPTIMIZED_TEXTURES)" ]; then \
@@ -217,8 +217,8 @@ $(TEXTURES_PMV_FILE):
 texture-report: presets cmd/texture-report/main.go
 	go run ./cmd/texture-report $(PRESETS_DIR) $(TEXTURE_REPORT)
 
-# Build presets.pmv archive from cream-of-the-crop dir (only if missing).
-$(FULL_PMV_FILE):
+# Build presets.gsa archive from cream-of-the-crop dir (only if missing).
+$(FULL_GSA_FILE):
 	@if [ ! -f "$@" ]; then \
 		$(MAKE) presets; \
 		mkdir -p $(dir $@); \
@@ -228,9 +228,9 @@ $(FULL_PMV_FILE):
 		echo "=== Full preset archive $@ already exists, skipping ==="; \
 	fi
 
-glitchscope: $(FULL_PMV_FILE)
+glitchscope: $(FULL_GSA_FILE)
 
-$(PMV_FILE):
+$(GSA_FILE):
 	@if [ ! -f "$@" ]; then \
 		$(MAKE) presets; \
 		mkdir -p $(dir $@); \
@@ -240,7 +240,7 @@ $(PMV_FILE):
 		echo "=== Preset archive $@ already exists, skipping ==="; \
 	fi
 
-portable-glitchscope: $(PMV_FILE)
+portable-glitchscope: $(GSA_FILE)
 
 # Download allmods.zip listing from modland.com (only if missing).
 $(ALLMODS_ZIP):

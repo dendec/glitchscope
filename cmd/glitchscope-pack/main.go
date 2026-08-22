@@ -20,7 +20,7 @@ const (
 
 func main() {
 	if len(os.Args) != 4 && len(os.Args) != 5 {
-		fmt.Fprintln(os.Stderr, "Usage: pmv-pack <presets|textures> <input-dir> <output.pmv> [benchmark.csv]")
+		fmt.Fprintln(os.Stderr, "Usage: glitchscope-pack <presets|textures> <input-dir> <output.gsa> [benchmark.csv]")
 		os.Exit(1)
 	}
 	kind, inputDir, outputPath := os.Args[1], os.Args[2], os.Args[3]

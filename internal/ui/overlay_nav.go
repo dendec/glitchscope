@@ -418,7 +418,7 @@ func (o *Overlay) SelectedCatalogTrack() (string, string) {
 
 // buildNCDirectoryEntries lists entries in a local directory for the NC panel.
 // Shows: ".." (unless at baseDir), directories, supported audio files.
-// Hides: dotfiles, .pmv_meta.json, artwork, symlinks, empty dirs.
+// Hides: dotfiles, .gsa_meta.json, artwork, symlinks, empty dirs.
 func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
 	var entries []navEntry
 	var dirEntries []filesystem.Entry
@@ -436,7 +436,7 @@ func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
 	var dirs, files []navEntry
 	for _, entry := range dirEntries {
 		name := entry.Name
-		if strings.HasPrefix(name, ".") || name == ".pmv_meta.json" {
+		if strings.HasPrefix(name, ".") || name == ".gsa_meta.json" {
 			continue
 		}
 		if entry.IsDir() {

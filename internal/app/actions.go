@@ -505,9 +505,9 @@ func (a *App) deleteNCPath(path string) {
 		}
 	}
 
-	// Remove parent's .pmv_meta.json for file deletion (stale cache).
+	// Remove parent's .gsa_meta.json for file deletion (stale cache).
 	if isFile {
-		os.Remove(filepath.Join(parentDir, ".pmv_meta.json"))
+		os.Remove(filepath.Join(parentDir, ".gsa_meta.json"))
 	}
 
 	// Rescan library.

@@ -26,7 +26,7 @@ func TestWalkAudioFiles(t *testing.T) {
 	createFile(t, filepath.Join(root, ".hidden.mp3"))
 
 	// Metadata — should be skipped.
-	createFile(t, filepath.Join(root, ".pmv_meta.json"))
+	createFile(t, filepath.Join(root, ".gsa_meta.json"))
 
 	// Artwork — should be skipped.
 	createFile(t, filepath.Join(root, "album.jpg"))

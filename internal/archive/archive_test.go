@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestOpenAndExtractPMV(t *testing.T) {
-	archivePath := filepath.Join(t.TempDir(), "textures.pmv")
+func TestOpenAndExtractGSA(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "textures.gsa")
 	entries := []SourceEntry{
 		{Name: "textures/example.png", Data: []byte("fixture")},
 	}

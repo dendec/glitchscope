@@ -18,7 +18,7 @@ type albumMeta struct {
 }
 
 const (
-	metaFileName = ".pmv_meta.json"
+	metaFileName = ".gsa_meta.json"
 	metaVersion  = 2
 )
 

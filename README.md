@@ -8,7 +8,7 @@ Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing 
 
 - **Audio Playback** — Plays WAV, MP3, FLAC, Ogg Vorbis, Opus, AAC, WMA, APE, WavPack, Musepack, Speex, and more via FFmpeg & SoLoud
 - **Tracker & Chip Music** — Full support for MOD, XM, IT, S3M (libopenmpt / libxmp), PT3 (pt3player), VTX (ayumi), YM (StSound), SID (cRSID), and console audio formats (libgme)
-- **MilkDrop Visualizations** — Real-time rendering powered by projectM 4.x with 100+ embedded `.milk` presets and compressed `.pmv` preset archives
+- **MilkDrop Visualizations** — Real-time rendering powered by projectM 4.x with 100+ embedded `.milk` presets and compressed `.gsa` preset archives
 - **Graphics Settings** — Custom render resolution scaling (e.g., 320x240, 480x360, 640x480) and upscale filters (Smooth/Pixel)
 - **Playback Modes** — Shuffle (Album, Local, All) and Repeat (Off, Repeat One, Repeat All)
 - **Preset Auto-Switch** — Configurable timer-based preset rotation (Off, 15s, 30s, 60s, 2m)
