@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dendec/pmv/internal/filesystem"
-	"github.com/dendec/pmv/internal/modarchive"
-	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/modarchive"
+	"github.com/dendec/glitchscope/internal/player"
 )
 
 // This file owns the library navigation model: local-album / modland / modarchive

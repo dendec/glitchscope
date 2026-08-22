@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dendec/pmv/internal/archive"
+	"github.com/dendec/glitchscope/internal/archive"
 )
 
 type entry struct {

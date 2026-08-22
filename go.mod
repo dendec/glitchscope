@@ -1,4 +1,4 @@
-module github.com/dendec/pmv
+module github.com/dendec/glitchscope
 
 go 1.25.0
 

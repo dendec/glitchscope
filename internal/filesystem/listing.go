@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dendec/pmv/internal/formats"
+	"github.com/dendec/glitchscope/internal/formats"
 )
 
 type Status int

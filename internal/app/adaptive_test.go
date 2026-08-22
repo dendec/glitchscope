@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/glitchscope/internal/config"
 )
 
 func TestFpsMeterUsesFixedWindow(t *testing.T) {

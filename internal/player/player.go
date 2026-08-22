@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dendec/pmv/internal/openmpt"
-	"github.com/dendec/pmv/internal/soloud"
-	"github.com/dendec/pmv/internal/xmp"
+	"github.com/dendec/glitchscope/internal/openmpt"
+	"github.com/dendec/glitchscope/internal/soloud"
+	"github.com/dendec/glitchscope/internal/xmp"
 )
 
 // Pre-render (decode-to-buffer) playback for tracker/chip formats whose native

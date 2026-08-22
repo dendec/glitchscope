@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dendec/pmv/internal/formats"
-	"github.com/dendec/pmv/internal/util"
+	"github.com/dendec/glitchscope/internal/formats"
+	"github.com/dendec/glitchscope/internal/util"
 )
 
 // Track holds a module filename and its expected size.

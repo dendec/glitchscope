@@ -1,4 +1,4 @@
-// Package archive reads indexed zstd-compressed archives used by PMV.
+// Package archive reads indexed zstd-compressed archives (.pmv format).
 package archive
 
 import (

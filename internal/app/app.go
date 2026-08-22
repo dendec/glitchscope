@@ -12,17 +12,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dendec/pmv/internal/archive"
-	"github.com/dendec/pmv/internal/config"
-	"github.com/dendec/pmv/internal/input"
-	"github.com/dendec/pmv/internal/mic"
-	"github.com/dendec/pmv/internal/modarchive"
-	"github.com/dendec/pmv/internal/modland"
-	"github.com/dendec/pmv/internal/player"
-	"github.com/dendec/pmv/internal/presets"
-	"github.com/dendec/pmv/internal/prof"
-	"github.com/dendec/pmv/internal/projectm"
-	"github.com/dendec/pmv/internal/ui"
+	"github.com/dendec/glitchscope/internal/archive"
+	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/input"
+	"github.com/dendec/glitchscope/internal/mic"
+	"github.com/dendec/glitchscope/internal/modarchive"
+	"github.com/dendec/glitchscope/internal/modland"
+	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/presets"
+	"github.com/dendec/glitchscope/internal/prof"
+	"github.com/dendec/glitchscope/internal/projectm"
+	"github.com/dendec/glitchscope/internal/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -136,7 +136,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 
 	// Keep bundled and user textures in one temporary search directory. User
 	// files are copied last so they override matching bundled textures.
-	extractedDir, extractErr := os.MkdirTemp("", "pmv-textures-")
+	extractedDir, extractErr := os.MkdirTemp("", "glitchscope-textures-")
 	if extractErr == nil {
 		a.textureDir = extractedDir
 		textureArchive, archiveErr := archive.Open(filepath.Join(presetDirPath(), "textures.pmv"), 10000)

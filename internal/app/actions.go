@@ -11,13 +11,13 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dendec/pmv/internal/config"
-	"github.com/dendec/pmv/internal/filesystem"
-	"github.com/dendec/pmv/internal/input"
-	"github.com/dendec/pmv/internal/mic"
-	"github.com/dendec/pmv/internal/player"
-	"github.com/dendec/pmv/internal/presets"
-	"github.com/dendec/pmv/internal/ui"
+	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/input"
+	"github.com/dendec/glitchscope/internal/mic"
+	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/presets"
+	"github.com/dendec/glitchscope/internal/ui"
 )
 
 func (a *App) handleAction(act input.Action, winW, winH int) {

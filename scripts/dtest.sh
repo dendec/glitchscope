@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dtest.sh — run Go checks inside the pmv-builder image WITHOUT rebuilding it.
+# dtest.sh — run Go checks inside the glitchscope-builder image WITHOUT rebuilding it.
 #
 # `make test` / `make lint` first run `make builder`, which rebuilds the image.
 # When the builder image already exists (and rebuilds are slow or blocked), use
@@ -10,8 +10,8 @@
 #   scripts/dtest.sh lint     # golangci-lint run ./cmd/... ./internal/...
 set -euo pipefail
 
-IMAGE="${DOCKER_BUILDER:-pmv-builder:latest}"
-GO_CACHE_VOL="${DOCKER_GO_CACHE:-pmv-go-build-cache}"
+IMAGE="${DOCKER_BUILDER:-glitchscope-builder:latest}"
+GO_CACHE_VOL="${DOCKER_GO_CACHE:-glitchscope-go-build-cache}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Env vars are passed *inside* the container (as the Makefile's DOCKER_GO_ENV

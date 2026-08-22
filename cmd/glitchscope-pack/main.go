@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dendec/pmv/internal/archive"
+	"github.com/dendec/glitchscope/internal/archive"
 )
 
 const (

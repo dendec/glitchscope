@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/glitchscope/internal/player"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )

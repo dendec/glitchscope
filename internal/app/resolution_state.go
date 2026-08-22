@@ -3,7 +3,7 @@ package app
 import (
 	"time"
 
-	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/glitchscope/internal/config"
 )
 
 type resolutionState struct {

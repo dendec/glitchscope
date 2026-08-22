@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dendec/pmv/internal/util"
+	"github.com/dendec/glitchscope/internal/util"
 )
 
 // Catalog contains pre-crawled directory structures for ModArchive.

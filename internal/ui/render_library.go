@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dendec/pmv/internal/filesystem"
-	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/player"
 )
 
 // This file owns rendering for the Library page: albums/tracks panels.

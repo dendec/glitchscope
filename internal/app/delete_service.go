@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dendec/pmv/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/filesystem"
 )
 
 var (

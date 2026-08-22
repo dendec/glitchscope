@@ -1,15 +1,15 @@
 {
   "version": 4,
-  "name": "pmv.zip",
+  "name": "glitchscope.zip",
   "items": [
-    "PMV.sh",
-    "pmv/"
+    "GlitchScope.sh",
+    "glitchscope/"
   ],
   "items_opt": null,
   "attr": {
-    "title": "PMV",
-    "desc": "Portable Music Visualizer — plays MP3/FLAC/Ogg with real-time MilkDrop visualizations. Drop your music files into /roms/ports/pmv/ and enjoy a psychedelic audio experience on your handheld.",
-    "inst": "Copy song.mp3 (or any MP3/FLAC/Ogg) to /roms/ports/pmv/. Presets are in /roms/ports/pmv/presets/.",
+    "title": "GlitchScope",
+    "desc": "GlitchScope — plays MP3/FLAC/Ogg with real-time MilkDrop visualizations. Drop your music files into /roms/ports/glitchscope/ and enjoy a psychedelic audio experience on your handheld.",
+    "inst": "Copy song.mp3 (or any MP3/FLAC/Ogg) to /roms/ports/glitchscope/. Presets are in /roms/ports/glitchscope/presets/.",
     "genres": ["music"],
     "porter": ["dendec"],
     "image": {

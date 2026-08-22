@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dendec/pmv/internal/config"
-	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/player"
 )
 
 func (s *playbackState) snapshot(trackAlbumIdx int, includeTrackInfos bool) overlayPlaybackSnapshot {

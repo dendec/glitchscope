@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dendec/pmv/internal/filesystem"
-	"github.com/dendec/pmv/internal/modarchive"
-	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/modarchive"
+	"github.com/dendec/glitchscope/internal/player"
 )
 
 func TestDisplayTrackPath(t *testing.T) {
-	o := &Overlay{baseDir: "/opt/pmv"}
+	o := &Overlay{baseDir: "/opt/glitchscope"}
 
 	tests := []struct {
 		name string
@@ -22,7 +22,7 @@ func TestDisplayTrackPath(t *testing.T) {
 	}{
 		{
 			name: "local file relative to application",
-			path: filepath.Join("/opt/pmv", "music", "2010", "IT", "1_9.it"),
+			path: filepath.Join("/opt/glitchscope", "music", "2010", "IT", "1_9.it"),
 			want: "music/2010/IT/1_9.it",
 		},
 		{

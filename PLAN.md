@@ -1,4 +1,4 @@
-# PMV — Portable Music Visualizer
+# GlitchScope
 
 > Этот файл сохранён как исторический roadmap ранней версии. Нормативная
 > архитектура находится в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), а
@@ -8,7 +8,7 @@
 Аудиоплеер с MilkDrop-совместимой визуализацией для портативных игровых
 консолей (PortMaster: TrimUI Smart Pro, Anbernic и др.).
 
-**pmv** = **P**ortable **M**usic **V**isualizer.
+**glitchscope** = a real-time audio player with MilkDrop visualizations.
 
 Воспроизведение аудио (MP3/FLAC/WAV/Ogg) + трекерной музыки (MOD/XM/IT/S3M/...)
 + визуализация через projectM (MilkDrop-совместимый движок) поверх OpenGL.
@@ -34,7 +34,7 @@ config, i18n, input обработка, Makefile, Dockerfile, Menu/UI, верд�
 
 | Компонент | Технология | Интеграция |
 |-----------|-----------|------------|
-| Язык | Go 1.25 | cmd/pmv/main.go |
+| Язык | Go 1.25 | cmd/glitchscope/main.go |
 | Окно + ввод | SDL2 (go-sdl2) | renderer/, ui/ |
 | OpenGL контекст | через SDL2 | renderer/ (совместно с go-sdl2) |
 | Аудио | SoLoud (vendored C++) | cgo-мост в internal/soloud/ |
@@ -48,8 +48,8 @@ config, i18n, input обработка, Makefile, Dockerfile, Menu/UI, верд�
 ## Структура репозитория
 
 ```
-pmv/
-├── cmd/pmv/main.go              # Точка входа
+glitchscope/
+├── cmd/glitchscope/main.go       # Точка входа
 ├── Makefile                       # build/test/lint/dist/deploy
 ├── Dockerfile.arm64               # ARM64 кросс-сборка для портативок
 ├── Dockerfile.windows             # Windows кросс-сборка (Zig)
@@ -98,11 +98,11 @@ pmv/
 │       └── string.go
 │
 ├── portmaster/                    # Упаковка для PortMaster
-│   ├── Pmv.sh                    # Лаунчер с LD_LIBRARY_PATH
+│   ├── GlitchScope.sh            # Лаунчер с LD_LIBRARY_PATH
 │   └── port.json                  # Метаданные
 │
 ├── scripts/
-│   └── pmv.sh                    # Деплой на устройство
+│   └── deploy.sh                 # Деплой на устройство
 │
 ├── assets/
 │   └── presets/                   # 100+ .milk пресетов (//go:embed)

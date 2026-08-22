@@ -9,10 +9,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dendec/pmv/internal/filesystem"
-	"github.com/dendec/pmv/internal/openmpt"
-	"github.com/dendec/pmv/internal/soloud"
-	"github.com/dendec/pmv/internal/xmp"
+	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/openmpt"
+	"github.com/dendec/glitchscope/internal/soloud"
+	"github.com/dendec/glitchscope/internal/xmp"
 )
 
 // Album represents a directory containing audio files.

@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/dendec/pmv/internal/app"
+	"github.com/dendec/glitchscope/internal/app"
 )
 
 var (

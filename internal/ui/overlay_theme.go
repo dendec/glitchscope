@@ -4,7 +4,7 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/glitchscope/internal/config"
 )
 
 // This file owns theme/color derivation. Struct fields in overlay.go.

@@ -17,9 +17,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dendec/pmv/internal/formats"
-	"github.com/dendec/pmv/internal/player"
-	"github.com/dendec/pmv/internal/util"
+	"github.com/dendec/glitchscope/internal/formats"
+	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/util"
 )
 
 const (

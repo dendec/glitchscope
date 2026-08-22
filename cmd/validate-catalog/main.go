@@ -11,13 +11,13 @@ import (
 	"sort"
 	"time"
 
-	"github.com/dendec/pmv/internal/modland"
-	"github.com/dendec/pmv/internal/openmpt"
-	"github.com/dendec/pmv/internal/xmp"
+	"github.com/dendec/glitchscope/internal/modland"
+	"github.com/dendec/glitchscope/internal/openmpt"
+	"github.com/dendec/glitchscope/internal/xmp"
 )
 
 func main() {
-	baseDir := filepath.Join(os.ExpandEnv("$HOME"), ".config", "pmv")
+	baseDir := filepath.Join(os.ExpandEnv("$HOME"), ".config", "glitchscope")
 	if len(os.Args) > 1 {
 		baseDir = os.Args[1]
 	}

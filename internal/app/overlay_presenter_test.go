@@ -3,8 +3,8 @@ package app
 import (
 	"testing"
 
-	"github.com/dendec/pmv/internal/player"
-	"github.com/dendec/pmv/internal/prof"
+	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/prof"
 )
 
 type fakeOverlayView struct {

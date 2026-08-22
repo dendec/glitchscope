@@ -5,11 +5,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/dendec/pmv/internal/config"
-	"github.com/dendec/pmv/internal/input"
-	"github.com/dendec/pmv/internal/presets"
-	"github.com/dendec/pmv/internal/projectm"
-	"github.com/dendec/pmv/internal/ui"
+	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/input"
+	"github.com/dendec/glitchscope/internal/presets"
+	"github.com/dendec/glitchscope/internal/projectm"
+	"github.com/dendec/glitchscope/internal/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
 

@@ -1,4 +1,4 @@
-# PMV — Portable Music Visualizer
+# GlitchScope
 
 **Audio player with MilkDrop-compatible real-time visualization for game consoles and desktop.**
 
@@ -29,7 +29,7 @@ make dist
 ```bash
 # Build PortMaster-compatible zip package for ARM64 handhelds
 make dist-portmaster
-# Output: dist/pmv.zip
+# Output: dist/glitchscope.zip
 ```
 
 ### Development (Lint & Test)
@@ -48,7 +48,7 @@ make test
 make dist
 
 # Launch the visualizer with a music directory
-./dist/linux-amd64/pmv -music /path/to/your/music/
+./dist/linux-amd64/glitchscope -music /path/to/your/music/
 ```
 
 ## Configuration

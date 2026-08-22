@@ -9,7 +9,7 @@ import (
 )
 
 // SettingsPath returns the settings file location.
-// On PortMaster, XDG_DATA_HOME points to /roms/ports/pmv/conf/.
+// On PortMaster, XDG_DATA_HOME points to /roms/ports/glitchscope/conf/.
 func SettingsPath() string {
 	if p := os.Getenv("XDG_DATA_HOME"); p != "" {
 		return filepath.Join(p, "settings.json")

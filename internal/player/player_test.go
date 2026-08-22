@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dendec/pmv/internal/soloud"
+	"github.com/dendec/glitchscope/internal/soloud"
 )
 
 // writeMinWav creates a minimal silent WAV file (0.1 s, mono, 44100 Hz, 16-bit).

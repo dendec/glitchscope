@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dendec/pmv/internal/util"
+	"github.com/dendec/glitchscope/internal/util"
 )
 
 // DownloadFile downloads a single module file from modland to the local cache.

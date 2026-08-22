@@ -1,6 +1,6 @@
 # Third-Party Licenses
 
-This file contains license information for all third-party libraries used in pmv.
+This file contains license information for all third-party libraries used in glitchscope.
 
 ## SoLoud
 **License:** zlib/libpng  

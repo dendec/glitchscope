@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dendec/pmv/internal/modarchive"
+	"github.com/dendec/glitchscope/internal/modarchive"
 )
 
 func main() {

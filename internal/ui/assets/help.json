@@ -3,7 +3,7 @@
     "id": 0,
     "title": "Quick Start",
     "lines": [
-      "PMV is a music visualizer and tracker module player.",
+      "GlitchScope is a music visualizer and tracker module player.",
       "",
       "**Keyboard:**",
       "Enter confirms or plays the focused item.",
@@ -159,7 +159,7 @@
     "id": 4,
     "title": "About",
     "lines": [
-      "PMV is a music visualizer and player."
+      "GlitchScope is a music visualizer and player."
     ]
   },
   {

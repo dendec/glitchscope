@@ -16,7 +16,7 @@ source $controlfolder/control.txt
 [ -f "${controlfolder}/mod_${CFW_NAME}.txt" ] && source "${controlfolder}/mod_${CFW_NAME}.txt"
 get_controls
 
-GAMEDIR="/$directory/ports/pmv"
+GAMEDIR="/$directory/ports/glitchscope"
 CONFDIR="$GAMEDIR/conf/"
 
 mkdir -p "$GAMEDIR/conf"
@@ -38,12 +38,12 @@ amixer -c 0 cset numid=13 on >/dev/null 2>&1 || true
 amixer -c 0 cset numid=9 160,160 >/dev/null 2>&1 || true
 
 # Display standard PortMaster loading text
-pm_message "Loading PMV... (Compiling shaders)"
+pm_message "Loading GlitchScope... (Compiling shaders)"
 
-# gptokeyb handles START+SELECT quit combo; kills pmv on combo press
-$GPTOKEYB "pmv" &
+# gptokeyb handles START+SELECT quit combo; kills glitchscope on combo press
+$GPTOKEYB "glitchscope" &
 
-pm_platform_helper "$GAMEDIR/pmv"
-./pmv -fullscreen -show-fps
+pm_platform_helper "$GAMEDIR/glitchscope"
+./glitchscope -fullscreen -show-fps
 
 pm_finish

@@ -1,4 +1,4 @@
-APP      := pmv
+APP      := glitchscope
 DIST_DIR := dist
 LOCAL_DIST_DIR := $(DIST_DIR)/local
 X64_DIST_DIR := $(DIST_DIR)/linux-amd64
@@ -21,7 +21,7 @@ OPTIMIZED_TEXTURES := dist/textures-optimized
 TEXTURES_PMV_FILE  := dist/textures.pmv
 TEXTURE_REPORT     := docs/texture-usage-report.csv
 PORTS_DIR          := /userdata/roms/ports
-DEVICE_DIR         := $(PORTS_DIR)/pmv
+DEVICE_DIR         := $(PORTS_DIR)/glitchscope
 PM_AUTOINSTALL     := /userdata/system/.local/share/PortMaster/autoinstall
 
 SDL_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
@@ -41,16 +41,16 @@ DOCKER_GO_ENV := GOFLAGS=-buildvcs=false CGO_ENABLED=1 \
 	CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/opt/soloud/include -I/opt/ayumi/include -I/opt/pt3player/include -I/opt/libstsound/include -I/opt/crsid/include -I/opt/ffmpeg/amd64/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/gme/amd64/include -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" \
 	CGO_LDFLAGS="-lSDL2 /opt/pt3player/amd64/lib/libpt3player.a /opt/ayumi/amd64/lib/libayumi.a /opt/libstsound/amd64/lib/libstsound.a /opt/crsid/amd64/lib/libcrsid.a /opt/ffmpeg/amd64/lib/libavformat.a /opt/ffmpeg/amd64/lib/libavcodec.a /opt/ffmpeg/amd64/lib/libswresample.a /opt/ffmpeg/amd64/lib/libavutil.a /opt/projectm/amd64/lib/libprojectM-4.a /opt/projectm/amd64/lib/libprojectM_eval.a -lGL -lGLESv2 -lm -pthread /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a /opt/gme/amd64/lib/libgme.a -lvorbisfile -lvorbis -lFLAC -logg -lmpg123 -lz -lstdc++"
 
-DOCKER_IMAGE_X64 := pmv-builder
-DOCKER_BUILDER   := pmv-builder:latest
-DOCKER_GO_CACHE  := pmv-go-build-cache
+DOCKER_IMAGE_X64 := glitchscope-builder
+DOCKER_BUILDER   := glitchscope-builder:latest
+DOCKER_GO_CACHE  := glitchscope-go-build-cache
 
 ALLMODS_URL := https://modland.antarctica.no/allmods.zip
 ALLMODS_ZIP := $(DIST_DIR)/allmods.zip
 MODLAND_CATALOG    := .cache/modland/catalog
 MODARCHIVE_CATALOG := .cache/modarchive/catalog
 
-.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets pmv portable-pmv textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog
+.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog
 
 DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
 
@@ -78,13 +78,13 @@ modarchive-catalog: $(MODARCHIVE_CATALOG)
 
 # Docker build (amd64)
 dist: builder $(PMV_FILE) $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
-	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t pmv:amd64 -f Dockerfile .
+	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t glitchscope:amd64 -f Dockerfile .
 	@rm -rf $(X64_DIST_DIR)
 	@mkdir -p $(X64_DIST_DIR)
-	@docker rm -f pmv-extract-x64 2>/dev/null || true
-	docker create --name pmv-extract-x64 pmv:amd64
-	docker cp pmv-extract-x64:/dist/pmv/. $(X64_DIST_DIR)/
-	docker rm pmv-extract-x64
+	@docker rm -f glitchscope-extract-x64 2>/dev/null || true
+	docker create --name glitchscope-extract-x64 glitchscope:amd64
+	docker cp glitchscope-extract-x64:/dist/glitchscope/. $(X64_DIST_DIR)/
+	docker rm glitchscope-extract-x64
 	@# Replace test presets with the real .pmv archive.
 	rm -rf $(X64_DIST_DIR)/presets/*
 	cp $(PMV_FILE) $(X64_DIST_DIR)/presets/presets.pmv
@@ -98,55 +98,55 @@ dist: builder $(PMV_FILE) $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_C
 	@ls -lhR $(X64_DIST_DIR)/
 
 # ARM64 cross-build via Docker
-DOCKER_IMAGE_ARM64 := pmv:arm64
+DOCKER_IMAGE_ARM64 := glitchscope:arm64
 
-dist-arm64: builder portable-pmv $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
+dist-arm64: builder portable-glitchscope $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)
-	@docker rm -f pmv-extract 2>/dev/null || true
-	docker create --name pmv-extract $(DOCKER_IMAGE_ARM64)
-	docker cp pmv-extract:/dist/. $(ARM64_DIST_DIR)/
-	docker rm pmv-extract
-	rm -rf $(ARM64_DIST_DIR)/pmv/presets/*
-	cp $(PMV_FILE) $(ARM64_DIST_DIR)/pmv/presets/presets.pmv
-	rm -rf $(ARM64_DIST_DIR)/pmv/textures
-	cp $(TEXTURES_PMV_FILE) $(ARM64_DIST_DIR)/pmv/presets/textures.pmv
+	@docker rm -f glitchscope-extract 2>/dev/null || true
+	docker create --name glitchscope-extract $(DOCKER_IMAGE_ARM64)
+	docker cp glitchscope-extract:/dist/. $(ARM64_DIST_DIR)/
+	docker rm glitchscope-extract
+	rm -rf $(ARM64_DIST_DIR)/glitchscope/presets/*
+	cp $(PMV_FILE) $(ARM64_DIST_DIR)/glitchscope/presets/presets.pmv
+	rm -rf $(ARM64_DIST_DIR)/glitchscope/textures
+	cp $(TEXTURES_PMV_FILE) $(ARM64_DIST_DIR)/glitchscope/presets/textures.pmv
 	cp -r test_data/* $(ARM64_DIST_DIR)/
-	@mkdir -p $(ARM64_DIST_DIR)/pmv/.cache/modland $(ARM64_DIST_DIR)/pmv/.cache/modarchive
-	@cp $(MODLAND_CATALOG) $(ARM64_DIST_DIR)/pmv/.cache/modland/catalog
-	@cp $(MODARCHIVE_CATALOG) $(ARM64_DIST_DIR)/pmv/.cache/modarchive/catalog
+	@mkdir -p $(ARM64_DIST_DIR)/glitchscope/.cache/modland $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive
+	@cp $(MODLAND_CATALOG) $(ARM64_DIST_DIR)/glitchscope/.cache/modland/catalog
+	@cp $(MODARCHIVE_CATALOG) $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/catalog
 	@echo "=== $(ARM64_DIST_DIR)/ ==="
 	@ls -lhR $(ARM64_DIST_DIR)/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
-dist-portmaster: dist-arm64 portable-pmv $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
+dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_PMV_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	@rm -rf dist/portmaster_build
-	@mkdir -p dist/portmaster_build/pmv/presets dist/portmaster_build/pmv/licenses
-	cp portmaster/PMV.sh dist/portmaster_build/
+	@mkdir -p dist/portmaster_build/glitchscope/presets dist/portmaster_build/glitchscope/licenses
+	cp portmaster/GlitchScope.sh dist/portmaster_build/
 	cp portmaster/port.json dist/portmaster_build/
 	cp portmaster/README.md dist/portmaster_build/
 	cp portmaster/screenshot.png dist/portmaster_build/
 	cp portmaster/gameinfo.xml dist/portmaster_build/ 2>/dev/null; true
 	@RELEASE_DATE=$$(date +%Y%m%d)T000000; \
-	printf '<gameList>\n    <game>\n        <path>./PMV.sh</path>\n        <name>PMV</name>\n        <desc>Portable Music Visualizer — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/pmv/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./pmv/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/pmv/gameinfo.xml
-	cp $(ARM64_DIST_DIR)/pmv/pmv dist/portmaster_build/pmv/
-	cp $(PMV_FILE) dist/portmaster_build/pmv/presets/presets.pmv
-	cp $(TEXTURES_PMV_FILE) dist/portmaster_build/pmv/presets/textures.pmv
-	@mkdir -p dist/portmaster_build/pmv/.cache/modland dist/portmaster_build/pmv/.cache/modarchive
-	@cp $(MODLAND_CATALOG) dist/portmaster_build/pmv/.cache/modland/catalog
-	@cp $(MODARCHIVE_CATALOG) dist/portmaster_build/pmv/.cache/modarchive/catalog
-	cp portmaster/licenses/* dist/portmaster_build/pmv/licenses/ 2>/dev/null; true
-	cp portmaster/screenshot.png dist/portmaster_build/pmv/cover.png 2>/dev/null; true
-	@rm -f dist/pmv.zip
-	cd dist/portmaster_build && zip -r ../pmv.zip "PMV.sh" README.md gameinfo.xml port.json screenshot.png pmv
-	@echo "=== Generated dist/pmv.zip ==="
-	@ls -lh dist/pmv.zip
+	printf '<gameList>\n    <game>\n        <path>./GlitchScope.sh</path>\n        <name>GlitchScope</name>\n        <desc>GlitchScope — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/glitchscope/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./glitchscope/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/glitchscope/gameinfo.xml
+	cp $(ARM64_DIST_DIR)/glitchscope/glitchscope dist/portmaster_build/glitchscope/
+	cp $(PMV_FILE) dist/portmaster_build/glitchscope/presets/presets.pmv
+	cp $(TEXTURES_PMV_FILE) dist/portmaster_build/glitchscope/presets/textures.pmv
+	@mkdir -p dist/portmaster_build/glitchscope/.cache/modland dist/portmaster_build/glitchscope/.cache/modarchive
+	@cp $(MODLAND_CATALOG) dist/portmaster_build/glitchscope/.cache/modland/catalog
+	@cp $(MODARCHIVE_CATALOG) dist/portmaster_build/glitchscope/.cache/modarchive/catalog
+	cp portmaster/licenses/* dist/portmaster_build/glitchscope/licenses/ 2>/dev/null; true
+	cp portmaster/screenshot.png dist/portmaster_build/glitchscope/cover.png 2>/dev/null; true
+	@rm -f dist/glitchscope.zip
+	cd dist/portmaster_build && zip -r ../glitchscope.zip "GlitchScope.sh" README.md gameinfo.xml port.json screenshot.png glitchscope
+	@echo "=== Generated dist/glitchscope.zip ==="
+	@ls -lh dist/glitchscope.zip
 
-deploy: dist-arm64 portable-pmv $(TEXTURES_PMV_FILE)
+deploy: dist-arm64 portable-glitchscope $(TEXTURES_PMV_FILE)
 	adb shell "mkdir -p $(DEVICE_DIR)"
-	adb push $(ARM64_DIST_DIR)/pmv/pmv $(DEVICE_DIR)/
-	adb push portmaster/PMV.sh $(PORTS_DIR)/
+	adb push $(ARM64_DIST_DIR)/glitchscope/glitchscope $(DEVICE_DIR)/
+	adb push portmaster/GlitchScope.sh $(PORTS_DIR)/
 	adb shell "mkdir -p $(DEVICE_DIR)/music"
 	adb push test_data/* $(DEVICE_DIR)/music
 	# Deploy presets as single .pmv archive (fast on FAT32).
@@ -156,26 +156,26 @@ deploy: dist-arm64 portable-pmv $(TEXTURES_PMV_FILE)
 	adb push $(TEXTURES_PMV_FILE) $(DEVICE_DIR)/presets/textures.pmv
 	# Deploy the prebuilt Modland and ModArchive catalogs.
 	adb shell "mkdir -p $(DEVICE_DIR)/.cache/modland $(DEVICE_DIR)/.cache/modarchive"
-	adb push $(ARM64_DIST_DIR)/pmv/.cache/modland/catalog $(DEVICE_DIR)/.cache/modland/catalog
-	adb push $(ARM64_DIST_DIR)/pmv/.cache/modarchive/catalog $(DEVICE_DIR)/.cache/modarchive/catalog
-	adb shell "killall -9 pmv 2>/dev/null; true"
+	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modland/catalog $(DEVICE_DIR)/.cache/modland/catalog
+	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/catalog $(DEVICE_DIR)/.cache/modarchive/catalog
+	adb shell "killall -9 glitchscope 2>/dev/null; true"
 	@echo "=== Deployed binary + music + presets + textures + catalogs ==="
 
 deploy-fast: dist-arm64
-	adb push $(ARM64_DIST_DIR)/pmv/pmv $(DEVICE_DIR)/
-	adb shell "killall -9 pmv 2>/dev/null; true"
+	adb push $(ARM64_DIST_DIR)/glitchscope/glitchscope $(DEVICE_DIR)/
+	adb shell "killall -9 glitchscope 2>/dev/null; true"
 	@echo "=== Deployed binary only ==="
 
 deploy-portmaster: dist-portmaster
-	adb push dist/pmv.zip $(PM_AUTOINSTALL)/
+	adb push dist/glitchscope.zip $(PM_AUTOINSTALL)/
 	@echo "=== Deployed to autoinstall ==="
 	adb shell "mkdir -p $(DEVICE_DIR)/music"
 	adb push test_data/* $(DEVICE_DIR)/music
 	@echo "=== Song deployed to $(DEVICE_DIR) ==="
 
 kill:
-	adb shell "killall -9 pmv 2>/dev/null || true"
-	@echo "=== Killed pmv on device ==="
+	adb shell "killall -9 glitchscope 2>/dev/null || true"
+	@echo "=== Killed glitchscope on device ==="
 
 # Download cream-of-the-crop presets (9.8K presets, ~160MB).
 presets:
@@ -208,7 +208,7 @@ $(TEXTURES_PMV_FILE):
 		if [ ! -d "$(OPTIMIZED_TEXTURES)" ]; then \
 			$(MAKE) optimize-textures; \
 		fi; \
-		$(GO) run ./cmd/pmv-pack textures $(OPTIMIZED_TEXTURES) $@; \
+		$(GO) run ./cmd/glitchscope-pack textures $(OPTIMIZED_TEXTURES) $@; \
 		echo "=== Built texture archive $@ ==="; \
 	else \
 		echo "=== Texture archive $@ already exists, skipping ==="; \
@@ -222,25 +222,25 @@ $(FULL_PMV_FILE):
 	@if [ ! -f "$@" ]; then \
 		$(MAKE) presets; \
 		mkdir -p $(dir $@); \
-		$(GO) run ./cmd/pmv-pack presets $(PRESETS_DIR) $@; \
+		$(GO) run ./cmd/glitchscope-pack presets $(PRESETS_DIR) $@; \
 		echo "=== Built full preset archive $@ ==="; \
 	else \
 		echo "=== Full preset archive $@ already exists, skipping ==="; \
 	fi
 
-pmv: $(FULL_PMV_FILE)
+glitchscope: $(FULL_PMV_FILE)
 
 $(PMV_FILE):
 	@if [ ! -f "$@" ]; then \
 		$(MAKE) presets; \
 		mkdir -p $(dir $@); \
-		$(GO) run ./cmd/pmv-pack presets $(PRESETS_DIR) $@ $(BENCHMARK_CSV); \
+		$(GO) run ./cmd/glitchscope-pack presets $(PRESETS_DIR) $@ $(BENCHMARK_CSV); \
 		echo "=== Built filtered portable preset archive $@ ==="; \
 	else \
 		echo "=== Preset archive $@ already exists, skipping ==="; \
 	fi
 
-portable-pmv: $(PMV_FILE)
+portable-glitchscope: $(PMV_FILE)
 
 # Download allmods.zip listing from modland.com (only if missing).
 $(ALLMODS_ZIP):

@@ -9,14 +9,14 @@ and must be followed.
 
 ## 1. Project at a glance
 
-**What this is.** `pmv` (Portable Music Visualizer) is a real-time audio player +
+**What this is.** `glitchscope` is a real-time audio player +
 MilkDrop visualizer. It plays audio (MP3/FLAC/Ogg/WAV/Opus/… via FFmpeg & SoLoud)
 and tracker/chip formats (MOD/XM/IT/S3M/PT3/VTX/YM/SID/console audio via
 libopenmpt, libxmp, pt3player, ayumi, StSound, libgme) while rendering projectM 4
 MilkDrop presets over OpenGL. Target: low-power ARM handhelds (PortMaster), but it
 runs on any Linux/Windows desktop.
 
-- **Language:** Go 1.25 (`module github.com/dendec/pmv`). UI is pure Go +
+- **Language:** Go 1.25 (`module github.com/dendec/glitchscope`). UI is pure Go +
   OpenGL/SDL2; there is no web frontend.
 - **Windowing/audio/GL:** `go-sdl2`, OpenGL. All audio decoding is done through
   statically linked C/C++ libraries (see §3 — you cannot build or run tests
@@ -27,8 +27,8 @@ runs on any Linux/Windows desktop.
 
 | Path | Purpose |
 |---|---|
-| `cmd/pmv/` | Main entrypoint. CLI flags, SDL/GL/SoLoud/projectM init, main loop. |
-| `cmd/pmv-pack/` | Packs preset/texture directories into `.pmv` archives. |
+| `cmd/glitchscope/` | Main entrypoint. CLI flags, SDL/GL/SoLoud/projectM init, main loop. |
+| `cmd/glitchscope-pack/` | Packs preset/texture directories into `.pmv` archives. |
 | `cmd/modland-catalog/` `cmd/modarchive-catalog/` | Build remote music catalogs from Modland / ModArchive. |
 | `cmd/validate-catalog/` | Validates a downloaded catalog by loading each format. |
 | `cmd/texture-report/` | Reports texture usage of presets (CSV). |
@@ -88,12 +88,12 @@ runs on any Linux/Windows desktop.
 Everything is driven by `make` and requires Docker.
 
 ```bash
-make builder          # compile the C/C++ deps once into the pmv-builder image
+make builder          # compile the C/C++ deps once into the glitchscope-builder image
 make lint             # golangci-lint run inside builder (config: .golangci.yml)
 make test             # go test -count=1 ./cmd/... ./internal/... inside builder
 make dist             # build amd64 release into dist/linux-amd64
 make dist-arm64       # arm64 cross-build
-make dist-portmaster  # PortMaster zip -> dist/pmv.zip
+make dist-portmaster  # PortMaster zip -> dist/glitchscope.zip
 make deploy           # push to an adb-connected handheld
 make presets          # clone cream-of-the-crop presets repo (~160MB)
 make textures         # clone milkdrop texture pack
@@ -109,7 +109,7 @@ make catalog          # build modland + modarchive catalogs + validate
   depend on local cgo availability. `make dist` additionally exercises the full
   amd64 packaging path.
 - **Fast local checks:** `scripts/dtest.sh test|lint` runs the same checks
-  directly against an *existing* `pmv-builder` image without rebuilding it
+  directly against an *existing* `glitchscope-builder` image without rebuilding it
   (use when the image is already present). It feeds the cgo env vars into the
   container exactly like the Makefile does.
 - CI runs `make lint` and `make test` on GitHub Actions (`.github/workflows/ci.yml`).
@@ -158,7 +158,7 @@ mechanical wrappers. Keep them thin — put business logic in the caller.
 
 - **Logging:** use `log/slog` structured logging only (`slog.Info/Debug/Warn/Error`)
   with key/value pairs. No `log.Printf`/global logger, no `fmt.Println` in
-  production paths. Verbose flags select `Debug` level (`cmd/pmv/main.go`).
+  production paths. Verbose flags select `Debug` level (`cmd/glitchscope/main.go`).
 - **Errors:** wrap with context and `%w`
   (`fmt.Errorf("sdl init: %w", err)`). Unwrap with `errors.As`/`errors.Is`.
   Never swallow an error silently; if a non-fatal failure is acceptable, log it

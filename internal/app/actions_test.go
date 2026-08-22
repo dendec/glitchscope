@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dendec/pmv/internal/config"
-	"github.com/dendec/pmv/internal/player"
+	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/player"
 )
 
 func TestWalkAudioFiles(t *testing.T) {

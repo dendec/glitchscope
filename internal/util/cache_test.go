@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dendec/pmv/internal/util"
+	"github.com/dendec/glitchscope/internal/util"
 )
 
 type sampleData struct {

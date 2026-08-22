@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dendec/pmv/internal/formats"
+	"github.com/dendec/glitchscope/internal/formats"
 )
 
 // skipPrefixes lists directories to skip during music scan.

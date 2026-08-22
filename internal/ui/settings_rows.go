@@ -3,7 +3,7 @@ package ui
 import (
 	"fmt"
 
-	"github.com/dendec/pmv/internal/config"
+	"github.com/dendec/glitchscope/internal/config"
 )
 
 // Settings row indices — shared between BuildSettingsRows and applySettings.

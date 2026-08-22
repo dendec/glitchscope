@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dendec/pmv/internal/presets"
-	"github.com/dendec/pmv/internal/projectm"
+	"github.com/dendec/glitchscope/internal/presets"
+	"github.com/dendec/glitchscope/internal/projectm"
 	"github.com/veandco/go-sdl2/sdl"
 )
 

@@ -9,10 +9,10 @@ import (
 )
 
 // TestHwOpen probes a real capture device end to end. Gated behind
-// PMV_MIC_HW_TEST=1 — CI containers have no audio hardware.
+// GLITCHSCOPE_MIC_HW_TEST=1 — CI containers have no audio hardware.
 func TestHwOpen(t *testing.T) {
-	if os.Getenv("PMV_MIC_HW_TEST") == "" {
-		t.Skip("set PMV_MIC_HW_TEST=1 to test real capture hardware")
+	if os.Getenv("GLITCHSCOPE_MIC_HW_TEST") == "" {
+		t.Skip("set GLITCHSCOPE_MIC_HW_TEST=1 to test real capture hardware")
 	}
 	if err := sdl.Init(sdl.INIT_AUDIO); err != nil {
 		t.Fatalf("sdl init: %v", err)
