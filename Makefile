@@ -50,7 +50,7 @@ ALLMODS_ZIP := $(DIST_DIR)/allmods.zip
 MODLAND_CATALOG    := .cache/modland/catalog
 MODARCHIVE_CATALOG := .cache/modarchive/catalog
 
-.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog
+.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill
 
 DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
 
@@ -90,7 +90,6 @@ dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_C
 	cp $(GSA_FILE) $(X64_DIST_DIR)/presets/presets.gsa
 	rm -rf $(X64_DIST_DIR)/textures
 	cp $(TEXTURES_GSA_FILE) $(X64_DIST_DIR)/presets/textures.gsa
-	cp -r test_data/* $(X64_DIST_DIR)/
 	@mkdir -p $(X64_DIST_DIR)/.cache/modland $(X64_DIST_DIR)/.cache/modarchive
 	@cp $(MODLAND_CATALOG) $(X64_DIST_DIR)/.cache/modland/catalog
 	@cp $(MODARCHIVE_CATALOG) $(X64_DIST_DIR)/.cache/modarchive/catalog
@@ -112,7 +111,6 @@ dist-arm64: builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG)
 	cp $(GSA_FILE) $(ARM64_DIST_DIR)/glitchscope/presets/presets.gsa
 	rm -rf $(ARM64_DIST_DIR)/glitchscope/textures
 	cp $(TEXTURES_GSA_FILE) $(ARM64_DIST_DIR)/glitchscope/presets/textures.gsa
-	cp -r test_data/* $(ARM64_DIST_DIR)/
 	@mkdir -p $(ARM64_DIST_DIR)/glitchscope/.cache/modland $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive
 	@cp $(MODLAND_CATALOG) $(ARM64_DIST_DIR)/glitchscope/.cache/modland/catalog
 	@cp $(MODARCHIVE_CATALOG) $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/catalog
@@ -147,8 +145,6 @@ deploy: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE)
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push $(ARM64_DIST_DIR)/glitchscope/glitchscope $(DEVICE_DIR)/
 	adb push portmaster/GlitchScope.sh $(PORTS_DIR)/
-	adb shell "mkdir -p $(DEVICE_DIR)/music"
-	adb push test_data/* $(DEVICE_DIR)/music
 	# Deploy presets as single .gsa archive (fast on FAT32).
 	adb shell "mkdir -p $(DEVICE_DIR)/presets"
 	adb push $(GSA_FILE) $(DEVICE_DIR)/presets/presets.gsa
@@ -159,7 +155,13 @@ deploy: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE)
 	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modland/catalog $(DEVICE_DIR)/.cache/modland/catalog
 	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/catalog $(DEVICE_DIR)/.cache/modarchive/catalog
 	adb shell "killall -9 glitchscope 2>/dev/null; true"
-	@echo "=== Deployed binary + music + presets + textures + catalogs ==="
+	@echo "=== Deployed binary + presets + textures + catalogs ==="
+
+# Push test music to device (optional, for quick testing).
+deploy-music:
+	adb shell "mkdir -p $(DEVICE_DIR)/music"
+	adb push test_data/* $(DEVICE_DIR)/music
+	@echo "=== Deployed test music to $(DEVICE_DIR)/music ==="
 
 deploy-fast: dist-arm64
 	adb push $(ARM64_DIST_DIR)/glitchscope/glitchscope $(DEVICE_DIR)/
@@ -169,9 +171,6 @@ deploy-fast: dist-arm64
 deploy-portmaster: dist-portmaster
 	adb push dist/glitchscope.zip $(PM_AUTOINSTALL)/
 	@echo "=== Deployed to autoinstall ==="
-	adb shell "mkdir -p $(DEVICE_DIR)/music"
-	adb push test_data/* $(DEVICE_DIR)/music
-	@echo "=== Song deployed to $(DEVICE_DIR) ==="
 
 kill:
 	adb shell "killall -9 glitchscope 2>/dev/null || true"
