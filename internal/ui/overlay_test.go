@@ -530,22 +530,22 @@ func TestNCFocusMachine(t *testing.T) {
 	o.focusPanel = 0
 	o.ncRight = ncRightInfo
 
-	// Left panel → Right = Play.
+	// Left panel → Right = Info.
+	o.FocusRight()
+	if o.focusPanel != 1 || o.ncRight != ncRightInfo {
+		t.Fatalf("after Right: focusPanel=%d ncRight=%d, want 1/%d", o.focusPanel, o.ncRight, ncRightInfo)
+	}
+
+	// Info → Right = Play.
 	o.FocusRight()
 	if o.focusPanel != 1 || o.ncRight != ncRightPlay {
-		t.Fatalf("after Right: focusPanel=%d ncRight=%d, want 1/%d", o.focusPanel, o.ncRight, ncRightPlay)
+		t.Fatalf("after 2nd Right: focusPanel=%d ncRight=%d, want 1/%d", o.focusPanel, o.ncRight, ncRightPlay)
 	}
 
 	// Play → Right = Delete.
 	o.FocusRight()
 	if o.focusPanel != 1 || o.ncRight != ncRightDelete {
-		t.Fatalf("after 2nd Right: focusPanel=%d ncRight=%d, want 1/%d", o.focusPanel, o.ncRight, ncRightDelete)
-	}
-
-	// Delete → Right = no change (rightmost).
-	o.FocusRight()
-	if o.focusPanel != 1 || o.ncRight != ncRightDelete {
-		t.Fatalf("after 3rd Right: should stay at Delete, got focusPanel=%d ncRight=%d", o.focusPanel, o.ncRight)
+		t.Fatalf("after 3rd Right: focusPanel=%d ncRight=%d, want 1/%d", o.focusPanel, o.ncRight, ncRightDelete)
 	}
 
 	// Delete → Left = Play.
@@ -554,13 +554,13 @@ func TestNCFocusMachine(t *testing.T) {
 		t.Fatalf("after Left: focusPanel=%d ncRight=%d, want 1/%d", o.focusPanel, o.ncRight, ncRightPlay)
 	}
 
-	// Play → Left = left panel.
+	// Play → Left = Info.
 	o.FocusLeft()
-	if o.focusPanel != 0 {
-		t.Fatalf("after 2nd Left: focusPanel=%d, want 0", o.focusPanel)
+	if o.focusPanel != 1 || o.ncRight != ncRightInfo {
+		t.Fatalf("after 2nd Left: focusPanel=%d ncRight=%d, want 1/%d", o.focusPanel, o.ncRight, ncRightInfo)
 	}
 
-	// Left → Left = no change.
+	// Info → Left = left panel.
 	o.FocusLeft()
 	if o.focusPanel != 0 {
 		t.Fatalf("after 3rd Left: should stay at 0, got %d", o.focusPanel)

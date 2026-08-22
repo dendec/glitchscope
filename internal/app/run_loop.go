@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	lowFPSThresh    = 30.0
+	lowFPSThresh    = 15.0
 	softCutDuration = 2.5 // seconds, for smooth preset transitions
 )
 
@@ -30,9 +30,10 @@ func (a *App) Run() {
 
 	lastFrame := time.Now()
 	var fpsMeter fpsMeter
-	lowFPSWarned := false
 
 	var prevW, prevH int
+	lowFPSPreset := "" // last preset that triggered the warning
+	lastSkippedPreset := ""
 
 	for range ticker.C {
 		if a.quit.Load() {
@@ -47,21 +48,22 @@ func (a *App) Run() {
 		}
 		fpsAvg := fpsMeter.Average()
 
-		if fpsMeter.Full() {
-			if fpsAvg < lowFPSThresh && !lowFPSWarned {
-				presetName := ""
-				if a.presetIdx >= 0 && a.presetIdx < len(a.presetNames) {
-					presetName = a.presetNames[a.presetIdx]
-				}
-				slog.Warn("low fps", "fps", fpsAvg, "threshold", lowFPSThresh, "preset", presetName)
-				lowFPSWarned = true
-			} else if fpsAvg >= lowFPSThresh {
-				lowFPSWarned = false
-			}
-		}
-
 		w32, h32 := a.window.GLGetDrawableSize()
 		w, h := int(w32), int(h32)
+
+		if fpsMeter.Full() && fpsAvg < lowFPSThresh {
+			presetName := ""
+			if a.presetIdx >= 0 && a.presetIdx < len(a.presetNames) {
+				presetName = a.presetNames[a.presetIdx]
+			}
+			if presetName != lowFPSPreset {
+				slog.Warn("low fps", "fps", fpsAvg, "threshold", lowFPSThresh, "preset", presetName, "resolution", fmt.Sprintf("%dx%d", w, h))
+				lowFPSPreset = presetName
+			}
+		}
+		if fpsMeter.Full() && fpsAvg >= lowFPSThresh {
+			lowFPSPreset = "" // reset so next drop on same preset logs again
+		}
 		winChanged := w != prevW || h != prevH
 
 		if winChanged && prevW > 0 && prevH > 0 {
@@ -93,12 +95,19 @@ func (a *App) Run() {
 		prevW, prevH = w, h
 
 		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && fpsMeter.Full() {
-			if resolution, direction, changed := a.adaptive.Decide(now, fpsAvg); changed {
+			if resolution, direction, changed, minReached := a.adaptive.Decide(now, fpsAvg); changed {
 				a.applyRenderResolution(resolution)
 				if direction > 0 {
 					slog.Info("adaptive: step down", "resolution", resolution)
 				} else {
 					slog.Info("adaptive: step up", "resolution", resolution)
+				}
+			} else if minReached {
+				presetName := a.currentPresetName()
+				if presetName != "" && presetName != lastSkippedPreset {
+					slog.Warn("preset too heavy", "fps", fpsAvg, "preset", presetName, "action", "skipping")
+					lastSkippedPreset = presetName
+					a.loadPreset(a.presetIdx + 1)
 				}
 			}
 		}

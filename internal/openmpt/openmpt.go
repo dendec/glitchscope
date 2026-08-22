@@ -4,6 +4,7 @@ package openmpt
 
 /*
 #include <stddef.h>
+#include <stdlib.h>
 
 void * openmpt_module_create_from_memory(const void * filedata, size_t filesize, void *logfunc, void * user, void * ctls);
 void openmpt_module_destroy(void * mod);
@@ -74,6 +75,39 @@ func GetTrackerMeta(data []byte) (bpm float64, channels int, duration float64, e
 	channels = int(C.openmpt_module_get_num_channels(mod))
 
 	return bpm, channels, duration, nil
+}
+
+// GetMetadata returns a metadata value by key (e.g. "message", "title", "author").
+// Returns empty string if the key is not available.
+func GetMetadata(data []byte, key string) string {
+	if len(data) == 0 || key == "" {
+		return ""
+	}
+
+	cKey := C.CString(key)
+	defer C.free(unsafe.Pointer(cKey))
+
+	mod := C.openmpt_module_create_from_memory(
+		unsafe.Pointer(&data[0]),
+		C.size_t(len(data)),
+		nil, nil, nil,
+	)
+	if mod == nil {
+		return ""
+	}
+	defer C.openmpt_module_destroy(mod)
+
+	cVal := C.openmpt_module_get_metadata(mod, cKey)
+	if cVal == nil {
+		return ""
+	}
+	return C.GoString(cVal)
+}
+
+// GetMessage is a convenience wrapper that returns the "message" metadata
+// (the tracker's text comment, common in XM/IT/MOD/S3M formats).
+func GetMessage(data []byte) string {
+	return GetMetadata(data, "message")
 }
 
 // Render decodes up to maxFrames frames of a tracker module into interleaved

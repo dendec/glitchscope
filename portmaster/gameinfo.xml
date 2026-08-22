@@ -4,7 +4,7 @@
     <path>./GlitchScope.sh</path>
     <name>GlitchScope</name>
     <desc>GlitchScope — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/glitchscope/music/.</desc>
-    <image>./glitchscope/cover.png</image>
+    <image>./glitchscope/screenshot.png</image>
     <developer>dendec</developer>
     <publisher>dendec</publisher>
     <genre>Music</genre>

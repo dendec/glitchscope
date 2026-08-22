@@ -36,15 +36,15 @@ func (o *Overlay) controlLabel(action string) string {
 	if o.controllerConnected {
 		switch action {
 		case hintSelect:
-			return "B"
+			return "A" // Nintendo A (right) = confirm/open
 		case hintBack:
-			return "A"
+			return "B" // Nintendo B (bottom) = back
 		case hintFocus, hintMove:
 			return "D-pad"
 		case hintPages:
 			return "L1/R1"
 		case hintPlay:
-			return "Y"
+			return "X"
 		}
 		return "?"
 	}
@@ -93,10 +93,10 @@ func (o *Overlay) ActionHints() []UIHint {
 
 	// Common low-priority hints shared across pages. Drawn when space allows;
 	// the renderer drops trailing hints first.
-	hints = append(hints, UIHint{Key: o.controlLabel(hintPages), Label: "Screens"})
 	if o.playingTrack != "" || o.loading {
 		hints = append(hints, UIHint{Key: o.controlLabel(hintPlay), Label: "Play/Pause"})
 	}
+	hints = append(hints, UIHint{Key: o.controlLabel(hintPages), Label: "Screens"})
 	return hints
 }
 
@@ -153,6 +153,11 @@ func (o *Overlay) libraryHints() []UIHint {
 	// NC right panel: Play / Delete button focus.
 	if o.isNC() && o.focusPanel == 1 {
 		switch o.ncRight {
+		case ncRightInfo:
+			return []UIHint{
+				{Key: o.controlLabel(hintMove), Label: "Scroll"},
+				{Key: o.controlLabel(hintBack), Label: "Left panel"},
+			}
 		case ncRightPlay:
 			return []UIHint{
 				{Key: o.controlLabel(hintSelect), Label: "Play"},

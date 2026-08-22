@@ -36,12 +36,12 @@ func (s *resolutionState) Reset(winW, winH int) bool {
 	return true
 }
 
-func (s *resolutionState) Decide(now time.Time, fps float64) (config.RenderResolution, int, bool) {
-	next, changed := s.policy.Decide(now, fps, s.index, len(s.resolutions))
+func (s *resolutionState) Decide(now time.Time, fps float64) (config.RenderResolution, int, bool, bool) {
+	next, changed, minReached := s.policy.Decide(now, fps, s.index, len(s.resolutions))
 	if !changed {
-		return config.RenderResolution{}, 0, false
+		return config.RenderResolution{}, 0, false, minReached
 	}
 	direction := next - s.index
 	s.index = next
-	return s.resolutions[next], direction, true
+	return s.resolutions[next], direction, true, false
 }

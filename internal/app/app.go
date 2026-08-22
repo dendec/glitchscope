@@ -514,12 +514,16 @@ func baseDir() string {
 }
 
 func (a *App) findMusicDir() string {
-	for _, candidate := range []string{baseDir() + "/music", baseDir() + "/test_data/music", baseDir()} {
+	for _, candidate := range []string{
+		filepath.Join(baseDir(), "music"),
+		"/userdata/music",
+		"/userdata/roms/music",
+	} {
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
 	}
-	return baseDir()
+	return filepath.Join(baseDir(), "music") // default even if missing
 }
 
 func scaledDim(v int, scale float64) int {

@@ -189,6 +189,9 @@ type Overlay struct {
 	ncInfoFile        string       // selected file path for right-panel info
 	ncInfoDir         string       // selected dir path for right-panel info
 	ncInfoIsDir       bool         // selected entry is a directory
+	ncInfoScroll      int          // vertical scroll offset for right-panel info
+	ncInfoLines       int          // total rendered lines in right-panel info
+	ncInfoVisible     int          // visible lines in right-panel info
 	ncListingStatus   filesystem.Status
 
 	theme        config.Theme

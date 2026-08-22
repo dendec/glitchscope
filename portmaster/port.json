@@ -8,8 +8,8 @@
   "items_opt": null,
   "attr": {
     "title": "GlitchScope",
-    "desc": "GlitchScope — plays MP3/FLAC/Ogg with real-time MilkDrop visualizations. Drop your music files into /roms/ports/glitchscope/ and enjoy a psychedelic audio experience on your handheld.",
-    "inst": "Copy song.mp3 (or any MP3/FLAC/Ogg) to /roms/ports/glitchscope/. Presets are in /roms/ports/glitchscope/presets/.",
+    "desc": "GlitchScope — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Comes with demo tracker music. Drop your own files into music/ and enjoy.",
+    "inst": "Music lives in glitchscope/music/. Add your own MP3/FLAC/Ogg/Mod/XM/IT/S3M files there. Presets are in glitchscope/presets/.",
     "genres": ["music"],
     "porter": ["dendec"],
     "image": {

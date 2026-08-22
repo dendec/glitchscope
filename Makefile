@@ -56,7 +56,9 @@ DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/r
 
 # Builder image: C/C++ static dependencies compiled once for amd64 & arm64
 builder:
-	docker build -t $(DOCKER_BUILDER) -f Dockerfile.builder .
+	@if ! docker image inspect $(DOCKER_BUILDER) > /dev/null 2>&1; then \
+		docker build -t $(DOCKER_BUILDER) -f Dockerfile.builder .; \
+	fi
 
 lint: builder
 	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) golangci-lint run --verbose --timeout=5m ./cmd/... ./internal/...'
@@ -79,6 +81,10 @@ modarchive-catalog: $(MODARCHIVE_CATALOG)
 # Docker build (amd64)
 dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t glitchscope:amd64 -f Dockerfile .
+	@# Backup music directory if it exists before rm -rf.
+	@if [ -d "$(X64_DIST_DIR)/music" ]; then \
+		cp -r "$(X64_DIST_DIR)/music" "$(X64_DIST_DIR)/music.bak"; \
+	fi
 	@rm -rf $(X64_DIST_DIR)
 	@mkdir -p $(X64_DIST_DIR)
 	@docker rm -f glitchscope-extract-x64 2>/dev/null || true
@@ -93,6 +99,10 @@ dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_C
 	@mkdir -p $(X64_DIST_DIR)/.cache/modland $(X64_DIST_DIR)/.cache/modarchive
 	@cp $(MODLAND_CATALOG) $(X64_DIST_DIR)/.cache/modland/catalog
 	@cp $(MODARCHIVE_CATALOG) $(X64_DIST_DIR)/.cache/modarchive/catalog
+	@# Restore music directory from backup.
+	@if [ -d "$(X64_DIST_DIR)/music.bak" ]; then \
+		mv "$(X64_DIST_DIR)/music.bak" "$(X64_DIST_DIR)/music"; \
+	fi
 	@echo "=== Built $(APP) (amd64) ==="
 	@ls -lhR $(X64_DIST_DIR)/
 
@@ -120,24 +130,32 @@ dist-arm64: builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG)
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
 dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
 	@rm -rf dist/portmaster_build
-	@mkdir -p dist/portmaster_build/glitchscope/presets dist/portmaster_build/glitchscope/licenses
+	@mkdir -p dist/portmaster_build/glitchscope
+	@# Laucher script in zip root
 	cp portmaster/GlitchScope.sh dist/portmaster_build/
-	cp portmaster/port.json dist/portmaster_build/
-	cp portmaster/README.md dist/portmaster_build/
-	cp portmaster/screenshot.png dist/portmaster_build/
-	cp portmaster/gameinfo.xml dist/portmaster_build/ 2>/dev/null; true
-	@RELEASE_DATE=$$(date +%Y%m%d)T000000; \
-	printf '<gameList>\n    <game>\n        <path>./GlitchScope.sh</path>\n        <name>GlitchScope</name>\n        <desc>GlitchScope — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Drop your music into /roms/ports/glitchscope/music/ and enjoy a psychedelic audio experience on your handheld.</desc>\n        <image>./glitchscope/cover.png</image>\n        <developer>dendec</developer>\n        <publisher>dendec</publisher>\n        <releasedate>%s</releasedate>\n        <genre>Music</genre>\n    </game>\n</gameList>\n' "$$RELEASE_DATE" > dist/portmaster_build/glitchscope/gameinfo.xml
+	@# Everything else goes INSIDE the glitchscope/ folder
 	cp $(ARM64_DIST_DIR)/glitchscope/glitchscope dist/portmaster_build/glitchscope/
 	cp $(GSA_FILE) dist/portmaster_build/glitchscope/presets/presets.gsa
 	cp $(TEXTURES_GSA_FILE) dist/portmaster_build/glitchscope/presets/textures.gsa
 	@mkdir -p dist/portmaster_build/glitchscope/.cache/modland dist/portmaster_build/glitchscope/.cache/modarchive
 	@cp $(MODLAND_CATALOG) dist/portmaster_build/glitchscope/.cache/modland/catalog
 	@cp $(MODARCHIVE_CATALOG) dist/portmaster_build/glitchscope/.cache/modarchive/catalog
+	cp portmaster/port.json dist/portmaster_build/glitchscope/
+	cp portmaster/screenshot.png dist/portmaster_build/glitchscope/
+	cp portmaster/gameinfo.xml dist/portmaster_build/glitchscope/ 2>/dev/null; true
 	cp portmaster/licenses/* dist/portmaster_build/glitchscope/licenses/ 2>/dev/null; true
-	cp portmaster/screenshot.png dist/portmaster_build/glitchscope/cover.png 2>/dev/null; true
+	@# Download demo tracker music
+	@mkdir -p dist/portmaster_build/glitchscope/music
+	@echo "=== Downloading demo tracks ==="
+	@curl -sL -o dist/portmaster_build/glitchscope/music/aryx.s3m "https://api.modarchive.org/downloads.php?moduleid=191789"
+	@curl -sL -o dist/portmaster_build/glitchscope/music/external.xm "https://api.modarchive.org/downloads.php?moduleid=66187"
+	@curl -sL -o dist/portmaster_build/glitchscope/music/ELYSIUM.MOD "https://api.modarchive.org/downloads.php?moduleid=40475"
+	@curl -sL -o dist/portmaster_build/glitchscope/music/sick-ass.it "https://api.modarchive.org/downloads.php?moduleid=177712"
+	@echo "=== Demo tracks downloaded ==="
+	@ls -lh dist/portmaster_build/glitchscope/music/
+	@# Zip: root = .sh + glitchscope/ folder only
 	@rm -f dist/glitchscope.zip
-	cd dist/portmaster_build && zip -r ../glitchscope.zip "GlitchScope.sh" README.md gameinfo.xml port.json screenshot.png glitchscope
+	cd dist/portmaster_build && zip -r ../glitchscope.zip "GlitchScope.sh" glitchscope
 	@echo "=== Generated dist/glitchscope.zip ==="
 	@ls -lh dist/glitchscope.zip
 

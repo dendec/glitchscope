@@ -654,6 +654,7 @@ func (o *Overlay) refreshNCPreview() {
 	o.ncInfoFile = ""
 	o.ncInfoDir = ""
 	o.ncInfoIsDir = false
+	o.ncInfoScroll = 0
 	if e == nil {
 		o.tracksDirty = true
 		o.tracksContentDirty = true

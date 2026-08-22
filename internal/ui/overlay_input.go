@@ -82,6 +82,7 @@ func (o *Overlay) ToggleUI() {
 		o.uiPage = PageLibrary
 		o.ncRight = ncRightInfo
 		o.ncConfirm = false
+		o.pageIndicatorDirty = true
 		if !o.textureCacheReady {
 			o.markAllDirty()
 			o.textureCacheReady = true
@@ -95,6 +96,7 @@ func (o *Overlay) NextScreen() {
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
+	o.pageIndicatorDirty = true
 	switch o.uiPage {
 	case PageLibrary:
 		o.uiPage = PageSettings
@@ -116,6 +118,7 @@ func (o *Overlay) PrevScreen() {
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
+	o.pageIndicatorDirty = true
 	switch o.uiPage {
 	case PageLibrary:
 		o.uiPage = PageHelp
@@ -145,6 +148,15 @@ func (o *Overlay) CursorDown() {
 		return
 	}
 	o.moveCursor(1)
+}
+
+func (o *Overlay) scrollNCInfo(dir int) {
+	maxScroll := o.ncInfoLines - o.ncInfoVisible
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	o.ncInfoScroll = max(0, min(o.ncInfoScroll+dir, maxScroll))
+	o.tracksDirty = true
 }
 
 // moveCursor shifts the active cursor by dir (-1 up, +1 down), scoped to the
@@ -205,6 +217,10 @@ func (o *Overlay) moveCursor(dir int) {
 	}
 	// --- Library page ---
 	if o.isNC() {
+		if o.focusPanel == 1 && o.ncRight == ncRightInfo {
+			o.scrollNCInfo(dir)
+			return
+		}
 		if o.focusPanel == 0 {
 			if next := o.albumCursor + dir; next >= 0 && next < len(o.albums) {
 				o.albumCursor = next
@@ -271,9 +287,12 @@ func (o *Overlay) FocusLeft() {
 			if o.focusPanel == 0 {
 				return // already at leftmost
 			}
-			if o.ncRight == ncRightPlay {
-				// Play → left panel
+			if o.ncRight == ncRightInfo {
+				// Info → left panel
 				o.focusPanel = 0
+				o.ncRight = ncRightInfo
+			} else if o.ncRight == ncRightPlay {
+				// Play → Info
 				o.ncRight = ncRightInfo
 			} else {
 				// Delete → Play
@@ -308,8 +327,11 @@ func (o *Overlay) FocusRight() {
 	default: // Library
 		if o.isNC() {
 			if o.focusPanel == 0 {
-				// left → Play
+				// left → Info
 				o.focusPanel = 1
+				o.ncRight = ncRightInfo
+			} else if o.ncRight == ncRightInfo {
+				// Info → Play
 				o.ncRight = ncRightPlay
 			} else if o.ncRight == ncRightPlay {
 				// Play → Delete

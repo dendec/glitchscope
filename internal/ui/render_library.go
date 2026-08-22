@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dendec/glitchscope/internal/filesystem"
 	"github.com/dendec/glitchscope/internal/player"
@@ -58,7 +59,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 	if o.tracksTex != 0 {
 		tx, ty := float32(tracksX), float32(panelY)
 		drawPanelBg(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
-		// NC right panel: no cursor highlight, no scrollbar, no marquee.
+		// NC right panel: no cursor highlight or marquee.
 		if !o.isNC() {
 			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
 				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
@@ -79,6 +80,8 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
 				o.drawMarqueeCol(&o.marqueeR, tx, ty, float32(textW), float32(panelH), lh, rowY, winW, winH, viewW, viewH)
 			}
+		} else {
+			drawScrollbar(o, tx+float32(panelW)-sbW, ty, float32(panelH), o.ncInfoLines, o.ncInfoVisible, o.ncInfoScroll, winW, winH, viewW, viewH)
 		}
 		if o.focusPanel == 1 {
 			drawPanelBorder(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
@@ -242,7 +245,6 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 			fmt.Sprintf("  Playable files: %d", files))
 	} else if o.ncInfoFile != "" {
 		// File info.
-		lines = append(lines, filepath.Base(o.ncInfoFile), "", o.displayTrackPath(o.ncInfoFile), "")
 		if info, err := os.Stat(o.ncInfoFile); err == nil {
 			size := info.Size()
 			if size < 1024 {
@@ -287,10 +289,37 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		lines = append(lines, deleteLine)
 	}
 
+	if ti := o.ncTrackInfo(); ti != nil && ti.Comment != "" {
+		lines = append(lines, "")
+		for _, cl := range strings.Split(ti.Comment, "\n") {
+			lines = append(lines, "  "+cl)
+		}
+	}
+
 	maxTextPx := availableRowTextWidth(maxW)
+	lh := o.face.Metrics().Height.Ceil()
+	maxRows := maxH / lh
+	if maxRows < 1 {
+		maxRows = 1
+	}
+	o.ncInfoVisible = maxRows
+	o.ncInfoLines = len(lines)
+	maxScroll := max(0, len(lines)-maxRows)
+	o.ncInfoScroll = min(o.ncInfoScroll, maxScroll)
+	start := o.ncInfoScroll
+	end := min(start+maxRows, len(lines))
 	var rows []listRow
-	for _, line := range lines {
+	for _, line := range lines[start:end] {
 		rows = append(rows, listRow{text: line})
 	}
 	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
+}
+
+func (o *Overlay) ncTrackInfo() *player.TrackInfo {
+	for i := range o.trackInfos {
+		if o.trackInfos[i].Path == o.ncInfoFile {
+			return &o.trackInfos[i]
+		}
+	}
+	return nil
 }

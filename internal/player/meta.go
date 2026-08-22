@@ -10,6 +10,7 @@ type TrackMeta struct {
 	Duration float64 `json:"d"`
 	BPM      float64 `json:"b,omitempty"`
 	Channels int     `json:"c,omitempty"`
+	Comment  string  `json:"m,omitempty"` // tracker message/comment
 }
 
 type albumMeta struct {

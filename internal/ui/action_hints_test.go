@@ -46,12 +46,12 @@ func TestControlLabelGamepad(t *testing.T) {
 	o := srcRoot()
 	o.controllerConnected = true
 	cases := map[string]string{
-		hintSelect: "B",
-		hintBack:   "A",
+		hintSelect: "A", // Nintendo A = select
+		hintBack:   "B", // Nintendo B = back
 		hintFocus:  "D-pad",
 		hintMove:   "D-pad",
 		hintPages:  "L1/R1",
-		hintPlay:   "Y",
+		hintPlay:   "X",
 	}
 	for action, want := range cases {
 		if got := o.controlLabel(action); got != want {
@@ -202,8 +202,8 @@ func TestActionHintsGamepadMapping(t *testing.T) {
 	o.focusPanel = 1
 	got := hints(o)
 	want := []UIHint{
-		{Key: "B", Label: "Select"},
-		{Key: "A", Label: "Back"},
+		{Key: "A", Label: "Select"},
+		{Key: "B", Label: "Back"},
 		{Key: "D-pad", Label: "Preset"},
 		{Key: "L1/R1", Label: "Screens"},
 	}

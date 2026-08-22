@@ -27,6 +27,7 @@ type TrackInfo struct {
 	Duration float64
 	BPM      float64
 	Channels int
+	Comment  string // tracker message/comment (XM/IT/MOD/S3M text)
 }
 
 // Library manages a list of albums scanned from a music root directory.
@@ -221,6 +222,7 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 			info.Duration = m.Duration
 			info.BPM = m.BPM
 			info.Channels = m.Channels
+			info.Comment = m.Comment
 		} else {
 			m := TrackMeta{}
 			ext := strings.ToLower(filepath.Ext(tp))
@@ -236,6 +238,13 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 							m.BPM = bpm
 							m.Channels = ch
 						}
+					}
+				}
+				// Extract tracker message/comment if available.
+				if fileBuf, err := os.ReadFile(tp); err == nil {
+					if msg := openmpt.GetMessage(fileBuf); msg != "" {
+						m.Comment = msg
+						slog.Debug("tracker comment", "file", filepath.Base(tp), "comment", msg)
 					}
 				}
 			} else if isFfmpegExt(ext) {
@@ -254,7 +263,26 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 			info.Duration = m.Duration
 			info.BPM = m.BPM
 			info.Channels = m.Channels
+			info.Comment = m.Comment
 			dirty = true
+		}
+		// Always extract comment for tracker files, even if cached (cache may be stale).
+		if info.Comment == "" {
+			ext := strings.ToLower(filepath.Ext(tp))
+			if isTrackerExt(ext) {
+				if fileBuf, err := os.ReadFile(tp); err == nil {
+					if msg := openmpt.GetMessage(fileBuf); msg != "" {
+						info.Comment = msg
+						// Update cache too.
+						if m, ok := cache.Tracks[fname]; ok {
+							m.Comment = msg
+							cache.Tracks[fname] = m
+							dirty = true
+						}
+						slog.Debug("tracker comment", "file", filepath.Base(tp), "comment", msg)
+					}
+				}
+			}
 		}
 		infos[i] = info
 	}

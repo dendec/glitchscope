@@ -195,13 +195,16 @@ func keyToAction(key sdl.Keycode) Action {
 }
 
 func buttonToAction(btn uint8) Action {
+	// Nintendo layout: A/B and X/Y are swapped compared to Xbox.
 	switch btn {
-	case sdl.CONTROLLER_BUTTON_B:
-		return ActionSelect
 	case sdl.CONTROLLER_BUTTON_A:
-		return ActionBack
+		return ActionSelect // Nintendo A (right) = confirm
+	case sdl.CONTROLLER_BUTTON_B:
+		return ActionBack // Nintendo B (bottom) = back
+	case sdl.CONTROLLER_BUTTON_X:
+		return ActionPlayPause // Nintendo X (top) = play/pause
 	case sdl.CONTROLLER_BUTTON_Y:
-		return ActionPlayPause
+		return ActionRandomPreset // Nintendo Y (left) = random preset
 	case sdl.CONTROLLER_BUTTON_DPAD_UP:
 		return ActionCursorUp
 	case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
@@ -218,8 +221,6 @@ func buttonToAction(btn uint8) Action {
 		return ActionPrevPreset
 	case sdl.CONTROLLER_BUTTON_RIGHTSHOULDER:
 		return ActionNextPreset
-	case sdl.CONTROLLER_BUTTON_X:
-		return ActionRandomPreset
 	}
 	return ActionNone
 }

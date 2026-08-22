@@ -195,6 +195,14 @@ func (a *App) handleNormalAction(act input.Action) {
 	}
 }
 
+// currentPresetName returns the name of the current preset, or "" if none.
+func (a *App) currentPresetName() string {
+	if a.presetIdx >= 0 && a.presetIdx < len(a.presetNames) {
+		return a.presetNames[a.presetIdx]
+	}
+	return ""
+}
+
 // loadPreset loads a preset by index (with wrapping) via transition.
 func (a *App) loadPreset(idx int) {
 	if len(a.presetNames) == 0 {
