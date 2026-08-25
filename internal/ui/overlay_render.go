@@ -63,7 +63,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	// The focus border is drawn inset (see drawPanelBorder), so panels can
 	// sit flush against the header/bottom bars with no reserved gap.
 	crumbRowH := 0
-	if o.uiPage == PageLibrary {
+	if o.uiPage == PageLibrary || o.uiPage == PagePresets {
 		crumbRowH = lh
 	}
 	headerH := lh + indicatorRowH + crumbRowH
