@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/dendec/glitchscope/internal/presets"
@@ -254,18 +253,13 @@ func (o *Overlay) buildPresetDetailRows(maxTextPx int) []listRow {
 
 	var lines []string
 
-	// Rating as stars.
-	lines = append(lines, "Rating: "+formatRating(m.Rating))
+	// Rating bar.
+	lines = append(lines, formatRating(m.Rating))
 
-	// Core parameters.
+	// Complexity summary — only meaningful fields.
 	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("  Decay: %-6s  Warp: %-6s", formatFrac(m.Decay), formatFrac(m.WarpSpeed)))
-	lines = append(lines, fmt.Sprintf("  Echo: %-7s  Mode: %d", formatFrac(m.VideoEchoZoom), m.WaveMode))
-
-	// Complexity.
-	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("  Shapes: %-3d  Waves: %d", m.Shapes, m.Waves))
-	lines = append(lines, fmt.Sprintf("  Per-frame: %-3d  Per-pixel: %d", m.PerFrameEqs, m.PerPixelEqs))
+	lines = append(lines, fmt.Sprintf("Shapes: %d   Waves: %d", m.Shapes, m.Waves))
+	lines = append(lines, fmt.Sprintf("Equations: %d per-frame, %d per-pixel", m.PerFrameEqs, m.PerPixelEqs))
 
 	var rows []listRow
 	for _, line := range lines {
@@ -274,31 +268,14 @@ func (o *Overlay) buildPresetDetailRows(maxTextPx int) []listRow {
 	return rows
 }
 
+// formatRating renders a rating as an ASCII bar: [#####] to [-----].
 func formatRating(r float64) string {
-	full := int(r)
+	full := int(r + 0.5)
 	if full > 5 {
 		full = 5
 	}
-	half := r-float64(full) >= 0.5
-	s := strings.Repeat("\u2605", full)
-	if half {
-		s += "\u00bd"
+	if full < 0 {
+		full = 0
 	}
-	s += strings.Repeat("\u2606", 5-full-boolToInt(half))
-	return s
-}
-
-func boolToInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
-func formatFrac(f float64) string {
-	s := strconv.FormatFloat(f, 'f', -1, 64)
-	if len(s) > 6 {
-		s = s[:6]
-	}
-	return s
+	return "[" + strings.Repeat("#", full) + strings.Repeat("-", 5-full) + "]"
 }
