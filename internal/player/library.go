@@ -4,15 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/dendec/glitchscope/internal/filesystem"
-	"github.com/dendec/glitchscope/internal/openmpt"
-	"github.com/dendec/glitchscope/internal/soloud"
-	"github.com/dendec/glitchscope/internal/xmp"
 )
 
 // Album represents a directory containing audio files.
@@ -28,19 +24,23 @@ type TrackInfo struct {
 	BPM      float64
 	Channels int
 	Comment  string // tracker message/comment (XM/IT/MOD/S3M text)
+	Cached   bool   // true when a local cache file exists on disk
 }
 
 // Library manages a list of albums scanned from a music root directory.
 // UP/DOWN navigates albums, LEFT/RIGHT navigates tracks within an album.
+// Virtual (catalog) albums live in the same list; cache-path resolution is
+// delegated to Resolver.
 type Library struct {
 	Albums   []Album
-	albumIdx int // -1 = no album loaded
-	trackIdx int // -1 = no track loaded, 0+ = index within current album
+	resolver *Resolver // maps virtual track paths to local cache files
+	albumIdx int       // -1 = no album loaded
+	trackIdx int       // -1 = no track loaded, 0+ = index within current album
 }
 
 // NewLibrary scans rootDir for leaf dirs containing audio files.
 func NewLibrary(rootDir string) (*Library, error) {
-	lib := &Library{albumIdx: -1, trackIdx: -1}
+	lib := &Library{resolver: NewResolver(), albumIdx: -1, trackIdx: -1}
 	var err error
 	lib.Albums, err = scanRoot(rootDir)
 	if err != nil {
@@ -53,6 +53,18 @@ func NewLibrary(rootDir string) (*Library, error) {
 		}
 	}
 	return lib, nil
+}
+
+// NewEmptyLibrary returns an empty library that can be populated later with
+// virtual albums (modland/modarchive).
+func NewEmptyLibrary() *Library {
+	return &Library{resolver: NewResolver(), albumIdx: -1, trackIdx: -1}
+}
+
+// SetBaseDir sets the application root directory for resolving virtual cache
+// paths (modland/modarchive downloaded files).
+func (l *Library) SetBaseDir(dir string) {
+	l.resolver.SetBaseDir(dir)
 }
 
 // scanRoot walks rootDir and returns sorted Albums from the filesystem.
@@ -202,7 +214,8 @@ func (l *Library) SelectTrack(idx int) string {
 }
 
 // GetAlbumTracks returns TrackInfo for each track. Reads cache first;
-// computes missing entries on demand.
+// computes missing entries on demand. Virtual paths (modland/modarchive)
+// are resolved to local cache paths before metadata extraction.
 func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 	if idx < 0 || idx >= len(l.Albums) {
 		return nil
@@ -216,48 +229,20 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 	infos := make([]TrackInfo, len(album.Tracks))
 	dirty := false
 	for i, tp := range album.Tracks {
-		fname := filepath.Base(tp)
-		info := TrackInfo{Path: tp}
+		fname := filepath.Base(TrimPrefixes(tp))
+		info := TrackInfo{Path: tp, Cached: l.resolver.ResolveLocalPath(tp) != ""}
 		if m, ok := cache.Tracks[fname]; ok {
 			info.Duration = m.Duration
 			info.BPM = m.BPM
 			info.Channels = m.Channels
 			info.Comment = m.Comment
 		} else {
+			// Compute metadata on demand from the local cache file (virtual
+			// paths resolved first). extractMetaFromFile is pure — no side
+			// effects — and reused by the comment refresh below.
 			m := TrackMeta{}
-			ext := strings.ToLower(filepath.Ext(tp))
-			if isTrackerExt(ext) {
-				if bpm, ch, dur, err := xmp.GetTrackerMeta(tp); err == nil {
-					m.Duration = dur
-					m.BPM = bpm
-					m.Channels = ch
-				} else if openmpt.HasExt(ext) {
-					if fileBuf, err := os.ReadFile(tp); err == nil {
-						if bpm, ch, dur, err := openmpt.GetTrackerMeta(fileBuf); err == nil {
-							m.Duration = dur
-							m.BPM = bpm
-							m.Channels = ch
-						}
-					}
-				}
-				// Extract tracker message/comment if available.
-				if fileBuf, err := os.ReadFile(tp); err == nil {
-					if msg := openmpt.GetMessage(fileBuf); msg != "" {
-						m.Comment = msg
-						slog.Debug("tracker comment", "file", filepath.Base(tp), "comment", msg)
-					}
-				}
-			} else if isFfmpegExt(ext) {
-				if fileBuf, err := os.ReadFile(tp); err == nil {
-					if source, err := soloud.NewFfmpeg(fileBuf); err == nil {
-						m.Duration = source.GetLength()
-						m.Channels = source.GetChannels()
-						source.Destroy()
-					}
-				}
-			} else if w, err := soloud.LoadWav(tp); err == nil {
-				m.Duration = w.GetLength()
-				w.Destroy()
+			if localPath := l.resolver.ResolveLocalPath(tp); localPath != "" {
+				m = extractMetaFromFile(localPath)
 			}
 			cache.Tracks[fname] = m
 			info.Duration = m.Duration
@@ -266,21 +251,18 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 			info.Comment = m.Comment
 			dirty = true
 		}
-		// Always extract comment for tracker files, even if cached (cache may be stale).
+		// Always refresh the comment for tracker files, even when the rest of
+		// the metadata came from cache (the cache may predate the comment).
 		if info.Comment == "" {
-			ext := strings.ToLower(filepath.Ext(tp))
-			if isTrackerExt(ext) {
-				if fileBuf, err := os.ReadFile(tp); err == nil {
-					if msg := openmpt.GetMessage(fileBuf); msg != "" {
-						info.Comment = msg
-						// Update cache too.
-						if m, ok := cache.Tracks[fname]; ok {
-							m.Comment = msg
-							cache.Tracks[fname] = m
-							dirty = true
-						}
-						slog.Debug("tracker comment", "file", filepath.Base(tp), "comment", msg)
+			if localPath := l.resolver.ResolveLocalPath(tp); localPath != "" {
+				if m := extractMetaFromFile(localPath); m.Comment != "" {
+					info.Comment = m.Comment
+					if cm, ok := cache.Tracks[fname]; ok {
+						cm.Comment = m.Comment
+						cache.Tracks[fname] = cm
+						dirty = true
 					}
+					slog.Debug("tracker comment", "file", filepath.Base(tp), "comment", m.Comment)
 				}
 			}
 		}
@@ -303,6 +285,22 @@ const (
 var KnownPrefixes = []string{
 	ModlandPrefix,
 	ModArchivePrefix,
+}
+
+// IsVirtual reports provider-browsed albums (modland/modarchive).
+func IsVirtual(a Album) bool {
+	return strings.HasPrefix(a.Path, ModlandPrefix) || strings.HasPrefix(a.Path, ModArchivePrefix)
+}
+
+// RealAlbumsOnly filters virtual provider albums out of a list.
+func RealAlbumsOnly(list []Album) []Album {
+	out := make([]Album, 0, len(list))
+	for _, a := range list {
+		if !IsVirtual(a) {
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 // TrimPrefixes strips any virtual provider prefix (modland:, modarchive:, etc.) from path.
@@ -345,6 +343,19 @@ func (l *Library) AddVirtualAlbums(albums []Album) {
 			l.trackIdx = 0
 		}
 	}
+}
+
+// AddCatalogAlbum appends an on-the-fly album (e.g. from modarchive navigation)
+// and returns its stable index in Albums. If an album with the same path already
+// exists, its existing index is returned instead of duplicating.
+func (l *Library) AddCatalogAlbum(album Album) int {
+	for i, a := range l.Albums {
+		if a.Path == album.Path {
+			return i
+		}
+	}
+	l.Albums = append(l.Albums, album)
+	return len(l.Albums) - 1
 }
 
 // Rescan re-reads rootDir and rebuilds local albums, preserving virtual
