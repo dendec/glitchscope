@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -409,7 +411,37 @@ func (a *App) restoreSavedPosition(allowRemote bool) {
 	a.resumeAttempted = true
 	a.resumePath = position.Path
 	a.resumeSeconds = position.Seconds
+	a.prepareSavedCatalogTrack(position.Path)
 	a.playTrack(position.Path, "")
+}
+
+// prepareSavedCatalogTrack restores the catalog context needed for sequential
+// playback. Catalog albums are normally created when the user browses into a
+// directory, but a saved remote track can be loaded before that happens.
+func (a *App) prepareSavedCatalogTrack(path string) {
+	if a.lib == nil || !player.IsModArchive(path) {
+		return
+	}
+	remotePath := player.RemotePath(path)
+	slash := strings.LastIndexByte(remotePath, '/')
+	if slash < 0 {
+		return
+	}
+	targetURL := remotePath[:slash+1]
+	items, ok := modarchive.FetchDirectoryCached(baseDir(), targetURL)
+	if !ok {
+		return
+	}
+	album := modarchive.BuildAlbum(targetURL, items)
+	if album == nil {
+		return
+	}
+	trackIdx := slices.Index(album.Tracks, path)
+	if trackIdx < 0 {
+		return
+	}
+	a.lib.AddCatalogAlbum(*album)
+	a.playbackState.setPlaylist(album.Tracks, trackIdx, album.Name)
 }
 
 func canRestorePosition(position config.PlaybackPosition, allowRemote bool) bool {

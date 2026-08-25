@@ -75,6 +75,7 @@ func (s *playbackState) play(path string) bool {
 	if s.pl == nil {
 		return false
 	}
+	s.selectLibraryTrack(path)
 	if s.playlistIdx < 0 || s.playlistIdx >= len(s.playlist) || s.playlist[s.playlistIdx] != path {
 		s.playlist = nil
 		s.playlistIdx = -1
@@ -82,6 +83,21 @@ func (s *playbackState) play(path string) bool {
 	}
 	s.pl.PlayFileAsync(path)
 	return true
+}
+
+func (s *playbackState) selectLibraryTrack(path string) {
+	if s.lib == nil || path == "" {
+		return
+	}
+	for albumIdx, album := range s.lib.Albums {
+		for trackIdx, trackPath := range album.Tracks {
+			if trackPath == path {
+				s.lib.SelectAlbum(albumIdx)
+				s.lib.SelectTrack(trackIdx)
+				return
+			}
+		}
+	}
 }
 
 func (s *playbackState) setPlaylist(tracks []string, index int, album string) bool {

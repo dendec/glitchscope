@@ -257,6 +257,10 @@ func (a *App) Run() {
 func (a *App) autoAdvance() {
 	if track, ok := a.playbackState.advance(a.settings.Playback); ok {
 		a.playTrack(track.path, track.album)
+		if a.overlay != nil {
+			a.overlay.NavigateToTrack(track.path)
+			a.presenter.invalidateTrackInfos()
+		}
 	}
 }
 

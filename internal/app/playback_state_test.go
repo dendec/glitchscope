@@ -48,3 +48,32 @@ func TestPlaybackStateManualNavigationUsesActivePlaylist(t *testing.T) {
 		t.Fatalf("previousTrack returned (%q, %q, %v), want first playlist track", path, album, ok)
 	}
 }
+
+func TestPlaybackStatePlaySynchronizesCatalogTrack(t *testing.T) {
+	path := "modarchive:http://modarchive.textfiles.com/2013/IT/B/bacter_vs_saga_musix_-_funky_junkie.it.zip"
+	state := playbackState{
+		pl: &player.Player{},
+		lib: &player.Library{Albums: []player.Album{
+			{Name: "Modland: Protracker/Asylum", Tracks: []string{"modland:asylum.mod"}},
+			{Name: "ModArchive: 2013/IT/B", Tracks: []string{
+				"modarchive:http://modarchive.textfiles.com/2013/IT/B/ba-piler.it.zip",
+				path,
+				"modarchive:http://modarchive.textfiles.com/2013/IT/B/bad_dreamz.it.zip",
+			}},
+		}},
+	}
+
+	state.selectLibraryTrack(path)
+
+	if got := state.lib.CurrentAlbumIndex(); got != 1 {
+		t.Fatalf("current album index = %d, want catalog album 1", got)
+	}
+	if got := state.lib.CurrentTrackIndex(); got != 1 {
+		t.Fatalf("current track index = %d, want bacter track 1", got)
+	}
+
+	track, ok := state.advance(config.PlaybackSettings{ShuffleMode: config.ShuffleOff})
+	if !ok || track.path != "modarchive:http://modarchive.textfiles.com/2013/IT/B/bad_dreamz.it.zip" {
+		t.Fatalf("advance returned (%+v, %v), want bad_dreamz", track, ok)
+	}
+}
