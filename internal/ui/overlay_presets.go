@@ -149,9 +149,23 @@ func sortedTreeNodes(m map[string]*treeEntry) []presetNode {
 // Used by the UI to display preset info without owning the cache.
 type presetMetaProvider func(key string) presets.PresetMeta
 
+// requestPreviewForSelected enqueues a preview if the selected node is a .milk.
+func (o *Overlay) requestPreviewForSelected() {
+	node := o.presetNav.Selected()
+	if node == nil || !node.isLeaf || o.presetPreviewReq == nil {
+		return
+	}
+	o.presetPreviewReq(node.key)
+}
+
 // SetPresetMetaProvider sets the metadata provider callback.
 func (o *Overlay) SetPresetMetaProvider(fn presetMetaProvider) {
 	o.presetMeta = fn
+}
+
+// SetPresetPreviewRequest sets the callback to request a thumbnail preview.
+func (o *Overlay) SetPresetPreviewRequest(fn func(key string)) {
+	o.presetPreviewReq = fn
 }
 
 // SetPresetTree updates the preset tree and resets navigation to root.
@@ -244,6 +258,7 @@ func (o *Overlay) syncPresetTree() {
 	}
 	o.presetsDirty = true
 	o.breadcrumbDirty = true
+	o.requestPreviewForSelected()
 }
 
 // nodeDisplayLine formats a preset node for display in the left panel.

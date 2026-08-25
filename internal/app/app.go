@@ -29,10 +29,11 @@ import (
 )
 
 type App struct {
-	window *sdl.Window
-	glCtx  sdl.GLContext
-	pm     *projectm.Handle
-	rt     *projectm.RenderTarget
+	window  *sdl.Window
+	glCtx   sdl.GLContext
+	pm      *projectm.Handle
+	rt      *projectm.RenderTarget
+	preview *previewRenderer
 
 	overlay *ui.Overlay
 	inp     *input.Input
@@ -136,6 +137,8 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	a.pm.SetSoftCutDuration(softCutDuration)
 	slog.Info("projectM init", "ms", time.Since(t0).Milliseconds())
 
+	a.preview = newPreviewRenderer()
+
 	// Keep bundled and user textures in one temporary search directory. User
 	// files are copied last so they override matching bundled textures.
 	extractedDir, extractErr := os.MkdirTemp("", "glitchscope-textures-")
@@ -227,6 +230,9 @@ func (a *App) Close() {
 	}
 	if a.presetTicker != nil {
 		a.presetTicker.Stop()
+	}
+	if a.preview != nil {
+		a.preview.Destroy()
 	}
 	if a.rt != nil {
 		a.rt.Destroy()
@@ -560,6 +566,17 @@ func (a *App) initPreset() {
 	if a.overlay != nil {
 		a.overlay.SetPresetTree(a.presetCats)
 		a.overlay.SetPresetMetaProvider(presets.ReadMeta)
+		a.overlay.SetPresetPreviewRequest(func(key string) {
+			if a.preview == nil {
+				return
+			}
+			data, err := presets.Read(key)
+			if err != nil {
+				slog.Debug("preview read preset", "key", key, "error", err)
+				return
+			}
+			a.preview.Enqueue(key, string(data))
+		})
 	}
 }
 

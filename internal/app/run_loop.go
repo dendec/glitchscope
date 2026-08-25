@@ -238,6 +238,13 @@ func (a *App) Run() {
 
 		a.pm.RenderFrame()
 		a.rt.Capture()
+
+		// Preview: render one thumbnail step (between capture and blit so
+		// BlitToScreen automatically restores the main render afterward).
+		if a.preview != nil {
+			a.preview.ProcessNext()
+		}
+
 		a.rt.BlitToScreen(w, h)
 
 		if a.overlay != nil {

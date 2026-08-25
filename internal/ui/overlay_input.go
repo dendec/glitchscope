@@ -138,6 +138,7 @@ func (o *Overlay) PrevScreen() {
 		o.uiPage = PageLibrary
 	case PageHelp:
 		o.uiPage = PagePresets
+		o.syncPresetTree()
 	}
 	o.panelEntered = true
 	o.settingsEditing = false
@@ -216,6 +217,7 @@ func (o *Overlay) moveCursor(dir int) {
 			if next := cur.cursor + dir; next >= 0 && next < total {
 				cur.cursor = next
 				o.presetsDirty = true
+				o.requestPreviewForSelected()
 			}
 		}
 		return
@@ -384,6 +386,7 @@ func (o *Overlay) FocusRight() {
 			o.presetNav.Expand(node)
 			o.presetsDirty = true
 			o.breadcrumbDirty = true
+			o.requestPreviewForSelected()
 		} else if node == nil && len(o.presetNav.stack) > 1 {
 			// ".." entry — collapse.
 			o.presetNav.Collapse()
