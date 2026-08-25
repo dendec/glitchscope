@@ -49,8 +49,8 @@ type App struct {
 	textureDir        string
 	presetNames       []string
 	presetIdx         int
-	presetCats        []ui.PresetCat // categories for presets page
-	transitionPresets []string       // "!"-prefixed presets for smooth transitions
+	presetCats        []string // all preset keys for presets page tree
+	transitionPresets []string // "!"-prefixed presets for smooth transitions
 
 	renderScale         float64
 	renderScaleExplicit bool
@@ -554,15 +554,11 @@ func (a *App) initPreset() {
 	}
 	slog.Info("preset loaded", "name", a.presetNames[a.presetIdx], "count", len(a.presetNames))
 
-	// Build categories for presets page. Static for the process lifetime,
+	// Build tree for presets page. Static for the process lifetime,
 	// so push once here rather than every frame.
-	cats := presets.Categories()
-	a.presetCats = make([]ui.PresetCat, len(cats))
-	for i, c := range cats {
-		a.presetCats[i] = ui.PresetCat{Name: c, Presets: presets.PresetsInCategory(c)}
-	}
+	a.presetCats = presets.Names()
 	if a.overlay != nil {
-		a.overlay.SetPresetCategories(a.presetCats)
+		a.overlay.SetPresetTree(a.presetCats)
 	}
 }
 

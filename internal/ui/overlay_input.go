@@ -112,7 +112,7 @@ func (o *Overlay) NextScreen() {
 		o.uiPage = PageSettings
 	case PageSettings:
 		o.uiPage = PagePresets
-		o.syncPresetCursors()
+		o.syncPresetTree()
 	case PagePresets:
 		o.uiPage = PageHelp
 	case PageHelp:
@@ -207,19 +207,11 @@ func (o *Overlay) moveCursor(dir int) {
 		return
 	}
 	if o.uiPage == PagePresets {
-		switch o.focusPanel {
-		case 0:
-			if next := o.presetCategoryCursor + dir; next >= 0 && next < len(o.presetCategories) {
-				o.presetCategoryCursor = next
-				o.presetCursor = 0
+		cur := o.presetNav.current()
+		if cur != nil {
+			if next := cur.cursor + dir; next >= 0 && next < len(cur.nodes) {
+				cur.cursor = next
 				o.presetsDirty = true
-			}
-		case 1:
-			if cat := o.currentCategory(); cat != nil {
-				if next := o.presetCursor + dir; next >= 0 && next < len(cat.Presets) {
-					o.presetCursor = next
-					o.presetsDirty = true
-				}
 			}
 		}
 		return
@@ -332,7 +324,9 @@ func (o *Overlay) FocusLeft() {
 			o.settingsDirty = true
 		}
 	case PagePresets:
-		o.focusPanelBy(-1, func() { o.presetsDirty = true })
+		if o.presetNav.Collapse() {
+			o.presetsDirty = true
+		}
 	default: // Library
 		if o.isNC() {
 			if o.infoPanelFocused() && o.scrollInfoHorizontal(-1) {
@@ -380,7 +374,11 @@ func (o *Overlay) FocusRight() {
 			o.settingsDirty = true
 		}
 	case PagePresets:
-		o.focusPanelBy(1, func() { o.presetsDirty = true })
+		node := o.presetNav.Selected()
+		if node != nil && !node.isLeaf {
+			o.presetNav.Expand(node)
+			o.presetsDirty = true
+		}
 	default: // Library
 		if o.isNC() {
 			if o.infoPanelFocused() && o.scrollInfoHorizontal(1) {
@@ -480,15 +478,16 @@ func (o *Overlay) Select() bool {
 			o.presetsDirty = true
 			return false
 		}
-		if o.focusPanel == 0 {
-			// Category selected — stay entered, switch to presets panel.
-			o.focusPanel = 1
-			o.presetCursor = 0
+		node := o.presetNav.Selected()
+		if node == nil {
+			return false
+		}
+		if !node.isLeaf {
+			o.presetNav.Expand(node)
 			o.presetsDirty = true
 			return false
 		}
-		// Preset selected.
-		return o.currentCategory() != nil && len(o.currentCategory().Presets) > 0
+		return node.key != ""
 	}
 
 	// Album panel selected: drill into a non-leaf entry or select a leaf.
@@ -628,15 +627,14 @@ func (o *Overlay) Back() {
 
 	if o.uiPage == PagePresets {
 		if o.panelEntered {
-			if o.backToLeftPanel(func() { o.presetsDirty = true }) {
+			if o.presetNav.Collapse() {
+				o.presetsDirty = true
 				return
 			}
-			// In categories panel → exit panel mode.
 			o.panelEntered = false
 			o.presetsDirty = true
 			return
 		}
-		// Exit presets page.
 		o.uiPage = PageLibrary
 		o.panelEntered = false
 		o.focusPanel = 0

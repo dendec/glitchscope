@@ -79,12 +79,6 @@ type SettingRow struct {
 	Index  int
 }
 
-// PresetCat holds a category name and its preset keys.
-type PresetCat struct {
-	Name    string
-	Presets []string
-}
-
 // navCtx selects the navigation model for a stack level.
 type navCtx int
 
@@ -171,13 +165,12 @@ type Overlay struct {
 	helpDirty           bool
 	helpVisibleRows     int
 
-	presetCategories     []PresetCat
-	presetCategoryCursor int
-	presetCursor         int
-	presetsColL          listTex
-	presetsColR          listTex
-	presetsScrollL       int
-	presetsScrollR       int
+	presetTreeRoot []presetNode     // hierarchical preset tree
+	presetNav      presetNavigation // navigation stack for preset tree
+	presetsColL    listTex
+	presetsColR    listTex
+	presetsScrollL int
+	presetsScrollR int
 
 	scrollUp    scrollHold
 	scrollDown  scrollHold

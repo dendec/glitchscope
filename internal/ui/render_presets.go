@@ -1,10 +1,5 @@
 package ui
 
-import (
-	"path/filepath"
-	"strings"
-)
-
 // This file owns rendering for the Presets page: two columns.
 // Shared primitives in overlay_render.go; model in overlay_presets.go.
 
@@ -16,91 +11,58 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	}
 	o.presetsDirty = false
 
-	// Leave room for texture padding, scrollbar, and clipped row edges.
 	maxTextPx := availableRowTextWidth(panelW)
-
-	// Only render rows that fit — avoid exceeding GPU max texture size.
 	maxRows := panelH / lh
 	if maxRows < 1 {
 		maxRows = 1
 	}
 
-	// Left panel — category names.
-	o.presetsScrollL = scrollOffset(o.presetsScrollL, o.presetCategoryCursor, len(o.presetCategories), maxRows)
-	var leftRows []listRow
-	leftEnd := o.presetsScrollL + maxRows
-	if leftEnd > len(o.presetCategories) {
-		leftEnd = len(o.presetCategories)
+	// Left panel — current tree level.
+	cur := o.presetNav.current()
+	if cur == nil {
+		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
+		return
 	}
-	for i := o.presetsScrollL; i < leftEnd; i++ {
-		cat := o.presetCategories[i]
+
+	cur.scroll = scrollOffset(cur.scroll, cur.cursor, len(cur.nodes), maxRows)
+	var leftRows []listRow
+	leftEnd := cur.scroll + maxRows
+	if leftEnd > len(cur.nodes) {
+		leftEnd = len(cur.nodes)
+	}
+	for i := cur.scroll; i < leftEnd; i++ {
+		node := cur.nodes[i]
 		prefix := "  "
-		if o.presetName != "" {
-			for _, p := range cat.Presets {
-				if p == o.presetName {
-					prefix = "▸ "
-					break
-				}
-			}
+		if !node.isLeaf {
+			prefix = "▸ "
 		}
-		line := prefix + cat.Name
-		isCursor := i == o.presetCategoryCursor && o.panelEntered && o.focusPanel == 0
-		leftRows = append(leftRows, listRow{text: line, active: isCursor})
+		// Mark currently-playing preset.
+		if node.isLeaf && node.key == o.presetName {
+			prefix = "▸ "
+		}
+		isCursor := i == cur.cursor && o.panelEntered
+		leftRows = append(leftRows, listRow{text: prefix + node.name, active: isCursor})
 	}
 	o.rebuildListRows(&o.presetsColL, leftRows, maxTextPx, panelW)
 
-	// Rebuild marquee for focused category name.
+	// Marquee for focused node name.
 	o.marqueeL.invalidate(o)
-	if o.panelEntered && o.focusPanel == 0 && o.presetCategoryCursor >= o.presetsScrollL && o.presetCategoryCursor < leftEnd {
-		cat := o.presetCategories[o.presetCategoryCursor]
+	if o.panelEntered && cur.cursor >= cur.scroll && cur.cursor < leftEnd {
+		node := cur.nodes[cur.cursor]
 		prefix := "  "
-		for _, p := range cat.Presets {
-			if p == o.presetName {
-				prefix = "▸ "
-				break
-			}
+		if !node.isLeaf {
+			prefix = "▸ "
 		}
-		o.rebuildMarqueeLine(&o.marqueeL, prefix+cat.Name, maxTextPx, true)
+		if node.isLeaf && node.key == o.presetName {
+			prefix = "▸ "
+		}
+		o.rebuildMarqueeLine(&o.marqueeL, prefix+node.name, maxTextPx, true)
 	}
 
-	// Right panel — presets in current category.
-	var rightRows []listRow
-	rightEnd := 0
-	if cat := o.currentCategory(); cat != nil {
-		o.presetsScrollR = scrollOffset(o.presetsScrollR, o.presetCursor, len(cat.Presets), maxRows)
-		rightEnd = o.presetsScrollR + maxRows
-		if rightEnd > len(cat.Presets) {
-			rightEnd = len(cat.Presets)
-		}
-		for i := o.presetsScrollR; i < rightEnd; i++ {
-			p := cat.Presets[i]
-			mark := "  "
-			if p == o.presetName {
-				mark = "▸ "
-			}
-			isCursor := i == o.presetCursor && o.panelEntered && o.focusPanel == 1
-			name := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
-			line := mark + name
-			rightRows = append(rightRows, listRow{text: line, active: isCursor})
-		}
-	} else {
-		o.presetsScrollR = 0
-	}
-	o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
-
-	// Rebuild marquee for focused preset name.
+	// Right panel — detail view (placeholder for Phase 3).
+	// For now, show selected node name or empty.
+	o.rebuildListRows(&o.presetsColR, nil, maxTextPx, panelW)
 	o.marqueeR.invalidate(o)
-	if o.panelEntered && o.focusPanel == 1 {
-		if cat := o.currentCategory(); cat != nil && o.presetCursor >= o.presetsScrollR && o.presetCursor < rightEnd {
-			p := cat.Presets[o.presetCursor]
-			name := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
-			mark := "  "
-			if p == o.presetName {
-				mark = "▸ "
-			}
-			o.rebuildMarqueeLine(&o.marqueeR, mark+name, maxTextPx, true)
-		}
-	}
 
 	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 }
@@ -118,23 +80,25 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 
 	textW := float32(availableRowTextWidth(panelW))
 
-	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelEntered && o.focusPanel == 0,
-		o.presetCategoryCursor, o.presetsScrollL, lh, winW, winH, viewW, viewH)
-	drawScrollbar(o, lx+colW-sbW, ly, colH, len(o.presetCategories), maxRows, o.presetsScrollL, winW, winH, viewW, viewH)
-	if o.panelEntered && o.focusPanel == 0 && len(o.presetCategories) > 0 {
-		rowY := ly + float32((o.presetCategoryCursor-o.presetsScrollL)*lh)
+	// Left panel.
+	cur := o.presetNav.current()
+	leftTotal := 0
+	leftCursor := 0
+	leftScroll := 0
+	if cur != nil {
+		leftTotal = len(cur.nodes)
+		leftCursor = cur.cursor
+		leftScroll = cur.scroll
+	}
+	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelEntered,
+		leftCursor, leftScroll, lh, winW, winH, viewW, viewH)
+	drawScrollbar(o, lx+colW-sbW, ly, colH, leftTotal, maxRows, leftScroll, winW, winH, viewW, viewH)
+	if o.panelEntered && leftTotal > 0 {
+		rowY := ly + float32((leftCursor-leftScroll)*lh)
 		o.drawMarqueeCol(&o.marqueeL, lx, ly, textW, colH, lh, rowY, winW, winH, viewW, viewH)
 	}
 
-	rightTotal := 0
-	if cat := o.currentCategory(); cat != nil {
-		rightTotal = len(cat.Presets)
-	}
-	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, o.panelEntered && o.focusPanel == 1,
-		o.presetCursor, o.presetsScrollR, lh, winW, winH, viewW, viewH)
-	drawScrollbar(o, rx+colW-sbW, ry, colH, rightTotal, maxRows, o.presetsScrollR, winW, winH, viewW, viewH)
-	if o.panelEntered && o.focusPanel == 1 && rightTotal > 0 {
-		rowY := ry + float32((o.presetCursor-o.presetsScrollR)*lh)
-		o.drawMarqueeCol(&o.marqueeR, rx, ry, textW, colH, lh, rowY, winW, winH, viewW, viewH)
-	}
+	// Right panel (detail — placeholder for Phase 3).
+	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, false,
+		0, 0, lh, winW, winH, viewW, viewH)
 }
