@@ -121,9 +121,11 @@ func MigrateLegacyCache(baseDir string) {
 func LoadCatalog(baseDir string) *Catalog {
 	MigrateLegacyCache(baseDir)
 	path := CatalogPath(baseDir)
+	slog.Debug("modland: LoadCatalog", "path", path)
 
 	var entry cacheEntry
 	if err := util.LoadGzipJSON(path, &entry); err != nil {
+		slog.Debug("modland: LoadCatalog failed", "path", path, "error", err)
 		return nil
 	}
 
@@ -135,6 +137,7 @@ func LoadCatalog(baseDir string) *Catalog {
 	cat := &Catalog{Albums: entry.Albums, ExcludedFormats: entry.ExcludedFormats, UpdatedAt: entry.UpdatedAt}
 	if len(entry.ExcludedFormats) > 0 {
 		cat = cat.FilterExcluded()
+		slog.Debug("modland: after FilterExcluded", "albums", len(cat.Albums))
 	}
 	return cat
 }

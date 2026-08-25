@@ -331,16 +331,41 @@ func (a *App) initLibrary() {
 	lib, err := player.NewLibrary(musicDir)
 	if err != nil {
 		slog.Warn("music scan failed", "error", err)
-		return
+		// Create a minimal library so that catalog loading can still proceed.
+		lib = player.NewEmptyLibrary()
 	}
 	a.lib = lib
+	a.lib.SetBaseDir(baseDir())
 	slog.Info("music scan", "albums", lib.AlbumCount(), "ms", time.Since(t).Milliseconds())
 
-	// Load modland from cache only (no download on startup).
-	a.loadModlandFromCache()
+	// Load catalogs from cache only (no download on startup). Cached catalogs
+	// are usable while offline, so expose their sources immediately.
+	slog.Debug("initLibrary: loading catalogs from cache", "baseDir", baseDir())
+	hasModland := a.loadModlandFromCache()
+	hasModArchive := modarchive.InitCatalog(baseDir())
+	slog.Debug("initLibrary: catalogs loaded", "hasModland", hasModland, "hasModArchive", hasModArchive,
+		"libAlbums", a.lib.AlbumCount())
+	if hasModland || hasModArchive {
+		slog.Debug("initLibrary: cached catalogs found, setting online")
+		a.online.Store(true)
+		if a.overlay != nil {
+			a.overlay.SetOnline(true)
+		}
+	}
 
-	// Preload modarchive catalog if available on disk.
-	modarchive.InitCatalog(baseDir())
+	// Wire catalog album creation: when the overlay navigates into a
+	// modarchive directory with files, it delegates album creation to the
+	// library (single owner of albums).
+	if a.overlay != nil && a.lib != nil {
+		a.overlay.SetLibAlbums(func() []player.Album {
+			return a.lib.Albums
+		})
+		a.overlay.SetAddCatalogAlbum(func(album player.Album) int {
+			idx := a.lib.AddCatalogAlbum(album)
+			slog.Debug("catalog album added", "name", album.Name, "idx", idx, "tracks", len(album.Tracks))
+			return idx
+		})
+	}
 }
 
 // checkConnectivity probes the network in the background. On success it
@@ -418,13 +443,16 @@ func (a *App) RequestQuit() {
 	a.quit.Store(true)
 }
 
-func (a *App) loadModlandFromCache() {
+func (a *App) loadModlandFromCache() bool {
+	slog.Debug("loadModlandFromCache: loading", "baseDir", baseDir())
 	cat := modland.LoadCatalog(baseDir())
 	if cat != nil && len(cat.Albums) > 0 {
+		slog.Debug("modland: catalog loaded from cache", "albums", len(cat.Albums))
 		a.addModlandAlbums(cat.Albums)
-		return
+		return true
 	}
-	slog.Info("modland: catalog not found")
+	slog.Debug("modland: catalog not found", "catNil", cat == nil)
+	return false
 }
 
 func (a *App) addModlandAlbums(catalogAlbums []modland.Album) {

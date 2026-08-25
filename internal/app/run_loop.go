@@ -121,9 +121,16 @@ func (a *App) Run() {
 			if a.lib != nil {
 				currentAlbum = a.lib.CurrentAlbumIndex()
 			}
+			// The snapshot resolves the target album itself (selected album
+			// when the UI is active, else the playing album), so the metadata
+			// gate must be evaluated for the same index.
+			trackAlbumIdx := currentAlbum
+			if selectedAlbum >= 0 {
+				trackAlbumIdx = selectedAlbum
+			}
 			a.presenter.Update(fpsAvg, a.settings.Graphics.Adaptive && !a.renderScaleExplicit,
 				a.settings.Graphics.RenderHeight, a.prof.ReadStats(),
-				a.playbackState.snapshot(selectedAlbum, a.presenter.needsTrackInfos(currentAlbum, selectedAlbum)))
+				a.playbackState.snapshot(selectedAlbum, a.presenter.needsTrackInfos(trackAlbumIdx)))
 		}
 
 		for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
@@ -193,18 +200,32 @@ func (a *App) Run() {
 		}
 
 		if a.pl != nil {
-			if _, failed := a.pl.CheckPending(); failed {
+			started, failed := a.pl.CheckPending()
+			if failed {
 				if a.overlay != nil {
 					a.overlay.ShowTrack(" playback error")
 				}
 				a.resumePath = ""
 				a.resumeSeconds = 0
-			} else if a.resumeAttempted && a.resumePath != "" && a.pl.TrackPath() == a.resumePath && a.pl.IsValidVoice() {
-				if err := a.pl.Seek(a.resumeSeconds); err != nil {
-					slog.Warn("restore playback position", "path", a.resumePath, "error", err)
+			} else {
+				// A load completed successfully. For catalog tracks the file
+				// may now be cached on disk, so the right panel must re-read
+				// its metadata (Cached, duration, comment) — even if the load
+				// finished before the presenter ever observed loading=true.
+				if started {
+					a.presenter.invalidateTrackInfos()
 				}
-				a.resumePath = ""
-				a.resumeSeconds = 0
+				if a.resumeAttempted && a.resumePath != "" && a.pl.TrackPath() == a.resumePath && a.pl.IsValidVoice() {
+					resumePath := a.resumePath
+					if err := a.pl.Seek(a.resumeSeconds); err != nil {
+						slog.Warn("restore playback position", "path", resumePath, "error", err)
+					}
+					if a.overlay != nil && a.overlay.UIVisible() {
+						a.overlay.NavigateToTrack(resumePath)
+					}
+					a.resumePath = ""
+					a.resumeSeconds = 0
+				}
 			}
 			a.restoreSavedPosition(a.online.Load())
 		}

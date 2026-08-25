@@ -44,11 +44,12 @@ func SaveCatalog(baseDir string, cat *Catalog) error {
 }
 
 // InitCatalog loads the pre-crawled catalog from baseDir and pre-populates in-memory cache.
-func InitCatalog(baseDir string) {
+// Reports whether a non-empty catalog was found.
+func InitCatalog(baseDir string) bool {
 	cat := LoadCatalog(baseDir)
 	if cat == nil || len(cat.Directories) == 0 {
 		slog.Info("modarchive: catalog file not found or empty")
-		return
+		return false
 	}
 
 	memCacheMu.Lock()
@@ -68,4 +69,5 @@ func InitCatalog(baseDir string) {
 	memCacheMu.Unlock()
 
 	slog.Info("modarchive: preloaded catalog from disk", "directories", len(cat.Directories), "age", time.Since(cat.UpdatedAt).Round(time.Hour))
+	return true
 }

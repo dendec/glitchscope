@@ -35,7 +35,14 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 		return
 	case input.ActionToggleUI:
 		if a.overlay != nil {
-			a.overlay.ToggleUI() // always show/hide the UI, never cycles pages
+			wasVisible := a.overlay.UIVisible()
+			a.overlay.ToggleUI()
+			// When opening the UI, navigate to the currently playing track.
+			if !wasVisible && a.pl != nil {
+				path := a.pl.TrackPath()
+				a.overlay.SetPlayingInfo(a.currentAlbumName(), path)
+				a.overlay.NavigateToTrack(path)
+			}
 		}
 		return
 	case input.ActionSeekForward:
@@ -115,8 +122,14 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 				a.stopMicCapture()
 			} else if selected && a.lib != nil && a.pl != nil {
 				if a.overlay.IsCatalogMode() {
-					if albumName, path := a.overlay.SelectedCatalogTrack(); path != "" {
+					albumName, path, tracks, idx := a.overlay.SelectedCatalogInfo()
+					slog.Debug("Select: catalog mode", "albumName", albumName, "path", path)
+					if path != "" {
+						// Start playback first, then commit the playlist: a
+						// failed start must not leave a stale catalog playlist
+						// behind for next/prev to navigate.
 						a.playTrack(path, albumName)
+						a.playbackState.setPlaylist(tracks, idx, albumName)
 					}
 				} else if a.overlay.FocusPanel() == 0 {
 					if path := a.lib.SelectAlbum(a.overlay.AlbumCursor()); path != "" {
@@ -161,7 +174,13 @@ func (a *App) handleNormalAction(act input.Action) {
 	switch act {
 	case input.ActionSelect:
 		if a.overlay != nil {
+			wasVisible := a.overlay.UIVisible()
 			a.overlay.ToggleUI()
+			if !wasVisible && a.pl != nil {
+				path := a.pl.TrackPath()
+				a.overlay.SetPlayingInfo(a.currentAlbumName(), path)
+				a.overlay.NavigateToTrack(path)
+			}
 		}
 
 	case input.ActionBack:
@@ -370,6 +389,15 @@ func (a *App) playTrack(path, album string) {
 		return
 	}
 	slog.Info("now loading", "track", path, "album", album)
+}
+
+// currentAlbumName returns the display name of the currently playing album,
+// or "" when no album is loaded.
+func (a *App) currentAlbumName() string {
+	if a.lib == nil {
+		return ""
+	}
+	return a.lib.CurrentAlbum().Name
 }
 
 // startMicCapture starts capture from one selected input device. Capture feeds the
