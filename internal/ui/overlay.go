@@ -565,6 +565,10 @@ func (o *Overlay) SetPresetName(name string) {
 	}
 	o.presetName = name
 	o.presetNameDirty = true
+	// Auto-follow: when preset changes on the Presets page, sync cursor.
+	if o.uiPage == PagePresets {
+		o.syncPresetTree()
+	}
 }
 
 // SetOnline updates the connectivity flag and refreshes the virtual source root.
