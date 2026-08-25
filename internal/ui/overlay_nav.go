@@ -2,6 +2,8 @@ package ui
 
 import (
 	"context"
+	"log/slog"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -17,21 +19,21 @@ import (
 
 const modlandNamePrefix = "Modland: "
 
-// isVirtualAlbum reports provider-browsed albums (modland/modarchive) that
-// live only in the overlay, not in the library scan.
-func isVirtualAlbum(a player.Album) bool {
-	return strings.HasPrefix(a.Path, player.ModlandPrefix) || strings.HasPrefix(a.Path, player.ModArchivePrefix)
+// currentAlbums returns the one-frame snapshot of the lib.Albums list (local
+// + virtual + catalog). Never nil — returns nil when no callback is
+// registered. The snapshot is refreshed once per frame in Update and after
+// every album mutation, so all consumers within a frame see the same list.
+func (o *Overlay) currentAlbums() []player.Album {
+	return o.cachedAlbums
 }
 
-// realAlbumsOnly filters virtual provider albums out of a list.
-func realAlbumsOnly(list []player.Album) []player.Album {
-	out := make([]player.Album, 0, len(list))
-	for _, a := range list {
-		if !isVirtualAlbum(a) {
-			out = append(out, a)
-		}
+// refreshAlbumsCache re-reads the lib.Albums snapshot. Called once per frame
+// (Update) and after every mutation (SetLibAlbums, catalog album addition).
+func (o *Overlay) refreshAlbumsCache() {
+	if o.libAlbums == nil {
+		return
 	}
-	return out
+	o.cachedAlbums = o.libAlbums()
 }
 
 // navEntryKind classifies a row in the library navigation panel.
@@ -138,6 +140,7 @@ func (o *Overlay) buildSourceEntries() []navEntry {
 	if len(o.micDevices) > 0 || o.micActive {
 		entries = append(entries, navEntry{label: o.micLabel(), kind: entrySource, source: sourceMicrophone, albumIdx: -1})
 	}
+	slog.Debug("buildSourceEntries", "online", o.online)
 	if o.online {
 		entries = append(entries,
 			navEntry{label: "modland/", kind: entrySource, source: sourceModland, albumIdx: -1},
@@ -192,7 +195,7 @@ func (o *Overlay) ShowMicrophoneDevices(devices []string) {
 func (o *Overlay) buildFormatEntries() []navEntry {
 	seen := map[string]bool{}
 	var formats []string
-	for _, a := range o.allAlbums {
+	for _, a := range o.currentAlbums() {
 		if !strings.HasPrefix(a.Path, player.ModlandPrefix) {
 			continue
 		}
@@ -203,6 +206,7 @@ func (o *Overlay) buildFormatEntries() []navEntry {
 		}
 	}
 	sort.Strings(formats)
+	slog.Debug("buildFormatEntries", "allAlbums", len(o.currentAlbums()), "modlandFormats", len(formats))
 	entries := make([]navEntry, len(formats))
 	for i, f := range formats {
 		entries[i] = navEntry{label: f + "/", kind: entryFormat, format: f, albumIdx: -1}
@@ -213,7 +217,7 @@ func (o *Overlay) buildFormatEntries() []navEntry {
 // buildAlbumsInFormatEntries lists modland albums within a single format.
 func (o *Overlay) buildAlbumsInFormatEntries(format string) []navEntry {
 	var entries []navEntry
-	for i, a := range o.allAlbums {
+	for i, a := range o.currentAlbums() {
 		if !strings.HasPrefix(a.Path, player.ModlandPrefix) {
 			continue
 		}
@@ -231,10 +235,11 @@ func (o *Overlay) buildAlbumsInFormatEntries(format string) []navEntry {
 }
 
 func (o *Overlay) buildCatalogTrackEntries(albumIdx int) []navEntry {
-	if albumIdx < 0 || albumIdx >= len(o.allAlbums) {
+	all := o.currentAlbums()
+	if albumIdx < 0 || albumIdx >= len(all) {
 		return nil
 	}
-	tracks := o.allAlbums[albumIdx].Tracks
+	tracks := all[albumIdx].Tracks
 	entries := make([]navEntry, 0, len(tracks))
 	for i, track := range tracks {
 		entries = append(entries, navEntry{
@@ -298,17 +303,17 @@ func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []moda
 	if hasFiles {
 		albumPath := player.ModArchivePrefix + targetURL
 		albumIdx := -1
-		for i, a := range o.allAlbums {
+		// Search in the library albums (which now includes catalog albums).
+		for i, a := range o.currentAlbums() {
 			if a.Path == albumPath {
 				albumIdx = i
 				break
 			}
 		}
 
-		if albumIdx < 0 {
+		if albumIdx < 0 && o.addCatalogAlbum != nil {
 			if album := modarchive.BuildAlbum(targetURL, items); album != nil {
-				o.allAlbums = append(o.allAlbums, *album)
-				albumIdx = len(o.allAlbums) - 1
+				albumIdx = o.addCatalogAlbum(*album)
 			}
 		}
 
@@ -392,26 +397,32 @@ func (o *Overlay) popLevel() bool {
 	return true
 }
 
-// AlbumCursor returns the real allAlbums index of the current leaf album,
-// or -1 when on a non-leaf row.
+// AlbumCursor returns the real allAlbums index of the current leaf album
+// or catalog track, or -1 when on a non-leaf row.
 func (o *Overlay) AlbumCursor() int {
 	e := o.currentEntry()
-	if e.IsLeafAlbum() {
+	if e.IsLeafAlbum() || e.IsCatalogTrack() {
 		return e.albumIdx
 	}
 	return -1
 }
 
-func (o *Overlay) SelectedCatalogTrack() (string, string) {
+// SelectedCatalogInfo returns the album name, the selected track path, the
+// album's full track list, and the selected track index for the current
+// catalog track. Returns zero values when the current entry is not a catalog
+// track. One lookup serves both playback (path) and playlist setup (tracks,
+// idx) — see CatalogAlbumTracks/SelectedCatalogTrack, merged here.
+func (o *Overlay) SelectedCatalogInfo() (albumName, path string, tracks []string, idx int) {
 	e := o.currentEntry()
-	if !e.IsCatalogTrack() || e.albumIdx < 0 || e.albumIdx >= len(o.allAlbums) {
-		return "", ""
+	all := o.currentAlbums()
+	if !e.IsCatalogTrack() || e.albumIdx < 0 || e.albumIdx >= len(all) {
+		return "", "", nil, -1
 	}
-	album := o.allAlbums[e.albumIdx]
+	album := all[e.albumIdx]
 	if e.trackIdx < 0 || e.trackIdx >= len(album.Tracks) {
-		return "", ""
+		return "", "", nil, -1
 	}
-	return album.Name, album.Tracks[e.trackIdx]
+	return album.Name, album.Tracks[e.trackIdx], album.Tracks, e.trackIdx
 }
 
 // --- NC-local filesystem navigation ---
@@ -633,11 +644,14 @@ func (o *Overlay) switchToSourceRoot() {
 }
 
 func (o *Overlay) switchToProvider(source sourceKind) {
+	slog.Debug("switchToProvider", "source", source, "allAlbums", len(o.currentAlbums()), "online", o.online)
 	o.source = source
 	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
 	switch source {
 	case sourceModland:
-		o.pushLevel(navLevel{ctx: ctxCatalog, label: "modland", entries: o.buildFormatEntries()})
+		entries := o.buildFormatEntries()
+		slog.Debug("switchToProvider modland", "formats", len(entries))
+		o.pushLevel(navLevel{ctx: ctxCatalog, label: "modland", entries: entries})
 	case sourceModArchive:
 		o.pushLevel(navLevel{ctx: ctxCatalog, label: "modarchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
 	}
@@ -669,6 +683,251 @@ func (o *Overlay) refreshNCPreview() {
 	}
 	o.tracksDirty = true
 	o.tracksContentDirty = true
+}
+
+// NavigateToTrack opens the Library at the location of the given track path.
+// For local files: enters the parent directory in NC mode and highlights the
+// file. For catalog tracks (modland/modarchive): walks the provider tree to
+// the album and highlights the track. Right-panel info is shown for catalog
+// tracks; NC info panel is shown for local files.
+func (o *Overlay) NavigateToTrack(path string) {
+	if path == "" {
+		return
+	}
+	if player.IsModland(path) || player.IsModArchive(path) {
+		o.navigateToCatalogTrack(path)
+		return
+	}
+	o.navigateToLocalTrack(path)
+}
+
+// navigateToLocalTrack enters the parent directory of a local file and
+// positions the cursor on the file. If the file is already visible in the
+// current NC view, just moves the cursor.
+func (o *Overlay) navigateToLocalTrack(path string) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return
+	}
+	dir := filepath.Dir(absPath)
+	name := filepath.Base(absPath)
+
+	// If already browsing this directory in NC, just move the cursor.
+	if o.isNC() && o.ncDir() == dir {
+		for i, e := range o.albumEntries {
+			if e.IsNCFile() && e.filePath == absPath {
+				o.albumCursor = i
+				o.focusPanel = 0
+				o.refreshNCPreview()
+				o.albumsDirty = true
+				return
+			}
+		}
+	}
+
+	// Enter the directory via NC.
+	o.switchToNC(dir)
+
+	// Find and highlight the file.
+	for i, e := range o.albumEntries {
+		if e.IsNCFile() && (e.filePath == absPath || filepath.Base(e.filePath) == name) {
+			o.albumCursor = i
+			o.focusPanel = 0
+			o.refreshNCPreview()
+			o.albumsDirty = true
+			return
+		}
+	}
+}
+
+// navigateToCatalogTrack walks the provider tree to locate a catalog track
+// and positions the cursor on it. The right panel shows track info.
+// Navigation works as long as the album data exists in the library —
+// regardless of the online flag (catalogs may be loaded from cache).
+func (o *Overlay) navigateToCatalogTrack(path string) {
+	if player.IsModland(path) {
+		o.navigateToModlandTrack(path)
+		return
+	}
+	if player.IsModArchive(path) {
+		o.navigateToModArchiveTrack(path)
+		return
+	}
+}
+
+// navigateToModlandTrack builds: source root → modland → format → album → track.
+func (o *Overlay) navigateToModlandTrack(path string) {
+	remote := player.RemotePath(path)
+	parts := strings.Split(remote, "/")
+	if len(parts) < 3 {
+		return
+	}
+	format := parts[0]
+	albumName := modlandNamePrefix + parts[0] + "/" + parts[1]
+	trackTitle := player.TrackTitle(path)
+
+	// Find the album index in the library.
+	all := o.currentAlbums()
+	albumIdx := -1
+	for i, a := range all {
+		if a.Path == path[:len(path)-len(trackTitle)-1] || a.Name == albumName {
+			albumIdx = i
+			break
+		}
+	}
+	if albumIdx < 0 {
+		// Album not in library yet — try to find by prefix match.
+		for i, a := range all {
+			if strings.HasPrefix(a.Path, player.ModlandPrefix+format+"/") && strings.Contains(a.Name, parts[1]) {
+				albumIdx = i
+				break
+			}
+		}
+	}
+	if albumIdx < 0 {
+		return
+	}
+
+	// Build navigation tree: source root → modland → format → album tracks.
+	// Temporarily enable online so the source root shows the provider entry;
+	// restore the original state afterward so offline users aren't left with
+	// phantom remote entries after closing the UI.
+	savedOnline := o.online
+	o.online = true
+	o.source = sourceModland
+	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
+	o.online = savedOnline
+
+	// Level 1: modland formats.
+	formatEntries := o.buildFormatEntries()
+	o.pushLevel(navLevel{ctx: ctxCatalog, label: "modland", entries: formatEntries})
+
+	// Level 2: albums within format.
+	albumEntries := o.buildAlbumsInFormatEntries(format)
+	o.pushLevel(navLevel{ctx: ctxCatalog, label: format, entries: albumEntries})
+
+	// Find the cursor position for the album in the format list.
+	for i, e := range o.albumEntries {
+		if e.IsLeafAlbum() && e.albumIdx == albumIdx {
+			o.albumCursor = i
+			break
+		}
+	}
+
+	// Level 3: tracks within album.
+	trackEntries := o.buildCatalogTrackEntries(albumIdx)
+	if len(trackEntries) == 0 {
+		return
+	}
+	o.pushLevel(navLevel{ctx: ctxCatalog, label: parts[1], entries: trackEntries})
+
+	// Find and highlight the track.
+	for i, e := range o.albumEntries {
+		if e.IsCatalogTrack() && e.label == trackTitle {
+			o.albumCursor = i
+			// Keep focus on the left panel — the right panel is a static
+			// info view for catalog tracks and does not draw a cursor.
+			o.albumsDirty = true
+			o.tracksDirty = true
+			o.tracksContentDirty = true
+			return
+		}
+	}
+	// Fallback: select the first track.
+	if len(o.albumEntries) > 1 {
+		o.albumCursor = 1
+		o.albumsDirty = true
+		o.tracksDirty = true
+		o.tracksContentDirty = true
+	}
+}
+
+// navigateToModArchiveTrack builds: source root → modarchive → directory tree → track.
+// ModArchive tracks are identified by URL; we search the library for the
+// matching album and navigate to its track list.
+func (o *Overlay) navigateToModArchiveTrack(path string) {
+	remote := player.RemotePath(path)
+	trackTitle := player.TrackTitle(path)
+	trackURL := strings.TrimRight(remote, "/")
+	lastSlash := strings.LastIndexByte(trackURL, '/')
+	if lastSlash < 0 {
+		return
+	}
+	albumURL := trackURL[:lastSlash+1]
+
+	// Album paths are directory URLs, while track paths append the archive file
+	// name. Entering the directory also creates its lazy catalog album when the
+	// track was restored before the user browsed ModArchive.
+	all := o.currentAlbums()
+	albumIdx := -1
+	for i, a := range all {
+		if strings.TrimRight(strings.TrimPrefix(a.Path, player.ModArchivePrefix), "/") == strings.TrimRight(albumURL, "/") {
+			albumIdx = i
+			break
+		}
+	}
+	if albumIdx < 0 {
+		o.buildModArchiveEntries(albumURL)
+		all = o.currentAlbums()
+		for i, a := range all {
+			if strings.TrimRight(strings.TrimPrefix(a.Path, player.ModArchivePrefix), "/") == strings.TrimRight(albumURL, "/") {
+				albumIdx = i
+				break
+			}
+		}
+	}
+	if albumIdx < 0 {
+		return
+	}
+
+	album := all[albumIdx]
+
+	// Build navigation tree: source root → modarchive → directory.
+	// Temporarily enable online so the source root shows the provider entry;
+	// restore the original state afterward.
+	savedOnline := o.online
+	o.online = true
+	o.source = sourceModArchive
+	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
+	o.online = savedOnline
+	o.pushLevel(navLevel{ctx: ctxCatalog, label: "modarchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
+
+	// Try to enter the directory if we can resolve it from the URL.
+	parsed, err := url.Parse(albumURL)
+	if err == nil {
+		dirURL := modarchive.BaseURL + strings.TrimPrefix(parsed.Path, "/")
+		dirEntries := o.buildModArchiveEntries(dirURL)
+		if dirEntries != nil {
+			o.pushLevel(navLevel{ctx: ctxCatalog, label: filepath.Base(parsed.Path), entries: dirEntries})
+		}
+	}
+
+	// If the album has tracks, build the track list.
+	if len(album.Tracks) > 0 {
+		trackEntries := o.buildCatalogTrackEntries(albumIdx)
+		if len(trackEntries) > 0 {
+			o.pushLevel(navLevel{ctx: ctxCatalog, label: album.Name, entries: trackEntries})
+		}
+	}
+
+	// Find and highlight the track.
+	for i, e := range o.albumEntries {
+		if e.IsCatalogTrack() && e.label == trackTitle {
+			o.albumCursor = i
+			// Keep focus on the left panel — the right panel is a static
+			// info view for catalog tracks and does not draw a cursor.
+			o.albumsDirty = true
+			o.tracksDirty = true
+			o.tracksContentDirty = true
+			return
+		}
+	}
+	if len(o.albumEntries) > 1 {
+		o.albumCursor = 1
+		o.albumsDirty = true
+		o.tracksDirty = true
+		o.tracksContentDirty = true
+	}
 }
 
 func clampCursor(cur, max int) int {

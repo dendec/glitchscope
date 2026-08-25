@@ -25,6 +25,9 @@ type scrollHold struct {
 // Update advances animations and handles scroll acceleration. Call every frame.
 // gamepadUp/gamepadDown report D-Pad state (SDL button events don't auto-repeat).
 func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
+	// Refresh the per-frame album snapshot before any navigation/render work
+	// of this frame reads it (runs even while the UI is hidden).
+	o.refreshAlbumsCache()
 	o.notif.Update(o.uiVisible)
 
 	if !o.uiVisible || !o.panelEntered {
@@ -236,6 +239,14 @@ func (o *Overlay) moveCursor(dir int) {
 		}
 		return
 	}
+	// Catalog track info panel: the right side is a scrollable info view
+	// (same scroll state as NC), not a track list.
+	if o.focusPanel == 1 {
+		if e := o.currentEntry(); e != nil && e.IsCatalogTrack() {
+			o.scrollNCInfo(dir)
+			return
+		}
+	}
 	switch o.focusPanel {
 	case 0:
 		if next := o.albumCursor + dir; next >= 0 && next < len(o.albums) {
@@ -432,6 +443,7 @@ func (o *Overlay) Select() bool {
 	// One dispatch — entry kinds drive everything.
 	if o.focusPanel == 0 {
 		if e := o.currentEntry(); e != nil {
+			slog.Debug("Select", "kind", e.kind, "label", e.label, "albumIdx", e.albumIdx, "trackIdx", e.trackIdx, "isCatalog", o.isCatalog())
 			switch {
 			case e.kind == entryParent:
 				o.popLevel()
@@ -460,6 +472,7 @@ func (o *Overlay) Select() bool {
 			case e.IsNCFile():
 				return true // play the file
 			case e.IsCatalogTrack():
+				slog.Debug("Select: catalog track", "albumIdx", e.albumIdx, "trackIdx", e.trackIdx)
 				return true // play the catalog track
 			case o.isCatalog() && e.IsLeafAlbum():
 				entries := o.buildCatalogTrackEntries(e.albumIdx)

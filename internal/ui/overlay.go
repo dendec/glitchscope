@@ -133,28 +133,30 @@ type Overlay struct {
 	musicDir         string // resolved local music root, may differ from baseDir/"music"
 	source           sourceKind
 
-	allAlbums    []player.Album
-	navStack     []navLevel
-	albumEntries []navEntry
-	albums       []string
-	albumCursor  int
-	trackInfos   []player.TrackInfo
-	trackCursor  int
-	statsLine    string
-	position     float64
-	duration     float64
-	sampleRate   float32
-	bitrate      float64
-	bpm          float64
-	channels     int
-	paused       bool
-	isTracker    bool
-	presetName   string
-	playingAlbum string
-	playingTrack string
-	loading      bool
-	loadPercent  int64
-	focusPanel   int // 0=albums, 1=tracks
+	libAlbums       func() []player.Album  // reads lib.Albums — snapshot cached once per frame
+	addCatalogAlbum func(player.Album) int // adds on-the-fly catalog album to lib, returns stable index
+	cachedAlbums    []player.Album         // one-frame snapshot of libAlbums(); never mutated by the overlay
+	navStack        []navLevel
+	albumEntries    []navEntry
+	albums          []string
+	albumCursor     int
+	trackInfos      []player.TrackInfo
+	trackCursor     int
+	statsLine       string
+	position        float64
+	duration        float64
+	sampleRate      float32
+	bitrate         float64
+	bpm             float64
+	channels        int
+	paused          bool
+	isTracker       bool
+	presetName      string
+	playingAlbum    string // display album name (from Library) for left-panel highlight
+	playingPath     string // full path of the currently playing track
+	loading         bool
+	loadPercent     int64
+	focusPanel      int // 0=albums, 1=tracks
 
 	settingsRows        []SettingRow
 	settingsCursor      int
@@ -457,29 +459,24 @@ func (o *Overlay) rebuildFace() {
 
 // --- Data setters ---
 
-// SetAlbums updates the catalog album data used by provider navigation.
-func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
+// HandleRescan detects local album changes and triggers the appropriate
+// navigation reset. Call from the presenter each frame with the current
+// and previous local album lists.
+func (o *Overlay) HandleRescan(prevLocal, nextLocal []player.Album) {
 	if o.isNC() {
 		return
 	}
-	atSourceRoot := o.topLevel().ctx == ctxSourceRoot
-	previousCursor := o.albumCursor
-	// Virtual provider albums (modland/modarchive) are overlay-owned and
-	// don't exist in the library — ignore them when detecting a rescan,
-	// otherwise creating a ModArchive album resets the nav stack to root.
-	prev := realAlbumsOnly(o.allAlbums)
-	next := realAlbumsOnly(albums)
-	listChanged := len(prev) != len(next)
+	listChanged := len(prevLocal) != len(nextLocal)
 	if !listChanged {
-		for i := range next {
-			if prev[i].Name != next[i].Name || prev[i].Path != next[i].Path {
+		for i := range nextLocal {
+			if prevLocal[i].Name != nextLocal[i].Name || prevLocal[i].Path != nextLocal[i].Path {
 				listChanged = true
 				break
 			}
 		}
 	}
 	if listChanged {
-		o.allAlbums = albums
+		atSourceRoot := o.topLevel().ctx == ctxSourceRoot
 		if atSourceRoot {
 			o.navStack[0].entries = o.buildSourceEntries()
 			o.albumEntries = o.navStack[0].entries
@@ -489,16 +486,9 @@ func (o *Overlay) SetAlbums(albums []player.Album, cursor int) {
 			// the filesystem browser at the configured music root.
 			o.switchToNC(o.musicDir)
 		}
-	}
-	if listChanged {
 		o.refreshAlbumLabels()
-	}
-	cursorChanged := previousCursor != o.albumCursor
-	if listChanged || cursorChanged {
 		o.albumsDirty = true
-		if listChanged {
-			o.albumsContentDirty = true
-		}
+		o.albumsContentDirty = true
 	}
 }
 
@@ -539,11 +529,14 @@ func (o *Overlay) SetPlayback(pos, dur float64, sr float32, bitrate, bpm float64
 	o.isTracker = isTracker
 }
 
-// SetPlaying identifies the currently playing album and track.
-func (o *Overlay) SetPlaying(album, track string) {
-	if o.playingAlbum != album || o.playingTrack != track {
-		o.playingAlbum = album
-		o.playingTrack = track
+// SetPlayingInfo updates the currently playing album name (for left-panel
+// highlight) and track path (for navigation, right-panel highlight, bottom
+// bar). Single setter — keeps both in sync.
+func (o *Overlay) SetPlayingInfo(album, path string) {
+	changed := o.playingAlbum != album || o.playingPath != path
+	o.playingAlbum = album
+	o.playingPath = path
+	if changed {
 		o.albumsDirty = true
 		o.albumsContentDirty = true
 		o.tracksDirty = true
@@ -585,6 +578,27 @@ func (o *Overlay) SetOnline(v bool) {
 	o.online = v
 	slog.Info("overlay connectivity changed", "online", v, "nc_dir", o.ncDir(), "base_dir", o.baseDir)
 	o.refreshSourceRoot()
+}
+
+// SetLibAlbums registers a callback that returns the current lib.Albums list.
+// Must be called before any catalog navigation. The result is snapshotted
+// into cachedAlbums (refreshed once per frame in Update and on every
+// mutation) so all consumers within a frame see the same list.
+func (o *Overlay) SetLibAlbums(fn func() []player.Album) {
+	o.libAlbums = fn
+	o.refreshAlbumsCache()
+}
+
+// SetAddCatalogAlbum registers the callback that delegates on-the-fly catalog
+// album creation to the library. Must be called before any catalog navigation.
+// The callback is wrapped so the per-frame album snapshot is refreshed as soon
+// as the album is added — the same navigation step reads it back.
+func (o *Overlay) SetAddCatalogAlbum(fn func(player.Album) int) {
+	o.addCatalogAlbum = func(album player.Album) int {
+		idx := fn(album)
+		o.refreshAlbumsCache()
+		return idx
+	}
 }
 
 func (o *Overlay) SettingsRows() []SettingRow { return o.settingsRows }

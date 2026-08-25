@@ -40,7 +40,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	if o.pageIndicatorDirty {
 		o.rebuildPageIndicatorTextures()
 	}
-	if (o.playingTrack != "" || o.loading) && o.bottomDirty {
+	if (o.playingPath != "" || o.loading) && o.bottomDirty {
 		o.rebuildBottomTex(winW, o.face.Metrics().Height.Ceil())
 	}
 	if o.uiPage == PageLibrary {
@@ -131,7 +131,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		o.renderLibraryPanels(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 	}
 
-	showBar := o.playingTrack != "" || o.loading || o.presetNameTex != 0
+	showBar := o.playingPath != "" || o.loading || o.presetNameTex != 0
 	if showBar {
 		by := float32(winH - bottomH)
 		barBackdropH := float32(presetLineH + statusRowH)
@@ -383,13 +383,13 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	o.bottomTitleX = 0
 	o.bottomTitleW = 0
 
-	if o.playingTrack == "" && !o.loading {
+	if o.playingPath == "" && !o.loading {
 		return
 	}
 
 	title := ""
-	if o.playingTrack != "" {
-		title = o.displayTrackPath(o.playingTrack)
+	if o.playingPath != "" {
+		title = o.displayTrackPath(o.playingPath)
 	}
 
 	// Loading indicator.

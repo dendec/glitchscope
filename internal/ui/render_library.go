@@ -59,8 +59,11 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 	if o.tracksTex != 0 {
 		tx, ty := float32(tracksX), float32(panelY)
 		drawPanelBg(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
-		// NC right panel: no cursor highlight or marquee.
-		if !o.isNC() {
+		// NC and catalog-track info panels are static info views: no cursor
+		// highlight, no marquee, and their scrollbar is driven by the shared
+		// ncInfo* scroll state instead of the track list.
+		isInfoPanel := o.isNC() || (o.currentEntry() != nil && o.currentEntry().IsCatalogTrack())
+		if !isInfoPanel {
 			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
 				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
 				o.drawCursorHighlight(tx, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
@@ -69,7 +72,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		glDrawOverlayTextClipped(o.programText, o.tracksTex, 1,
 			tx, ty, float32(o.tracksTexW), float32(o.tracksTexH),
 			tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
-		if !o.isNC() {
+		if !isInfoPanel {
 			tm := panelH / lh
 			if tm < 1 {
 				tm = 1
@@ -127,7 +130,7 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 		if o.isNC() {
 			// NC: highlight by file path match.
 			e := o.albumEntries[i]
-			if e.IsNCFile() && e.filePath == o.playingTrack {
+			if e.IsNCFile() && e.filePath == o.playingPath {
 				prefix = "▸ "
 			}
 		} else if name == o.playingAlbum {
@@ -159,6 +162,13 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 		return
 	}
 
+	// Catalog track: show right-panel info if track has cached metadata.
+	if e := o.currentEntry(); e != nil && e.IsCatalogTrack() {
+		o.rebuildCatalogTrackInfoTex(e, maxW, maxH)
+		return
+	}
+
+	// Catalog directory/format level: no right panel.
 	if o.isCatalog() {
 		o.deleteTex(&o.tracksTex)
 		o.marqueeR.invalidate(o)
@@ -206,7 +216,7 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 			suffix = "  " + formatDuration(info.Duration)
 		}
 		prefix := "  "
-		if info.Path == o.playingTrack {
+		if info.Path == o.playingPath {
 			prefix = "▸ "
 		}
 		line := prefix + title + suffix
@@ -322,4 +332,88 @@ func (o *Overlay) ncTrackInfo() *player.TrackInfo {
 		}
 	}
 	return nil
+}
+
+// catalogTrackInfoLines builds the right-panel lines for a cached catalog
+// track. Returns nil when the track is not cached or metadata is not yet
+// available — the caller hides the right panel in that case.
+// Pure logic, no GL — unit-testable.
+func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []player.TrackInfo) []string {
+	if e.albumIdx < 0 || e.trackIdx < 0 {
+		return nil
+	}
+	if e.albumIdx >= len(albums) {
+		return nil
+	}
+	album := albums[e.albumIdx]
+	if e.trackIdx >= len(album.Tracks) {
+		return nil
+	}
+	trackPath := album.Tracks[e.trackIdx]
+
+	// Find the track info from the presenter-provided trackInfos.
+	for i := range trackInfos {
+		if trackInfos[i].Path != trackPath {
+			continue
+		}
+		ti := &trackInfos[i]
+		if !ti.Cached {
+			return nil
+		}
+		// Cached — show metadata. Even with zero metadata the panel is
+		// visible, signalling that the file is locally available.
+		var lines []string
+		lines = append(lines, player.TrackTitle(e.label), "")
+		if ti.Duration > 0 {
+			lines = append(lines, fmt.Sprintf("  %s", formatDuration(ti.Duration)))
+		}
+		if ti.BPM > 0 {
+			lines = append(lines, fmt.Sprintf("  BPM: %.0f", ti.BPM))
+		}
+		if ti.Channels > 0 {
+			lines = append(lines, fmt.Sprintf("  Channels: %d", ti.Channels))
+		}
+		if ti.Comment != "" {
+			lines = append(lines, "")
+			for _, cl := range strings.Split(ti.Comment, "\n") {
+				lines = append(lines, "  "+cl)
+			}
+		}
+		return lines
+	}
+
+	// Track info not yet available (metadata still loading).
+	return nil
+}
+
+// rebuildCatalogTrackInfoTex renders the right-panel info for a cached catalog
+// track. Hides the panel (no texture) when the track is not cached or
+// metadata is unavailable. Long comments scroll via ncInfo* scroll state.
+func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
+	o.deleteTex(&o.tracksTex)
+	o.marqueeR.invalidate(o)
+	o.tracksContentDirty = false
+
+	lines := catalogTrackInfoLines(e, o.currentAlbums(), o.trackInfos)
+	if len(lines) == 0 {
+		return
+	}
+
+	maxTextPx := availableRowTextWidth(maxW)
+	lh := o.face.Metrics().Height.Ceil()
+	maxRows := maxH / lh
+	if maxRows < 1 {
+		maxRows = 1
+	}
+	o.ncInfoVisible = maxRows
+	o.ncInfoLines = len(lines)
+	maxScroll := max(0, len(lines)-maxRows)
+	o.ncInfoScroll = min(o.ncInfoScroll, maxScroll)
+	start := o.ncInfoScroll
+	end := min(start+maxRows, len(lines))
+	var rows []listRow
+	for _, line := range lines[start:end] {
+		rows = append(rows, listRow{text: line})
+	}
+	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
 }

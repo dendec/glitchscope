@@ -76,6 +76,7 @@ func TestSelectModArchiveDirectoryShowsFiles(t *testing.T) {
 		{label: "2014", kind: entryModArchiveDir, url: targetURL},
 		{label: "other", kind: entryModArchiveDir, url: "other/"},
 	}
+	var all []player.Album
 	o := &Overlay{
 		navStack: []navLevel{{ctx: ctxCatalog, entries: entries}},
 		albumEntries: []navEntry{
@@ -85,7 +86,6 @@ func TestSelectModArchiveDirectoryShowsFiles(t *testing.T) {
 		albums:      []string{"2014", "other"},
 		albumCursor: 0,
 		focusPanel:  0,
-		allAlbums:   []player.Album{},
 		modArchiveItems: map[string][]modarchive.DirItem{
 			targetURL: {{
 				Name:      "j-61m_-_kilobyte_chillout.it.zip",
@@ -95,6 +95,11 @@ func TestSelectModArchiveDirectoryShowsFiles(t *testing.T) {
 			}},
 		},
 	}
+	o.SetLibAlbums(func() []player.Album { return all })
+	o.SetAddCatalogAlbum(func(album player.Album) int {
+		all = append(all, album)
+		return len(all) - 1
+	})
 
 	if selected := o.Select(); selected {
 		t.Fatal("directory selection unexpectedly started playback")
@@ -119,7 +124,6 @@ func TestSelectModArchiveEmptyDirectoryEntersLevel(t *testing.T) {
 		modArchiveItems: map[string][]modarchive.DirItem{
 			targetURL: {},
 		},
-		allAlbums:   []player.Album{},
 		albumCursor: 0,
 		focusPanel:  0,
 	}
@@ -135,20 +139,116 @@ func TestSelectModArchiveEmptyDirectoryEntersLevel(t *testing.T) {
 	}
 }
 
+func TestNavigateToModArchiveZipTrack(t *testing.T) {
+	targetURL := "http://modarchive.textfiles.com/2014/IT/J/"
+	trackURL := targetURL + "song.mod.zip"
+	albums := []player.Album{{
+		Name:   "ModArchive: 2014/IT/J",
+		Path:   player.ModArchivePrefix + targetURL,
+		Tracks: []string{player.ModArchivePrefix + trackURL},
+	}}
+	o := &Overlay{
+		modArchiveItems: map[string][]modarchive.DirItem{
+			modarchive.BaseURL: {{Name: "2014", URL: targetURL, Kind: modarchive.KindDir}},
+			targetURL:          {{Name: "song.mod.zip", URL: trackURL, Kind: modarchive.KindFile}},
+		},
+		libAlbums: func() []player.Album { return albums },
+	}
+	o.refreshAlbumsCache()
+
+	o.NavigateToTrack(player.ModArchivePrefix + trackURL)
+
+	if len(o.navStack) < 2 || !o.isCatalog() {
+		t.Fatalf("navigation stack = %#v, want ModArchive catalog", o.navStack)
+	}
+	if o.focusPanel != 0 {
+		t.Fatalf("focus panel = %d, want left panel (cursor on track entry)", o.focusPanel)
+	}
+	selected := o.currentEntry()
+	if selected == nil || !selected.IsCatalogTrack() || selected.trackIdx != 0 {
+		t.Fatalf("selected entry = %#v, want ZIP-backed catalog track", selected)
+	}
+}
+
+func TestNavigateToRestoredModArchiveTrackCreatesAlbum(t *testing.T) {
+	targetURL := "http://modarchive.textfiles.com/modarchive_2014_additions/MOD/A/"
+	trackURL := targetURL + "aceman_-_wonka_honk.mod.zip"
+	var albums []player.Album
+	o := &Overlay{
+		modArchiveItems: map[string][]modarchive.DirItem{
+			modarchive.BaseURL: {{Name: "2014", URL: targetURL, Kind: modarchive.KindDir}},
+			targetURL: {{
+				Name:      "aceman_-_wonka_honk.mod.zip",
+				URL:       trackURL,
+				Kind:      modarchive.KindFile,
+				CleanName: "aceman_-_wonka_honk.mod",
+			}},
+		},
+	}
+	o.SetLibAlbums(func() []player.Album { return albums })
+	o.SetAddCatalogAlbum(func(album player.Album) int {
+		albums = append(albums, album)
+		return len(albums) - 1
+	})
+
+	o.NavigateToTrack(player.ModArchivePrefix + trackURL)
+
+	if len(albums) != 1 {
+		t.Fatalf("catalog albums = %d, want restored track album to be created", len(albums))
+	}
+	selected := o.currentEntry()
+	if selected == nil || !selected.IsCatalogTrack() || selected.trackIdx != 0 {
+		t.Fatalf("selected entry = %#v, want restored ModArchive track", selected)
+	}
+	if name, selectedPath, _, _ := o.SelectedCatalogInfo(); name == "" || selectedPath != player.ModArchivePrefix+trackURL {
+		t.Fatalf("selected catalog track = (%q, %q), want %q", name, selectedPath, player.ModArchivePrefix+trackURL)
+	}
+}
+
+func TestNavigateToModlandTrack(t *testing.T) {
+	albumPath := player.ModlandPrefix + "Protracker/Curt Cool"
+	playingPath := albumPath + "/second.mod"
+	albums := []player.Album{{
+		Name: "Modland: Protracker/Curt Cool",
+		Path: albumPath,
+		Tracks: []string{
+			albumPath + "/first.mod",
+			playingPath,
+		},
+	}}
+	o := &Overlay{libAlbums: func() []player.Album { return albums }}
+	o.refreshAlbumsCache()
+
+	o.NavigateToTrack(playingPath)
+
+	if len(o.navStack) != 4 || !o.isCatalog() {
+		t.Fatalf("navigation stack = %#v, want Modland track level", o.navStack)
+	}
+	if o.source != sourceModland {
+		t.Fatalf("source = %v, want Modland", o.source)
+	}
+	selected := o.currentEntry()
+	if selected == nil || !selected.IsCatalogTrack() || selected.trackIdx != 1 {
+		t.Fatalf("selected entry = %#v, want second Modland track", selected)
+	}
+}
+
 func TestSelectCatalogAlbumEntersTrackLevel(t *testing.T) {
 	entries := []navEntry{{label: "song", kind: entryModlandAlbum, albumIdx: 0}}
+	albums := []player.Album{{
+		Name:   "song",
+		Path:   player.ModlandPrefix + "Protracker/song",
+		Tracks: []string{player.ModlandPrefix + "Protracker/song/song.mod"},
+	}}
 	o := &Overlay{
 		navStack:     []navLevel{{ctx: ctxCatalog, entries: entries}},
 		albumEntries: entries,
-		allAlbums: []player.Album{{
-			Name:   "song",
-			Path:   player.ModlandPrefix + "Protracker/song",
-			Tracks: []string{player.ModlandPrefix + "Protracker/song/song.mod"},
-		}},
+		libAlbums:    func() []player.Album { return albums },
 		albumCursor:  0,
 		focusPanel:   0,
 		panelEntered: true,
 	}
+	o.refreshAlbumsCache()
 
 	if o.Select() {
 		t.Fatal("catalog album selection unexpectedly started playback")
@@ -163,9 +263,12 @@ func TestSelectCatalogAlbumEntersTrackLevel(t *testing.T) {
 		t.Fatalf("catalog track entries = %#v, want parent and catalog track", o.albumEntries)
 	}
 	o.CursorDown()
-	name, path := o.SelectedCatalogTrack()
+	name, path, tracks, idx := o.SelectedCatalogInfo()
 	if name != "song" || path != player.ModlandPrefix+"Protracker/song/song.mod" {
 		t.Fatalf("selected catalog track = (%q, %q), want song and track path", name, path)
+	}
+	if idx != 0 || len(tracks) != 1 {
+		t.Fatalf("selected catalog info = (tracks:%d, idx:%d), want 1 track at idx 0", len(tracks), idx)
 	}
 }
 
@@ -330,6 +433,7 @@ func TestShadow_zeroRadius(t *testing.T) {
 
 func TestModArchiveSyncFromCache(t *testing.T) {
 	url := "http://modarchive.textfiles.com/2014/IT/"
+	var all []player.Album
 	o := &Overlay{
 		baseDir: t.TempDir(),
 		modArchiveItems: map[string][]modarchive.DirItem{
@@ -341,6 +445,11 @@ func TestModArchiveSyncFromCache(t *testing.T) {
 			}},
 		},
 	}
+	o.SetLibAlbums(func() []player.Album { return all })
+	o.SetAddCatalogAlbum(func(album player.Album) int {
+		all = append(all, album)
+		return len(all) - 1
+	})
 	defer o.Close()
 
 	// First access resolves to a leaf album immediately — no async, no retry.
@@ -348,8 +457,8 @@ func TestModArchiveSyncFromCache(t *testing.T) {
 	if len(entries) != 1 || entries[0].kind != entryCatalogTrack {
 		t.Fatalf("expected one catalog track, got %#v", entries)
 	}
-	if len(o.allAlbums) != 1 {
-		t.Fatalf("expected album appended to allAlbums, got %d", len(o.allAlbums))
+	if len(all) != 1 {
+		t.Fatalf("expected album added via callback, got %d", len(all))
 	}
 
 	// Missing listings resolve to nil — empty catalog, honest entry.
@@ -419,6 +528,31 @@ func TestNCMissingRootReportsFailed(t *testing.T) {
 	o.switchToNC(filepath.Join(dir, "missing"))
 	if got := o.NCListingStatus(); got != filesystem.StatusFailed {
 		t.Fatalf("NC listing status = %s, want failed", got)
+	}
+}
+
+func TestNavigateToTrackSelectsLocalTrack(t *testing.T) {
+	o, dir := ncTestOverlay(t)
+	defer o.Close()
+
+	trackPath := filepath.Join(dir, "sub1", "track2.mod")
+	o.NavigateToTrack(trackPath)
+
+	if !o.isNC() {
+		t.Fatal("NavigateToTrack should open the local NC view")
+	}
+	if got := o.ncDir(); got != filepath.Dir(trackPath) {
+		t.Fatalf("NC directory = %q, want %q", got, filepath.Dir(trackPath))
+	}
+	if o.focusPanel != 0 {
+		t.Fatalf("focus panel = %d, want left panel", o.focusPanel)
+	}
+	if o.albumCursor < 0 || o.albumCursor >= len(o.albumEntries) {
+		t.Fatalf("album cursor = %d, entries = %d", o.albumCursor, len(o.albumEntries))
+	}
+	selected := o.albumEntries[o.albumCursor]
+	if !selected.IsNCFile() || selected.filePath != trackPath {
+		t.Fatalf("selected entry = %#v, want local track %q", selected, trackPath)
 	}
 }
 
@@ -707,5 +841,86 @@ func TestBreadcrumbText(t *testing.T) {
 	)
 	if got := o.breadcrumbText(); got != "/music/Modland/Protracker/Nested/Author" {
 		t.Fatalf("elision: got %q", got)
+	}
+}
+
+// --- Catalog track info panel ---
+
+func catalogTrackInfoTestAlbums() []player.Album {
+	return []player.Album{{
+		Name: "ModArchive: test",
+		Path: player.ModArchivePrefix + "http://example.com/test",
+		Tracks: []string{
+			player.ModArchivePrefix + "http://example.com/test/a.mod",
+			player.ModArchivePrefix + "http://example.com/test/b.mod",
+		},
+	}}
+}
+
+func TestCatalogTrackInfoCachedWithEmptyMetadata(t *testing.T) {
+	e := &navEntry{label: "a.mod", kind: entryCatalogTrack, albumIdx: 0, trackIdx: 0}
+	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
+		{Path: player.ModArchivePrefix + "http://example.com/test/a.mod", Cached: true},
+		{Path: player.ModArchivePrefix + "http://example.com/test/b.mod"},
+	})
+	// Cached track with empty metadata: panel shows title + blank line.
+	if len(lines) < 2 {
+		t.Fatalf("cached track with empty metadata should still show title, got %q", lines)
+	}
+	if lines[0] != "a.mod" {
+		t.Fatalf("first line should be track title, got %q", lines[0])
+	}
+}
+
+func TestCatalogTrackInfoNotCached(t *testing.T) {
+	e := &navEntry{label: "a.mod", kind: entryCatalogTrack, albumIdx: 0, trackIdx: 0}
+	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
+		{Path: player.ModArchivePrefix + "http://example.com/test/a.mod", Cached: false},
+	})
+	// Uncached track: no right panel.
+	if lines != nil {
+		t.Fatalf("uncached track must return nil, got %q", lines)
+	}
+}
+
+func TestCatalogTrackInfoSelectsRightTrack(t *testing.T) {
+	// Second track of the album selected; first is cached, second is not.
+	e := &navEntry{label: "b.mod", kind: entryCatalogTrack, albumIdx: 0, trackIdx: 1}
+	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
+		{Path: player.ModArchivePrefix + "http://example.com/test/a.mod", Cached: true},
+		{Path: player.ModArchivePrefix + "http://example.com/test/b.mod", Cached: false},
+	})
+	// Second track is not cached: no right panel.
+	if lines != nil {
+		t.Fatalf("uncached track must return nil, got %q", lines)
+	}
+}
+
+func TestCatalogTrackInfoLongComment(t *testing.T) {
+	e := &navEntry{label: "a.mod", kind: entryCatalogTrack, albumIdx: 0, trackIdx: 0}
+	comment := "line one\nline two\nline three\nline four"
+	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
+		{Path: player.ModArchivePrefix + "http://example.com/test/a.mod", Cached: true, Duration: 120, Comment: comment},
+	})
+	if len(lines) < 3+4 {
+		t.Fatalf("comment lines missing, got %d lines: %q", len(lines), lines)
+	}
+	found := false
+	for _, l := range lines {
+		if l == "  line three" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("comment line missing, got %q", lines)
+	}
+}
+
+func TestCatalogTrackInfoInvalidIndexReturnsNil(t *testing.T) {
+	e := &navEntry{label: "a.mod", kind: entryCatalogTrack, albumIdx: 5, trackIdx: 0}
+	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), nil)
+	if lines != nil {
+		t.Fatalf("invalid album index must return nil, got %q", lines)
 	}
 }
