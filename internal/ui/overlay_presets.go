@@ -202,16 +202,19 @@ func (o *Overlay) syncPresetTree() {
 		return
 	}
 	parts := strings.Split(key, "/")
+
+	// Build the navigation stack by walking the tree.
+	// Each part expands one level; the last part positions the cursor.
+	o.presetNav.stack = []presetNavLevel{{nodes: o.presetTreeRoot}}
 	cur := o.presetTreeRoot
 
-	// Walk down the tree, expanding each level to find the target.
 	for i, part := range parts {
-		isLast := i == len(parts)-1
 		displayName := part
-		if isLast {
+		if i == len(parts)-1 {
 			displayName = strings.TrimSuffix(part, filepath.Ext(part))
 		}
 
+		// Find target in current level.
 		found := -1
 		for j := range cur {
 			if cur[j].name == displayName {
@@ -223,15 +226,18 @@ func (o *Overlay) syncPresetTree() {
 			return
 		}
 
-		// Set cursor at this level.
-		if len(o.presetNav.stack) > i {
-			o.presetNav.stack[i].cursor = found
-		}
-
-		if !isLast {
-			// Expand to next level.
-			o.presetNav.Expand(&cur[found])
+		// If not the last part, expand into children.
+		if i < len(parts)-1 {
+			o.presetNav.stack = append(o.presetNav.stack, presetNavLevel{nodes: cur[found].children})
 			cur = cur[found].children
+		} else {
+			// Last part: set cursor on the found node.
+			// Account for ".." entry at position 0 when not at root.
+			cursor := found
+			if len(o.presetNav.stack) > 1 {
+				cursor++
+			}
+			o.presetNav.stack[len(o.presetNav.stack)-1].cursor = cursor
 		}
 	}
 	o.presetsDirty = true
