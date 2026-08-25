@@ -24,39 +24,70 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 		return
 	}
 
-	cur.scroll = scrollOffset(cur.scroll, cur.cursor, len(cur.nodes), maxRows)
+	// Prepend ".." entry if not at root.
+	hasParent := len(o.presetNav.stack) > 1
+	totalNodes := len(cur.nodes)
+	if hasParent {
+		totalNodes++
+	}
+
+	cur.scroll = scrollOffset(cur.scroll, cur.cursor, totalNodes, maxRows)
 	var leftRows []listRow
 	leftEnd := cur.scroll + maxRows
-	if leftEnd > len(cur.nodes) {
-		leftEnd = len(cur.nodes)
+	if leftEnd > totalNodes {
+		leftEnd = totalNodes
 	}
 	for i := cur.scroll; i < leftEnd; i++ {
-		node := cur.nodes[i]
-		prefix := "  "
-		if !node.isLeaf {
-			prefix = "▸ "
-		}
-		// Mark currently-playing preset.
-		if node.isLeaf && node.key == o.presetName {
-			prefix = "▸ "
-		}
+		var line string
 		isCursor := i == cur.cursor && o.panelEntered
-		leftRows = append(leftRows, listRow{text: prefix + node.name, active: isCursor})
+		if hasParent && i == 0 {
+			// ".." entry at position 0.
+			line = ".."
+		} else {
+			nodeIdx := i
+			if hasParent {
+				nodeIdx--
+			}
+			node := cur.nodes[nodeIdx]
+			prefix := "  "
+			if node.isLeaf {
+				// Mark currently-playing preset.
+				if node.key == o.presetName {
+					prefix = "▸ "
+				}
+				line = prefix + node.name
+			} else {
+				// Directory: trailing "/", no triangle.
+				line = node.name + "/"
+			}
+		}
+		leftRows = append(leftRows, listRow{text: line, active: isCursor})
 	}
 	o.rebuildListRows(&o.presetsColL, leftRows, maxTextPx, panelW)
 
 	// Marquee for focused node name.
 	o.marqueeL.invalidate(o)
 	if o.panelEntered && cur.cursor >= cur.scroll && cur.cursor < leftEnd {
-		node := cur.nodes[cur.cursor]
-		prefix := "  "
-		if !node.isLeaf {
-			prefix = "▸ "
+		var name string
+		if hasParent && cur.cursor == 0 {
+			name = ".."
+		} else {
+			nodeIdx := cur.cursor
+			if hasParent {
+				nodeIdx--
+			}
+			node := cur.nodes[nodeIdx]
+			if node.isLeaf {
+				prefix := "  "
+				if node.key == o.presetName {
+					prefix = "▸ "
+				}
+				name = prefix + node.name
+			} else {
+				name = node.name + "/"
+			}
 		}
-		if node.isLeaf && node.key == o.presetName {
-			prefix = "▸ "
-		}
-		o.rebuildMarqueeLine(&o.marqueeL, prefix+node.name, maxTextPx, true)
+		o.rebuildMarqueeLine(&o.marqueeL, name, maxTextPx, true)
 	}
 
 	// Right panel — detail view (placeholder for Phase 3).
@@ -82,11 +113,15 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 
 	// Left panel.
 	cur := o.presetNav.current()
+	hasParent := cur != nil && len(o.presetNav.stack) > 1
 	leftTotal := 0
 	leftCursor := 0
 	leftScroll := 0
 	if cur != nil {
 		leftTotal = len(cur.nodes)
+		if hasParent {
+			leftTotal++ // account for ".." entry
+		}
 		leftCursor = cur.cursor
 		leftScroll = cur.scroll
 	}

@@ -209,7 +209,11 @@ func (o *Overlay) moveCursor(dir int) {
 	if o.uiPage == PagePresets {
 		cur := o.presetNav.current()
 		if cur != nil {
-			if next := cur.cursor + dir; next >= 0 && next < len(cur.nodes) {
+			total := len(cur.nodes)
+			if len(o.presetNav.stack) > 1 {
+				total++ // ".." entry
+			}
+			if next := cur.cursor + dir; next >= 0 && next < total {
 				cur.cursor = next
 				o.presetsDirty = true
 			}
@@ -326,6 +330,7 @@ func (o *Overlay) FocusLeft() {
 	case PagePresets:
 		if o.presetNav.Collapse() {
 			o.presetsDirty = true
+			o.breadcrumbDirty = true
 		}
 	default: // Library
 		if o.isNC() {
@@ -378,6 +383,12 @@ func (o *Overlay) FocusRight() {
 		if node != nil && !node.isLeaf {
 			o.presetNav.Expand(node)
 			o.presetsDirty = true
+			o.breadcrumbDirty = true
+		} else if node == nil && len(o.presetNav.stack) > 1 {
+			// ".." entry — collapse.
+			o.presetNav.Collapse()
+			o.presetsDirty = true
+			o.breadcrumbDirty = true
 		}
 	default: // Library
 		if o.isNC() {
@@ -478,6 +489,17 @@ func (o *Overlay) Select() bool {
 			o.presetsDirty = true
 			return false
 		}
+		cur := o.presetNav.current()
+		if cur == nil {
+			return false
+		}
+		// ".." entry at position 0 when not at root.
+		if len(o.presetNav.stack) > 1 && cur.cursor == 0 {
+			o.presetNav.Collapse()
+			o.presetsDirty = true
+			o.breadcrumbDirty = true
+			return false
+		}
 		node := o.presetNav.Selected()
 		if node == nil {
 			return false
@@ -485,6 +507,7 @@ func (o *Overlay) Select() bool {
 		if !node.isLeaf {
 			o.presetNav.Expand(node)
 			o.presetsDirty = true
+			o.breadcrumbDirty = true
 			return false
 		}
 		return node.key != ""
@@ -629,6 +652,7 @@ func (o *Overlay) Back() {
 		if o.panelEntered {
 			if o.presetNav.Collapse() {
 				o.presetsDirty = true
+				o.breadcrumbDirty = true
 				return
 			}
 			o.panelEntered = false

@@ -33,12 +33,25 @@ func (n *presetNavigation) current() *presetNavLevel {
 }
 
 // Selected returns the currently selected node, or nil if empty.
+// Returns nil for the ".." entry (caller handles collapse separately).
 func (n *presetNavigation) Selected() *presetNode {
 	cur := n.current()
-	if cur.cursor < 0 || cur.cursor >= len(cur.nodes) {
+	if cur == nil {
 		return nil
 	}
-	return &cur.nodes[cur.cursor]
+	nodes := len(cur.nodes)
+	hasParent := len(n.stack) > 1
+	idx := cur.cursor
+	if hasParent {
+		if idx == 0 {
+			return nil // ".." entry
+		}
+		idx--
+	}
+	if idx < 0 || idx >= nodes {
+		return nil
+	}
+	return &cur.nodes[idx]
 }
 
 // Expand pushes a directory's children as a new level.
@@ -56,6 +69,11 @@ func (n *presetNavigation) Collapse() bool {
 	}
 	n.stack = n.stack[:len(n.stack)-1]
 	return true
+}
+
+// Depth returns the current expansion depth (1 = root).
+func (n *presetNavigation) Depth() int {
+	return len(n.stack)
 }
 
 // buildPresetTree builds a hierarchical tree from sorted preset keys.
@@ -138,6 +156,7 @@ func (o *Overlay) SetPresetTree(keys []string) {
 		stack: []presetNavLevel{{nodes: tree}},
 	}
 	o.presetsDirty = true
+	o.breadcrumbDirty = true
 }
 
 func presetTreeEqual(a, b []presetNode) bool {
@@ -204,4 +223,5 @@ func (o *Overlay) syncPresetTree() {
 		}
 	}
 	o.presetsDirty = true
+	o.breadcrumbDirty = true
 }

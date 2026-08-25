@@ -43,7 +43,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	if (o.playingPath != "" || o.loading) && o.bottomDirty {
 		o.rebuildBottomTex(winW, o.face.Metrics().Height.Ceil())
 	}
-	if o.uiPage == PageLibrary {
+	if o.uiPage == PageLibrary || o.uiPage == PagePresets {
 		o.rebuildBreadcrumbTex(winW)
 	}
 
@@ -113,7 +113,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 
 	o.renderPageIndicator(winW, winH, viewW, viewH, indicatorY)
 
-	if o.uiPage == PageLibrary && o.breadcrumbTex != 0 {
+	if (o.uiPage == PageLibrary || o.uiPage == PagePresets) && o.breadcrumbTex != 0 {
 		if !o.drawMarquee(&o.breadcrumbMarquee, headerMarginX, float32(lh+indicatorRowH-textPadding(o.fontSize)), float32(winW-headerMarginX*2), float32(o.breadcrumbTexH), winW, winH, viewW, viewH) {
 			glDrawOverlayText(o.programText, o.breadcrumbTex, 1,
 				headerMarginX, float32(lh+indicatorRowH-textPadding(o.fontSize)), float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)

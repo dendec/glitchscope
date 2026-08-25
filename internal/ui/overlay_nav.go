@@ -566,8 +566,23 @@ func (o *Overlay) NCListingStatus() filesystem.Status {
 // breadcrumbParts returns the breadcrumb path components for the current
 // navigation position. NC levels are derived from the current directory
 // (which fully describes the position, even after a deep-link that collapses
-// the stack); library/catalog levels use their stored label.
+// the stack); library/catalog levels use their stored label; presets page
+// shows the tree path.
 func (o *Overlay) breadcrumbParts() []string {
+	if o.uiPage == PagePresets {
+		parts := []string{"presets"}
+		for i := 1; i < len(o.presetNav.stack); i++ {
+			parentLevel := &o.presetNav.stack[i-1]
+			nodesIdx := o.presetNav.stack[i].cursor
+			if nodesIdx > 0 {
+				nodesIdx-- // ".." offset
+			}
+			if nodesIdx >= 0 && nodesIdx < len(parentLevel.nodes) {
+				parts = append(parts, parentLevel.nodes[nodesIdx].name)
+			}
+		}
+		return parts
+	}
 	if o.topLevel().ctx == ctxSourceRoot {
 		return []string{"/"}
 	}
