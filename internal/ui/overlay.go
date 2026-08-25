@@ -165,8 +165,9 @@ type Overlay struct {
 	helpDirty           bool
 	helpVisibleRows     int
 
-	presetTreeRoot []presetNode     // hierarchical preset tree
-	presetNav      presetNavigation // navigation stack for preset tree
+	presetTreeRoot []presetNode       // hierarchical preset tree
+	presetNav      presetNavigation   // navigation stack for preset tree
+	presetMeta     presetMetaProvider // metadata provider callback
 	presetsColL    listTex
 	presetsColR    listTex
 	presetsScrollL int

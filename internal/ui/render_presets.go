@@ -90,9 +90,9 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 		o.rebuildMarqueeLine(&o.marqueeL, name, maxTextPx, true)
 	}
 
-	// Right panel — detail view (placeholder for Phase 3).
-	// For now, show selected node name or empty.
-	o.rebuildListRows(&o.presetsColR, nil, maxTextPx, panelW)
+	// Right panel — preset info when cursor is on a .milk node.
+	rightRows := o.buildPresetDetailRows(maxTextPx)
+	o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
 	o.marqueeR.invalidate(o)
 
 	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)

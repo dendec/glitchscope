@@ -22,6 +22,31 @@ type PresetMeta struct {
 	PerPixelEqs   int     // count of per_pixel_N= lines
 }
 
+// metaCache stores parsed metadata keyed by preset key.
+// Populated lazily by ReadMeta; invalidated on store reload.
+var metaCache = make(map[string]PresetMeta)
+
+// ReadMeta returns cached metadata for key, parsing on first access.
+// Safe to call from any goroutine (cache is populated once per key,
+// never mutated after; map reads are safe when no concurrent writes).
+func ReadMeta(key string) PresetMeta {
+	if m, ok := metaCache[key]; ok {
+		return m
+	}
+	data, err := Read(key)
+	if err != nil {
+		return PresetMeta{}
+	}
+	m := ParseMeta(data)
+	metaCache[key] = m
+	return m
+}
+
+// InvalidateMetaCache clears the metadata cache (call on store reload).
+func InvalidateMetaCache() {
+	metaCache = make(map[string]PresetMeta)
+}
+
 // ParseMeta extracts metadata from .milk preset content.
 // It handles real-world .milk files:
 //   - Recognizes [preset00] section header; keys outside sections are ignored

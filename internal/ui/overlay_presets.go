@@ -1,9 +1,13 @@
 package ui
 
 import (
+	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+
+	"github.com/dendec/glitchscope/internal/presets"
 )
 
 // presetNode is a single node in the hierarchical preset tree.
@@ -144,6 +148,15 @@ func sortedTreeNodes(m map[string]*treeEntry) []presetNode {
 	return append(dirs, files...)
 }
 
+// presetMetaProvider returns metadata for a preset key.
+// Used by the UI to display preset info without owning the cache.
+type presetMetaProvider func(key string) presets.PresetMeta
+
+// SetPresetMetaProvider sets the metadata provider callback.
+func (o *Overlay) SetPresetMetaProvider(fn presetMetaProvider) {
+	o.presetMeta = fn
+}
+
 // SetPresetTree updates the preset tree and resets navigation to root.
 // Only marks dirty if the tree actually changed.
 func (o *Overlay) SetPresetTree(keys []string) {
@@ -224,4 +237,68 @@ func (o *Overlay) syncPresetTree() {
 	}
 	o.presetsDirty = true
 	o.breadcrumbDirty = true
+}
+
+// buildPresetDetailRows returns the text lines for the right panel detail.
+// Returns nil when the selected node is a directory or has no metadata.
+func (o *Overlay) buildPresetDetailRows(maxTextPx int) []listRow {
+	node := o.presetNav.Selected()
+	if node == nil || !node.isLeaf {
+		return nil
+	}
+	if o.presetMeta == nil {
+		return nil
+	}
+
+	m := o.presetMeta(node.key)
+
+	var lines []string
+
+	// Rating as stars.
+	lines = append(lines, "Rating: "+formatRating(m.Rating))
+
+	// Core parameters.
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  Decay: %-6s  Warp: %-6s", formatFrac(m.Decay), formatFrac(m.WarpSpeed)))
+	lines = append(lines, fmt.Sprintf("  Echo: %-7s  Mode: %d", formatFrac(m.VideoEchoZoom), m.WaveMode))
+
+	// Complexity.
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  Shapes: %-3d  Waves: %d", m.Shapes, m.Waves))
+	lines = append(lines, fmt.Sprintf("  Per-frame: %-3d  Per-pixel: %d", m.PerFrameEqs, m.PerPixelEqs))
+
+	var rows []listRow
+	for _, line := range lines {
+		rows = append(rows, listRow{text: line})
+	}
+	return rows
+}
+
+func formatRating(r float64) string {
+	full := int(r)
+	if full > 5 {
+		full = 5
+	}
+	half := r-float64(full) >= 0.5
+	s := strings.Repeat("\u2605", full)
+	if half {
+		s += "\u00bd"
+	}
+	s += strings.Repeat("\u2606", 5-full-boolToInt(half))
+	return s
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func formatFrac(f float64) string {
+	s := strconv.FormatFloat(f, 'f', -1, 64)
+	if len(s) > 6 {
+		s = s[:6]
+	}
+	return s
 }
