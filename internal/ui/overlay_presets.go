@@ -250,13 +250,11 @@ func (o *Overlay) buildPresetDetailRows(maxTextPx int) []listRow {
 	}
 
 	m := o.presetMeta(node.key)
+	complexity := calcComplexity(m)
 
 	var lines []string
 
-	// Rating bar.
-	lines = append(lines, formatRating(m.Rating))
-
-	// Complexity summary — only meaningful fields.
+	lines = append(lines, formatComplexity(complexity))
 	lines = append(lines, "")
 	lines = append(lines, fmt.Sprintf("Shapes: %d   Waves: %d", m.Shapes, m.Waves))
 	lines = append(lines, fmt.Sprintf("Equations: %d per-frame, %d per-pixel", m.PerFrameEqs, m.PerPixelEqs))
@@ -268,14 +266,31 @@ func (o *Overlay) buildPresetDetailRows(maxTextPx int) []listRow {
 	return rows
 }
 
-// formatRating renders a rating as an ASCII bar: [#####] to [-----].
-func formatRating(r float64) string {
-	full := int(r + 0.5)
-	if full > 5 {
-		full = 5
+// calcComplexity returns a 0–10 score based on preset complexity factors.
+func calcComplexity(m presets.PresetMeta) int {
+	// Weighted sum: equations are the main complexity driver,
+	// shapes and waves add visual richness.
+	score := float64(m.PerFrameEqs)*0.4 + float64(m.PerPixelEqs)*0.6
+	score += float64(m.Shapes+m.Waves) * 0.5
+	// Normalize: a typical complex preset has ~20 per-frame + 10 per-pixel + 5 shapes/waves.
+	// That sums to ~20*0.4 + 10*0.6 + 5*0.5 = 8 + 6 + 2.5 = 16.5 → cap at 10.
+	score = score * 10 / 16.5
+	if score > 10 {
+		score = 10
 	}
-	if full < 0 {
-		full = 0
+	if score < 0 {
+		score = 0
 	}
-	return "[" + strings.Repeat("#", full) + strings.Repeat("-", 5-full) + "]"
+	return int(score + 0.5)
+}
+
+// formatComplexity renders complexity as a bar: [##########] to [----------].
+func formatComplexity(v int) string {
+	if v > 10 {
+		v = 10
+	}
+	if v < 0 {
+		v = 0
+	}
+	return "[" + strings.Repeat("#", v) + strings.Repeat("-", 10-v) + "]"
 }
