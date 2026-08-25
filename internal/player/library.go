@@ -221,7 +221,10 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 		return nil
 	}
 	album := l.Albums[idx]
-	cache := readMetaCache(album.Path)
+	var cache *albumMeta
+	if !IsVirtual(album) {
+		cache = readMetaCache(album.Path)
+	}
 	if cache == nil {
 		cache = &albumMeta{Tracks: map[string]TrackMeta{}}
 	}
@@ -268,7 +271,7 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 		}
 		infos[i] = info
 	}
-	if dirty && !strings.HasPrefix(album.Path, ModlandPrefix) {
+	if dirty && !IsVirtual(album) {
 		if err := writeMetaCache(album.Path, cache); err != nil {
 			slog.Warn("write meta cache", "album", album.Name, "error", err)
 		}
