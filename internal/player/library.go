@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -23,6 +24,7 @@ type TrackInfo struct {
 	Duration float64
 	BPM      float64
 	Channels int
+	Size     int64
 	Comment  string // tracker message/comment (XM/IT/MOD/S3M text)
 	Cached   bool   // true when a local cache file exists on disk
 }
@@ -234,6 +236,11 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 	for i, tp := range album.Tracks {
 		fname := filepath.Base(TrimPrefixes(tp))
 		info := TrackInfo{Path: tp, Cached: l.resolver.ResolveLocalPath(tp) != ""}
+		if localPath := l.resolver.ResolveLocalPath(tp); localPath != "" {
+			if fi, err := os.Stat(localPath); err == nil {
+				info.Size = fi.Size()
+			}
+		}
 		if m, ok := cache.Tracks[fname]; ok {
 			info.Duration = m.Duration
 			info.BPM = m.BPM

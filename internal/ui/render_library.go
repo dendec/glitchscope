@@ -264,12 +264,7 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 	} else if o.ncInfoFile != "" {
 		// File info.
 		if info, err := os.Stat(o.ncInfoFile); err == nil {
-			size := info.Size()
-			if size < 1024 {
-				lines = append(lines, fmt.Sprintf("  %d B", size))
-			} else {
-				lines = append(lines, fmt.Sprintf("  %.1f KB", float64(size)/1024))
-			}
+			lines = append(lines, fmt.Sprintf("  %s", formatSize(info.Size())))
 		}
 	} else if len(lines) == 0 {
 		o.tracksTex, o.tracksTexW, o.tracksTexH = 0, 0, 0
@@ -382,19 +377,39 @@ func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []play
 		// visible, signalling that the file is locally available.
 		var lines []string
 		lines = append(lines, player.TrackTitle(e.label), "")
+		// Line 1: Length + Size (aligned columns)
+		var header string
 		if ti.Duration > 0 {
-			lines = append(lines, fmt.Sprintf("  %s", formatDuration(ti.Duration)))
+			header = fmt.Sprintf("Length: %-6s", formatDuration(ti.Duration))
+		}
+		if ti.Size > 0 {
+			if header != "" {
+				header += " "
+			}
+			header += fmt.Sprintf("Size: %s", formatSize(ti.Size))
+		}
+		if header != "" {
+			lines = append(lines, header)
+		}
+		// Line 2: Channels + BPM (aligned columns)
+		var specs string
+		if ti.Channels > 0 {
+			specs = fmt.Sprintf("Channels: %-3d", ti.Channels)
 		}
 		if ti.BPM > 0 {
-			lines = append(lines, fmt.Sprintf("  BPM: %.0f", ti.BPM))
+			if specs != "" {
+				specs += " "
+			}
+			specs += fmt.Sprintf("BPM: %-3.0f", ti.BPM)
 		}
-		if ti.Channels > 0 {
-			lines = append(lines, fmt.Sprintf("  Channels: %d", ti.Channels))
+		if specs != "" {
+			lines = append(lines, specs)
 		}
+		// Comment block
 		if ti.Comment != "" {
-			lines = append(lines, "")
+			lines = append(lines, "Comment:")
 			for _, cl := range strings.Split(ti.Comment, "\n") {
-				lines = append(lines, "  "+cl)
+				lines = append(lines, cl)
 			}
 		}
 		return lines

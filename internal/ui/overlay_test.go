@@ -948,12 +948,13 @@ func TestCatalogTrackInfoLongComment(t *testing.T) {
 	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
 		{Path: player.ModArchivePrefix + "http://example.com/test/a.mod", Cached: true, Duration: 120, Comment: comment},
 	})
-	if len(lines) < 3+4 {
+	// title, "", "Comment:", 4 comment lines = 7
+	if len(lines) < 7 {
 		t.Fatalf("comment lines missing, got %d lines: %q", len(lines), lines)
 	}
 	found := false
 	for _, l := range lines {
-		if l == "  line three" {
+		if l == "line three" {
 			found = true
 			break
 		}
