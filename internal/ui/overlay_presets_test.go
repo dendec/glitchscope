@@ -2,6 +2,8 @@ package ui
 
 import (
 	"testing"
+
+	"github.com/dendec/glitchscope/internal/presets"
 )
 
 func TestBuildPresetTreeFlat(t *testing.T) {
@@ -112,6 +114,7 @@ func TestNavigationExpandCollapse(t *testing.T) {
 	if len(nav.stack) != 2 {
 		t.Fatalf("stack depth = %d, want 2", len(nav.stack))
 	}
+	nav.current().cursor = 1 // Skip the ".." entry.
 	if nav.Selected() == nil || nav.Selected().name != "Loops" {
 		t.Errorf("after expand, selection = %v, want Loops", nav.Selected())
 	}
@@ -146,14 +149,14 @@ func TestNavigationCursorMove(t *testing.T) {
 	cur := nav.current()
 
 	// Move down.
-	cur.cursor = 1
+	cur.cursor = 2 // Cursor 0 is the ".." entry.
 	if nav.Selected().name != "b" {
-		t.Errorf("cursor=1, selection = %v, want b", nav.Selected())
+		t.Errorf("cursor=2, selection = %v, want b", nav.Selected())
 	}
 
-	cur.cursor = 2
+	cur.cursor = 3
 	if nav.Selected().name != "c" {
-		t.Errorf("cursor=2, selection = %v, want c", nav.Selected())
+		t.Errorf("cursor=3, selection = %v, want c", nav.Selected())
 	}
 
 	// Out of bounds returns nil.
@@ -185,5 +188,83 @@ func TestPresetTreeEqual(t *testing.T) {
 	}
 	if presetTreeEqual(a, c) {
 		t.Error("different trees should not be equal")
+	}
+}
+
+func TestSetPresetTreeFollowsPlayingPreset(t *testing.T) {
+	o := &Overlay{presetName: "Fractal/Loops/playing.milk"}
+	o.SetPresetMetaProvider(func(key string) presets.PresetMeta {
+		if key != o.presetName {
+			t.Fatalf("detail requested for %q, want playing preset %q", key, o.presetName)
+		}
+		return presets.PresetMeta{Shapes: 2, Waves: 1}
+	})
+
+	o.SetPresetTree([]string{
+		"Dancer/other.milk",
+		"Fractal/Loops/other.milk",
+		"Fractal/Loops/playing.milk",
+	})
+
+	if got := o.SelectedPresetKey(); got != o.presetName {
+		t.Fatalf("selected preset = %q, want playing preset %q", got, o.presetName)
+	}
+	if got := o.presetNav.Depth(); got != 3 {
+		t.Fatalf("navigation depth = %d, want 3", got)
+	}
+	if rows := o.buildPresetDetailRows(); len(rows) == 0 {
+		t.Fatal("playing preset detail is empty")
+	}
+}
+
+func TestPresetBreadcrumbFollowsPlayingPreset(t *testing.T) {
+	o := &Overlay{
+		uiPage:     PagePresets,
+		presetName: "Transition/Illusion/playing.milk",
+	}
+
+	o.SetPresetTree([]string{
+		"Other/first.milk",
+		"Transition/Illusion/playing.milk",
+	})
+
+	if got := o.breadcrumbText(); got != "/Transition/Illusion" {
+		t.Fatalf("breadcrumb = %q, want /Transition/Illusion", got)
+	}
+}
+
+func TestSetPresetNameFollowsChangedPreset(t *testing.T) {
+	o := &Overlay{uiPage: PagePresets}
+	o.SetPresetTree([]string{
+		"Dancer/first.milk",
+		"Fractal/Loops/second.milk",
+	})
+
+	o.SetPresetName("Dancer/first.milk")
+	if got := o.SelectedPresetKey(); got != "Dancer/first.milk" {
+		t.Fatalf("selected preset after first change = %q, want Dancer/first.milk", got)
+	}
+
+	o.SetPresetName("Fractal/Loops/second.milk")
+	if got := o.SelectedPresetKey(); got != "Fractal/Loops/second.milk" {
+		t.Fatalf("selected preset after second change = %q, want Fractal/Loops/second.milk", got)
+	}
+}
+
+func TestPrevScreenToPresetsFollowsPlayingPreset(t *testing.T) {
+	o := &Overlay{uiPage: PageHelp, presetName: "Fractal/playing.milk"}
+	o.SetPresetTree([]string{
+		"Dancer/other.milk",
+		"Fractal/playing.milk",
+	})
+	o.presetNav = presetNavigation{stack: []presetNavLevel{{nodes: o.presetTreeRoot}}}
+
+	o.PrevScreen()
+
+	if o.uiPage != PagePresets {
+		t.Fatalf("page = %v, want Presets", o.uiPage)
+	}
+	if got := o.SelectedPresetKey(); got != o.presetName {
+		t.Fatalf("selected preset = %q, want playing preset %q", got, o.presetName)
 	}
 }

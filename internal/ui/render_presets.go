@@ -17,15 +17,14 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 		maxRows = 1
 	}
 
-	// Left panel — current tree level.
 	cur := o.presetNav.current()
 	if cur == nil {
 		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 		return
 	}
-
-	// Prepend ".." entry if not at root.
 	hasParent := len(o.presetNav.stack) > 1
+
+	// Left panel — current tree level with ".." entry when not at root.
 	totalNodes := len(cur.nodes)
 	if hasParent {
 		totalNodes++
@@ -38,28 +37,16 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 		leftEnd = totalNodes
 	}
 	for i := cur.scroll; i < leftEnd; i++ {
-		var line string
 		isCursor := i == cur.cursor && o.panelEntered
+		var line string
 		if hasParent && i == 0 {
-			// ".." entry at position 0.
 			line = ".."
 		} else {
 			nodeIdx := i
 			if hasParent {
 				nodeIdx--
 			}
-			node := cur.nodes[nodeIdx]
-			prefix := "  "
-			if node.isLeaf {
-				// Mark currently-playing preset.
-				if node.key == o.presetName {
-					prefix = "▸ "
-				}
-				line = prefix + node.name
-			} else {
-				// Directory: trailing "/", no triangle.
-				line = node.name + "/"
-			}
+			line = nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
 		}
 		leftRows = append(leftRows, listRow{text: line, active: isCursor})
 	}
@@ -76,22 +63,13 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 			if hasParent {
 				nodeIdx--
 			}
-			node := cur.nodes[nodeIdx]
-			if node.isLeaf {
-				prefix := "  "
-				if node.key == o.presetName {
-					prefix = "▸ "
-				}
-				name = prefix + node.name
-			} else {
-				name = node.name + "/"
-			}
+			name = nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
 		}
 		o.rebuildMarqueeLine(&o.marqueeL, name, maxTextPx, true)
 	}
 
-	// Right panel — preset info when cursor is on a .milk node.
-	rightRows := o.buildPresetDetailRows(maxTextPx)
+	// Right panel — preset metadata for selected .milk node.
+	rightRows := o.buildPresetDetailRows()
 	o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
 	o.marqueeR.invalidate(o)
 
@@ -120,7 +98,7 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 	if cur != nil {
 		leftTotal = len(cur.nodes)
 		if hasParent {
-			leftTotal++ // account for ".." entry
+			leftTotal++
 		}
 		leftCursor = cur.cursor
 		leftScroll = cur.scroll
@@ -133,7 +111,7 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 		o.drawMarqueeCol(&o.marqueeL, lx, ly, textW, colH, lh, rowY, winW, winH, viewW, viewH)
 	}
 
-	// Right panel (detail — placeholder for Phase 3).
+	// Right panel — metadata detail.
 	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, false,
 		0, 0, lh, winW, winH, viewW, viewH)
 }

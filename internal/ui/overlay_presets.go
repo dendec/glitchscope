@@ -21,6 +21,7 @@ type presetNode struct {
 // presetNavLevel holds the visible nodes and cursor at one expansion depth.
 type presetNavLevel struct {
 	nodes  []presetNode
+	label  string
 	cursor int
 	scroll int
 }
@@ -62,7 +63,7 @@ func (n *presetNavigation) Expand(node *presetNode) {
 	if node == nil || len(node.children) == 0 {
 		return
 	}
-	n.stack = append(n.stack, presetNavLevel{nodes: node.children})
+	n.stack = append(n.stack, presetNavLevel{nodes: node.children, label: node.name})
 }
 
 // Collapse pops back to the parent level. Returns false if already at root.
@@ -79,18 +80,15 @@ func (n *presetNavigation) Depth() int {
 	return len(n.stack)
 }
 
-// buildPresetTree builds a hierarchical tree from sorted preset keys.
-// Keys use "/" as separator (e.g. "Fractal/Loops/preset.milk").
-// Directories come before files at each level, then lexicographic sort.
-//
 // treeEntry is an intermediate node used during tree construction.
 type treeEntry struct {
 	node     *presetNode
 	children map[string]*treeEntry
 }
 
-// buildPresetTreeLinear builds the tree in a single pass over sorted keys.
-// This avoids the map-of-maps approach and builds directly.
+// buildPresetTree builds a hierarchical tree from sorted preset keys.
+// Keys use "/" as separator (e.g. "Fractal/Loops/preset.milk").
+// Directories come before files at each level, then lexicographic sort.
 func buildPresetTree(keys []string) []presetNode {
 	if len(keys) == 0 {
 		return nil
@@ -167,6 +165,7 @@ func (o *Overlay) SetPresetTree(keys []string) {
 	o.presetNav = presetNavigation{
 		stack: []presetNavLevel{{nodes: tree}},
 	}
+	o.syncPresetTree()
 	o.presetsDirty = true
 	o.breadcrumbDirty = true
 }
@@ -228,7 +227,10 @@ func (o *Overlay) syncPresetTree() {
 
 		// If not the last part, expand into children.
 		if i < len(parts)-1 {
-			o.presetNav.stack = append(o.presetNav.stack, presetNavLevel{nodes: cur[found].children})
+			o.presetNav.stack = append(o.presetNav.stack, presetNavLevel{
+				nodes: cur[found].children,
+				label: cur[found].name,
+			})
 			cur = cur[found].children
 		} else {
 			// Last part: set cursor on the found node.
@@ -244,43 +246,53 @@ func (o *Overlay) syncPresetTree() {
 	o.breadcrumbDirty = true
 }
 
+// nodeDisplayLine formats a preset node for display in the left panel.
+// Leaf nodes show a playing indicator ("\u25b8 "); directories show a trailing "/".
+func nodeDisplayLine(node *presetNode, playingKey string) string {
+	if node.isLeaf {
+		prefix := "  "
+		if node.key == playingKey {
+			prefix = "\u25b8 "
+		}
+		return prefix + node.name
+	}
+	return node.name + "/"
+}
+
 // buildPresetDetailRows returns the text lines for the right panel detail.
 // Returns nil when the selected node is a directory or has no metadata.
-func (o *Overlay) buildPresetDetailRows(maxTextPx int) []listRow {
+func (o *Overlay) buildPresetDetailRows() []listRow {
 	node := o.presetNav.Selected()
-	if node == nil || !node.isLeaf {
-		return nil
-	}
-	if o.presetMeta == nil {
+	if node == nil || !node.isLeaf || o.presetMeta == nil {
 		return nil
 	}
 
 	m := o.presetMeta(node.key)
 	complexity := calcComplexity(m)
 
-	var lines []string
-
-	lines = append(lines, formatComplexity(complexity))
-	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("Shapes: %d   Waves: %d", m.Shapes, m.Waves))
-	lines = append(lines, fmt.Sprintf("Equations: %d per-frame, %d per-pixel", m.PerFrameEqs, m.PerPixelEqs))
-
-	var rows []listRow
-	for _, line := range lines {
-		rows = append(rows, listRow{text: line})
+	return []listRow{
+		{text: formatComplexity(complexity)},
+		{},
+		{text: fmt.Sprintf("Shapes: %d   Waves: %d", m.Shapes, m.Waves)},
+		{text: fmt.Sprintf("Equations: %d per-frame, %d per-pixel", m.PerFrameEqs, m.PerPixelEqs)},
 	}
-	return rows
 }
+
+// Complexity scoring weights. Normalized so a typical complex preset (~20 per-frame,
+// ~10 per-pixel, ~5 shapes/waves) scores ~10.
+const (
+	complexityPerFrameWeight = 0.4
+	complexityPerPixelWeight = 0.6
+	complexityVisualWeight   = 0.5
+	complexityNormFactor     = 16.5 // (20*0.4 + 10*0.6 + 5*0.5)
+)
 
 // calcComplexity returns a 0–10 score based on preset complexity factors.
 func calcComplexity(m presets.PresetMeta) int {
-	// Weighted sum: equations are the main complexity driver,
-	// shapes and waves add visual richness.
-	score := float64(m.PerFrameEqs)*0.4 + float64(m.PerPixelEqs)*0.6
-	score += float64(m.Shapes+m.Waves) * 0.5
-	// Normalize: a typical complex preset has ~20 per-frame + 10 per-pixel + 5 shapes/waves.
-	// That sums to ~20*0.4 + 10*0.6 + 5*0.5 = 8 + 6 + 2.5 = 16.5 → cap at 10.
-	score = score * 10 / 16.5
+	score := float64(m.PerFrameEqs)*complexityPerFrameWeight +
+		float64(m.PerPixelEqs)*complexityPerPixelWeight +
+		float64(m.Shapes+m.Waves)*complexityVisualWeight
+	score = score * 10 / complexityNormFactor
 	if score > 10 {
 		score = 10
 	}
