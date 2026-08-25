@@ -215,7 +215,7 @@ func TestActionHintsGamepadMapping(t *testing.T) {
 func TestActionHintsPlayPauseShown(t *testing.T) {
 	o := srcRoot()
 	o.uiPage = PageLibrary
-	o.playingTrack = "/music/track.it"
+	o.playingPath = "/music/track.it"
 	got := hints(o)
 	found := false
 	for _, h := range got {

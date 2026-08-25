@@ -93,7 +93,7 @@ func (o *Overlay) ActionHints() []UIHint {
 
 	// Common low-priority hints shared across pages. Drawn when space allows;
 	// the renderer drops trailing hints first.
-	if o.playingTrack != "" || o.loading {
+	if o.playingPath != "" || o.loading {
 		hints = append(hints, UIHint{Key: o.controlLabel(hintPlay), Label: "Play/Pause"})
 	}
 	hints = append(hints, UIHint{Key: o.controlLabel(hintPages), Label: "Screens"})

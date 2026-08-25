@@ -9,11 +9,26 @@
 | Понятие | Единственный владелец | Остальные проекции |
 |---|---|---|
 | Настройки | `internal/config` | JSON storage, Settings UI |
-| Локальный индекс музыки | `internal/player` | NC navigation, playback selection |
+| Локальный индекс музыки | `internal/player` | NC navigation, playback selection, catalog albums |
 | Навигация и focus | `internal/ui` | rendered lists and breadcrumbs |
 | Playback queue | `internal/app` playback state | player commands, overlay snapshot |
 | Удаление файлов | `internal/app/delete_service.go` | confirmation UI, rescan |
 | Remote catalogs | `internal/modland`, `internal/modarchive` | provider navigation and downloads |
+
+**Каталоговые альбомы** (modland/modarchive) хранятся в `lib.Albums` через
+`Library.AddCatalogAlbum`. Overlay создаёт альбомы on-the-fly во время навигации
+и делегирует создание в Library через callback `SetAddCatalogAlbum`. Overlay
+является только view — не хранит альбомы самостоятельно: каждый кадр он
+снимает snapshot `lib.Albums` (`cachedAlbums`, обновляется в `Update()` и
+после каждой мутации) и все потребители кадра читают один и тот же список.
+
+**Виртуальные пути ↔ локальный кэш** (`.cache/modland/files`,
+`.cache/modarchive/files`) резолвит `internal/player.Resolver`
+(`resolver.go`) — единственный владелец правил cache-путей. `Library`
+использует его как зависимость (`GetAlbumTracks`, флаг `TrackInfo.Cached`);
+сам Library отвечает только за индекс альбомов. Извлечение метаданных из
+локального файла — чистая функция `extractMetaFromFile` (`meta.go`), без
+side effects, переиспользуется при on-demand заполнении и refresh комментария.
 
 ## Правила изменений
 
