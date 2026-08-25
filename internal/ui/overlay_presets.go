@@ -168,6 +168,11 @@ func (o *Overlay) SetPresetPreviewRequest(fn func(key string)) {
 	o.presetPreviewReq = fn
 }
 
+// SetPresetPreviewTex sets the callback to retrieve a cached preview texture.
+func (o *Overlay) SetPresetPreviewTex(fn func(key string) (uint32, bool)) {
+	o.presetPreviewTex = fn
+}
+
 // SetPresetTree updates the preset tree and resets navigation to root.
 // Only marks dirty if the tree actually changed.
 func (o *Overlay) SetPresetTree(keys []string) {

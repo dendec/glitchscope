@@ -577,6 +577,12 @@ func (a *App) initPreset() {
 			}
 			a.preview.Enqueue(key, string(data))
 		})
+		a.overlay.SetPresetPreviewTex(func(key string) (uint32, bool) {
+			if a.preview == nil {
+				return 0, false
+			}
+			return a.preview.HasResult(key)
+		})
 	}
 }
 

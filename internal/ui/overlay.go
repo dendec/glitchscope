@@ -165,10 +165,11 @@ type Overlay struct {
 	helpDirty           bool
 	helpVisibleRows     int
 
-	presetTreeRoot   []presetNode       // hierarchical preset tree
-	presetNav        presetNavigation   // navigation stack for preset tree
-	presetMeta       presetMetaProvider // metadata provider callback
-	presetPreviewReq func(key string)   // request thumbnail preview for preset key
+	presetTreeRoot   []presetNode                    // hierarchical preset tree
+	presetNav        presetNavigation                // navigation stack for preset tree
+	presetMeta       presetMetaProvider              // metadata provider callback
+	presetPreviewReq func(key string)                // request thumbnail preview
+	presetPreviewTex func(key string) (uint32, bool) // get preview texture ID
 	presetsColL      listTex
 	presetsColR      listTex
 

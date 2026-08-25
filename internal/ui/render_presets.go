@@ -1,5 +1,11 @@
 package ui
 
+// Thumbnail dimensions for preset preview.
+const (
+	thumbW = 160
+	thumbH = 90
+)
+
 // This file owns rendering for the Presets page: two columns.
 // Shared primitives in overlay_render.go; model in overlay_presets.go.
 
@@ -76,6 +82,16 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 }
 
+func (o *Overlay) drawPreviewThumb(tex uint32, x, y, panelW float32, winW, winH, viewW, viewH int) {
+	// Center the thumbnail horizontally within the panel, fit to width.
+	thumbAspect := float32(thumbW) / float32(thumbH)
+	w := float32(panelW - 8) // padding
+	h := w / thumbAspect
+	tx := x + 4
+	ty := y + 4
+	glDrawOverlayText(o.programText, tex, 1, tx, ty, w, h, winW, winH, viewW, viewH)
+}
+
 func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	lx, ly := float32(0), float32(panelY)
 	rx, ry := float32(winW-panelW), float32(panelY)
@@ -111,7 +127,19 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 		o.drawMarqueeCol(&o.marqueeL, lx, ly, textW, colH, lh, rowY, winW, winH, viewW, viewH)
 	}
 
-	// Right panel — metadata detail.
+	// Right panel — thumbnail + metadata detail.
+	if o.presetPreviewTex != nil {
+		node := o.presetNav.Selected()
+		if node != nil && node.isLeaf {
+			if tex, ok := o.presetPreviewTex(node.key); ok && tex != 0 {
+				// Draw thumbnail at top of right panel.
+				o.drawPreviewThumb(tex, rx, ry, colW, winW, winH, viewW, viewH)
+				// Shift text below thumbnail.
+				ry += float32(thumbH + 4)
+				colH -= float32(thumbH + 4)
+			}
+		}
+	}
 	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, false,
 		0, 0, lh, winW, winH, viewW, viewH)
 }
