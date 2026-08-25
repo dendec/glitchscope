@@ -380,7 +380,7 @@ func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []play
 		// Line 1: Length + Size (aligned columns)
 		var header string
 		if ti.Duration > 0 {
-			header = fmt.Sprintf("Length: %-6s", formatDuration(ti.Duration))
+			header = fmt.Sprintf("Length: %-5s", formatDuration(ti.Duration))
 		}
 		if ti.Size > 0 {
 			if header != "" {

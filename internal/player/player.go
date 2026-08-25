@@ -630,7 +630,7 @@ func renderToSeekable(src soloud.AudioSource, data []byte, duration float64, cha
 	slog.Info("pre-rendered track for exact seeking",
 		"seconds", float64(frames)/renderSampleRate, "frames", frames, "channels", rendCh)
 	newDuration = wav.GetLength()
-	newChannels = wav.GetChannels()
+	newChannels = channels
 	return wav, newDuration, newChannels, true
 }
 
