@@ -570,7 +570,7 @@ func (o *Overlay) NCListingStatus() filesystem.Status {
 // shows the tree path.
 func (o *Overlay) breadcrumbParts() []string {
 	if o.uiPage == PagePresets {
-		parts := []string{"presets"}
+		parts := []string{"/"}
 		// Each stack level beyond root represents an expanded directory.
 		// The directory name is at stack[i-1].nodes[stack[i-1].cursor].
 		for i := 0; i+1 < len(o.presetNav.stack); i++ {
