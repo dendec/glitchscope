@@ -179,8 +179,10 @@ type Overlay struct {
 	presetsScrollL       int
 	presetsScrollR       int
 
-	scrollUp   scrollHold
-	scrollDown scrollHold
+	scrollUp    scrollHold
+	scrollDown  scrollHold
+	scrollLeft  scrollHold
+	scrollRight scrollHold
 
 	albumsScroll int
 	tracksScroll int
@@ -201,6 +203,7 @@ type Overlay struct {
 
 	marqueeL          marqueeState
 	marqueeR          marqueeState
+	infoMarquee       marqueeState
 	statsMarquee      marqueeState
 	breadcrumbMarquee marqueeState
 	presetNameMarquee marqueeState

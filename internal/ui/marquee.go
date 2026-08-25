@@ -67,6 +67,7 @@ func (o *Overlay) invalidateActiveMarquee() {
 		o.marqueeL.reset()
 	} else {
 		o.marqueeR.reset()
+		o.infoMarquee.reset()
 	}
 }
 

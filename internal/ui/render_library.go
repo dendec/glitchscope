@@ -8,6 +8,7 @@ import (
 
 	"github.com/dendec/glitchscope/internal/filesystem"
 	"github.com/dendec/glitchscope/internal/player"
+	"golang.org/x/image/font"
 )
 
 // This file owns rendering for the Library page: albums/tracks panels.
@@ -85,6 +86,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 			}
 		} else {
 			drawScrollbar(o, tx+float32(panelW)-sbW, ty, float32(panelH), o.ncInfoLines, o.ncInfoVisible, o.ncInfoScroll, winW, winH, viewW, viewH)
+			o.drawInfoMarquee(tx, ty, float32(textW), float32(panelH), winW, winH, viewW, viewH)
 		}
 		if o.focusPanel == 1 {
 			drawPanelBorder(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
@@ -150,6 +152,7 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.tracksDirty = false
 
 	if o.isNC() {
+		o.infoMarquee.invalidate(o)
 		o.rebuildNCInfoTex(maxW, maxH)
 		o.tracksContentDirty = false
 		return
@@ -158,6 +161,7 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	if e := o.currentEntry(); e != nil && e.kind == entryParent {
 		o.deleteTex(&o.tracksTex)
 		o.marqueeR.invalidate(o)
+		o.infoMarquee.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
@@ -172,6 +176,7 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	if o.isCatalog() {
 		o.deleteTex(&o.tracksTex)
 		o.marqueeR.invalidate(o)
+		o.infoMarquee.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
@@ -180,6 +185,7 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	if e == nil || !e.IsLeafAlbum() {
 		o.deleteTex(&o.tracksTex)
 		o.marqueeR.invalidate(o)
+		o.infoMarquee.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
@@ -187,6 +193,7 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	if len(o.trackInfos) == 0 {
 		o.deleteTex(&o.tracksTex)
 		o.marqueeR.invalidate(o)
+		o.infoMarquee.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
@@ -233,6 +240,7 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 	o.deleteTex(&o.tracksTex)
 	o.marqueeR.invalidate(o)
+	o.infoMarquee.invalidate(o)
 
 	var lines []string
 	if status := o.NCListingStatus(); status != filesystem.StatusOK {
@@ -307,6 +315,12 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 	}
 
 	maxTextPx := availableRowTextWidth(maxW)
+	infoTextW := maxTextPx
+	for _, line := range lines {
+		if width := font.MeasureString(o.face, line).Ceil(); width > infoTextW {
+			infoTextW = width
+		}
+	}
 	lh := o.face.Metrics().Height.Ceil()
 	maxRows := maxH / lh
 	if maxRows < 1 {
@@ -320,9 +334,13 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 	end := min(start+maxRows, len(lines))
 	var rows []listRow
 	for _, line := range lines[start:end] {
+		if infoTextW > maxTextPx {
+			line = ""
+		}
 		rows = append(rows, listRow{text: line})
 	}
-	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
+	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, infoTextW, maxW)
+	o.rebuildInfoMarquee(lines[start:end], maxTextPx, infoTextW)
 }
 
 func (o *Overlay) ncTrackInfo() *player.TrackInfo {
@@ -392,6 +410,7 @@ func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []play
 func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 	o.deleteTex(&o.tracksTex)
 	o.marqueeR.invalidate(o)
+	o.infoMarquee.invalidate(o)
 	o.tracksContentDirty = false
 
 	lines := catalogTrackInfoLines(e, o.currentAlbums(), o.trackInfos)
@@ -400,6 +419,12 @@ func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 	}
 
 	maxTextPx := availableRowTextWidth(maxW)
+	infoTextW := maxTextPx
+	for _, line := range lines {
+		if width := font.MeasureString(o.face, line).Ceil(); width > infoTextW {
+			infoTextW = width
+		}
+	}
 	lh := o.face.Metrics().Height.Ceil()
 	maxRows := maxH / lh
 	if maxRows < 1 {
@@ -413,7 +438,39 @@ func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 	end := min(start+maxRows, len(lines))
 	var rows []listRow
 	for _, line := range lines[start:end] {
+		if infoTextW > maxTextPx {
+			line = ""
+		}
 		rows = append(rows, listRow{text: line})
 	}
-	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
+	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, infoTextW, maxW)
+	o.rebuildInfoMarquee(lines[start:end], maxTextPx, infoTextW)
+}
+
+func (o *Overlay) rebuildInfoMarquee(lines []string, viewportW, contentW int) {
+	if contentW <= viewportW {
+		o.infoMarquee.invalidate(o)
+		return
+	}
+	marqueeLines := make([]string, len(lines))
+	spaceW := font.MeasureString(o.face, " ").Ceil()
+	if spaceW < 1 {
+		spaceW = 1
+	}
+	for i, line := range lines {
+		width := font.MeasureString(o.face, line).Ceil()
+		padding := max(0, (contentW-width+spaceW-1)/spaceW)
+		marqueeLines[i] = line + strings.Repeat(" ", padding)
+	}
+	o.rebuildMarqueeLine(&o.infoMarquee, strings.Join(marqueeLines, "\n"), viewportW, false)
+}
+
+func (o *Overlay) drawInfoMarquee(x, y, w, h float32, winW, winH, viewW, viewH int) {
+	if o.infoMarquee.tex == 0 || float32(o.infoMarquee.texW) <= w {
+		return
+	}
+	offset := max(0, min(int(o.infoMarquee.offset), o.infoMarquee.texW-int(w)))
+	glDrawOverlayTextClipped(o.programText, o.infoMarquee.tex, 1,
+		x-float32(offset), y, float32(o.infoMarquee.texW), float32(o.infoMarquee.texH),
+		x, y, w, h, winW, winH, viewW, viewH)
 }

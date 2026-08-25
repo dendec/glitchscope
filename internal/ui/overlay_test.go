@@ -51,6 +51,52 @@ func TestDisplayTrackPath(t *testing.T) {
 	}
 }
 
+func TestScrollPosition(t *testing.T) {
+	tests := []struct {
+		name                    string
+		current, delta, content int
+		viewport                int
+		want                    int
+		wantChanged             bool
+	}{
+		{name: "moves within content", current: 10, delta: 3, content: 30, viewport: 10, want: 13, wantChanged: true},
+		{name: "clamps at start", current: 2, delta: -5, content: 30, viewport: 10, want: 0, wantChanged: true},
+		{name: "clamps at end", current: 20, delta: 5, content: 30, viewport: 10, want: 20, wantChanged: false},
+		{name: "content fits", current: 0, delta: 5, content: 5, viewport: 10, want: 0, wantChanged: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, changed := scrollPosition(test.current, test.delta, test.content, test.viewport)
+			if got != test.want || changed != test.wantChanged {
+				t.Fatalf("scrollPosition(%d, %d, %d, %d) = (%d, %t), want (%d, %t)", test.current, test.delta, test.content, test.viewport, got, changed, test.want, test.wantChanged)
+			}
+		})
+	}
+}
+
+func TestCatalogInfoFocusLeftScrollsBeforeChangingPanel(t *testing.T) {
+	o := &Overlay{
+		panelEntered: true,
+		focusPanel:   1,
+		navStack: []navLevel{{entries: []navEntry{{
+			kind: entryCatalogTrack,
+		}}}},
+		albumEntries: []navEntry{{kind: entryCatalogTrack}},
+		albumCursor:  0,
+		infoMarquee:  marqueeState{tex: 1, texW: 240, maxPx: 160, offset: 40},
+	}
+
+	o.FocusLeft()
+
+	if o.focusPanel != 1 {
+		t.Fatalf("focusPanel = %d, want right panel while scrolling", o.focusPanel)
+	}
+	if o.infoMarquee.offset != 0 {
+		t.Fatalf("info marquee offset = %v, want 0", o.infoMarquee.offset)
+	}
+}
+
 func TestTrackTitleKeepsExtension(t *testing.T) {
 	tests := []struct {
 		path string

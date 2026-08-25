@@ -39,6 +39,13 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 
 	o.updateScrollHold(&o.scrollUp, state[sdl.SCANCODE_UP] != 0 || gamepadUp, now, func() { o.moveCursor(-1) })
 	o.updateScrollHold(&o.scrollDown, state[sdl.SCANCODE_DOWN] != 0 || gamepadDown, now, func() { o.moveCursor(1) })
+	if o.infoPanelFocused() {
+		o.updateScrollHold(&o.scrollLeft, state[sdl.SCANCODE_LEFT] != 0, now, func() { o.scrollInfoHorizontal(-1) })
+		o.updateScrollHold(&o.scrollRight, state[sdl.SCANCODE_RIGHT] != 0, now, func() { o.scrollInfoHorizontal(1) })
+	} else {
+		o.scrollLeft.active = false
+		o.scrollRight.active = false
+	}
 	o.updateMarquee(now)
 }
 
@@ -154,12 +161,11 @@ func (o *Overlay) CursorDown() {
 }
 
 func (o *Overlay) scrollNCInfo(dir int) {
-	maxScroll := o.ncInfoLines - o.ncInfoVisible
-	if maxScroll < 0 {
-		maxScroll = 0
+	next, changed := scrollPosition(o.ncInfoScroll, dir, o.ncInfoLines, o.ncInfoVisible)
+	if changed {
+		o.ncInfoScroll = next
+		o.tracksDirty = true
 	}
-	o.ncInfoScroll = max(0, min(o.ncInfoScroll+dir, maxScroll))
-	o.tracksDirty = true
 }
 
 // moveCursor shifts the active cursor by dir (-1 up, +1 down), scoped to the
@@ -279,6 +285,40 @@ func (o *Overlay) focusPanelBy(delta int, markDirty func()) {
 	markDirty()
 }
 
+func (o *Overlay) scrollInfoHorizontal(dir int) bool {
+	if o.infoMarquee.tex == 0 {
+		return false
+	}
+	viewportW := o.infoMarquee.maxPx
+	maxOffset := o.infoMarquee.texW - viewportW
+	if maxOffset <= 0 {
+		return false
+	}
+	const step = 40
+	next, changed := scrollPosition(int(o.infoMarquee.offset), dir*step, o.infoMarquee.texW, viewportW)
+	if changed {
+		o.infoMarquee.offset = float32(next)
+	}
+	return changed
+}
+
+func scrollPosition(current, delta, content, viewport int) (int, bool) {
+	maxPosition := max(0, content-viewport)
+	next := max(0, min(current+delta, maxPosition))
+	return next, next != current
+}
+
+func (o *Overlay) infoPanelFocused() bool {
+	if o.focusPanel != 1 {
+		return false
+	}
+	if o.isNC() {
+		return o.ncRight == ncRightInfo
+	}
+	e := o.currentEntry()
+	return e != nil && e.IsCatalogTrack()
+}
+
 func (o *Overlay) FocusLeft() {
 	switch o.uiPage {
 	case PageHelp:
@@ -295,6 +335,9 @@ func (o *Overlay) FocusLeft() {
 		o.focusPanelBy(-1, func() { o.presetsDirty = true })
 	default: // Library
 		if o.isNC() {
+			if o.infoPanelFocused() && o.scrollInfoHorizontal(-1) {
+				return
+			}
 			if o.focusPanel == 0 {
 				return // already at leftmost
 			}
@@ -312,6 +355,9 @@ func (o *Overlay) FocusLeft() {
 			o.albumsDirty = true
 			o.tracksDirty = true
 			o.tracksContentDirty = true
+			return
+		}
+		if o.infoPanelFocused() && o.scrollInfoHorizontal(-1) {
 			return
 		}
 		o.focusPanelBy(-1, func() { o.albumsDirty = true; o.tracksDirty = true })
@@ -337,6 +383,9 @@ func (o *Overlay) FocusRight() {
 		o.focusPanelBy(1, func() { o.presetsDirty = true })
 	default: // Library
 		if o.isNC() {
+			if o.infoPanelFocused() && o.scrollInfoHorizontal(1) {
+				return
+			}
 			if o.focusPanel == 0 {
 				// left → Info
 				o.focusPanel = 1
@@ -353,6 +402,9 @@ func (o *Overlay) FocusRight() {
 			o.albumsDirty = true
 			o.tracksDirty = true
 			o.tracksContentDirty = true
+			return
+		}
+		if o.infoPanelFocused() && o.scrollInfoHorizontal(1) {
 			return
 		}
 		o.focusPanelBy(1, func() { o.albumsDirty = true; o.tracksDirty = true })
