@@ -12,7 +12,28 @@ import (
 	"time"
 )
 
-const DefaultDownloadTimeout = 60 * time.Second
+
+// perReadTimeout wraps an io.Reader and fails if no data arrives within d.
+// This prevents stuck downloads without imposing a total transaction timeout
+// (which would kill large files on slow connections).
+type perReadTimeout struct {
+	r       io.Reader
+	d       time.Duration
+	lastRead time.Time
+}
+
+func (t *perReadTimeout) Read(p []byte) (int, error) {
+	n, err := t.r.Read(p)
+	if n > 0 {
+		t.lastRead = time.Now()
+	} else if t.lastRead.IsZero() {
+		t.lastRead = time.Now()
+	}
+	if err == nil && time.Since(t.lastRead) > t.d {
+		return n, fmt.Errorf("download: no data received for %s", t.d)
+	}
+	return n, err
+}
 
 // ProgressReader wraps an io.Reader and reports cumulative bytes read.
 type ProgressReader struct {
@@ -48,7 +69,9 @@ func DownloadWithFallback(ctx context.Context, urls []string, targetPath string,
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	client := &http.Client{Timeout: DefaultDownloadTimeout}
+	// No total client timeout: large files on slow connections need
+	// unbounded body read time. Cancellation is handled by ctx.
+	client := &http.Client{}
 	var resp *http.Response
 	var lastErr error
 	lastStatus := 0
@@ -97,8 +120,10 @@ func DownloadWithFallback(ctx context.Context, urls []string, targetPath string,
 	tmpPath := tmp.Name()
 
 	var reader io.Reader = resp.Body
+	// Guard against stuck connections: fail if no data arrives for 2 minutes.
+	reader = &perReadTimeout{r: reader, d: 2 * time.Minute}
 	if onProgress != nil {
-		reader = &ProgressReader{r: resp.Body, total: total, onProgress: onProgress}
+		reader = &ProgressReader{r: reader, total: total, onProgress: onProgress}
 	}
 
 	if _, err := io.Copy(tmp, reader); err != nil {
