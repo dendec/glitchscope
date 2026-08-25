@@ -170,8 +170,6 @@ type Overlay struct {
 	presetMeta     presetMetaProvider // metadata provider callback
 	presetsColL    listTex
 	presetsColR    listTex
-	presetsScrollL int
-	presetsScrollR int
 
 	scrollUp    scrollHold
 	scrollDown  scrollHold

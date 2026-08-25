@@ -559,9 +559,7 @@ func (a *App) initPreset() {
 	a.presetCats = presets.Names()
 	if a.overlay != nil {
 		a.overlay.SetPresetTree(a.presetCats)
-		a.overlay.SetPresetMetaProvider(func(key string) presets.PresetMeta {
-			return presets.ReadMeta(key)
-		})
+		a.overlay.SetPresetMetaProvider(presets.ReadMeta)
 	}
 }
 

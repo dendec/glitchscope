@@ -408,9 +408,7 @@ func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []play
 		// Comment block
 		if ti.Comment != "" {
 			lines = append(lines, "Comment:")
-			for _, cl := range strings.Split(ti.Comment, "\n") {
-				lines = append(lines, cl)
-			}
+			lines = append(lines, strings.Split(ti.Comment, "\n")...)
 		}
 		return lines
 	}

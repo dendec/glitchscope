@@ -12,13 +12,12 @@ import (
 	"time"
 )
 
-
 // perReadTimeout wraps an io.Reader and fails if no data arrives within d.
 // This prevents stuck downloads without imposing a total transaction timeout
 // (which would kill large files on slow connections).
 type perReadTimeout struct {
-	r       io.Reader
-	d       time.Duration
+	r        io.Reader
+	d        time.Duration
 	lastRead time.Time
 }
 
