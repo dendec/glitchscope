@@ -42,16 +42,15 @@ import (
 )
 
 const (
-	defaultWarmup = 3
-	previewFPS    = 12 // thumbnail animation frame rate
+	previewWarmup = 3 // frames to render before first capture
+	previewFPS    = 12
 	maxQueue      = 10
 )
 
 // previewJob is a pending thumbnail render request.
 type previewJob struct {
-	key    string // preset key (for cache lookup)
-	data   string // .milk content
-	warmup int    // frames to render before capture
+	key  string // preset key (for cache lookup)
+	data string // .milk content
 }
 
 // previewRenderer manages a dedicated projectM instance for thumbnail rendering.
@@ -161,9 +160,8 @@ func (r *previewRenderer) Enqueue(key, data string) {
 		r.queue = r.queue[1:]
 	}
 	r.queue = append(r.queue, previewJob{
-		key:    key,
-		data:   data,
-		warmup: defaultWarmup,
+		key:  key,
+		data: data,
 	})
 	slog.Debug("preview enqueued", "key", key, "queueLen", len(r.queue))
 }
@@ -202,8 +200,8 @@ func (r *previewRenderer) ProcessNext() bool {
 		}
 		r.active = &r.queue[0]
 		r.queue = r.queue[1:]
-		r.warmupLeft = r.active.warmup
-		slog.Debug("preview job started", "key", r.active.key, "warmup", r.warmupLeft)
+		r.warmupLeft = previewWarmup
+		slog.Debug("preview job started", "key", r.active.key)
 		r.pm.LoadPresetData(r.active.data, false)
 		r.feedPCM()
 	}
