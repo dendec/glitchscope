@@ -108,10 +108,15 @@ func newPreviewRenderer() *previewRenderer {
 	return r
 }
 
+// isReady reports whether the renderer can process jobs.
+func (r *previewRenderer) isReady() bool {
+	return r.ready && r.pm != nil
+}
+
 // Resize recreates the capture texture and FBO at the given dimensions.
 // No-op if dimensions haven't changed.
 func (r *previewRenderer) Resize(w, h int) {
-	if !r.ready || r.pm == nil || w <= 0 || h <= 0 {
+	if !r.isReady() || w <= 0 || h <= 0 {
 		return
 	}
 	if w == r.w && h == r.h {
@@ -142,7 +147,7 @@ func (r *previewRenderer) Resize(w, h int) {
 
 // Enqueue adds a preview job. Replaces the active job if key differs.
 func (r *previewRenderer) Enqueue(key, data string) {
-	if !r.ready || r.pm == nil {
+	if !r.isReady() {
 		return
 	}
 	// Replace active job if different key.
@@ -188,7 +193,7 @@ func (r *previewRenderer) setResult(key string, tex uint32) {
 // The job stays active during animation so the thumbnail keeps playing.
 // A new Enqueue replaces the current job.
 func (r *previewRenderer) ProcessNext() bool {
-	if !r.ready || r.pm == nil || r.w == 0 || r.h == 0 {
+	if !r.isReady() || r.w == 0 || r.h == 0 {
 		return false
 	}
 

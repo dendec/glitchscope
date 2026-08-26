@@ -6,20 +6,16 @@ package ui
 func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	texturesValid := glIsTexture(o.presetsColL.tex) && glIsTexture(o.presetsColR.tex)
 	if !o.presetsDirty && texturesValid {
-		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
+		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, 0)
 		return
 	}
 	o.presetsDirty = false
 
 	maxTextPx := availableRowTextWidth(panelW)
-	maxRows := panelH / lh
-	if maxRows < 1 {
-		maxRows = 1
-	}
 
 	cur := o.presetNav.current()
 	if cur == nil {
-		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
+		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, 0)
 		return
 	}
 	hasParent := len(o.presetNav.stack) > 1
@@ -28,6 +24,11 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	totalNodes := len(cur.nodes)
 	if hasParent {
 		totalNodes++
+	}
+
+	maxRows := panelH / lh
+	if maxRows < 1 {
+		maxRows = 1
 	}
 
 	cur.scroll = scrollOffset(cur.scroll, cur.cursor, totalNodes, maxRows)
@@ -73,10 +74,10 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
 	o.marqueeR.invalidate(o)
 
-	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
+	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, len(rightRows))
 }
 
-func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
+func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int, nRightRows int) {
 	lx, ly := float32(0), float32(panelY)
 	rx, ry := float32(winW-panelW), float32(panelY)
 	colW, colH := float32(panelW), float32(panelH)
@@ -116,7 +117,7 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 		0, 0, lh, winW, winH, viewW, viewH)
 
 	// Thumbnail below text, centered in remaining space.
-	if o.presetPreviewTex == nil {
+	if o.presetPreviewTex == nil || nRightRows == 0 {
 		return
 	}
 	node := o.presetNav.Selected()
@@ -130,11 +131,8 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 	thumbW := float32(rw) * 2
 	thumbH := float32(rh) * 2
 
-	// Position below metadata text, centered horizontally.
-	rightRows := o.buildPresetDetailRows()
-	nTextRows := len(rightRows)
-	textBottom := ry + float32(nTextRows*lh)
-	remaining := colH - float32(nTextRows*lh)
+	textBottom := ry + float32(nRightRows*lh)
+	remaining := colH - float32(nRightRows*lh)
 	tx := rx + (colW-thumbW)/2
 	ty := textBottom + (remaining-thumbH)/2
 	if ty < textBottom {
