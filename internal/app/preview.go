@@ -228,22 +228,27 @@ func (r *previewRenderer) ProcessNext() bool {
 		r.pm.LoadPresetData(r.active.data, false)
 	}
 
-	// Warmup phase: render without capture.
+	// Warmup phase: render to FBO without updating result.
 	if r.warmupLeft > 0 {
+		C.glBindFramebuffer(C.GL_FRAMEBUFFER, r.fbo)
+		C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
 		r.pm.RenderFrame()
+		C.glBindFramebuffer(C.GL_FRAMEBUFFER, 0)
 		r.warmupLeft--
 		return true
 	}
 
-	// Animation phase: optionally throttle to previewFPS.
+	// Animation phase: render directly to FBO (r.tex), not fb0.
 	if r.throttle {
 		interval := time.Second / previewFPS
 		if time.Since(r.lastRender) < interval {
 			return false
 		}
 	}
+	C.glBindFramebuffer(C.GL_FRAMEBUFFER, r.fbo)
+	C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
 	r.pm.RenderFrame()
-	r.capture()
+	C.glBindFramebuffer(C.GL_FRAMEBUFFER, 0)
 	r.setResult(r.active.key, uint32(r.tex))
 	r.lastRender = time.Now()
 
@@ -258,14 +263,7 @@ func (r *previewRenderer) ProcessNext() bool {
 	return true
 }
 
-// capture copies the bottom-left w×h region of fb0 into r.tex.
-func (r *previewRenderer) capture() {
-	C.glBindTexture(C.GL_TEXTURE_2D, r.tex)
-	C.glCopyTexSubImage2D(C.GL_TEXTURE_2D, 0, 0, 0, 0, 0,
-		C.GLsizei(r.w), C.GLsizei(r.h))
-	C.glBindTexture(C.GL_TEXTURE_2D, 0)
-	slog.Debug("preview captured", "key", r.active.key)
-}
+
 
 // Flush cancels all pending jobs and clears the result.
 func (r *previewRenderer) Flush() {
