@@ -127,8 +127,8 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 	if !ok || tex == 0 {
 		return
 	}
-	thumbW := float32(rw)
-	thumbH := float32(rh)
+	thumbW := float32(rw) * 2
+	thumbH := float32(rh) * 2
 
 	// Position below metadata text, centered horizontally.
 	rightRows := o.buildPresetDetailRows()
