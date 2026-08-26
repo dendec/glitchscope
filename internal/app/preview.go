@@ -79,22 +79,16 @@ type previewRenderer struct {
 	ready bool // false if GL init failed
 }
 
-// ThumbSize returns the recommended thumbnail render dimensions for a given
-// panel width. Maintains 16:9 aspect ratio, capped for ARM performance.
-func ThumbSize(panelW int) (w, h int) {
-	// Use full panel width (minus small padding) as render width.
-	w = panelW - 8
-	if w < 64 {
-		w = 64
+// ThumbSize returns the thumbnail render dimensions for a given window width.
+// The thumbnail is 1/8 of screen width, maintaining 16:9 aspect ratio.
+func ThumbSize(winW int) (w, h int) {
+	w = winW / 8
+	if w < 32 {
+		w = 32
 	}
 	h = int(float64(w) / thumbAspect)
-	if h < 36 {
-		h = 36
-	}
-	// Cap for ARM: large thumbs are expensive to render.
-	if w > 320 {
-		w = 320
-		h = int(float64(w) / thumbAspect)
+	if h < 18 {
+		h = 18
 	}
 	return w, h
 }
