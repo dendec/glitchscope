@@ -172,7 +172,7 @@ func (o *Overlay) SetPresetPreviewRequest(fn func(key string)) {
 }
 
 // SetPresetPreviewTex sets the callback to retrieve a cached preview texture.
-func (o *Overlay) SetPresetPreviewTex(fn func(key string) (uint32, bool)) {
+func (o *Overlay) SetPresetPreviewTex(fn func(key string) (tex uint32, w, h int, ok bool)) {
 	o.presetPreviewTex = fn
 }
 

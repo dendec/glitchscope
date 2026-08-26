@@ -579,11 +579,15 @@ func (a *App) initPreset() {
 			slog.Debug("preview: read data", "key", key, "bytes", len(data))
 			a.preview.Enqueue(key, string(data))
 		})
-		a.overlay.SetPresetPreviewTex(func(key string) (uint32, bool) {
+		a.overlay.SetPresetPreviewTex(func(key string) (uint32, int, int, bool) {
 			if a.preview == nil {
-				return 0, false
+				return 0, 0, 0, false
 			}
-			return a.preview.HasResult(key)
+			tex, ok := a.preview.HasResult(key)
+			if !ok {
+				return 0, 0, 0, false
+			}
+			return tex, a.preview.w, a.preview.h, true
 		})
 	}
 }

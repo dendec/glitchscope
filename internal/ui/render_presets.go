@@ -1,8 +1,5 @@
 package ui
 
-// thumbAspect is the preview thumbnail aspect ratio (16:9).
-const thumbAspect = 16.0 / 9.0
-
 // This file owns rendering for the Presets page: two columns.
 // Shared primitives in overlay_render.go; model in overlay_presets.go.
 
@@ -79,12 +76,8 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 }
 
-func (o *Overlay) drawPreviewThumb(tex uint32, x, y, panelW float32, winW, winH, viewW, viewH int) {
-	w := float32(panelW - 8) // padding
-	h := w / thumbAspect
-	tx := x + 4
-	ty := y + 4
-	glDrawOverlayText(o.programText, tex, 1, tx, ty, w, h, winW, winH, viewW, viewH)
+func (o *Overlay) drawPreviewThumb(tex uint32, x, y, w, h, panelW float32, winW, winH, viewW, viewH int) {
+	glDrawOverlayText(o.programText, tex, 1, x+4, y+4, w, h, winW, winH, viewW, viewH)
 }
 
 func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
@@ -128,15 +121,17 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 	if o.presetPreviewTex != nil {
 		node := o.presetNav.Selected()
 		if node != nil && node.isLeaf {
-			if tex, ok := o.presetPreviewTex(node.key); ok && tex != 0 {
+			if tex, rw, rh, ok := o.presetPreviewTex(node.key); ok && tex != 0 {
 				thumbTex = tex
-				thumbW := colW - 8
-				thumbDisplayH = thumbW / thumbAspect
+				// Scale render dimensions to fit panel width.
+				aspect := float64(rw) / float64(rh)
+				thumbDisplayH = float32(float64(colW-8) / aspect)
 			}
 		}
 	}
 	if thumbTex != 0 {
-		o.drawPreviewThumb(thumbTex, rx, ry, colW, winW, winH, viewW, viewH)
+		thumbDisplayW := colW - 8
+		o.drawPreviewThumb(thumbTex, rx, ry, thumbDisplayW, thumbDisplayH, colW, winW, winH, viewW, viewH)
 		ry += thumbDisplayH + 4
 		colH -= thumbDisplayH + 4
 	}
@@ -144,6 +139,7 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 		0, 0, lh, winW, winH, viewW, viewH)
 	// Draw thumbnail on top of panel background.
 	if thumbTex != 0 {
-		o.drawPreviewThumb(thumbTex, rx, ry-thumbDisplayH-4, colW, winW, winH, viewW, viewH)
+		thumbDisplayW := colW - 8
+		o.drawPreviewThumb(thumbTex, rx, ry-thumbDisplayH-4, thumbDisplayW, thumbDisplayH, colW, winW, winH, viewW, viewH)
 	}
 }

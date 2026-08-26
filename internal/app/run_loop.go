@@ -242,7 +242,7 @@ func (a *App) Run() {
 		// Preview: render one thumbnail step (between capture and blit so
 		// BlitToScreen automatically restores the main render afterward).
 		if a.preview != nil {
-			tW, tH := ThumbSize(w)
+			tW, tH := ThumbSize(w, h)
 			a.preview.Resize(tW, tH)
 			a.preview.ProcessNext()
 		}

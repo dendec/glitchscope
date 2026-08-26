@@ -79,14 +79,13 @@ type previewRenderer struct {
 	ready bool // false if GL init failed
 }
 
-// ThumbSize returns the thumbnail render dimensions for a given window width.
-// The thumbnail is 1/8 of screen width, maintaining 16:9 aspect ratio.
-func ThumbSize(winW int) (w, h int) {
+// ThumbSize returns the thumbnail render dimensions: 1/8 of screen size.
+func ThumbSize(winW, winH int) (w, h int) {
 	w = winW / 8
+	h = winH / 8
 	if w < 32 {
 		w = 32
 	}
-	h = int(float64(w) / thumbAspect)
 	if h < 18 {
 		h = 18
 	}
