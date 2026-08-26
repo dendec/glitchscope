@@ -41,7 +41,6 @@ import (
 )
 
 const (
-	thumbAspect   = 16.0 / 9.0
 	defaultWarmup = 3
 	maxQueue      = 10
 )

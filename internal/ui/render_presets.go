@@ -76,7 +76,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 }
 
-func (o *Overlay) drawPreviewThumb(tex uint32, x, y, w, h, panelW float32, winW, winH, viewW, viewH int) {
+func (o *Overlay) drawPreviewThumb(tex uint32, x, y, w, h float32, winW, winH, viewW, viewH int) {
 	glDrawOverlayText(o.programText, tex, 1, x+4, y+4, w, h, winW, winH, viewW, viewH)
 }
 
@@ -117,29 +117,25 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 
 	// Right panel — thumbnail + metadata detail.
 	var thumbTex uint32
-	var thumbDisplayH float32
+	var thumbW, thumbH float32
 	if o.presetPreviewTex != nil {
 		node := o.presetNav.Selected()
 		if node != nil && node.isLeaf {
 			if tex, rw, rh, ok := o.presetPreviewTex(node.key); ok && tex != 0 {
 				thumbTex = tex
-				// Scale render dimensions to fit panel width.
-				aspect := float64(rw) / float64(rh)
-				thumbDisplayH = float32(float64(colW-8) / aspect)
+				thumbW = colW - 8
+				thumbH = thumbW / float32(float64(rw)/float64(rh))
 			}
 		}
 	}
 	if thumbTex != 0 {
-		thumbDisplayW := colW - 8
-		o.drawPreviewThumb(thumbTex, rx, ry, thumbDisplayW, thumbDisplayH, colW, winW, winH, viewW, viewH)
-		ry += thumbDisplayH + 4
-		colH -= thumbDisplayH + 4
+		o.drawPreviewThumb(thumbTex, rx, ry, thumbW, thumbH, winW, winH, viewW, viewH)
+		ry += thumbH + 4
+		colH -= thumbH + 4
 	}
 	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, false,
 		0, 0, lh, winW, winH, viewW, viewH)
-	// Draw thumbnail on top of panel background.
 	if thumbTex != 0 {
-		thumbDisplayW := colW - 8
-		o.drawPreviewThumb(thumbTex, rx, ry-thumbDisplayH-4, thumbDisplayW, thumbDisplayH, colW, winW, winH, viewW, viewH)
+		o.drawPreviewThumb(thumbTex, rx, ry-thumbH-4, thumbW, thumbH, winW, winH, viewW, viewH)
 	}
 }
