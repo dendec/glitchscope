@@ -42,8 +42,9 @@ import (
 )
 
 const (
-	previewFPS = 12
-	maxQueue   = 10
+	previewFPS         = 12
+	maxQueue           = 10
+	previewBurstFrames = 3 // frames per tick on Presets page
 )
 
 // ClearFB clears the current framebuffer to black.

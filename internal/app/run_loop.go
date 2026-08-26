@@ -247,31 +247,29 @@ func (a *App) Run() {
 			slog.Info("presets page: main viz resumed")
 		}
 
+		// Preview resize (shared by both modes).
+		if a.preview != nil {
+			tW, tH := ThumbSize(w, h)
+			a.preview.Resize(tW, tH)
+		}
+
 		if a.onPresetsPage {
 			// Presets page: main viz stopped, all resources to preview.
 			ClearFB()
 			a.rt.Capture()
 
 			// Feed audio to preview only (skip main pm).
-			var wave []float32
-			if a.mic != nil {
-				wave = a.mic.Read()
-			} else if a.pl != nil {
-				wave = a.pl.GetWave()
-			}
-			if len(wave) > 0 {
+			if wave := a.readAudio(); len(wave) > 0 {
 				a.previewFeedPCM(wave)
 			} else if a.preview != nil && a.preview.isReady() {
-				a.previewFeedPCM(a.generateTestSignal(512))
+				a.previewFeedPCM(a.testSignal())
 			}
 
 			// Render preview as fast as possible.
 			if a.preview != nil {
-				tW, tH := ThumbSize(w, h)
-				a.preview.Resize(tW, tH)
-				a.preview.ProcessNext()
-				a.preview.ProcessNext()
-				a.preview.ProcessNext()
+				for range previewBurstFrames {
+					a.preview.ProcessNext()
+				}
 			}
 		} else {
 			// Normal mode: main viz + throttled preview.
@@ -279,22 +277,13 @@ func (a *App) Run() {
 			a.rt.Capture()
 
 			if a.preview != nil {
-				tW, tH := ThumbSize(w, h)
-				a.preview.Resize(tW, tH)
 				a.preview.ProcessNext()
 			}
 
 			// Feed audio to both main pm and preview.
-			if a.mic != nil {
-				if w := a.mic.Read(); len(w) > 0 {
-					a.pm.PCMAddFloat(w, projectm.Mono)
-					a.previewFeedPCM(w)
-				}
-			} else if a.pl != nil {
-				if w := a.pl.GetWave(); w != nil {
-					a.pm.PCMAddFloat(w, projectm.Mono)
-					a.previewFeedPCM(w)
-				}
+			if wave := a.readAudio(); len(wave) > 0 {
+				a.pm.PCMAddFloat(wave, projectm.Mono)
+				a.previewFeedPCM(wave)
 			}
 		}
 

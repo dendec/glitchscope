@@ -81,6 +81,7 @@ type App struct {
 	seek           seekControl // continuous-seek drivetrain state
 	onPresetsPage  bool        // true when UI is on Presets page (main viz stopped)
 	testSignalFreq float64     // phase accumulator for synthetic test signal
+	testSignalBuf  []float32   // reusable buffer for test signal (avoids alloc per frame)
 }
 
 // New creates an App with display initialised. Player/overlay/input/library
@@ -275,10 +276,28 @@ func (a *App) previewFeedPCM(wave []float32) {
 	}
 }
 
-// generateTestSignal produces a harmonic beating signal (sum of two close
+// testSignalSize is the number of samples per test signal buffer.
+const testSignalSize = 512
+
+// readAudio returns the current audio wave from mic or player, or nil.
+func (a *App) readAudio() []float32 {
+	if a.mic != nil {
+		return a.mic.Read()
+	}
+	if a.pl != nil {
+		return a.pl.GetWave()
+	}
+	return nil
+}
+
+// testSignal produces a harmonic beating signal (sum of two close
 // frequencies) for preview when audio is paused or stopped.
-func (a *App) generateTestSignal(n int) []float32 {
-	wave := make([]float32, n)
+// Reuses a pre-allocated buffer to avoid per-frame allocation.
+func (a *App) testSignal() []float32 {
+	if cap(a.testSignalBuf) < testSignalSize {
+		a.testSignalBuf = make([]float32, testSignalSize)
+	}
+	wave := a.testSignalBuf[:testSignalSize]
 	const (
 		f1    = 220.0 // Hz
 		f2    = 223.0 // Hz (3 Hz beat)
