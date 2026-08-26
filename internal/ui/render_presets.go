@@ -68,16 +68,12 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 		o.rebuildMarqueeLine(&o.marqueeL, name, maxTextPx, true)
 	}
 
-	// Right panel — preset metadata for selected .milk node.
+	// Right panel — metadata text.
 	rightRows := o.buildPresetDetailRows()
 	o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
 	o.marqueeR.invalidate(o)
 
 	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
-}
-
-func (o *Overlay) drawPreviewThumb(tex uint32, x, y, w, h float32, winW, winH, viewW, viewH int) {
-	glDrawOverlayText(o.programText, tex, 1, x+4, y+4, w, h, winW, winH, viewW, viewH)
 }
 
 func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
@@ -115,27 +111,34 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 		o.drawMarqueeCol(&o.marqueeL, lx, ly, textW, colH, lh, rowY, winW, winH, viewW, viewH)
 	}
 
-	// Right panel — thumbnail + metadata detail.
-	var thumbTex uint32
-	var thumbW, thumbH float32
-	if o.presetPreviewTex != nil {
-		node := o.presetNav.Selected()
-		if node != nil && node.isLeaf {
-			if tex, rw, rh, ok := o.presetPreviewTex(node.key); ok && tex != 0 {
-				thumbTex = tex
-				thumbW = colW - 8
-				thumbH = thumbW / float32(float64(rw)/float64(rh))
-			}
-		}
-	}
-	if thumbTex != 0 {
-		o.drawPreviewThumb(thumbTex, rx, ry, thumbW, thumbH, winW, winH, viewW, viewH)
-		ry += thumbH + 4
-		colH -= thumbH + 4
-	}
+	// Right panel — metadata text.
 	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, false,
 		0, 0, lh, winW, winH, viewW, viewH)
-	if thumbTex != 0 {
-		o.drawPreviewThumb(thumbTex, rx, ry-thumbH-4, thumbW, thumbH, winW, winH, viewW, viewH)
+
+	// Thumbnail below text, centered in remaining space.
+	if o.presetPreviewTex == nil {
+		return
 	}
+	node := o.presetNav.Selected()
+	if node == nil || !node.isLeaf {
+		return
+	}
+	tex, rw, rh, ok := o.presetPreviewTex(node.key)
+	if !ok || tex == 0 {
+		return
+	}
+	thumbW := float32(rw)
+	thumbH := float32(rh)
+
+	// Position below metadata text, centered horizontally.
+	rightRows := o.buildPresetDetailRows()
+	nTextRows := len(rightRows)
+	textBottom := ry + float32(nTextRows*lh)
+	remaining := colH - float32(nTextRows*lh)
+	tx := rx + (colW-thumbW)/2
+	ty := textBottom + (remaining-thumbH)/2
+	if ty < textBottom {
+		ty = textBottom
+	}
+	glDrawOverlayText(o.programText, tex, 1, tx, ty, thumbW, thumbH, winW, winH, viewW, viewH)
 }
