@@ -24,90 +24,119 @@ func TestFpsMeterUsesFixedWindow(t *testing.T) {
 	}
 }
 
-func TestAdaptivePolicyDownAfterLowFPS(t *testing.T) {
+func TestAdaptiveDownByFrames(t *testing.T) {
 	var p adaptivePolicy
-
-	// Before the hold duration: no change.
-	for i := 0; i < adaptiveLowFrames-1; i++ {
-		if next, changed, minReached := p.Decide(adaptiveThreshLow-1, 0, 3); changed || next != 0 || minReached {
-			t.Fatalf("changed too early at step %d: next=%d changed=%v minReached=%v", i, next, changed, minReached)
+	// 9 frames: building counters, no trigger yet.
+	for i := 0; i < 9; i++ {
+		if next, changed, _ := p.Decide(15, 0, 3); changed || next != 0 {
+			t.Fatalf("should not change at step %d", i)
 		}
 	}
-
-	// At hold duration: should step down.
-	if next, changed, minReached := p.Decide(adaptiveThreshLow-1, 0, 3); !changed || next != 1 || minReached {
-		t.Fatalf("step down = (%d, %v, %v), want (1, true, false)", next, changed, minReached)
+	// 10th frame: lowFrames=10, ring full, all < 20 → triggers.
+	if next, changed, _ := p.Decide(15, 0, 3); !changed || next != 1 {
+		t.Fatalf("frame trigger = (%d, %v), want (1, true)", next, changed)
 	}
 }
 
-func TestAdaptivePolicyUpAfterHighFPS(t *testing.T) {
+func TestAdaptiveUpByFrames(t *testing.T) {
 	var p adaptivePolicy
-
-	// Before the hold duration: no change.
-	for i := 0; i < adaptiveHighFrames-1; i++ {
-		if next, changed, minReached := p.Decide(adaptiveThreshHigh+1, 1, 3); changed || next != 1 || minReached {
-			t.Fatalf("changed too early at step %d: next=%d changed=%v minReached=%v", i, next, changed, minReached)
+	for i := 0; i < 9; i++ {
+		if next, changed, _ := p.Decide(30, 1, 3); changed || next != 1 {
+			t.Fatalf("should not change at step %d", i)
 		}
 	}
-
-	// At hold duration: should step up.
-	if next, changed, minReached := p.Decide(adaptiveThreshHigh+1, 1, 3); !changed || next != 0 || minReached {
-		t.Fatalf("step up = (%d, %v, %v), want (0, true, false)", next, changed, minReached)
+	if next, changed, _ := p.Decide(30, 1, 3); !changed || next != 0 {
+		t.Fatalf("frame trigger = (%d, %v), want (0, true)", next, changed)
 	}
 }
 
-func TestAdaptivePolicyDeadZoneResetsCounters(t *testing.T) {
+func TestAdaptiveTimeFallbackUltraLowFPS(t *testing.T) {
 	var p adaptivePolicy
-
-	// Start low for a while.
-	for i := 0; i < adaptiveLowFrames-1; i++ {
-		p.Decide(adaptiveThreshLow-1, 0, 3)
+	// At 2fps: each call adds 0.5s to lowElapsed.
+	// After 3 calls: lowElapsed=1.5 < 2.0, no trigger.
+	for i := 0; i < 3; i++ {
+		if next, changed, _ := p.Decide(2, 0, 3); changed || next != 0 {
+			t.Fatalf("should not change at step %d", i)
+		}
 	}
-	// Then jump into dead zone — counters reset.
-	p.Decide(adaptiveThreshLow+2, 0, 3)
-	// Then back low — needs full hold again.
-	if next, changed, minReached := p.Decide(adaptiveThreshLow-1, 0, 3); changed || next != 0 || minReached {
-		t.Fatalf("dead zone should reset low counter: next=%d changed=%v minReached=%v", next, changed, minReached)
+	// 4th call: lowElapsed=2.0 ≥ 2.0 → time fallback triggers.
+	if next, changed, _ := p.Decide(2, 0, 3); !changed || next != 1 {
+		t.Fatalf("time fallback = (%d, %v), want (1, true)", next, changed)
 	}
 }
 
-func TestAdaptivePolicyCooldown(t *testing.T) {
+func TestAdaptiveTimeFallbackSingleFPS(t *testing.T) {
 	var p adaptivePolicy
-
-	// Trigger first downscale.
-	for i := 0; i < adaptiveLowFrames; i++ {
-		p.Decide(adaptiveThreshLow-1, 0, 3)
+	// At 1fps: each call adds 1.0s. 1st call: lowElapsed=1.0 < 2.0.
+	if next, changed, _ := p.Decide(1, 0, 3); changed || next != 0 {
+		t.Fatalf("should not change at step 0")
 	}
-	p.Decide(adaptiveThreshLow-1, 0, 3) // triggers
-
-	// Immediately try again — cooldown blocks it.
-	p.Reset()
-	if next, changed, minReached := p.Decide(adaptiveThreshLow-1, 1, 3); changed || next != 1 || minReached {
-		t.Fatalf("cooldown should block: next=%d changed=%v minReached=%v", next, changed, minReached)
+	// 2nd call: lowElapsed=2.0 ≥ 2.0 → time fallback triggers.
+	if next, changed, _ := p.Decide(1, 0, 3); !changed || next != 1 {
+		t.Fatalf("time fallback = (%d, %v), want (1, true)", next, changed)
 	}
 }
 
-func TestAdaptivePolicyMinReached(t *testing.T) {
+func TestAdaptiveUnstableFPSBlocksTrigger(t *testing.T) {
 	var p adaptivePolicy
-
-	// At minimum resolution (current == resolutionCount-1) and still low fps.
-	for i := 0; i < adaptiveLowFrames-1; i++ {
-		p.Decide(adaptiveThreshLow-1, 2, 3)
+	// Alternate between 19 and 21 — oscillating around threshold.
+	for i := 0; i < 20; i++ {
+		fps := 19.0
+		if i%2 == 0 {
+			fps = 21.0
+		}
+		p.Decide(fps, 0, 3)
 	}
-	if next, changed, minReached := p.Decide(adaptiveThreshLow-1, 2, 3); changed || next != 2 || !minReached {
+	// Should NOT trigger — fpsRing has samples > 20 (unstable).
+	if next, changed, _ := p.Decide(19, 0, 3); changed || next != 0 {
+		t.Fatalf("unstable should not trigger: next=%d changed=%v", next, changed)
+	}
+}
+
+func TestAdaptiveDeadZoneResetsCounters(t *testing.T) {
+	var p adaptivePolicy
+	for i := 0; i < 8; i++ {
+		p.Decide(15, 0, 3)
+	}
+	// Dead zone (22) resets everything.
+	p.Decide(22, 0, 3)
+	// 2 low frames — should NOT trigger.
+	if next, changed, _ := p.Decide(15, 0, 3); changed || next != 0 {
+		t.Fatalf("after dead zone: next=%d changed=%v", next, changed)
+	}
+}
+
+func TestAdaptiveCooldown(t *testing.T) {
+	var p adaptivePolicy
+	// 10 calls: 10th triggers cooldown=10.
+	for i := 0; i < 10; i++ {
+		p.Decide(15, 0, 3)
+	}
+	// 11th call: cooldown active → blocked.
+	if next, changed, _ := p.Decide(15, 0, 3); changed || next != 0 {
+		t.Fatalf("cooldown should block: next=%d changed=%v", next, changed)
+	}
+}
+
+func TestAdaptiveMinReached(t *testing.T) {
+	var p adaptivePolicy
+	// 9 calls building up, 10th triggers with min resolution.
+	for i := 0; i < 9; i++ {
+		p.Decide(15, 2, 3)
+	}
+	if next, changed, minReached := p.Decide(15, 2, 3); changed || next != 2 || !minReached {
 		t.Fatalf("min reached = (%d, %v, %v), want (2, false, true)", next, changed, minReached)
 	}
 }
 
-func TestAdaptivePolicyBounds(t *testing.T) {
+func TestAdaptiveBounds(t *testing.T) {
 	var p adaptivePolicy
-
-	// Already at highest resolution (current == 0): can't go higher.
-	for i := 0; i < adaptiveHighFrames; i++ {
-		p.Decide(adaptiveThreshHigh+1, 0, 3)
+	// Already at highest resolution: can't upscale.
+	for i := 0; i < 10; i++ {
+		p.Decide(30, 0, 3)
 	}
-	if next, changed, minReached := p.Decide(adaptiveThreshHigh+1, 0, 3); changed || next != 0 || minReached {
-		t.Fatalf("at upper bound: next=%d changed=%v minReached=%v", next, changed, minReached)
+	if next, changed, _ := p.Decide(30, 0, 3); changed || next != 0 {
+		t.Fatalf("at upper bound: next=%d changed=%v", next, changed)
 	}
 }
 
@@ -115,15 +144,27 @@ func TestResolutionStateDecidesAndUpdatesIndex(t *testing.T) {
 	state := resolutionState{
 		resolutions: []config.RenderResolution{{Width: 320, Height: 180}, {Width: 480, Height: 270}},
 	}
-	// Simulate sustained low fps.
-	for i := 0; i <= adaptiveLowFrames; i++ {
+	for i := 0; i < 10; i++ {
 		state.Decide(adaptiveThreshLow - 1)
 	}
-
 	if state.index != 1 {
 		t.Fatalf("index = %d, want 1", state.index)
 	}
 	if got := state.resolutions[state.index]; got.Width != 480 || got.Height != 270 {
 		t.Fatalf("resolution = %v, want 480x270", got)
+	}
+}
+
+func TestFpsRingMinMax(t *testing.T) {
+	var r fpsRing
+	r.Add(10)
+	r.Add(30)
+	r.Add(5)
+	r.Add(20)
+	if r.min() != 5 {
+		t.Fatalf("min = %v, want 5", r.min())
+	}
+	if r.max() != 30 {
+		t.Fatalf("max = %v, want 30", r.max())
 	}
 }
