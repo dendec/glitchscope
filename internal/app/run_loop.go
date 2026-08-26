@@ -192,10 +192,12 @@ func (a *App) Run() {
 		if a.mic != nil {
 			if wave := a.mic.Read(); len(wave) > 0 {
 				a.pm.PCMAddFloat(wave, projectm.Mono)
+				a.previewFeedPCM(wave)
 			}
 		} else if a.pl != nil {
 			if wave := a.pl.GetWave(); wave != nil {
 				a.pm.PCMAddFloat(wave, projectm.Mono)
+				a.previewFeedPCM(wave)
 			}
 		}
 

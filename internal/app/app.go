@@ -265,6 +265,13 @@ func (a *App) Close() {
 	sdl.Quit()
 }
 
+// previewFeedPCM forwards the current audio signal to the preview instance.
+func (a *App) previewFeedPCM(wave []float32) {
+	if a.preview != nil && a.preview.pm != nil {
+		a.preview.pm.PCMAddFloat(wave, projectm.Mono)
+	}
+}
+
 func (a *App) Init() {
 	a.initAudio()
 	a.initLibrary()

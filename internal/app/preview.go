@@ -202,7 +202,6 @@ func (r *previewRenderer) ProcessNext() bool {
 		r.warmupLeft = 3 // few frames to fill projectM feedback buffer
 		slog.Debug("preview job started", "key", r.active.key)
 		r.pm.LoadPresetData(r.active.data, false)
-		r.feedPCM()
 	}
 
 	// Warmup phase: render without capture.
@@ -231,16 +230,6 @@ func (r *previewRenderer) capture() {
 		C.GLsizei(r.w), C.GLsizei(r.h))
 	C.glBindTexture(C.GL_TEXTURE_2D, 0)
 	slog.Debug("preview captured", "key", r.active.key)
-}
-
-// feedPCM sends a minimal signal so audio-reactive presets produce a
-// representative thumbnail. Not played through speakers.
-func (r *previewRenderer) feedPCM() {
-	samples := make([]float32, 512)
-	for i := range samples {
-		samples[i] = 0.3 * float32(i%200) / 200.0
-	}
-	r.pm.PCMAddFloat(samples, projectm.Mono)
 }
 
 // Flush cancels all pending jobs and clears the result.
