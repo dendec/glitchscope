@@ -138,13 +138,17 @@ func (o *Overlay) helpHints() []UIHint {
 
 func (o *Overlay) presetsHints() []UIHint {
 	hints := []UIHint{
-		{Key: o.controlLabel(hintSelect), Label: "Select"},
+		{Key: o.controlLabel(hintMove), Label: "Move"},
 		{Key: o.controlLabel(hintBack), Label: "Back"},
 	}
-	if o.focusPanel == 1 {
-		hints = append(hints, UIHint{Key: o.controlLabel(hintMove), Label: "Preset"})
+	node := o.presetNav.Selected()
+	if node == nil {
+		return hints
+	}
+	if !node.isLeaf {
+		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: "Open"})
 	} else {
-		hints = append(hints, UIHint{Key: o.controlLabel(hintMove), Label: "Category"})
+		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: "Load"})
 	}
 	return hints
 }

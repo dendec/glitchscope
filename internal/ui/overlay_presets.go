@@ -33,6 +33,9 @@ type presetNavigation struct {
 }
 
 func (n *presetNavigation) current() *presetNavLevel {
+	if len(n.stack) == 0 {
+		return nil
+	}
 	return &n.stack[len(n.stack)-1]
 }
 

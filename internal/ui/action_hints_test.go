@@ -199,12 +199,20 @@ func TestActionHintsGamepadMapping(t *testing.T) {
 	o := srcRoot()
 	o.controllerConnected = true
 	o.uiPage = PagePresets
-	o.focusPanel = 1
+	o.presetNav = presetNavigation{
+		stack: []presetNavLevel{{
+			nodes: []presetNode{
+				{name: "Fractal", isLeaf: false},
+			},
+			cursor: 0,
+		},
+		},
+	}
 	got := hints(o)
 	want := []UIHint{
-		{Key: "A", Label: "Select"},
+		{Key: "D-pad", Label: "Move"},
 		{Key: "B", Label: "Back"},
-		{Key: "D-pad", Label: "Preset"},
+		{Key: "A", Label: "Open"},
 		{Key: "L1/R1", Label: "Screens"},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -236,6 +244,56 @@ func TestJoinHints(t *testing.T) {
 	want := "[Enter] Open   [Backspace] Back"
 	if text != want {
 		t.Fatalf("joinHints = %q, want %q", text, want)
+	}
+}
+
+func TestActionHintsPresetsDirectory(t *testing.T) {
+	o := srcRoot()
+	o.uiPage = PagePresets
+	o.presetNav = presetNavigation{
+		stack: []presetNavLevel{
+			{
+				nodes: []presetNode{
+					{name: "Fractal", isLeaf: false, children: []presetNode{{name: "Loops", isLeaf: true, key: "Fractal/Loops/a.milk"}}},
+				},
+				cursor: 0,
+			},
+		},
+	}
+	got := hints(o)
+	want := []UIHint{
+		{Key: "Up/Down", Label: "Move"},
+		{Key: "Backspace", Label: "Back"},
+		{Key: "Enter", Label: "Open"},
+		{Key: "P", Label: "Screens"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ActionHints(presets dir) = %v, want %v", got, want)
+	}
+}
+
+func TestActionHintsPresetsLeaf(t *testing.T) {
+	o := srcRoot()
+	o.uiPage = PagePresets
+	o.presetNav = presetNavigation{
+		stack: []presetNavLevel{
+			{
+				nodes: []presetNode{
+					{name: "a", isLeaf: true, key: "Fractal/Loops/a.milk"},
+				},
+				cursor: 0,
+			},
+		},
+	}
+	got := hints(o)
+	want := []UIHint{
+		{Key: "Up/Down", Label: "Move"},
+		{Key: "Backspace", Label: "Back"},
+		{Key: "Enter", Label: "Load"},
+		{Key: "P", Label: "Screens"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ActionHints(presets leaf) = %v, want %v", got, want)
 	}
 }
 
