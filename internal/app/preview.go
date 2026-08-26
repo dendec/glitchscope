@@ -126,6 +126,7 @@ func (r *previewRenderer) Enqueue(key, data string) {
 		data:   data,
 		warmup: defaultWarmup,
 	})
+	slog.Debug("preview enqueued", "key", key, "queueLen", len(r.queue))
 }
 
 // HasResult returns the GL texture ID for the given key, if available.
@@ -134,6 +135,13 @@ func (r *previewRenderer) HasResult(key string) (uint32, bool) {
 		return r.resultTex, true
 	}
 	return 0, false
+}
+
+// SetResult stores the capture result. Called internally after capture.
+func (r *previewRenderer) setResult(key string, tex uint32) {
+	r.resultKey.Store(key)
+	r.resultTex = tex
+	slog.Debug("preview result stored", "key", key, "tex", tex)
 }
 
 // ProcessNext runs one preview step. Returns true if work was done.
@@ -156,6 +164,7 @@ func (r *previewRenderer) ProcessNext() bool {
 		r.active = &r.queue[0]
 		r.queue = r.queue[1:]
 		r.warmupLeft = r.active.warmup
+		slog.Debug("preview job started", "key", r.active.key, "warmup", r.warmupLeft)
 		r.pm.LoadPresetData(r.active.data, false)
 		r.feedPCM()
 	}
@@ -167,7 +176,7 @@ func (r *previewRenderer) ProcessNext() bool {
 	// Capture when warmup is done.
 	if r.warmupLeft <= 0 {
 		r.capture()
-		r.resultKey.Store(r.active.key)
+		r.setResult(r.active.key, uint32(r.tex))
 		r.active = nil
 		return true
 	}
@@ -180,6 +189,7 @@ func (r *previewRenderer) capture() {
 	C.glCopyTexSubImage2D(C.GL_TEXTURE_2D, 0, 0, 0, 0, 0,
 		C.GLsizei(thumbW), C.GLsizei(thumbH))
 	C.glBindTexture(C.GL_TEXTURE_2D, 0)
+	slog.Debug("preview captured", "key", r.active.key)
 }
 
 // feedPCM sends a minimal signal so audio-reactive presets produce a
