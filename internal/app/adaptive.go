@@ -4,14 +4,14 @@ const (
 	fpsWindow          = 10
 	adaptiveThreshLow  = 20.0
 	adaptiveThreshHigh = 24.0
-	adaptiveLowFrames  = 10  // frames below threshold to downscale
-	adaptiveHighFrames = 10  // frames above threshold to upscale
+	adaptiveLowFrames  = 10  // consecutive frames below threshold to downscale
+	adaptiveHighFrames = 10  // consecutive frames above threshold to upscale
 	adaptiveLowSec     = 2.0 // time fallback for ultra-low fps (1-2 fps)
 	adaptiveHighSec    = 4.0 // time fallback for upscale
 	adaptiveCooldown   = 10  // min frames between resolution changes
 )
 
-// fpsRing is a fixed-size ring buffer of recent FPS samples.
+// fpsRing is a fixed-size ring buffer of FPS samples for stability checks.
 type fpsRing struct {
 	data [fpsWindow]float64
 	pos  int
@@ -27,6 +27,7 @@ func (r *fpsRing) Add(v float64) {
 	}
 }
 
+// min/max return the extremum over valid samples.
 func (r *fpsRing) min() float64 {
 	n := fpsWindow
 	if !r.full {
@@ -65,7 +66,7 @@ type adaptivePolicy struct {
 	fpsRing     fpsRing
 	lowFrames   int     // consecutive frames below threshold
 	highFrames  int     // consecutive frames above threshold
-	lowElapsed  float64 // seconds below threshold (accumulated per-frame)
+	lowElapsed  float64 // seconds below threshold
 	highElapsed float64 // seconds above threshold
 	cooldown    int     // frames until next change allowed
 }
@@ -77,11 +78,26 @@ func (p *adaptivePolicy) Reset() {
 	p.highElapsed = 0
 }
 
+func (p *adaptivePolicy) triggerDown(current, resolutionCount int) (int, bool, bool) {
+	p.Reset()
+	p.cooldown = adaptiveCooldown
+	if current+1 < resolutionCount {
+		return current + 1, true, false
+	}
+	return current, false, true
+}
+
+func (p *adaptivePolicy) triggerUp(current int) (int, bool, bool) {
+	p.Reset()
+	p.cooldown = adaptiveCooldown
+	return current - 1, true, false
+}
+
 // Decide evaluates whether to change render resolution.
 //
 // Two trigger modes (whichever fires first):
-//   - Frame mode: 10 consecutive frames + ring buffer stability check
-//   - Time mode: 2s elapsed at ultra-low fps (bypasses ring buffer requirement)
+//   - Frame mode: N consecutive frames + ring buffer stability check
+//   - Time mode: elapsed time at ultra-low fps (bypasses ring buffer)
 //
 // Stability: frame mode requires all fpsWindow samples on the same side of
 // the threshold. This prevents oscillation when fps hovers near the boundary.
@@ -101,23 +117,11 @@ func (p *adaptivePolicy) Decide(fps float64, current, resolutionCount int) (next
 		p.highFrames = 0
 		p.highElapsed = 0
 
-		// Frame trigger: requires stable low fps across all ring samples.
 		if p.lowFrames >= adaptiveLowFrames && p.fpsRing.full && p.fpsRing.max() < adaptiveThreshLow {
-			p.Reset()
-			p.cooldown = adaptiveCooldown
-			if current+1 < resolutionCount {
-				return current + 1, true, false
-			}
-			return current, false, true
+			return p.triggerDown(current, resolutionCount)
 		}
-		// Time fallback: at 1-2 fps, ring takes too long to fill.
 		if p.lowElapsed >= adaptiveLowSec {
-			p.Reset()
-			p.cooldown = adaptiveCooldown
-			if current+1 < resolutionCount {
-				return current + 1, true, false
-			}
-			return current, false, true
+			return p.triggerDown(current, resolutionCount)
 		}
 
 	case fps > adaptiveThreshHigh:
@@ -126,21 +130,14 @@ func (p *adaptivePolicy) Decide(fps float64, current, resolutionCount int) (next
 		p.lowFrames = 0
 		p.lowElapsed = 0
 
-		// Frame trigger: requires stable high fps across all ring samples.
 		if p.highFrames >= adaptiveHighFrames && p.fpsRing.full && p.fpsRing.min() > adaptiveThreshHigh && current > 0 {
-			p.Reset()
-			p.cooldown = adaptiveCooldown
-			return current - 1, true, false
+			return p.triggerUp(current)
 		}
-		// Time fallback.
 		if p.highElapsed >= adaptiveHighSec && current > 0 {
-			p.Reset()
-			p.cooldown = adaptiveCooldown
-			return current - 1, true, false
+			return p.triggerUp(current)
 		}
 
 	default:
-		// Dead zone (20-24): reset all counters.
 		p.Reset()
 	}
 
