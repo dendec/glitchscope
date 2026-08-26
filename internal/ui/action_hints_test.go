@@ -200,12 +200,13 @@ func TestActionHintsGamepadMapping(t *testing.T) {
 	o.controllerConnected = true
 	o.uiPage = PagePresets
 	o.presetNav = presetNavigation{
-		stack: []presetNavLevel{{
-			nodes: []presetNode{
-				{name: "Fractal", isLeaf: false},
+		stack: []presetNavLevel{
+			{
+				nodes: []presetNode{
+					{name: "Fractal", isLeaf: false},
+				},
+				cursor: 0,
 			},
-			cursor: 0,
-		},
 		},
 	}
 	got := hints(o)

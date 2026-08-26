@@ -1,10 +1,7 @@
 package ui
 
-// Thumbnail dimensions for preset preview.
-const (
-	thumbW = 160
-	thumbH = 90
-)
+// thumbAspect is the preview thumbnail aspect ratio (16:9).
+const thumbAspect = 16.0 / 9.0
 
 // This file owns rendering for the Presets page: two columns.
 // Shared primitives in overlay_render.go; model in overlay_presets.go.
@@ -83,8 +80,6 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 }
 
 func (o *Overlay) drawPreviewThumb(tex uint32, x, y, panelW float32, winW, winH, viewW, viewH int) {
-	// Center the thumbnail horizontally within the panel, fit to width.
-	thumbAspect := float32(thumbW) / float32(thumbH)
 	w := float32(panelW - 8) // padding
 	h := w / thumbAspect
 	tx := x + 4
@@ -129,23 +124,26 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 
 	// Right panel — thumbnail + metadata detail.
 	var thumbTex uint32
+	var thumbDisplayH float32
 	if o.presetPreviewTex != nil {
 		node := o.presetNav.Selected()
 		if node != nil && node.isLeaf {
 			if tex, ok := o.presetPreviewTex(node.key); ok && tex != 0 {
 				thumbTex = tex
+				thumbW := colW - 8
+				thumbDisplayH = thumbW / thumbAspect
 			}
 		}
 	}
 	if thumbTex != 0 {
 		o.drawPreviewThumb(thumbTex, rx, ry, colW, winW, winH, viewW, viewH)
-		ry += float32(thumbH + 4)
-		colH -= float32(thumbH + 4)
+		ry += thumbDisplayH + 4
+		colH -= thumbDisplayH + 4
 	}
 	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, false,
 		0, 0, lh, winW, winH, viewW, viewH)
 	// Draw thumbnail on top of panel background.
 	if thumbTex != 0 {
-		o.drawPreviewThumb(thumbTex, rx, ry-float32(thumbH+4), colW, winW, winH, viewW, viewH)
+		o.drawPreviewThumb(thumbTex, rx, ry-thumbDisplayH-4, colW, winW, winH, viewW, viewH)
 	}
 }

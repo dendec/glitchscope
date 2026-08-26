@@ -41,8 +41,7 @@ import (
 )
 
 const (
-	thumbW        = 160
-	thumbH        = 90
+	thumbAspect   = 16.0 / 9.0
 	defaultWarmup = 3
 	maxQueue      = 10
 )
@@ -68,6 +67,7 @@ type previewRenderer struct {
 	pm         *projectm.Handle
 	fbo        C.GLuint
 	tex        C.GLuint // thumbnail capture texture
+	w, h       int      // current thumbnail render dimensions
 	queue      []previewJob
 	active     *previewJob
 	warmupLeft int
@@ -79,8 +79,28 @@ type previewRenderer struct {
 	ready bool // false if GL init failed
 }
 
-// newPreviewRenderer creates a second projectM instance and capture texture.
-// Must be called on the main GL thread after the main pm is created.
+// ThumbSize returns the recommended thumbnail render dimensions for a given
+// panel width. Maintains 16:9 aspect ratio, capped for ARM performance.
+func ThumbSize(panelW int) (w, h int) {
+	// Use full panel width (minus small padding) as render width.
+	w = panelW - 8
+	if w < 64 {
+		w = 64
+	}
+	h = int(float64(w) / thumbAspect)
+	if h < 36 {
+		h = 36
+	}
+	// Cap for ARM: large thumbs are expensive to render.
+	if w > 320 {
+		w = 320
+		h = int(float64(w) / thumbAspect)
+	}
+	return w, h
+}
+
+// newPreviewRenderer creates a second projectM instance for thumbnails.
+// Call Resize() before the first ProcessNext() to set initial dimensions.
 func newPreviewRenderer() *previewRenderer {
 	r := &previewRenderer{}
 
@@ -90,19 +110,41 @@ func newPreviewRenderer() *previewRenderer {
 		return r
 	}
 	r.pm = pm
-	r.pm.SetWindowSize(thumbW, thumbH)
 	r.pm.SetHardCutEnabled(false)
+	r.ready = true
+	return r
+}
 
-	// Create capture texture and FBO (FBO validates completeness).
-	C.prCreateThumbTexture(&r.tex, C.GLsizei(thumbW), C.GLsizei(thumbH))
+// Resize recreates the capture texture and FBO at the given dimensions.
+// No-op if dimensions haven't changed.
+func (r *previewRenderer) Resize(w, h int) {
+	if !r.ready || r.pm == nil || w <= 0 || h <= 0 {
+		return
+	}
+	if w == r.w && h == r.h {
+		return
+	}
+	// Destroy old resources.
+	if r.fbo != 0 {
+		C.glDeleteFramebuffers(1, &r.fbo)
+		r.fbo = 0
+	}
+	if r.tex != 0 {
+		C.glDeleteTextures(1, &r.tex)
+		r.tex = 0
+	}
+	// Create new.
+	r.pm.SetWindowSize(w, h)
+	C.prCreateThumbTexture(&r.tex, C.GLsizei(w), C.GLsizei(h))
 	r.fbo = C.prCreateFBO(r.tex)
 	if r.fbo == 0 {
-		slog.Warn("preview FBO incomplete, thumbnail preview disabled")
-		return r
+		slog.Warn("preview FBO incomplete after resize", "w", w, "h", h)
+		r.ready = false
+		return
 	}
-	r.ready = true
-	slog.Info("preview renderer initialized", "thumbW", thumbW, "thumbH", thumbH)
-	return r
+	r.w, r.h = w, h
+	r.Flush() // discard stale results
+	slog.Debug("preview resized", "w", w, "h", h)
 }
 
 // Enqueue adds a preview job. Drops the oldest if queue is full.
@@ -137,7 +179,6 @@ func (r *previewRenderer) HasResult(key string) (uint32, bool) {
 	return 0, false
 }
 
-// SetResult stores the capture result. Called internally after capture.
 func (r *previewRenderer) setResult(key string, tex uint32) {
 	r.resultKey.Store(key)
 	r.resultTex = tex
@@ -152,7 +193,7 @@ func (r *previewRenderer) setResult(key string, tex uint32) {
 //  3. We capture the corner into r.tex
 //  4. rt.BlitToScreen() restores the full main render, erasing preview artifacts
 func (r *previewRenderer) ProcessNext() bool {
-	if !r.ready || r.pm == nil {
+	if !r.ready || r.pm == nil || r.w == 0 || r.h == 0 {
 		return false
 	}
 
@@ -183,11 +224,11 @@ func (r *previewRenderer) ProcessNext() bool {
 	return true
 }
 
-// capture copies the bottom-left thumbW×thumbH region of fb0 into r.tex.
+// capture copies the bottom-left w×h region of fb0 into r.tex.
 func (r *previewRenderer) capture() {
 	C.glBindTexture(C.GL_TEXTURE_2D, r.tex)
 	C.glCopyTexSubImage2D(C.GL_TEXTURE_2D, 0, 0, 0, 0, 0,
-		C.GLsizei(thumbW), C.GLsizei(thumbH))
+		C.GLsizei(r.w), C.GLsizei(r.h))
 	C.glBindTexture(C.GL_TEXTURE_2D, 0)
 	slog.Debug("preview captured", "key", r.active.key)
 }
