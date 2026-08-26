@@ -95,7 +95,7 @@ func (a *App) Run() {
 		prevW, prevH = w, h
 
 		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && fpsMeter.Full() {
-			if resolution, direction, changed, minReached := a.adaptive.Decide(now, fpsAvg); changed {
+			if resolution, direction, changed, minReached := a.adaptive.Decide(fpsAvg); changed {
 				a.applyRenderResolution(resolution)
 				if direction > 0 {
 					slog.Info("adaptive: step down", "resolution", resolution)

@@ -1,10 +1,6 @@
 package app
 
-import (
-	"time"
-
-	"github.com/dendec/glitchscope/internal/config"
-)
+import "github.com/dendec/glitchscope/internal/config"
 
 type resolutionState struct {
 	resolutions []config.RenderResolution
@@ -36,8 +32,8 @@ func (s *resolutionState) Reset(winW, winH int) bool {
 	return true
 }
 
-func (s *resolutionState) Decide(now time.Time, fps float64) (config.RenderResolution, int, bool, bool) {
-	next, changed, minReached := s.policy.Decide(now, fps, s.index, len(s.resolutions))
+func (s *resolutionState) Decide(fps float64) (config.RenderResolution, int, bool, bool) {
+	next, changed, minReached := s.policy.Decide(fps, s.index, len(s.resolutions))
 	if !changed {
 		return config.RenderResolution{}, 0, false, minReached
 	}
