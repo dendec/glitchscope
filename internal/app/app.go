@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -77,7 +78,9 @@ type App struct {
 
 	deleteSvc *deleteService
 
-	seek seekControl // continuous-seek drivetrain state
+	seek           seekControl // continuous-seek drivetrain state
+	onPresetsPage  bool        // true when UI is on Presets page (main viz stopped)
+	testSignalFreq float64     // phase accumulator for synthetic test signal
 }
 
 // New creates an App with display initialised. Player/overlay/input/library
@@ -270,6 +273,25 @@ func (a *App) previewFeedPCM(wave []float32) {
 	if a.preview != nil && a.preview.pm != nil {
 		a.preview.pm.PCMAddFloat(wave, projectm.Mono)
 	}
+}
+
+// generateTestSignal produces a harmonic beating signal (sum of two close
+// frequencies) for preview when audio is paused or stopped.
+func (a *App) generateTestSignal(n int) []float32 {
+	wave := make([]float32, n)
+	const (
+		f1    = 220.0 // Hz
+		f2    = 223.0 // Hz (3 Hz beat)
+		amp   = 0.3
+		twoPi = 2 * 3.141592653589793
+		sr    = 44100.0
+	)
+	for i := range wave {
+		t := a.testSignalFreq / sr
+		wave[i] = float32(amp * (math.Sin(twoPi*f1*t) + math.Sin(twoPi*f2*t)))
+		a.testSignalFreq++
+	}
+	return wave
 }
 
 func (a *App) Init() {
@@ -595,6 +617,12 @@ func (a *App) initPreset() {
 				return 0, 0, 0, false
 			}
 			return tex, a.preview.w, a.preview.h, true
+		})
+		a.overlay.SetPresetPreviewFPS(func() float64 {
+			if a.preview == nil {
+				return 0
+			}
+			return a.preview.RenderFPS()
 		})
 	}
 }

@@ -176,6 +176,19 @@ func (o *Overlay) SetPresetPreviewTex(fn func(key string) (tex uint32, w, h int,
 	o.presetPreviewTex = fn
 }
 
+// SetPresetPreviewFPS sets the callback to retrieve the preview render FPS.
+func (o *Overlay) SetPresetPreviewFPS(fn func() float64) {
+	o.presetPreviewFPS = fn
+}
+
+// PresetPreviewFPS returns the measured preview render FPS, or 0 if unavailable.
+func (o *Overlay) PresetPreviewFPS() float64 {
+	if o.presetPreviewFPS != nil {
+		return o.presetPreviewFPS()
+	}
+	return 0
+}
+
 // SetPresetTree updates the preset tree and resets navigation to root.
 // Only marks dirty if the tree actually changed.
 func (o *Overlay) SetPresetTree(keys []string) {
@@ -293,12 +306,19 @@ func (o *Overlay) buildPresetDetailRows() []listRow {
 	m := o.presetMeta(node.key)
 	complexity := calcComplexity(m)
 
-	return []listRow{
+	rows := []listRow{
 		{text: formatComplexity(complexity)},
 		{},
 		{text: fmt.Sprintf("Shapes: %d   Waves: %d", m.Shapes, m.Waves)},
 		{text: fmt.Sprintf("Equations: %d per-frame, %d per-pixel", m.PerFrameEqs, m.PerPixelEqs)},
 	}
+
+	// Show preview FPS when available (presets page, preview active).
+	if fps := o.PresetPreviewFPS(); fps > 0 {
+		rows = append(rows, listRow{}, listRow{text: fmt.Sprintf("FPS: %.0f", fps)})
+	}
+
+	return rows
 }
 
 // Complexity scoring weights. Normalized so a typical complex preset (~20 per-frame,

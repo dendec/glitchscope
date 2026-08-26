@@ -46,6 +46,12 @@ const (
 	maxQueue   = 10
 )
 
+// ClearFB clears the current framebuffer to black.
+func ClearFB() {
+	C.glClearColor(0, 0, 0, 1)
+	C.glClear(C.GL_COLOR_BUFFER_BIT)
+}
+
 // previewJob is a pending thumbnail render request.
 type previewJob struct {
 	key  string // preset key (for cache lookup)
@@ -54,14 +60,6 @@ type previewJob struct {
 
 // previewRenderer manages a dedicated projectM instance for thumbnail rendering.
 // All methods must be called on the main GL thread.
-//
-// Render ordering within the main frame:
-//
-//	pm.RenderFrame()        // main visualizer → fb0 at render resolution
-//	rt.Capture()            // copy fb0 → rt.tex (saves main output)
-//	preview.ProcessNext()   // pmPreview renders to fb0 at thumb size, captures corner
-//	rt.BlitToScreen(w, h)  // restores fb0 from rt.tex (overwrites any preview artifacts)
-//	overlay.Draw(w, h)     // UI draws; can reference preview.HasResult() for thumbnail
 type previewRenderer struct {
 	pm         *projectm.Handle
 	fbo        C.GLuint
@@ -71,6 +69,12 @@ type previewRenderer struct {
 	active     *previewJob
 	warmupLeft int
 	lastRender time.Time // last animation frame capture time
+	throttle   bool      // false = render as fast as possible (presets page)
+
+	// FPS measurement.
+	renderCount int
+	lastFPSTime time.Time
+	currentFPS  float64
 
 	// Result of the last completed render.
 	resultKey atomic.Value // string
@@ -95,7 +99,10 @@ func ThumbSize(winW, winH int) (w, h int) {
 // newPreviewRenderer creates a second projectM instance for thumbnails.
 // Call Resize() before the first ProcessNext() to set initial dimensions.
 func newPreviewRenderer() *previewRenderer {
-	r := &previewRenderer{}
+	r := &previewRenderer{
+		throttle:    true,
+		lastFPSTime: time.Now(),
+	}
 
 	pm, err := projectm.Create()
 	if err != nil {
@@ -111,6 +118,17 @@ func newPreviewRenderer() *previewRenderer {
 // isReady reports whether the renderer can process jobs.
 func (r *previewRenderer) isReady() bool {
 	return r.ready && r.pm != nil
+}
+
+// SetThrottle controls the FPS throttle. When false, ProcessNext renders
+// as fast as possible (used on Presets page where main viz is stopped).
+func (r *previewRenderer) SetThrottle(v bool) {
+	r.throttle = v
+}
+
+// RenderFPS returns the measured render FPS of the preview instance.
+func (r *previewRenderer) RenderFPS() float64 {
+	return r.currentFPS
 }
 
 // Resize recreates the capture texture and FBO at the given dimensions.
@@ -188,7 +206,7 @@ func (r *previewRenderer) setResult(key string, tex uint32) {
 //
 // Two phases:
 //  1. Warmup: render `warmup` frames (no capture) to build feedback history
-//  2. Animation: render + capture at previewFPS, texture updated each frame
+//  2. Animation: render + capture, texture updated each frame
 //
 // The job stays active during animation so the thumbnail keeps playing.
 // A new Enqueue replaces the current job.
@@ -216,15 +234,26 @@ func (r *previewRenderer) ProcessNext() bool {
 		return true
 	}
 
-	// Animation phase: throttle to previewFPS.
-	interval := time.Second / previewFPS
-	if time.Since(r.lastRender) < interval {
-		return false
+	// Animation phase: optionally throttle to previewFPS.
+	if r.throttle {
+		interval := time.Second / previewFPS
+		if time.Since(r.lastRender) < interval {
+			return false
+		}
 	}
 	r.pm.RenderFrame()
 	r.capture()
 	r.setResult(r.active.key, uint32(r.tex))
 	r.lastRender = time.Now()
+
+	// FPS measurement.
+	r.renderCount++
+	if elapsed := time.Since(r.lastFPSTime); elapsed >= time.Second {
+		r.currentFPS = float64(r.renderCount) / elapsed.Seconds()
+		r.renderCount = 0
+		r.lastFPSTime = time.Now()
+	}
+
 	return true
 }
 

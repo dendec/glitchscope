@@ -51,7 +51,7 @@ func (a *App) Run() {
 		w32, h32 := a.window.GLGetDrawableSize()
 		w, h := int(w32), int(h32)
 
-		if fpsMeter.Full() && fpsAvg < lowFPSThresh {
+		if fpsMeter.Full() && fpsAvg < lowFPSThresh && !a.onPresetsPage {
 			presetName := ""
 			if a.presetIdx >= 0 && a.presetIdx < len(a.presetNames) {
 				presetName = a.presetNames[a.presetIdx]
@@ -94,7 +94,7 @@ func (a *App) Run() {
 		}
 		prevW, prevH = w, h
 
-		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && fpsMeter.Full() {
+		if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && !a.onPresetsPage && fpsMeter.Full() {
 			if resolution, direction, changed, minReached := a.adaptive.Decide(fpsAvg); changed {
 				a.applyRenderResolution(resolution)
 				if direction > 0 {
@@ -189,18 +189,6 @@ func (a *App) Run() {
 			a.randPreset()
 		}
 
-		if a.mic != nil {
-			if wave := a.mic.Read(); len(wave) > 0 {
-				a.pm.PCMAddFloat(wave, projectm.Mono)
-				a.previewFeedPCM(wave)
-			}
-		} else if a.pl != nil {
-			if wave := a.pl.GetWave(); wave != nil {
-				a.pm.PCMAddFloat(wave, projectm.Mono)
-				a.previewFeedPCM(wave)
-			}
-		}
-
 		if a.pl != nil {
 			started, failed := a.pl.CheckPending()
 			if failed {
@@ -238,15 +226,76 @@ func (a *App) Run() {
 
 		a.pm.SetFPS(int32(fpsAvg))
 
-		a.pm.RenderFrame()
-		a.rt.Capture()
+		// Detect presets page transitions.
+		onPresets := a.overlay != nil && a.overlay.IsPresetsPage()
+		if onPresets && !a.onPresetsPage {
+			a.onPresetsPage = true
+			if a.preview != nil {
+				a.preview.SetThrottle(false)
+			}
+			slog.Info("presets page: main viz stopped")
+		} else if !onPresets && a.onPresetsPage {
+			a.onPresetsPage = false
+			if a.preview != nil {
+				a.preview.SetThrottle(true)
+			}
+			if a.overlay != nil {
+				if key := a.overlay.SelectedPresetKey(); key != "" {
+					a.transitionPreset(key)
+				}
+			}
+			slog.Info("presets page: main viz resumed")
+		}
 
-		// Preview: render one thumbnail step (between capture and blit so
-		// BlitToScreen automatically restores the main render afterward).
-		if a.preview != nil {
-			tW, tH := ThumbSize(w, h)
-			a.preview.Resize(tW, tH)
-			a.preview.ProcessNext()
+		if a.onPresetsPage {
+			// Presets page: main viz stopped, all resources to preview.
+			ClearFB()
+			a.rt.Capture()
+
+			// Feed audio to preview only (skip main pm).
+			var wave []float32
+			if a.mic != nil {
+				wave = a.mic.Read()
+			} else if a.pl != nil {
+				wave = a.pl.GetWave()
+			}
+			if len(wave) > 0 {
+				a.previewFeedPCM(wave)
+			} else if a.preview != nil && a.preview.isReady() {
+				a.previewFeedPCM(a.generateTestSignal(512))
+			}
+
+			// Render preview as fast as possible.
+			if a.preview != nil {
+				tW, tH := ThumbSize(w, h)
+				a.preview.Resize(tW, tH)
+				a.preview.ProcessNext()
+				a.preview.ProcessNext()
+				a.preview.ProcessNext()
+			}
+		} else {
+			// Normal mode: main viz + throttled preview.
+			a.pm.RenderFrame()
+			a.rt.Capture()
+
+			if a.preview != nil {
+				tW, tH := ThumbSize(w, h)
+				a.preview.Resize(tW, tH)
+				a.preview.ProcessNext()
+			}
+
+			// Feed audio to both main pm and preview.
+			if a.mic != nil {
+				if w := a.mic.Read(); len(w) > 0 {
+					a.pm.PCMAddFloat(w, projectm.Mono)
+					a.previewFeedPCM(w)
+				}
+			} else if a.pl != nil {
+				if w := a.pl.GetWave(); w != nil {
+					a.pm.PCMAddFloat(w, projectm.Mono)
+					a.previewFeedPCM(w)
+				}
+			}
 		}
 
 		a.rt.BlitToScreen(w, h)
