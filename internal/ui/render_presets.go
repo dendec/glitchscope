@@ -6,7 +6,7 @@ package ui
 func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	texturesValid := glIsTexture(o.presetsColL.tex) && glIsTexture(o.presetsColR.tex)
 	if !o.presetsDirty && texturesValid {
-		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, 0)
+		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, o.presetsRightRows)
 		return
 	}
 	o.presetsDirty = false
@@ -15,6 +15,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 
 	cur := o.presetNav.current()
 	if cur == nil {
+		o.presetsRightRows = 0
 		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, 0)
 		return
 	}
@@ -73,6 +74,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	rightRows := o.buildPresetDetailRows()
 	o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
 	o.marqueeR.invalidate(o)
+	o.presetsRightRows = len(rightRows)
 
 	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, len(rightRows))
 }

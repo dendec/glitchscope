@@ -243,6 +243,7 @@ type Overlay struct {
 	bottomDirty        bool
 	presetNameDirty    bool
 	presetsDirty       bool
+	presetsRightRows   int // cached right panel row count for thumbnail draw
 	online             bool
 	micActive          bool // microphone capture is running
 	micDevices         []string
