@@ -36,12 +36,14 @@ import "C"
 import (
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"github.com/dendec/glitchscope/internal/projectm"
 )
 
 const (
 	defaultWarmup = 3
+	previewFPS    = 12 // thumbnail animation frame rate
 	maxQueue      = 10
 )
 
@@ -70,6 +72,7 @@ type previewRenderer struct {
 	queue      []previewJob
 	active     *previewJob
 	warmupLeft int
+	lastRender time.Time // last animation frame capture time
 
 	// Result of the last completed render.
 	resultKey atomic.Value // string
@@ -139,14 +142,16 @@ func (r *previewRenderer) Resize(w, h int) {
 	slog.Debug("preview resized", "w", w, "h", h)
 }
 
-// Enqueue adds a preview job. Drops the oldest if queue is full.
+// Enqueue adds a preview job. Replaces the active job if key differs.
 func (r *previewRenderer) Enqueue(key, data string) {
 	if !r.ready || r.pm == nil {
 		return
 	}
-	if r.active != nil && r.active.key == key {
-		return
+	// Replace active job if different key.
+	if r.active != nil && r.active.key != key {
+		r.active = nil
 	}
+	// Deduplicate in queue.
 	for _, j := range r.queue {
 		if j.key == key {
 			return
@@ -179,11 +184,12 @@ func (r *previewRenderer) setResult(key string, tex uint32) {
 
 // ProcessNext runs one preview step. Returns true if work was done.
 //
-// Call between rt.Capture() and rt.BlitToScreen() so that:
-//  1. Main render is already saved in rt.tex
-//  2. pmPreview renders to fb0 at thumb size (overwrites a corner)
-//  3. We capture the corner into r.tex
-//  4. rt.BlitToScreen() restores the full main render, erasing preview artifacts
+// Two phases:
+//  1. Warmup: render `warmup` frames (no capture) to build feedback history
+//  2. Animation: render + capture at previewFPS, texture updated each frame
+//
+// The job stays active during animation so the thumbnail keeps playing.
+// A new Enqueue replaces the current job.
 func (r *previewRenderer) ProcessNext() bool {
 	if !r.ready || r.pm == nil || r.w == 0 || r.h == 0 {
 		return false
@@ -202,17 +208,22 @@ func (r *previewRenderer) ProcessNext() bool {
 		r.feedPCM()
 	}
 
-	// Render one frame.
-	r.pm.RenderFrame()
-	r.warmupLeft--
-
-	// Capture when warmup is done.
-	if r.warmupLeft <= 0 {
-		r.capture()
-		r.setResult(r.active.key, uint32(r.tex))
-		r.active = nil
+	// Warmup phase: render without capture.
+	if r.warmupLeft > 0 {
+		r.pm.RenderFrame()
+		r.warmupLeft--
 		return true
 	}
+
+	// Animation phase: throttle to previewFPS.
+	interval := time.Second / previewFPS
+	if time.Since(r.lastRender) < interval {
+		return false
+	}
+	r.pm.RenderFrame()
+	r.capture()
+	r.setResult(r.active.key, uint32(r.tex))
+	r.lastRender = time.Now()
 	return true
 }
 
@@ -239,6 +250,7 @@ func (r *previewRenderer) feedPCM() {
 func (r *previewRenderer) Flush() {
 	r.queue = r.queue[:0]
 	r.active = nil
+	r.lastRender = time.Time{}
 	r.resultKey.Store("")
 	r.resultTex = 0
 }
