@@ -255,8 +255,9 @@ func (a *App) Run() {
 
 		if a.onPresetsPage {
 			// Presets page: main viz stopped, all resources to preview.
+			// Skip rt.Capture/BlitToScreen — they would overwrite the preview
+			// with the black frame captured before preview rendered.
 			ClearFB()
-			a.rt.Capture()
 
 			// Feed audio to preview only (skip main pm).
 			if wave := a.readAudio(); len(wave) > 0 {
@@ -285,9 +286,9 @@ func (a *App) Run() {
 				a.pm.PCMAddFloat(wave, projectm.Mono)
 				a.previewFeedPCM(wave)
 			}
-		}
 
-		a.rt.BlitToScreen(w, h)
+			a.rt.BlitToScreen(w, h)
+		}
 
 		if a.overlay != nil {
 			rw, rh := a.rt.Size()
