@@ -568,6 +568,7 @@ func (a *App) initPreset() {
 		a.overlay.SetPresetMetaProvider(presets.ReadMeta)
 		a.overlay.SetPresetPreviewRequest(func(key string) {
 			if a.preview == nil {
+				slog.Debug("preview: no renderer")
 				return
 			}
 			data, err := presets.Read(key)
@@ -575,6 +576,7 @@ func (a *App) initPreset() {
 				slog.Debug("preview read preset", "key", key, "error", err)
 				return
 			}
+			slog.Debug("preview: read data", "key", key, "bytes", len(data))
 			a.preview.Enqueue(key, string(data))
 		})
 		a.overlay.SetPresetPreviewTex(func(key string) (uint32, bool) {

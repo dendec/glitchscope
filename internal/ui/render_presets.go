@@ -128,18 +128,24 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 	}
 
 	// Right panel — thumbnail + metadata detail.
+	var thumbTex uint32
 	if o.presetPreviewTex != nil {
 		node := o.presetNav.Selected()
 		if node != nil && node.isLeaf {
 			if tex, ok := o.presetPreviewTex(node.key); ok && tex != 0 {
-				// Draw thumbnail at top of right panel.
-				o.drawPreviewThumb(tex, rx, ry, colW, winW, winH, viewW, viewH)
-				// Shift text below thumbnail.
-				ry += float32(thumbH + 4)
-				colH -= float32(thumbH + 4)
+				thumbTex = tex
 			}
 		}
 	}
+	if thumbTex != 0 {
+		o.drawPreviewThumb(thumbTex, rx, ry, colW, winW, winH, viewW, viewH)
+		ry += float32(thumbH + 4)
+		colH -= float32(thumbH + 4)
+	}
 	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, false,
 		0, 0, lh, winW, winH, viewW, viewH)
+	// Draw thumbnail on top of panel background.
+	if thumbTex != 0 {
+		o.drawPreviewThumb(thumbTex, rx, ry-float32(thumbH+4), colW, winW, winH, viewW, viewH)
+	}
 }
