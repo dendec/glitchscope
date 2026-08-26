@@ -42,9 +42,8 @@ import (
 )
 
 const (
-	previewWarmup = 3 // frames to render before first capture
-	previewFPS    = 12
-	maxQueue      = 10
+	previewFPS = 12
+	maxQueue   = 10
 )
 
 // previewJob is a pending thumbnail render request.
@@ -200,7 +199,7 @@ func (r *previewRenderer) ProcessNext() bool {
 		}
 		r.active = &r.queue[0]
 		r.queue = r.queue[1:]
-		r.warmupLeft = previewWarmup
+		r.warmupLeft = 3 // few frames to fill projectM feedback buffer
 		slog.Debug("preview job started", "key", r.active.key)
 		r.pm.LoadPresetData(r.active.data, false)
 		r.feedPCM()
