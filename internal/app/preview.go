@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	previewTargetFPS   = 15
+	previewTargetFPS   = 25
 	previewFramePeriod = time.Second / previewTargetFPS
 )
 
@@ -188,7 +188,6 @@ func (r *previewRenderer) ProcessNext() bool {
 	started := time.Now()
 	r.pm.RenderFrame()
 	r.meter.AddDuration(time.Since(started))
-	r.pm.SetFPS(max(1, int32(r.meter.Average()+0.5)))
 	C.prCaptureThumb(r.tex, C.GLsizei(r.w), C.GLsizei(r.h))
 	r.setResult(r.active.key, uint32(r.tex))
 

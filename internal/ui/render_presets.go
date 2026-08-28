@@ -3,14 +3,14 @@ package ui
 // This file owns rendering for the Presets page: two columns.
 // Shared primitives in overlay_render.go; model in overlay_presets.go.
 
-// PresetPreviewSize returns a low-resolution preview render size for a window.
-// Rendering at one eighth of the window dimensions keeps preview work cheap.
+// PresetPreviewSize returns the preview render size for a window.
+// Rendering at one quarter of the window dimensions balances detail and cost.
 func PresetPreviewSize(winW, winH int) (w, h int) {
 	if winW <= 0 || winH <= 0 {
 		return 0, 0
 	}
-	w = max(1, winW/8)
-	h = max(1, winH/8)
+	w = max(1, winW/4)
+	h = max(1, winH/4)
 	return w, h
 }
 
@@ -20,7 +20,8 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, o.presetsRightRows)
 		return
 	}
-	rebuildList := o.presetsDirty || !glIsTexture(o.presetsColL.tex)
+	rebuildList := o.presetsDirty || o.presetCursorDirty || !glIsTexture(o.presetsColL.tex)
+	rebuildDetail := o.presetsDetailDirty || !glIsTexture(o.presetsColR.tex)
 	o.presetsDirty = false
 	o.presetCursorDirty = false
 	o.presetsDetailDirty = false
@@ -73,7 +74,6 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	}
 
 	// Marquee for focused node name.
-	o.marqueeL.invalidate(o)
 	if o.panelEntered && cur.cursor >= cur.scroll && cur.cursor < leftEnd {
 		var name string
 		if hasParent && cur.cursor == 0 {
@@ -86,9 +86,11 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 			name = nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
 		}
 		o.rebuildMarqueeLine(&o.marqueeL, name, maxTextPx, true)
+	} else {
+		o.marqueeL.invalidate(o)
 	}
 
-	if o.presetsDetailDirty || !glIsTexture(o.presetsColR.tex) {
+	if rebuildDetail {
 		// Right panel — metadata text for the last settled selection.
 		rightRows := o.buildPresetDetailRows()
 		o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
