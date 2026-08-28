@@ -49,6 +49,7 @@ ALLMODS_URL := https://modland.antarctica.no/allmods.zip
 ALLMODS_ZIP := $(DIST_DIR)/allmods.zip
 MODLAND_CATALOG    := .cache/modland/catalog
 MODARCHIVE_CATALOG := .cache/modarchive/catalog
+MODARCHIVE_SNAPSHOT := .cache/modarchive/1980-2007.gsa
 
 .PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill
 
@@ -69,17 +70,25 @@ test: builder
 # Build modarchive catalog via crawler (only if missing).
 $(MODARCHIVE_CATALOG): builder
 	@if [ ! -f "$@" ]; then \
-		$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go run ./cmd/modarchive-catalog -v'; \
+		$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go run ./cmd/modarchive-catalog -catalog-only -v'; \
 		echo "=== Built modarchive catalog $@ ==="; \
 	else \
 		echo "=== Modarchive catalog $@ already exists, skipping ==="; \
 	fi
 
+$(MODARCHIVE_SNAPSHOT): builder
+	@if [ ! -f "$@" ]; then \
+		$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go run ./cmd/modarchive-catalog -snapshot-only -v'; \
+		echo "=== Built modarchive snapshot $@ ==="; \
+	else \
+		echo "=== Modarchive snapshot $@ already exists, skipping ==="; \
+	fi
+
 modland-catalog: $(MODLAND_CATALOG)
-modarchive-catalog: $(MODARCHIVE_CATALOG)
+modarchive-catalog: $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT)
 
 # Docker build (amd64)
-dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
+dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t glitchscope:amd64 -f Dockerfile .
 	@# Backup music directory if it exists before rm -rf.
 	@if [ -d "$(X64_DIST_DIR)/music" ]; then \
@@ -99,6 +108,7 @@ dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_C
 	@mkdir -p $(X64_DIST_DIR)/.cache/modland $(X64_DIST_DIR)/.cache/modarchive
 	@cp $(MODLAND_CATALOG) $(X64_DIST_DIR)/.cache/modland/catalog
 	@cp $(MODARCHIVE_CATALOG) $(X64_DIST_DIR)/.cache/modarchive/catalog
+	@cp $(MODARCHIVE_SNAPSHOT) $(X64_DIST_DIR)/.cache/modarchive/1980-2007.gsa
 	@# Restore music directory from backup.
 	@if [ -d "$(X64_DIST_DIR)/music.bak" ]; then \
 		mv "$(X64_DIST_DIR)/music.bak" "$(X64_DIST_DIR)/music"; \
@@ -109,7 +119,7 @@ dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_C
 # ARM64 cross-build via Docker
 DOCKER_IMAGE_ARM64 := glitchscope:arm64
 
-dist-arm64: builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
+dist-arm64: builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)
@@ -124,11 +134,12 @@ dist-arm64: builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG)
 	@mkdir -p $(ARM64_DIST_DIR)/glitchscope/.cache/modland $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive
 	@cp $(MODLAND_CATALOG) $(ARM64_DIST_DIR)/glitchscope/.cache/modland/catalog
 	@cp $(MODARCHIVE_CATALOG) $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/catalog
+	@cp $(MODARCHIVE_SNAPSHOT) $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/1980-2007.gsa
 	@echo "=== $(ARM64_DIST_DIR)/ ==="
 	@ls -lhR $(ARM64_DIST_DIR)/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
-dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG)
+dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT)
 	@rm -rf dist/portmaster_build
 	@mkdir -p dist/portmaster_build/glitchscope
 	@# Laucher script in zip root
@@ -140,6 +151,7 @@ dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_
 	@mkdir -p dist/portmaster_build/glitchscope/.cache/modland dist/portmaster_build/glitchscope/.cache/modarchive
 	@cp $(MODLAND_CATALOG) dist/portmaster_build/glitchscope/.cache/modland/catalog
 	@cp $(MODARCHIVE_CATALOG) dist/portmaster_build/glitchscope/.cache/modarchive/catalog
+	@cp $(MODARCHIVE_SNAPSHOT) dist/portmaster_build/glitchscope/.cache/modarchive/1980-2007.gsa
 	cp portmaster/port.json dist/portmaster_build/glitchscope/
 	cp portmaster/screenshot.png dist/portmaster_build/glitchscope/
 	cp portmaster/gameinfo.xml dist/portmaster_build/glitchscope/ 2>/dev/null; true
@@ -172,6 +184,7 @@ deploy: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE)
 	adb shell "mkdir -p $(DEVICE_DIR)/.cache/modland $(DEVICE_DIR)/.cache/modarchive"
 	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modland/catalog $(DEVICE_DIR)/.cache/modland/catalog
 	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/catalog $(DEVICE_DIR)/.cache/modarchive/catalog
+	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/1980-2007.gsa $(DEVICE_DIR)/.cache/modarchive/1980-2007.gsa
 	adb shell "killall -9 glitchscope 2>/dev/null; true"
 	@echo "=== Deployed binary + presets + textures + catalogs ==="
 
