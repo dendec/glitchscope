@@ -67,14 +67,15 @@ type App struct {
 	appCtx    context.Context
 	appCancel context.CancelFunc
 
-	pending         pendingPreset // pending preset name + scheduled load time
-	presetTicker    *time.Ticker
-	resumePath      string
-	resumeSeconds   float64
-	resumeAttempted bool
-	online          atomic.Bool
-	quit            atomic.Bool
-	presetSwitch    atomic.Bool
+	pending          pendingPreset // pending preset name + scheduled load time
+	adaptiveResumeAt time.Time
+	presetTicker     *time.Ticker
+	resumePath       string
+	resumeSeconds    float64
+	resumeAttempted  bool
+	online           atomic.Bool
+	quit             atomic.Bool
+	presetSwitch     atomic.Bool
 
 	deleteSvc *deleteService
 
@@ -139,7 +140,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 		return nil, fmt.Errorf("projectm init: %w", err)
 	}
 	a.pm = pm
-	a.pm.SetSoftCutDuration(softCutDuration)
+	a.pm.SetSoftCutDuration(softCutDuration.Seconds())
 	slog.Info("projectM init", "ms", time.Since(t0).Milliseconds())
 
 	a.preview = newPreviewRenderer()

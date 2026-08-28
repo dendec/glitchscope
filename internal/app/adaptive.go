@@ -78,6 +78,10 @@ func (p *adaptivePolicy) Reset() {
 	p.highElapsed = 0
 }
 
+func (p *adaptivePolicy) Restart() {
+	*p = adaptivePolicy{}
+}
+
 func (p *adaptivePolicy) triggerDown(current, resolutionCount int) (int, bool, bool) {
 	p.Reset()
 	p.cooldown = adaptiveCooldown

@@ -7,7 +7,6 @@ import (
 
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/input"
-	"github.com/dendec/glitchscope/internal/presets"
 	"github.com/dendec/glitchscope/internal/projectm"
 	"github.com/dendec/glitchscope/internal/ui"
 	"github.com/veandco/go-sdl2/sdl"
@@ -15,7 +14,7 @@ import (
 
 const (
 	lowFPSThresh          = 15.0
-	softCutDuration       = 2.5 // seconds, for smooth preset transitions
+	softCutDuration       = 2500 * time.Millisecond
 	mainFramePeriod       = time.Second / 60
 	visualizerTargetFPS   = 30
 	visualizerFramePeriod = time.Second / visualizerTargetFPS
@@ -30,11 +29,13 @@ type visualizerClock struct {
 	lastFrame time.Time
 	nextFrame time.Time
 	meter     fpsMeter
+	frames    uint64
 }
 
 type runState struct {
 	lastLoop          time.Time
 	visualizer        visualizerClock
+	adaptiveFrame     uint64
 	prevW             int
 	prevH             int
 	lowFPSPreset      string
@@ -50,17 +51,27 @@ func (c *visualizerClock) Complete(now time.Time) {
 		c.meter.AddDuration(now.Sub(c.lastFrame))
 	}
 	c.lastFrame = now
+	c.frames++
 	if c.nextFrame.IsZero() {
 		c.nextFrame = now.Add(visualizerFramePeriod)
 		return
 	}
-	if now.Before(c.nextFrame) {
-		c.nextFrame = now.Add(visualizerFramePeriod)
+	c.nextFrame = c.nextFrame.Add(visualizerFramePeriod)
+	if now.After(c.nextFrame) {
+		c.nextFrame = now
 	}
 }
 
 func (c *visualizerClock) Reset() {
 	*c = visualizerClock{}
+}
+
+func (s *runState) consumeAdaptiveFrame() bool {
+	if s.adaptiveFrame == s.visualizer.frames {
+		return false
+	}
+	s.adaptiveFrame = s.visualizer.frames
+	return true
 }
 
 // Run enters the main loop. Must be called after Init().
@@ -81,7 +92,7 @@ func (a *App) Run() {
 
 		w32, h32 := a.window.GLGetDrawableSize()
 		w, h := int(w32), int(h32)
-		a.prepareFrame(&state, w, h, fpsAvg)
+		a.prepareFrame(&state, now, w, h, fpsAvg)
 		if !a.handleFrameInput(&state, now, dt, w, h) {
 			return
 		}
@@ -90,14 +101,16 @@ func (a *App) Run() {
 	}
 }
 
-func (a *App) prepareFrame(state *runState, w, h int, fpsAvg float64) {
+func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg float64) {
+	newVisualizerFrame := state.consumeAdaptiveFrame()
 	if state.visualizer.meter.Full() && fpsAvg < lowFPSThresh && !a.onPresetsPage {
 		presetName := ""
 		if a.presetIdx >= 0 && a.presetIdx < len(a.presetNames) {
 			presetName = a.presetNames[a.presetIdx]
 		}
 		if presetName != state.lowFPSPreset {
-			slog.Warn("low fps", "fps", fpsAvg, "threshold", lowFPSThresh, "preset", presetName, "resolution", fmt.Sprintf("%dx%d", w, h))
+			renderW, renderH := a.rt.Size()
+			slog.Warn("low fps", "fps", fpsAvg, "threshold", lowFPSThresh, "preset", presetName, "resolution", fmt.Sprintf("%dx%d", renderW, renderH))
 			state.lowFPSPreset = presetName
 		}
 	}
@@ -134,7 +147,8 @@ func (a *App) prepareFrame(state *runState, w, h int, fpsAvg float64) {
 	}
 	state.prevW, state.prevH = w, h
 
-	if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && !a.onPresetsPage && state.visualizer.meter.Full() {
+	if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && !a.onPresetsPage &&
+		state.visualizer.meter.Full() && newVisualizerFrame && !a.adaptiveSuspended(now) {
 		if resolution, direction, changed, minReached := a.adaptive.Decide(fpsAvg); changed {
 			a.applyRenderResolution(resolution)
 			if direction > 0 {
@@ -229,10 +243,7 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 
 func (a *App) updateFramePlayback(now time.Time) {
 	if !a.onPresetsPage && a.pending.name != "" && now.After(a.pending.at) {
-		if d, err := presets.Read(a.pending.name); err == nil {
-			a.pm.LoadPresetData(string(d), true)
-			a.applyPresetName(a.pending.name)
-		}
+		a.transitionPreset(a.pending.name)
 		a.pending = pendingPreset{}
 	}
 
@@ -402,6 +413,10 @@ func (a *App) resetPresetTicker() {
 func (a *App) applyRenderResolution(r config.RenderResolution) {
 	a.settings.Graphics.RenderWidth = r.Width
 	a.settings.Graphics.RenderHeight = r.Height
+	a.resizeRenderTarget(r)
+}
+
+func (a *App) resizeRenderTarget(r config.RenderResolution) {
 	if currentW, currentH := a.rt.Size(); currentW == r.Width && currentH == r.Height {
 		return
 	}
@@ -409,6 +424,15 @@ func (a *App) applyRenderResolution(r config.RenderResolution) {
 	a.pm.SetWindowSize(r.Width, r.Height)
 	a.pm.BindFeedbackFramebuffer()
 	a.rt.SeedFeedback()
+}
+
+func (a *App) suspendAdaptiveForPresetTransition(now time.Time) {
+	a.adaptiveResumeAt = now.Add(softCutDuration)
+	a.adaptive.RestartForPreset()
+}
+
+func (a *App) adaptiveSuspended(now time.Time) bool {
+	return now.Before(a.adaptiveResumeAt)
 }
 
 func (a *App) resetAdaptiveCounters() {

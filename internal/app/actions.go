@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
@@ -271,9 +272,11 @@ func (a *App) randPreset() {
 func (a *App) transitionPreset(name string) {
 	d, err := presets.Read(name)
 	if err != nil {
+		slog.Warn("preset transition read failed", "preset", name, "error", err)
 		return
 	}
 	a.pm.LoadPresetData(string(d), true)
+	a.suspendAdaptiveForPresetTransition(time.Now())
 	a.applyPresetName(name)
 }
 

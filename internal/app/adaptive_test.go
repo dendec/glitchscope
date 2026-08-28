@@ -54,7 +54,7 @@ func TestVisualizerClock(t *testing.T) {
 	}
 }
 
-func TestVisualizerClockDoesNotDelayAfterSlowFrame(t *testing.T) {
+func TestVisualizerClockReschedulesAfterSlowFrame(t *testing.T) {
 	var clock visualizerClock
 	start := time.Unix(100, 0)
 	clock.Complete(start)
@@ -62,7 +62,64 @@ func TestVisualizerClockDoesNotDelayAfterSlowFrame(t *testing.T) {
 	slowFrameEnd := start.Add(67 * time.Millisecond)
 	clock.Complete(slowFrameEnd)
 	if !clock.Due(slowFrameEnd) {
-		t.Fatal("visualizer frame should remain due after missing its deadline")
+		t.Fatal("slow frame should not wait another frame period after missing its deadline")
+	}
+}
+
+func TestVisualizerClockKeepsDeadlineAfterFrameWork(t *testing.T) {
+	var clock visualizerClock
+	start := time.Unix(100, 0)
+	clock.Complete(start)
+
+	frameCompleted := start.Add(visualizerFramePeriod + 20*time.Millisecond)
+	clock.Complete(frameCompleted)
+	nextDeadline := start.Add(2 * visualizerFramePeriod)
+	if clock.Due(nextDeadline.Add(-time.Nanosecond)) {
+		t.Fatal("visualizer frame became due before the fixed 30 FPS deadline")
+	}
+	if !clock.Due(nextDeadline) {
+		t.Fatal("visualizer frame was delayed by render work")
+	}
+}
+
+func TestRunStateConsumesEachVisualizerFrameOnce(t *testing.T) {
+	var state runState
+	if state.consumeAdaptiveFrame() {
+		t.Fatal("empty clock produced an adaptive sample")
+	}
+
+	now := time.Unix(100, 0)
+	state.visualizer.Complete(now)
+	if !state.consumeAdaptiveFrame() {
+		t.Fatal("completed visualizer frame did not produce an adaptive sample")
+	}
+	if state.consumeAdaptiveFrame() {
+		t.Fatal("same visualizer frame produced two adaptive samples")
+	}
+
+	state.visualizer.Complete(now.Add(visualizerFramePeriod))
+	if !state.consumeAdaptiveFrame() {
+		t.Fatal("next visualizer frame did not produce an adaptive sample")
+	}
+}
+
+func TestPresetTransitionSuspendsAndRestartsAdaptivePolicy(t *testing.T) {
+	var a App
+	for range adaptiveLowFrames - 1 {
+		a.adaptive.policy.Decide(adaptiveThreshLow-1, 0, 3)
+	}
+	a.adaptive.policy.cooldown = adaptiveCooldown
+
+	now := time.Unix(100, 0)
+	a.suspendAdaptiveForPresetTransition(now)
+	if !a.adaptiveSuspended(now.Add(softCutDuration - time.Nanosecond)) {
+		t.Fatal("adaptive resumed before the soft transition completed")
+	}
+	if a.adaptiveSuspended(now.Add(softCutDuration)) {
+		t.Fatal("adaptive remained suspended after the soft transition completed")
+	}
+	if a.adaptive.policy.lowFrames != 0 || a.adaptive.policy.cooldown != 0 || a.adaptive.policy.fpsRing.pos != 0 {
+		t.Fatal("preset transition retained adaptive policy history")
 	}
 }
 
@@ -194,6 +251,44 @@ func TestResolutionStateDecidesAndUpdatesIndex(t *testing.T) {
 	}
 	if got := state.resolutions[state.index]; got.Width != 480 || got.Height != 270 {
 		t.Fatalf("resolution = %v, want 480x270", got)
+	}
+}
+
+func TestResolutionStateBlocksFailedUpscaleForPreset(t *testing.T) {
+	state := resolutionState{
+		resolutions: []config.RenderResolution{
+			{Width: 800, Height: 450},
+			{Width: 640, Height: 360},
+		},
+		index:        1,
+		upscaleTrial: -1,
+	}
+
+	for range adaptiveHighFrames {
+		state.Decide(adaptiveThreshHigh + 1)
+	}
+	if state.index != 0 {
+		t.Fatalf("first upscale index = %d, want 0", state.index)
+	}
+	for range adaptiveCooldown + adaptiveLowFrames {
+		state.Decide(adaptiveThreshLow - 1)
+	}
+	if state.index != 1 || state.upscaleFloor != 1 {
+		t.Fatalf("failed upscale state = (index %d, floor %d), want (1, 1)", state.index, state.upscaleFloor)
+	}
+	for range adaptiveCooldown + adaptiveHighFrames*2 {
+		state.Decide(adaptiveThreshHigh + 1)
+	}
+	if state.index != 1 {
+		t.Fatalf("blocked resolution was retried: index = %d, want 1", state.index)
+	}
+
+	state.RestartForPreset()
+	for range adaptiveHighFrames {
+		state.Decide(adaptiveThreshHigh + 1)
+	}
+	if state.index != 0 {
+		t.Fatalf("new preset did not clear upscale block: index = %d, want 0", state.index)
 	}
 }
 
