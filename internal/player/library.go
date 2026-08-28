@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -325,6 +326,11 @@ func TrimPrefixes(path string) string {
 
 func TrackTitle(path string) string {
 	p := TrimPrefixes(path)
+	if IsModArchive(path) {
+		if parsed, err := url.Parse(p); err == nil && parsed.Fragment != "" {
+			p = parsed.Fragment
+		}
+	}
 	base := filepath.Base(p)
 	if strings.HasSuffix(strings.ToLower(base), ".zip") {
 		base = base[:len(base)-4]

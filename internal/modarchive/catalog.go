@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/dendec/glitchscope/internal/util"
@@ -50,6 +52,26 @@ func InitCatalog(baseDir string) bool {
 	if cat == nil || len(cat.Directories) == 0 {
 		slog.Info("modarchive: catalog file not found or empty")
 		return false
+	}
+	rootItems := cat.Directories[BaseURL]
+	hasSnapshot := false
+	for _, item := range rootItems {
+		if strings.Trim(item.Name, "/") == SnapshotDir {
+			hasSnapshot = true
+			break
+		}
+	}
+	if !hasSnapshot {
+		rootItems = append(rootItems, DirItem{
+			Name:      SnapshotDir,
+			URL:       BaseURL + SnapshotDir + "/",
+			Kind:      KindDir,
+			CleanName: SnapshotLabel,
+		})
+		sort.Slice(rootItems, func(i, j int) bool {
+			return strings.ToLower(rootItems[i].CleanName) < strings.ToLower(rootItems[j].CleanName)
+		})
+		cat.Directories[BaseURL] = rootItems
 	}
 
 	memCacheMu.Lock()

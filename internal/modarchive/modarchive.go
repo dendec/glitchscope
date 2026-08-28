@@ -2,6 +2,7 @@
 package modarchive
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -23,11 +24,13 @@ import (
 )
 
 const (
-	BaseURL      = "http://modarchive.textfiles.com/"
-	cacheDirName = "modarchive-cache"
-	indexSubDir  = "index"
-	filesSubDir  = "files"
-	httpTimeout  = 30 * time.Second
+	BaseURL       = "http://modarchive.textfiles.com/"
+	SnapshotDir   = "modarchive_2007_official_snapshot_120000_modules"
+	SnapshotLabel = "1980-2007"
+	cacheDirName  = "modarchive-cache"
+	indexSubDir   = "index"
+	filesSubDir   = "files"
+	httpTimeout   = 30 * time.Second
 )
 
 var (
@@ -41,15 +44,21 @@ type ItemKind int
 const (
 	KindDir ItemKind = iota
 	KindFile
+	KindArchive
 )
 
 // DirItem represents a single folder or file in a ModArchive directory.
 type DirItem struct {
-	Name      string   `json:"name"`       // Display name (e.g. "2023 Additions", "song.mod")
-	URL       string   `json:"url"`        // Absolute or relative URL path
-	Kind      ItemKind `json:"kind"`       // KindDir or KindFile
-	Size      int64    `json:"size"`       // Size in bytes (0 if unknown)
-	CleanName string   `json:"clean_name"` // Stripped name for sorting/display (e.g. "song.mod" from "song.mod.zip")
+	Name             string   `json:"name"`       // Display name (e.g. "2023 Additions", "song.mod")
+	URL              string   `json:"url"`        // Absolute or relative URL path
+	Kind             ItemKind `json:"kind"`       // KindDir, KindFile, or KindArchive
+	Size             int64    `json:"size"`       // Uncompressed size in bytes (0 if unknown)
+	CleanName        string   `json:"clean_name"` // Stripped name for sorting/display (e.g. "song.mod" from "song.mod.zip")
+	ArchiveOffset    int64    `json:"archive_offset,omitempty"`
+	ArchiveEndOffset int64    `json:"archive_end_offset,omitempty"`
+	CompressedSize   uint64   `json:"compressed_size,omitempty"`
+	CRC32            uint32   `json:"crc32,omitempty"`
+	Compression      uint16   `json:"compression,omitempty"`
 }
 
 // CacheDir returns the main modarchive cache directory (.cache/modarchive).
@@ -131,6 +140,9 @@ func FormatDirName(raw string) string {
 	if raw == "" {
 		return "ModArchive"
 	}
+	if raw == SnapshotDir {
+		return SnapshotLabel
+	}
 	// modarchive_2023_additions -> 2023
 	if matches := yearAdditionsExtract.FindStringSubmatch(raw); len(matches) == 2 {
 		return matches[1]
@@ -187,10 +199,10 @@ func ParseDirectoryListing(htmlBody string, currentURL string) ([]DirItem, error
 			continue
 		}
 
-		// If root directory, only accept modarchive_YYYY_additions folders
+		// If root directory, only accept the official snapshot and yearly additions.
 		if isRoot {
 			trimmedHref := strings.TrimPrefix(href, "/")
-			if !yearAdditionsRegex.MatchString(trimmedHref) {
+			if strings.Trim(trimmedHref, "/") != SnapshotDir && !yearAdditionsRegex.MatchString(trimmedHref) {
 				continue
 			}
 		}
@@ -211,7 +223,7 @@ func ParseDirectoryListing(htmlBody string, currentURL string) ([]DirItem, error
 		name := strings.Trim(href, "/")
 
 		// If href points to a folder path without trailing slash, check text
-		if !isDir && (strings.HasSuffix(text, "/") || yearAdditionsRegex.MatchString(name)) {
+		if !isDir && (strings.HasSuffix(text, "/") || yearAdditionsRegex.MatchString(name) || name == SnapshotDir) {
 			isDir = true
 		}
 
@@ -224,7 +236,10 @@ func ParseDirectoryListing(htmlBody string, currentURL string) ([]DirItem, error
 		} else {
 			kind = KindFile
 			ext := strings.ToLower(filepath.Ext(name))
-			if ext == ".zip" {
+			if ext == ".zip" && isSnapshotDirectoryURL(parsedCurrentURL) {
+				kind = KindArchive
+				cleanName = strings.TrimSuffix(name, filepath.Ext(name))
+			} else if ext == ".zip" {
 				// E.g. "song.mod.zip" -> cleanName = "song.mod", "song.zip" -> cleanName = "song"
 				inner := name[:len(name)-4]
 				innerExt := strings.ToLower(filepath.Ext(inner))
@@ -313,6 +328,11 @@ func FetchDirectory(baseDir string, targetURL string) ([]DirItem, error) {
 
 	if items, ok := FetchDirectoryCached(baseDir, targetURL); ok {
 		return items, nil
+	}
+	if IsSnapshotArchiveURL(targetURL) {
+		ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
+		defer cancel()
+		return fetchAndCacheArchiveIndex(ctx, baseDir, targetURL)
 	}
 
 	return fetchAndCacheDirectory(baseDir, targetURL)

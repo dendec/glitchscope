@@ -3,6 +3,7 @@ package player
 import (
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -49,29 +50,44 @@ func (r *Resolver) ResolveLocalPath(virtualPath string) string {
 		return ""
 	}
 	if IsModArchive(virtualPath) {
-		// ModArchive files may be ZIP-extracted; the URL path determines
-		// the local name. Try the raw URL path and the .zip-stripped form.
-		filesDir := filepath.Join(r.baseDir, ".cache", "modarchive", "files")
-		parsed, err := url.Parse(remote)
-		if err != nil {
-			return ""
-		}
-		urlPath := strings.TrimPrefix(parsed.Path, "/")
-		raw := filepath.Join(filesDir, filepath.FromSlash(urlPath))
-		// Direct file (non-zip).
-		if fileExists(raw) {
-			return raw
-		}
-		// ZIP-extracted: strip .zip extension.
-		if strings.HasSuffix(strings.ToLower(raw), ".zip") {
-			extracted := strings.TrimSuffix(raw, filepath.Ext(raw))
-			if fileExists(extracted) {
-				return extracted
-			}
+		local := ModArchiveCachePath(r.baseDir, remote)
+		if fileExists(local) {
+			return local
 		}
 		return ""
 	}
 	return ""
+}
+
+// ModArchiveCachePath maps a ModArchive track URL to its canonical local cache path.
+func ModArchiveCachePath(baseDir, remote string) string {
+	parsed, err := url.Parse(remote)
+	if err != nil {
+		return ""
+	}
+	urlPath := strings.TrimPrefix(parsed.Path, "/")
+	if urlPath == "" {
+		return ""
+	}
+	filesDir := filepath.Join(baseDir, ".cache", "modarchive", "files")
+	if parsed.Fragment == "" {
+		local := filepath.Join(filesDir, filepath.FromSlash(urlPath))
+		if strings.EqualFold(filepath.Ext(local), ".zip") {
+			local = strings.TrimSuffix(local, filepath.Ext(local))
+		}
+		return local
+	}
+
+	entryPath := path.Clean(parsed.Fragment)
+	if entryPath == "." || path.IsAbs(parsed.Fragment) || entryPath == ".." || strings.HasPrefix(entryPath, "../") || strings.Contains(parsed.Fragment, "\\") || strings.Contains(parsed.Fragment, "\x00") {
+		return ""
+	}
+	archivePath := strings.TrimSuffix(urlPath, path.Ext(urlPath))
+	local := filepath.Join(filesDir, filepath.FromSlash(archivePath), filepath.FromSlash(entryPath))
+	if strings.EqualFold(filepath.Ext(local), ".zip") {
+		local = strings.TrimSuffix(local, filepath.Ext(local))
+	}
+	return local
 }
 
 // fileExists reports whether path exists on disk and is non-empty. A zero-byte

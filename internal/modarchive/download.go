@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/dendec/glitchscope/internal/formats"
+	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/util"
 )
 
@@ -26,16 +27,19 @@ func DownloadAndExtract(ctx context.Context, baseDir, remoteURL string, onProgre
 	if err != nil {
 		return "", fmt.Errorf("invalid URL %q: %w", remoteURL, err)
 	}
+	if parsedURL.Fragment != "" && IsSnapshotArchiveURL(remoteURL) {
+		return downloadArchiveEntry(ctx, baseDir, remoteURL, onProgress)
+	}
 
 	// Derive local path relative to filesDir
 	urlPath := strings.TrimPrefix(parsedURL.Path, "/")
 	rawLocalPath := filepath.Join(filesDir, filepath.FromSlash(urlPath))
 
-	targetPath := rawLocalPath
-	isZip := strings.HasSuffix(strings.ToLower(urlPath), ".zip")
-	if isZip {
-		targetPath = strings.TrimSuffix(rawLocalPath, filepath.Ext(rawLocalPath))
+	targetPath := player.ModArchiveCachePath(baseDir, remoteURL)
+	if targetPath == "" {
+		return "", fmt.Errorf("invalid ModArchive cache path for %q", remoteURL)
 	}
+	isZip := strings.HasSuffix(strings.ToLower(urlPath), ".zip")
 
 	if info, err := os.Stat(targetPath); err == nil && info.Size() > 0 {
 		slog.Debug("modarchive: track cached", "path", targetPath)
