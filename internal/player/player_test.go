@@ -80,6 +80,34 @@ func TestPlayFileAsyncLocalSuccess(t *testing.T) {
 	}
 }
 
+func TestPlayFileAsyncReleasesCurrentSourceBeforeLoad(t *testing.T) {
+	p := newTestPlayer(t)
+	dir := t.TempDir()
+	currentPath := writeMinWav(t, dir, "current.wav")
+	nextPath := writeMinWav(t, dir, "next.wav")
+
+	current, err := soloud.LoadWav(currentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.current = current
+
+	loadStarted := make(chan struct{})
+	continueLoad := make(chan struct{})
+	p.loadFunc = func(localPath string) loadResult {
+		close(loadStarted)
+		<-continueLoad
+		return loadResult{path: localPath, localPath: localPath, duration: 1.0}
+	}
+
+	p.PlayFileAsync(nextPath)
+	<-loadStarted
+	if p.current != nil {
+		t.Fatal("current source retained while replacement is loading")
+	}
+	close(continueLoad)
+}
+
 func TestPlayFileAsyncDisplayPathPreserved(t *testing.T) {
 	p := newTestPlayer(t)
 	dir := t.TempDir()
@@ -551,6 +579,9 @@ func TestPlayFileAsyncContextCancelledOnNewTrack(t *testing.T) {
 // produce the right frame counts, an unknown duration defaults to the cap, and
 // tracks longer than the cap yield 0 (fall back to native streaming).
 func TestMaxRenderFrames(t *testing.T) {
+	if maxRenderSeconds != 360 {
+		t.Fatalf("maxRenderSeconds = %v, want 360; update the memory budget and SEEK-DESIGN.md together", maxRenderSeconds)
+	}
 	capFrames := int(maxRenderSeconds * renderSampleRate)
 
 	if got := maxRenderFrames(maxRenderSeconds); got != capFrames {

@@ -52,6 +52,7 @@ int Ym_loadMem(void *source, const unsigned char *data, unsigned int length);
 unsigned int Ym_getLengthMs(void *source);
 unsigned int Ym_getSampleRate(void *source);
 unsigned int Ym_render(const unsigned char *data, unsigned int length, float *outL, float *outR, unsigned int maxFrames);
+int Wav_loadInterleaved(void *source, const float *samples, unsigned int length, float sampleRate, unsigned int channels);
 */
 import "C"
 
@@ -179,6 +180,30 @@ func NewWavFromSamples(planar []float32, sampleRate float64, channels int) (*Wav
 	if r != 0 {
 		C.Wav_destroy(p)
 		return nil, fmt.Errorf("wav from samples: loadRawWaveEx: %d", r)
+	}
+	return &Wav{p: p}, nil
+}
+
+// NewWavFromInterleavedSamples builds a memory-backed Wav while converting
+// interleaved PCM directly into a planar buffer owned by SoLoud.
+func NewWavFromInterleavedSamples(samples []float32, sampleRate float64, channels int) (*Wav, error) {
+	if len(samples) == 0 || sampleRate <= 0 || channels < 1 {
+		return nil, fmt.Errorf("wav from interleaved samples: bad params (len=%d sr=%g ch=%d)", len(samples), sampleRate, channels)
+	}
+	if channels*int(len(samples)/channels) != len(samples) {
+		return nil, fmt.Errorf("wav from interleaved samples: %d samples not divisible by %d channels", len(samples), channels)
+	}
+	p := C.Wav_create()
+	r := int(C.Wav_loadInterleaved(
+		unsafe.Pointer(p),
+		(*C.float)(unsafe.Pointer(&samples[0])),
+		C.uint(len(samples)),
+		C.float(sampleRate),
+		C.uint(channels),
+	))
+	if r != 0 {
+		C.Wav_destroy(p)
+		return nil, fmt.Errorf("wav from interleaved samples: load: %d", r)
 	}
 	return &Wav{p: p}, nil
 }

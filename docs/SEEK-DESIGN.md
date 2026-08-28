@@ -95,9 +95,15 @@ MOD/IT/YM/SID (and any other tracker) get identical, precise scrubbing.
 keep native streaming to bound RAM on low-power handhelds (backward seek then
 restarts). The cap is set above typical chip-track lengths (e.g. a common YM
 tune is ~186s) so they pre-render and seek exactly rather than silently falling
-back to the unreliable native YM seek. Unknown-duration tracks default to the
-cap. Rendering runs in the background load goroutine, so the UI shows the
-loading indicator, never stalls.
+back to the unreliable native YM seek. The render pipeline can temporarily hold
+multiple full-track PCM buffers while decoding and converting channel layout, so
+the cap is based on peak working memory rather than only the final SoLoud buffer.
+Unknown-duration tracks default to the cap. Rendering runs in the background load
+goroutine, so the UI shows the loading indicator, never stalls. Starting an
+async replacement releases the already stopped current source before decoding, so
+its memory-backed PCM does not overlap with the temporary render buffers for the
+next track. The decoded interleaved PCM is converted directly into a SoLoud-
+owned planar buffer, avoiding one additional full-track copy.
 
 **Seek matrix with pre-render** — for pre-rendered tracks all formats become
 exact/bidirectional; the "implementation" column applies only to the over-cap

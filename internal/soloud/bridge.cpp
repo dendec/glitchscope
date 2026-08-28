@@ -7,6 +7,7 @@
 #include "soloud_openmpt.h"
 #include "gme_source.h"
 #include "hvl_source.h"
+#include <new>
 
 using namespace SoLoud;
 
@@ -124,6 +125,22 @@ unsigned int Wav_getChannels(void * aClassPtr) {
 
 int Wav_loadRawWaveEx(void * aClassPtr, float * aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels, int aCopy, int aTakeOwnership) {
 	return ((Wav *)aClassPtr)->loadRawWave(aMem, aLength, aSamplerate, aChannels, !!aCopy, !!aTakeOwnership);
+}
+
+int Wav_loadInterleaved(void * aClassPtr, const float * aMem, unsigned int aLength, float aSamplerate, unsigned int aChannels) {
+	if (aMem == 0 || aLength == 0 || aSamplerate <= 0 || aChannels < 1 || aLength % aChannels != 0)
+		return INVALID_PARAMETER;
+	float * planar = new (std::nothrow) float[aLength];
+	if (planar == 0)
+		return OUT_OF_MEMORY;
+	const unsigned int frames = aLength / aChannels;
+	for (unsigned int frame = 0; frame < frames; frame++)
+		for (unsigned int channel = 0; channel < aChannels; channel++)
+			planar[channel * frames + frame] = aMem[frame * aChannels + channel];
+	const result res = ((Wav *)aClassPtr)->loadRawWave(planar, aLength, aSamplerate, aChannels, false, true);
+	if (res != SO_NO_ERROR)
+		delete[] planar;
+	return res;
 }
 
 } // extern "C"

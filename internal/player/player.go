@@ -352,9 +352,10 @@ func (p *Player) PlayFileAsync(path string) {
 	}
 	p.pendingMu.Unlock()
 
-	if p.s != nil {
-		p.s.StopAll()
-	}
+	// Loading a seekable tracker can temporarily hold several full-track PCM
+	// buffers. Release the stopped source before decoding its replacement so
+	// the previous memory-backed Wav does not contribute to that peak.
+	p.replaceSource(nil)
 	p.voice = 0
 	p.currentPath = path // show path in UI while loading
 	p.loading.Store(true)
@@ -621,8 +622,7 @@ func renderToSeekable(src soloud.AudioSource, data []byte, duration float64, cha
 		slog.Warn("render-to-buffer bad channels", "channels", rendCh)
 		return src, duration, channels, false
 	}
-	planar := interleavedToPlanar(samples, rendCh)
-	wav, err := soloud.NewWavFromSamples(planar, renderSampleRate, rendCh)
+	wav, err := soloud.NewWavFromInterleavedSamples(samples, renderSampleRate, rendCh)
 	if err != nil {
 		slog.Warn("render-to-buffer wav build failed, using native playback", "err", err)
 		return src, duration, channels, false
