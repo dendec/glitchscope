@@ -125,5 +125,4 @@ index cbf5f6e..8c12bc0 100644
  void projectm_set_beat_sensitivity(projectm_handle instance, float sensitivity)
  {
      auto projectMInstance = handle_to_instance(instance);
-index 455cdae..27bbcc7 100644
 
