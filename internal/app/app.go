@@ -229,6 +229,7 @@ func (a *App) Close() {
 	if a.appCancel != nil {
 		a.appCancel()
 	}
+	modarchive.CloseSnapshotCatalog()
 	a.savePlaybackPosition()
 	if a.pm != nil {
 		a.pm.SetPresetSwitchRequestedHandler(nil)

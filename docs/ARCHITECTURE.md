@@ -32,7 +32,10 @@ side effects, переиспользуется при on-demand заполнен
 
 **ModArchive snapshot 1980-2007** представлен как дерево виртуальных папок:
 буква → bucket ZIP → треки. `internal/modarchive` получает central directory
-bucket ZIP хвостовым HTTP Range-запросом и кэширует индекс; выбранный entry
+bucket ZIP хвостовым HTTP Range-запросом и кэширует индекс; сборка поставляет
+все известные bucket-индексы в `.cache/modarchive/1980-2007.gsa`. GSA хранит
+каждый bucket независимо сжатым и читает его лениво, поэтому навигация не
+требует сети и не загружает весь snapshot-индекс в память. Выбранный entry
 скачивается отдельным Range от его local header до следующего local header.
 Полный внешний ZIP не скачивается даже как fallback: ответ без `206 Partial
 Content` считается ошибкой. Прямые module entries распаковываются из `store`
