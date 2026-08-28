@@ -513,6 +513,20 @@ func TestModArchiveSyncFromCache(t *testing.T) {
 	}
 }
 
+func TestModArchiveSnapshotZipIsDirectory(t *testing.T) {
+	archiveURL := modarchive.BaseURL + modarchive.SnapshotDir + "/A/A0.zip"
+	o := &Overlay{}
+	entries := o.buildModArchiveEntriesFromItems(modarchive.BaseURL+modarchive.SnapshotDir+"/A/", []modarchive.DirItem{{
+		Name:      "A0.zip",
+		URL:       archiveURL,
+		Kind:      modarchive.KindArchive,
+		CleanName: "A0",
+	}})
+	if len(entries) != 1 || entries[0].kind != entryModArchiveDir || entries[0].label != "A0/" || entries[0].url != archiveURL {
+		t.Fatalf("snapshot archive entries = %#v, want A0 directory", entries)
+	}
+}
+
 // --- NC FSM tests ---
 
 // ncTestOverlay creates an Overlay with a real temp directory for NC testing.

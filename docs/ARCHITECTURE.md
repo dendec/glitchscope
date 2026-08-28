@@ -30,6 +30,16 @@
 локального файла — чистая функция `extractMetaFromFile` (`meta.go`), без
 side effects, переиспользуется при on-demand заполнении и refresh комментария.
 
+**ModArchive snapshot 1980-2007** представлен как дерево виртуальных папок:
+буква → bucket ZIP → треки. `internal/modarchive` получает central directory
+bucket ZIP хвостовым HTTP Range-запросом и кэширует индекс; выбранный entry
+скачивается отдельным Range от его local header до следующего local header.
+Полный внешний ZIP не скачивается даже как fallback: ответ без `206 Partial
+Content` считается ошибкой. Прямые module entries распаковываются из `store`
+или `deflate`; вложенные однотрековые ZIP после этого извлекаются локально.
+Виртуальный track path хранит имя entry во fragment внешнего URL, а итоговый
+cache path по-прежнему определяет только `internal/player.Resolver`.
+
 ## Правила изменений
 
 Изменение понятия считается завершённым только после обновления всех его

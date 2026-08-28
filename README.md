@@ -11,6 +11,7 @@ Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing 
 - **MilkDrop Visualizations** — Real-time rendering powered by projectM 4.x with 100+ embedded `.milk` presets and compressed `.gsa` preset archives
 - **Graphics Settings** — Custom render resolution scaling (e.g., 320x240, 480x360, 640x480) and upscale filters (Smooth/Pixel)
 - **Playback Modes** — Shuffle (Album, Local, All) and Repeat (Off, Repeat One, Repeat All)
+- **Online Module Catalogs** — Browse Modland, yearly ModArchive additions, and the 1980-2007 ModArchive snapshot; snapshot tracks are fetched individually with HTTP Range requests instead of downloading whole collection archives
 - **Preset Auto-Switch** — Configurable timer-based preset rotation (Off, 15s, 30s, 60s, 2m)
 - **UI & Themes** — Clean 2-column interface with Dark/Light themes and customizable overlay transparency
 - **Gamepad & Keyboard** — Full controller mapping optimized for PortMaster handhelds (TrimUI Smart Pro, Anbernic, Miyoo, etc.)

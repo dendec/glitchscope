@@ -48,11 +48,11 @@ func TestCatalog_SaveLoadInit(t *testing.T) {
 
 	// Verify memCache contains preloaded directories
 	items, ok := FetchDirectoryCached(tmpDir, BaseURL)
-	if !ok || len(items) != 1 {
-		t.Fatalf("expected 1 preloaded root item, got ok=%v, count=%d", ok, len(items))
+	if !ok || len(items) != 2 {
+		t.Fatalf("expected snapshot plus preloaded root item, got ok=%v, count=%d", ok, len(items))
 	}
-	if items[0].CleanName != "2023" {
-		t.Errorf("unexpected clean name: %s", items[0].CleanName)
+	if items[0].CleanName != SnapshotLabel || items[1].CleanName != "2023" {
+		t.Errorf("unexpected root items: %+v", items)
 	}
 }
 

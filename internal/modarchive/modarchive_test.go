@@ -4,9 +4,12 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -17,6 +20,7 @@ func TestFormatDirName(t *testing.T) {
 	}{
 		{"modarchive_2008_additions", "2008"},
 		{"modarchive_2023_additions", "2023"},
+		{SnapshotDir, SnapshotLabel},
 		{"MOD", "MOD"},
 		{"XM", "XM"},
 		{"", "ModArchive"},
@@ -49,15 +53,18 @@ func TestParseDirectoryListing_Root(t *testing.T) {
 		t.Fatalf("ParseDirectoryListing root failed: %v", err)
 	}
 
-	if len(items) != 2 {
-		t.Fatalf("expected 2 items, got %d", len(items))
+	if len(items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(items))
 	}
 
-	if items[0].CleanName != "2008" || items[0].Kind != KindDir {
+	if items[0].CleanName != SnapshotLabel || items[0].Kind != KindDir {
 		t.Errorf("unexpected item 0: %+v", items[0])
 	}
-	if items[1].CleanName != "2023" || items[1].Kind != KindDir {
+	if items[1].CleanName != "2008" || items[1].Kind != KindDir {
 		t.Errorf("unexpected item 1: %+v", items[1])
+	}
+	if items[2].CleanName != "2023" || items[2].Kind != KindDir {
+		t.Errorf("unexpected item 2: %+v", items[2])
 	}
 }
 
@@ -101,6 +108,152 @@ func TestParseDirectoryListing_HvlZip(t *testing.T) {
 	if len(items) != 1 || items[0].CleanName != "street_fighter_ii_-_vega.hvl" || items[0].Kind != KindFile {
 		t.Fatalf("unexpected HVL item: %+v", items)
 	}
+}
+
+func TestParseDirectoryListing_SnapshotArchive(t *testing.T) {
+	htmlBody := `<a href="A0.zip">A0.zip</a><a href="AA.zip">AA.zip</a>`
+	targetURL := BaseURL + SnapshotDir + "/A/"
+
+	items, err := ParseDirectoryListing(htmlBody, targetURL)
+	if err != nil {
+		t.Fatalf("ParseDirectoryListing snapshot failed: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("snapshot items = %d, want 2", len(items))
+	}
+	if items[0].Kind != KindArchive || items[0].CleanName != "A0" {
+		t.Fatalf("snapshot item = %+v, want archive A0", items[0])
+	}
+}
+
+func TestSnapshotArchiveRangeIndexAndExtract(t *testing.T) {
+	innerBuffer := new(bytes.Buffer)
+	innerWriter := zip.NewWriter(innerBuffer)
+	innerFile, err := innerWriter.Create("a0d_agep.xm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	xmContent := []byte("Extended Module: range test")
+	if _, err := innerFile.Write(xmContent); err != nil {
+		t.Fatal(err)
+	}
+	if err := innerWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	outerBuffer := new(bytes.Buffer)
+	outerWriter := zip.NewWriter(outerBuffer)
+	directFile, err := outerWriter.Create("a0v_tune.mod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	modContent := []byte("M.K. direct range test")
+	if _, err := directFile.Write(modContent); err != nil {
+		t.Fatal(err)
+	}
+	innerHeader := &zip.FileHeader{Name: "a0d_agep.xm.zip", Method: zip.Store}
+	innerEntry, err := outerWriter.CreateHeader(innerHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := innerEntry.Write(innerBuffer.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if err := outerWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	outerData := outerBuffer.Bytes()
+
+	var ranges []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		rangeHeader := request.Header.Get("Range")
+		ranges = append(ranges, rangeHeader)
+		start, end, parseErr := testRangeBounds(rangeHeader, int64(len(outerData)))
+		if parseErr != nil {
+			http.Error(writer, parseErr.Error(), http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		writer.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(outerData)))
+		writer.WriteHeader(http.StatusPartialContent)
+		_, _ = writer.Write(outerData[start : end+1])
+	}))
+	defer server.Close()
+
+	archiveURL := server.URL + "/" + SnapshotDir + "/A/A0.zip"
+	baseDir := t.TempDir()
+	items, err := FetchDirectory(baseDir, archiveURL)
+	if err != nil {
+		t.Fatalf("FetchDirectory archive: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("archive items = %d, want 2", len(items))
+	}
+	if len(ranges) != 1 || ranges[0] != "bytes=-131072" {
+		t.Fatalf("index ranges = %q, want one suffix request", ranges)
+	}
+
+	byName := make(map[string]DirItem, len(items))
+	for _, item := range items {
+		byName[item.Name] = item
+	}
+	directPath, err := DownloadAndExtract(context.Background(), baseDir, byName["a0v_tune.mod"].URL, nil)
+	if err != nil {
+		t.Fatalf("download direct entry: %v", err)
+	}
+	directContent, err := os.ReadFile(directPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(directContent, modContent) {
+		t.Fatalf("direct content = %q, want %q", directContent, modContent)
+	}
+
+	nestedPath, err := DownloadAndExtract(context.Background(), baseDir, byName["a0d_agep.xm.zip"].URL, nil)
+	if err != nil {
+		t.Fatalf("download nested entry: %v", err)
+	}
+	nestedContent, err := os.ReadFile(nestedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(nestedContent, xmContent) {
+		t.Fatalf("nested content = %q, want %q", nestedContent, xmContent)
+	}
+	if len(ranges) != 3 {
+		t.Fatalf("requests = %q, want index plus one range per selected track", ranges)
+	}
+}
+
+func TestSnapshotArchiveRejectsFullResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		_, _ = writer.Write([]byte("full archive must not be accepted"))
+	}))
+	defer server.Close()
+
+	archiveURL := server.URL + "/" + SnapshotDir + "/A/A0.zip"
+	if _, err := FetchDirectory(t.TempDir(), archiveURL); err == nil || !strings.Contains(err.Error(), "HTTP 200") {
+		t.Fatalf("FetchDirectory error = %v, want rejected non-range response", err)
+	}
+}
+
+func testRangeBounds(header string, total int64) (int64, int64, error) {
+	if !strings.HasPrefix(header, "bytes=") {
+		return 0, 0, fmt.Errorf("missing byte range")
+	}
+	spec := strings.TrimPrefix(header, "bytes=")
+	if strings.HasPrefix(spec, "-") {
+		suffix, err := strconv.ParseInt(strings.TrimPrefix(spec, "-"), 10, 64)
+		if err != nil || suffix <= 0 {
+			return 0, 0, fmt.Errorf("invalid suffix range")
+		}
+		return max(0, total-suffix), total - 1, nil
+	}
+	var start, end int64
+	if _, err := fmt.Sscanf(spec, "%d-%d", &start, &end); err != nil || start < 0 || end < start || end >= total {
+		return 0, 0, fmt.Errorf("invalid range %q", spec)
+	}
+	return start, end, nil
 }
 
 func TestDownloadAndExtract_Zip(t *testing.T) {

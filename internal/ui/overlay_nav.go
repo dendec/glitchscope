@@ -278,7 +278,7 @@ func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []moda
 	hasDirs := false
 	hasFiles := false
 	for _, item := range items {
-		if item.Kind == modarchive.KindDir {
+		if item.Kind == modarchive.KindDir || item.Kind == modarchive.KindArchive {
 			hasDirs = true
 		} else if item.Kind == modarchive.KindFile {
 			hasFiles = true
@@ -288,7 +288,7 @@ func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []moda
 	if hasDirs {
 		var entries []navEntry
 		for _, item := range items {
-			if item.Kind == modarchive.KindDir {
+			if item.Kind == modarchive.KindDir || item.Kind == modarchive.KindArchive {
 				entries = append(entries, navEntry{
 					label:    item.CleanName + "/",
 					kind:     entryModArchiveDir,
@@ -858,12 +858,10 @@ func (o *Overlay) navigateToModlandTrack(path string) {
 func (o *Overlay) navigateToModArchiveTrack(path string) {
 	remote := player.RemotePath(path)
 	trackTitle := player.TrackTitle(path)
-	trackURL := strings.TrimRight(remote, "/")
-	lastSlash := strings.LastIndexByte(trackURL, '/')
-	if lastSlash < 0 {
+	albumURL := modarchive.AlbumURL(remote)
+	if albumURL == "" {
 		return
 	}
-	albumURL := trackURL[:lastSlash+1]
 
 	// Album paths are directory URLs, while track paths append the archive file
 	// name. Entering the directory also creates its lazy catalog album when the

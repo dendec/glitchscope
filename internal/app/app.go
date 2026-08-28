@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -479,11 +478,10 @@ func (a *App) prepareSavedCatalogTrack(path string) {
 		return
 	}
 	remotePath := player.RemotePath(path)
-	slash := strings.LastIndexByte(remotePath, '/')
-	if slash < 0 {
+	targetURL := modarchive.AlbumURL(remotePath)
+	if targetURL == "" {
 		return
 	}
-	targetURL := remotePath[:slash+1]
 	items, ok := modarchive.FetchDirectoryCached(baseDir(), targetURL)
 	if !ok {
 		return

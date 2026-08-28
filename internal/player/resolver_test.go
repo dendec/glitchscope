@@ -59,6 +59,37 @@ func TestResolveLocalPathModArchive(t *testing.T) {
 	}
 }
 
+func TestResolveLocalPathModArchiveEntry(t *testing.T) {
+	dir := t.TempDir()
+	remote := "http://modarchive.textfiles.com/modarchive_2007_official_snapshot_120000_modules/A/A0.zip#a0d_agep.xm.zip"
+	cachePath := ModArchiveCachePath(dir, remote)
+	if cachePath == "" {
+		t.Fatal("ModArchiveCachePath returned empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(cachePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cachePath, []byte("XM"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	resolver := NewResolver()
+	resolver.SetBaseDir(dir)
+	if got := resolver.ResolveLocalPath(ModArchivePrefix + remote); got != cachePath {
+		t.Fatalf("ResolveLocalPath archive entry = %q, want %q", got, cachePath)
+	}
+	if got := TrackTitle(ModArchivePrefix + remote); got != "a0d_agep.xm" {
+		t.Fatalf("TrackTitle archive entry = %q, want a0d_agep.xm", got)
+	}
+}
+
+func TestModArchiveCachePathRejectsTraversal(t *testing.T) {
+	remote := "http://modarchive.textfiles.com/modarchive_2007_official_snapshot_120000_modules/A/A0.zip#../escape.mod"
+	if got := ModArchiveCachePath(t.TempDir(), remote); got != "" {
+		t.Fatalf("traversal cache path = %q, want empty", got)
+	}
+}
+
 func TestResolveLocalPathLocalFile(t *testing.T) {
 	r := NewResolver()
 	r.SetBaseDir(t.TempDir())
