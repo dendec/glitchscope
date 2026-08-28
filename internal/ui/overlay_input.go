@@ -105,7 +105,7 @@ func (o *Overlay) ToggleUI() {
 	slog.Debug("ui visibility", "visible", o.uiVisible)
 }
 
-// NextScreen cycles Library → Settings → Presets → Help → Library.
+// NextScreen cycles Library → Presets → Settings → Help → Library.
 func (o *Overlay) NextScreen() {
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
@@ -113,11 +113,11 @@ func (o *Overlay) NextScreen() {
 	o.pageIndicatorDirty = true
 	switch o.uiPage {
 	case PageLibrary:
-		o.uiPage = PageSettings
-	case PageSettings:
 		o.uiPage = PagePresets
 		o.syncPresetTree()
 	case PagePresets:
+		o.uiPage = PageSettings
+	case PageSettings:
 		o.uiPage = PageHelp
 	case PageHelp:
 		o.uiPage = PageLibrary
@@ -127,7 +127,7 @@ func (o *Overlay) NextScreen() {
 	o.markAllDirty()
 }
 
-// PrevScreen cycles Library → Help → Presets → Settings → Library.
+// PrevScreen cycles Library → Help → Settings → Presets → Library.
 func (o *Overlay) PrevScreen() {
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
@@ -136,13 +136,13 @@ func (o *Overlay) PrevScreen() {
 	switch o.uiPage {
 	case PageLibrary:
 		o.uiPage = PageHelp
-	case PagePresets:
-		o.uiPage = PageSettings
 	case PageSettings:
-		o.uiPage = PageLibrary
-	case PageHelp:
 		o.uiPage = PagePresets
 		o.syncPresetTree()
+	case PagePresets:
+		o.uiPage = PageLibrary
+	case PageHelp:
+		o.uiPage = PageSettings
 	}
 	o.panelEntered = true
 	o.settingsEditing = false

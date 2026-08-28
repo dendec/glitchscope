@@ -35,14 +35,14 @@ func TestHelpLinesUseGamepadMappingWhenConnected(t *testing.T) {
 
 func TestPageCycleIncludesHelp(t *testing.T) {
 	o := &Overlay{uiPage: PageLibrary}
-	for _, want := range []UIPage{PageSettings, PagePresets, PageHelp, PageLibrary} {
+	for _, want := range []UIPage{PagePresets, PageSettings, PageHelp, PageLibrary} {
 		o.NextScreen()
 		if o.uiPage != want {
 			t.Fatalf("NextScreen() page = %d, want %d", o.uiPage, want)
 		}
 	}
 
-	for _, want := range []UIPage{PageHelp, PagePresets, PageSettings, PageLibrary} {
+	for _, want := range []UIPage{PageHelp, PageSettings, PagePresets, PageLibrary} {
 		o.PrevScreen()
 		if o.uiPage != want {
 			t.Fatalf("PrevScreen() page = %d, want %d", o.uiPage, want)

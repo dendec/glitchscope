@@ -314,7 +314,7 @@ func TestSetPresetNameFollowsChangedPreset(t *testing.T) {
 }
 
 func TestPrevScreenToPresetsFollowsPlayingPreset(t *testing.T) {
-	o := &Overlay{uiPage: PageHelp, presetName: "Fractal/playing.milk"}
+	o := &Overlay{uiPage: PageSettings, presetName: "Fractal/playing.milk"}
 	o.SetPresetTree([]string{
 		"Dancer/other.milk",
 		"Fractal/playing.milk",
@@ -379,14 +379,14 @@ func TestFitPresetPreviewConstrainsHeight(t *testing.T) {
 
 func TestPresetPreviewSizeMatchesPanelAt720p(t *testing.T) {
 	w, h := PresetPreviewSize(1280, 720)
-	if w != 160 || h != 90 {
-		t.Fatalf("preview size = %dx%d, want 160x90", w, h)
+	if w != 320 || h != 180 {
+		t.Fatalf("preview size = %dx%d, want 320x180", w, h)
 	}
 }
 
 func TestPresetPreviewSizePreservesWindowRatio(t *testing.T) {
 	w, h := PresetPreviewSize(1024, 768)
-	if w != 128 || h != 96 {
-		t.Fatalf("preview size = %dx%d, want 128x96", w, h)
+	if w != 256 || h != 192 {
+		t.Fatalf("preview size = %dx%d, want 256x192", w, h)
 	}
 }

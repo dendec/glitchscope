@@ -32,8 +32,8 @@ type UIPage int
 
 const (
 	PageLibrary UIPage = iota
-	PageSettings
 	PagePresets
+	PageSettings
 	PageHelp
 )
 

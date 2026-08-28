@@ -599,13 +599,13 @@ const (
 	pageIndicatorGapFactor = 2.0 // horizontal gap between page indicator labels, in font-size units
 )
 
-// renderPageIndicator draws the Library/Settings/Presets row at the given y,
+// renderPageIndicator draws the Library/Presets/Settings/Help row at the given y,
 // which the caller stacks directly below the stats line so it never overlaps.
 func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH, y int) {
 	if o.pageIndicatorDirty {
 		o.rebuildPageIndicatorTextures()
 	}
-	pages := []string{"Library", "Settings", "Presets", "Help"}
+	pages := []string{"Library", "Presets", "Settings", "Help"}
 	gap := int(o.fontSize * pageIndicatorGapFactor)
 
 	// Compute total width.
@@ -632,7 +632,7 @@ func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH, y int) {
 
 func (o *Overlay) rebuildPageIndicatorTextures() {
 	o.pageIndicatorDirty = false
-	pages := []string{"Library", "Settings", "Presets", "Help"}
+	pages := []string{"Library", "Presets", "Settings", "Help"}
 	textColor := o.textColor()
 	for i, name := range pages {
 		o.deleteTex(&o.pageIndicatorTex[i])
