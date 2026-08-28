@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/player"
@@ -247,6 +248,44 @@ func TestCanRestorePosition(t *testing.T) {
 				t.Fatalf("canRestorePosition(%+v, %t) = %t, want %t", test.position, test.allowRemote, got, test.want)
 			}
 		})
+	}
+}
+
+func TestSelectPresetDefersLoad(t *testing.T) {
+	a := &App{}
+
+	a.selectPreset("Fractal/selected.milk")
+
+	if a.selectedPreset != "Fractal/selected.milk" {
+		t.Fatalf("selectedPreset = %q, want deferred preset", a.selectedPreset)
+	}
+	if a.presetIdx != 0 {
+		t.Fatalf("presetIdx = %d, changed before leaving Presets page", a.presetIdx)
+	}
+}
+
+func TestEnterPresetsPageStopsPresetTimer(t *testing.T) {
+	timer := time.NewTicker(time.Hour)
+	a := &App{
+		settings:       &config.Settings{},
+		presetTicker:   timer,
+		selectedPreset: "stale.milk",
+	}
+	a.presetSwitch.Store(true)
+
+	a.enterPresetsPage()
+
+	if !a.onPresetsPage {
+		t.Fatal("onPresetsPage = false, want true")
+	}
+	if a.presetTicker != nil {
+		t.Fatal("preset timer was not stopped")
+	}
+	if a.presetSwitch.Load() {
+		t.Fatal("pending automatic preset switch was not cleared")
+	}
+	if a.selectedPreset != "" {
+		t.Fatalf("selectedPreset = %q, want cleared on page entry", a.selectedPreset)
 	}
 }
 

@@ -3,13 +3,27 @@ package ui
 // This file owns rendering for the Presets page: two columns.
 // Shared primitives in overlay_render.go; model in overlay_presets.go.
 
+// PresetPreviewSize returns a low-resolution preview render size for a window.
+// Rendering at one eighth of the window dimensions keeps preview work cheap.
+func PresetPreviewSize(winW, winH int) (w, h int) {
+	if winW <= 0 || winH <= 0 {
+		return 0, 0
+	}
+	w = max(1, winW/8)
+	h = max(1, winH/8)
+	return w, h
+}
+
 func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	texturesValid := glIsTexture(o.presetsColL.tex) && glIsTexture(o.presetsColR.tex)
-	if !o.presetsDirty && texturesValid {
+	if !o.presetsDirty && !o.presetCursorDirty && !o.presetsDetailDirty && texturesValid {
 		o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, o.presetsRightRows)
 		return
 	}
+	rebuildList := o.presetsDirty || !glIsTexture(o.presetsColL.tex)
 	o.presetsDirty = false
+	o.presetCursorDirty = false
+	o.presetsDetailDirty = false
 
 	maxTextPx := availableRowTextWidth(panelW)
 
@@ -32,27 +46,31 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 		maxRows = 1
 	}
 
+	previousScroll := cur.scroll
 	cur.scroll = scrollOffset(cur.scroll, cur.cursor, totalNodes, maxRows)
-	var leftRows []listRow
+	rebuildList = rebuildList || cur.scroll != previousScroll
 	leftEnd := cur.scroll + maxRows
 	if leftEnd > totalNodes {
 		leftEnd = totalNodes
 	}
-	for i := cur.scroll; i < leftEnd; i++ {
-		isCursor := i == cur.cursor && o.panelEntered
-		var line string
-		if hasParent && i == 0 {
-			line = ".."
-		} else {
-			nodeIdx := i
-			if hasParent {
-				nodeIdx--
+	if rebuildList {
+		var leftRows []listRow
+		for i := cur.scroll; i < leftEnd; i++ {
+			isCursor := i == cur.cursor && o.panelEntered
+			var line string
+			if hasParent && i == 0 {
+				line = ".."
+			} else {
+				nodeIdx := i
+				if hasParent {
+					nodeIdx--
+				}
+				line = nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
 			}
-			line = nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
+			leftRows = append(leftRows, listRow{text: line, active: isCursor})
 		}
-		leftRows = append(leftRows, listRow{text: line, active: isCursor})
+		o.rebuildListRows(&o.presetsColL, leftRows, maxTextPx, panelW)
 	}
-	o.rebuildListRows(&o.presetsColL, leftRows, maxTextPx, panelW)
 
 	// Marquee for focused node name.
 	o.marqueeL.invalidate(o)
@@ -70,13 +88,15 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 		o.rebuildMarqueeLine(&o.marqueeL, name, maxTextPx, true)
 	}
 
-	// Right panel — metadata text.
-	rightRows := o.buildPresetDetailRows()
-	o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
-	o.marqueeR.invalidate(o)
-	o.presetsRightRows = len(rightRows)
+	if o.presetsDetailDirty || !glIsTexture(o.presetsColR.tex) {
+		// Right panel — metadata text for the last settled selection.
+		rightRows := o.buildPresetDetailRows()
+		o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
+		o.marqueeR.invalidate(o)
+		o.presetsRightRows = len(rightRows)
+	}
 
-	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, len(rightRows))
+	o.drawPresetsTextures(winW, winH, viewW, viewH, panelW, panelY, panelH, lh, o.presetsRightRows)
 }
 
 func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int, nRightRows int) {
@@ -122,23 +142,28 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 	if o.presetPreviewTex == nil || nRightRows == 0 {
 		return
 	}
-	node := o.presetNav.Selected()
-	if node == nil || !node.isLeaf {
+	if o.presetDetailKey == "" {
 		return
 	}
-	tex, rw, rh, ok := o.presetPreviewTex(node.key)
+	tex, rw, rh, ok := o.presetPreviewTex(o.presetDetailKey)
 	if !ok || tex == 0 {
 		return
 	}
-	thumbW := float32(rw) * 2
-	thumbH := float32(rh) * 2
-
 	textBottom := ry + float32(nRightRows*lh)
 	remaining := colH - float32(nRightRows*lh)
+	thumbW, thumbH := fitPresetPreview(float32(rw), float32(rh), colW, remaining)
+	if thumbW == 0 || thumbH == 0 {
+		return
+	}
 	tx := rx + (colW-thumbW)/2
 	ty := textBottom + (remaining-thumbH)/2
-	if ty < textBottom {
-		ty = textBottom
+	glDrawOverlayImage(o.programImage, tex, 1, tx, ty, thumbW, thumbH, winW, winH, viewW, viewH)
+}
+
+func fitPresetPreview(srcW, srcH, maxW, maxH float32) (w, h float32) {
+	if srcW <= 0 || srcH <= 0 || maxW <= 0 || maxH <= 0 {
+		return 0, 0
 	}
-	glDrawOverlayText(o.programText, tex, 1, tx, ty, thumbW, thumbH, winW, winH, viewW, viewH)
+	scale := min(maxW/srcW, maxH/srcH)
+	return srcW * scale, srcH * scale
 }

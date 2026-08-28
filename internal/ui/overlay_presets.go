@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dendec/glitchscope/internal/presets"
 )
@@ -152,13 +153,41 @@ func sortedTreeNodes(m map[string]*treeEntry) []presetNode {
 // Used by the UI to display preset info without owning the cache.
 type presetMetaProvider func(key string) presets.PresetMeta
 
-// requestPreviewForSelected enqueues a preview if the selected node is a .milk.
-func (o *Overlay) requestPreviewForSelected() {
+const presetPreviewDelay = 120 * time.Millisecond
+
+// settlePresetSelection updates the right panel and requests a preview for the
+// selected .milk after cursor navigation has stopped.
+func (o *Overlay) settlePresetSelection() {
+	o.presetPreviewDue = time.Time{}
 	node := o.presetNav.Selected()
-	if node == nil || !node.isLeaf || o.presetPreviewReq == nil {
+	key := ""
+	if node != nil && node.isLeaf {
+		key = node.key
+	}
+	if o.presetDetailKey != key {
+		o.presetDetailKey = key
+		o.presetsDetailDirty = true
+	}
+	if key == "" || o.presetPreviewReq == nil {
 		return
 	}
-	o.presetPreviewReq(node.key)
+	o.presetPreviewReq(key)
+}
+
+func (o *Overlay) schedulePreviewForSelected(now time.Time) {
+	node := o.presetNav.Selected()
+	if node == nil || !node.isLeaf || o.presetPreviewReq == nil {
+		o.presetPreviewDue = time.Time{}
+		return
+	}
+	o.presetPreviewDue = now.Add(presetPreviewDelay)
+}
+
+func (o *Overlay) requestScheduledPreview(now time.Time) {
+	if o.presetPreviewDue.IsZero() || now.Before(o.presetPreviewDue) {
+		return
+	}
+	o.settlePresetSelection()
 }
 
 // SetPresetMetaProvider sets the metadata provider callback.
@@ -279,7 +308,7 @@ func (o *Overlay) syncPresetTree() {
 	}
 	o.presetsDirty = true
 	o.breadcrumbDirty = true
-	o.requestPreviewForSelected()
+	o.settlePresetSelection()
 }
 
 // nodeDisplayLine formats a preset node for display in the left panel.
@@ -298,12 +327,11 @@ func nodeDisplayLine(node *presetNode, playingKey string) string {
 // buildPresetDetailRows returns the text lines for the right panel detail.
 // Returns nil when the selected node is a directory or has no metadata.
 func (o *Overlay) buildPresetDetailRows() []listRow {
-	node := o.presetNav.Selected()
-	if node == nil || !node.isLeaf || o.presetMeta == nil {
+	if o.presetDetailKey == "" || o.presetMeta == nil {
 		return nil
 	}
 
-	m := o.presetMeta(node.key)
+	m := o.presetMeta(o.presetDetailKey)
 	complexity := calcComplexity(m)
 
 	rows := []listRow{
@@ -314,8 +342,8 @@ func (o *Overlay) buildPresetDetailRows() []listRow {
 	}
 
 	// Show preview FPS when available (presets page, preview active).
-	if fps := o.PresetPreviewFPS(); fps > 0 {
-		rows = append(rows, listRow{}, listRow{text: fmt.Sprintf("FPS: %.0f", fps)})
+	if o.presetPreviewFPSNow > 0 {
+		rows = append(rows, listRow{}, listRow{text: fmt.Sprintf("FPS: %d", o.presetPreviewFPSNow)})
 	}
 
 	return rows

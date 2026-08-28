@@ -90,7 +90,7 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 		} else if a.overlay.IsPresetsPage() {
 			if a.overlay.Select() {
 				if key := a.overlay.SelectedPresetKey(); key != "" {
-					a.loadPresetByKey(key)
+					a.selectPreset(key)
 				}
 			}
 		} else if a.overlay.IsNCMode() {
@@ -232,9 +232,10 @@ func (a *App) loadPreset(idx int) {
 	a.transitionPreset(name)
 }
 
-// loadPresetByKey loads a preset by its store key via transition.
-func (a *App) loadPresetByKey(key string) {
-	a.transitionPreset(key)
+// selectPreset confirms a preset on the Presets page without mutating the
+// running projectM instance. It is loaded when the page or menu closes.
+func (a *App) selectPreset(key string) {
+	a.selectedPreset = key
 }
 
 // randPreset picks a random non-transition preset.

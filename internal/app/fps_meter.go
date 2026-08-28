@@ -1,5 +1,7 @@
 package app
 
+import "time"
+
 type fpsMeter struct {
 	values [fpsWindow]float64
 	count  int
@@ -7,7 +9,14 @@ type fpsMeter struct {
 	sum    float64
 }
 
-func (m *fpsMeter) Add(fps float64) {
+func (m *fpsMeter) AddDuration(duration time.Duration) {
+	if duration <= 0 {
+		return
+	}
+	m.add(1 / duration.Seconds())
+}
+
+func (m *fpsMeter) add(fps float64) {
 	if m.count < len(m.values) {
 		m.count++
 	} else {
@@ -27,4 +36,8 @@ func (m *fpsMeter) Average() float64 {
 
 func (m *fpsMeter) Full() bool {
 	return m.count == len(m.values)
+}
+
+func (m *fpsMeter) Reset() {
+	*m = fpsMeter{}
 }

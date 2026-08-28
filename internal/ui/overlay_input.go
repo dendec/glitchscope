@@ -29,6 +29,14 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	// of this frame reads it (runs even while the UI is hidden).
 	o.refreshAlbumsCache()
 	o.notif.Update(o.uiVisible)
+	if o.uiVisible && o.uiPage == PagePresets {
+		o.requestScheduledPreview(time.Now())
+		fps := int(o.PresetPreviewFPS() + 0.5)
+		if fps != o.presetPreviewFPSNow {
+			o.presetPreviewFPSNow = fps
+			o.presetsDetailDirty = true
+		}
+	}
 
 	if !o.uiVisible || !o.panelEntered {
 		return
@@ -71,13 +79,9 @@ func (o *Overlay) updateScrollHold(h *scrollHold, held bool, now time.Time, step
 	if sinceLast < stepInterval {
 		return
 	}
-	steps := int(sinceLast / stepInterval)
-	if steps < 1 {
-		steps = 1
-	}
-	for i := 0; i < steps; i++ {
-		step()
-	}
+	// A delayed frame must not catch up with several cursor moves before the
+	// next swap; those intermediate selections could never be displayed.
+	step()
 	h.lastStep = now
 }
 
@@ -216,8 +220,8 @@ func (o *Overlay) moveCursor(dir int) {
 			}
 			if next := cur.cursor + dir; next >= 0 && next < total {
 				cur.cursor = next
-				o.presetsDirty = true
-				o.requestPreviewForSelected()
+				o.presetCursorDirty = true
+				o.schedulePreviewForSelected(time.Now())
 			}
 		}
 		return
@@ -386,7 +390,7 @@ func (o *Overlay) FocusRight() {
 			o.presetNav.Expand(node)
 			o.presetsDirty = true
 			o.breadcrumbDirty = true
-			o.requestPreviewForSelected()
+			o.settlePresetSelection()
 		} else if node == nil && len(o.presetNav.stack) > 1 {
 			// ".." entry — collapse.
 			o.presetNav.Collapse()

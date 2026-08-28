@@ -10,6 +10,7 @@ import (
 type fakeOverlayView struct {
 	visible        bool
 	cursor         int
+	rescanCalls    int
 	trackInfoCalls int
 	lastTrackInfos []player.TrackInfo
 	playingAlbum   string
@@ -22,7 +23,7 @@ func (f *fakeOverlayView) SetStats(string) {}
 
 func (f *fakeOverlayView) SetPlayback(float64, float64, float32, float64, float64, int, bool, bool) {}
 
-func (f *fakeOverlayView) HandleRescan(_, _ []player.Album) {}
+func (f *fakeOverlayView) HandleRescan(_, _ []player.Album) { f.rescanCalls++ }
 
 func (f *fakeOverlayView) UIVisible() bool { return f.visible }
 
@@ -101,6 +102,25 @@ func TestOverlayPresenterInitializesAndCachesAlbumTracks(t *testing.T) {
 	// Panel data from first frame must be preserved.
 	if len(view.lastTrackInfos) != 1 || view.lastTrackInfos[0].Path != "track" {
 		t.Fatalf("panel data corrupted after second frame: %#v", view.lastTrackInfos)
+	}
+}
+
+func TestOverlayPresenterChecksRescanOnlyWhenAlbumSnapshotChanges(t *testing.T) {
+	view := &fakeOverlayView{}
+	presenter := newOverlayPresenter(view)
+	albums := []player.Album{{Name: "album"}}
+	snapshot := overlayPlaybackSnapshot{hasLibrary: true, albums: albums}
+
+	presenter.Update(60, false, 0, prof.Stats{}, snapshot)
+	presenter.Update(60, false, 0, prof.Stats{}, snapshot)
+	if view.rescanCalls != 1 {
+		t.Fatalf("rescan calls for unchanged snapshot = %d, want 1", view.rescanCalls)
+	}
+
+	snapshot.albums = append(albums, player.Album{Name: "new album"})
+	presenter.Update(60, false, 0, prof.Stats{}, snapshot)
+	if view.rescanCalls != 2 {
+		t.Fatalf("rescan calls after snapshot change = %d, want 2", view.rescanCalls)
 	}
 }
 

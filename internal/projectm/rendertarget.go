@@ -113,6 +113,23 @@ static void rtBlit(GLuint program, GLuint tex, GLsizei dstW, GLsizei dstH) {
 	glDisableVertexAttribArray(pos);
 	glUseProgram(0);
 }
+
+static void rtSeedFeedback(GLuint program, GLuint tex, GLsizei dstW, GLsizei dstH) {
+	static const float verts[] = { -1,-1, 1,-1, -1,1, 1,1 };
+	glViewport(0, 0, dstW, dstH);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+	glUseProgram(program);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glUniform1i(glGetUniformLocation(program, "tex"), 0);
+	GLint pos = glGetAttribLocation(program, "pos");
+	glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 0, verts);
+	glEnableVertexAttribArray(pos);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glDisableVertexAttribArray(pos);
+	glUseProgram(0);
+}
 */
 import "C"
 
@@ -177,6 +194,15 @@ func (rt *RenderTarget) Size() (int, int) {
 // Call right after pm.RenderFrame().
 func (rt *RenderTarget) Capture() {
 	C.rtCapture(rt.tex, C.GLsizei(rt.w), C.GLsizei(rt.h))
+}
+
+// SeedFeedback scales the image retained by Resize into the currently bound
+// projectM feedback framebuffer.
+func (rt *RenderTarget) SeedFeedback() {
+	if !rt.showPrevious || rt.previousTex == 0 {
+		return
+	}
+	C.rtSeedFeedback(rt.program, rt.previousTex, C.GLsizei(rt.w), C.GLsizei(rt.h))
 }
 
 // BlitToScreen draws the captured texture scaled up to fill the viewport.

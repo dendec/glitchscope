@@ -80,6 +80,7 @@ type App struct {
 
 	seek           seekControl // continuous-seek drivetrain state
 	onPresetsPage  bool        // true when UI is on Presets page (main viz stopped)
+	selectedPreset string      // confirmed on Presets page, loaded when the page closes
 	testSignalFreq float64     // phase accumulator for synthetic test signal
 	testSignalBuf  []float32   // reusable buffer for test signal (avoids alloc per frame)
 }
@@ -290,8 +291,7 @@ func (a *App) readAudio() []float32 {
 	return nil
 }
 
-// testSignal produces a harmonic beating signal (sum of two close
-// frequencies) for preview when audio is paused or stopped.
+// testSignal produces a harmonic signal for preview when audio is unavailable.
 // Reuses a pre-allocated buffer to avoid per-frame allocation.
 func (a *App) testSignal() []float32 {
 	if cap(a.testSignalBuf) < testSignalSize {
@@ -299,15 +299,16 @@ func (a *App) testSignal() []float32 {
 	}
 	wave := a.testSignalBuf[:testSignalSize]
 	const (
-		f1    = 220.0 // Hz
-		f2    = 223.0 // Hz (3 Hz beat)
-		amp   = 0.3
+		base  = 110.0 // Hz
+		amp   = 0.22
 		twoPi = 2 * 3.141592653589793
 		sr    = 44100.0
 	)
 	for i := range wave {
 		t := a.testSignalFreq / sr
-		wave[i] = float32(amp * (math.Sin(twoPi*f1*t) + math.Sin(twoPi*f2*t)))
+		wave[i] = float32(amp * (math.Sin(twoPi*base*t) +
+			0.65*math.Sin(twoPi*base*2*t) +
+			0.35*math.Sin(twoPi*base*4*t)))
 		a.testSignalFreq++
 	}
 	return wave

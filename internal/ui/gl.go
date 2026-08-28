@@ -7,6 +7,7 @@ package ui
 #include <GLES2/gl2ext.h>
 
 static unsigned int createTextProgram();
+static unsigned int createImageProgram();
 static unsigned int createRectProgram();
 
 static unsigned int compileShader(unsigned int type, const char *source) {
@@ -135,6 +136,26 @@ static unsigned int createTextProgram() {
 	return createProgram(vs, fs);
 }
 
+static unsigned int createImageProgram() {
+	const char *vs =
+		"#version 100\n"
+		"attribute vec2 pos;\n"
+		"attribute vec2 tc;\n"
+		"varying vec2 uv;\n"
+		"void main() { uv = tc; gl_Position = vec4(pos, 0.0, 1.0); }";
+	const char *fs =
+		"#version 100\n"
+		"precision mediump float;\n"
+		"uniform sampler2D text;\n"
+		"uniform float opacity;\n"
+		"varying vec2 uv;\n"
+		"void main() {\n"
+		"  vec3 color = texture2D(text, uv).rgb;\n"
+		"  gl_FragColor = vec4(color, opacity);\n"
+		"}";
+	return createProgram(vs, fs);
+}
+
 static unsigned int createRectProgram() {
 	const char *vs =
 		"#version 100\n"
@@ -175,8 +196,17 @@ import (
 // This file is the single point of contact with cgo/GLES. Every other file
 // calls these Go wrappers instead of touching "C" directly.
 
-func glCreateTextProgram() uint32 { return uint32(C.createTextProgram()) }
-func glCreateRectProgram() uint32 { return uint32(C.createRectProgram()) }
+func glCreateTextProgram() uint32 {
+	return uint32(C.createTextProgram())
+}
+
+func glCreateImageProgram() uint32 {
+	return uint32(C.createImageProgram())
+}
+
+func glCreateRectProgram() uint32 {
+	return uint32(C.createRectProgram())
+}
 
 func glDeleteProgram(program uint32) {
 	if program != 0 {
@@ -194,6 +224,11 @@ func glDrawFilledRect(program uint32, x, y, w, h, r, g, b, a float32, winW, winH
 }
 
 func glDrawOverlayText(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH, viewW, viewH int) {
+	C.drawOverlayText(C.uint(program), C.uint(tex), C.float(opacity),
+		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH), C.int(viewW), C.int(viewH))
+}
+
+func glDrawOverlayImage(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH, viewW, viewH int) {
 	C.drawOverlayText(C.uint(program), C.uint(tex), C.float(opacity),
 		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH), C.int(viewW), C.int(viewH))
 }

@@ -571,13 +571,9 @@ func (o *Overlay) NCListingStatus() filesystem.Status {
 func (o *Overlay) breadcrumbParts() []string {
 	if o.uiPage == PagePresets {
 		parts := []string{"/"}
-		// Each stack level beyond root represents an expanded directory.
-		// The directory name is at stack[i-1].nodes[stack[i-1].cursor].
-		for i := 0; i+1 < len(o.presetNav.stack); i++ {
-			parentLevel := &o.presetNav.stack[i]
-			nodesIdx := parentLevel.cursor
-			if nodesIdx >= 0 && nodesIdx < len(parentLevel.nodes) {
-				parts = append(parts, parentLevel.nodes[nodesIdx].name)
+		for i, level := range o.presetNav.stack {
+			if i > 0 && level.label != "" {
+				parts = append(parts, level.label)
 			}
 		}
 		return parts

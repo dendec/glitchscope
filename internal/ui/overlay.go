@@ -111,6 +111,7 @@ const (
 type Overlay struct {
 	controllerConnected bool
 	programText         uint32
+	programImage        uint32
 	programRect         uint32
 	face                font.Face
 
@@ -171,6 +172,8 @@ type Overlay struct {
 	presetPreviewReq func(key string)
 	presetPreviewTex func(key string) (tex uint32, w, h int, ok bool)
 	presetPreviewFPS func() float64
+	presetPreviewDue time.Time
+	presetDetailKey  string
 	presetsColL      listTex
 	presetsColR      listTex
 
@@ -235,30 +238,34 @@ type Overlay struct {
 	pageIndicatorDirty bool
 	textureCacheReady  bool
 
-	albumsDirty        bool
-	albumsContentDirty bool
-	tracksDirty        bool
-	tracksContentDirty bool
-	statsDirty         bool
-	bottomDirty        bool
-	presetNameDirty    bool
-	presetsDirty       bool
-	presetsRightRows   int // cached right panel row count for thumbnail draw
-	online             bool
-	micActive          bool // microphone capture is running
-	micDevices         []string
-	micMenuRequested   bool   // one-shot: microphone source selected
-	micDeviceSelected  string // one-shot: selected SDL capture device name
-	micStopRequested   bool   // one-shot: stop capture selected
-	closeInjectPending bool
-	modArchiveItems    map[string][]modarchive.DirItem
-	deviceInfo         *DeviceInfo
+	albumsDirty         bool
+	albumsContentDirty  bool
+	tracksDirty         bool
+	tracksContentDirty  bool
+	statsDirty          bool
+	bottomDirty         bool
+	presetNameDirty     bool
+	presetsDirty        bool
+	presetCursorDirty   bool
+	presetsDetailDirty  bool
+	presetsRightRows    int // cached right panel row count for thumbnail draw
+	presetPreviewFPSNow int // rounded value currently baked into the detail texture
+	online              bool
+	micActive           bool // microphone capture is running
+	micDevices          []string
+	micMenuRequested    bool   // one-shot: microphone source selected
+	micDeviceSelected   string // one-shot: selected SDL capture device name
+	micStopRequested    bool   // one-shot: stop capture selected
+	closeInjectPending  bool
+	modArchiveItems     map[string][]modarchive.DirItem
+	deviceInfo          *DeviceInfo
 }
 
 // New creates an Overlay. The stack always has a virtual source root.
 func New() *Overlay {
 	o := &Overlay{
 		programText:     glCreateTextProgram(),
+		programImage:    glCreateImageProgram(),
 		programRect:     glCreateRectProgram(),
 		modArchiveItems: make(map[string][]modarchive.DirItem),
 	}
@@ -296,6 +303,8 @@ func (o *Overlay) Close() {
 	}
 	glDeleteProgram(o.programText)
 	o.programText = 0
+	glDeleteProgram(o.programImage)
+	o.programImage = 0
 	glDeleteProgram(o.programRect)
 	o.programRect = 0
 	if o.face != nil {
@@ -396,6 +405,7 @@ func (o *Overlay) markAllDirty() {
 	o.presetNameDirty = true
 	o.settingsDirty = true
 	o.presetsDirty = true
+	o.presetsDetailDirty = true
 	o.helpDirty = true
 	o.pageIndicatorDirty = true
 	o.breadcrumbDirty = true

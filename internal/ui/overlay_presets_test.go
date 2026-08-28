@@ -2,6 +2,7 @@ package ui
 
 import (
 	"testing"
+	"time"
 
 	"github.com/dendec/glitchscope/internal/presets"
 )
@@ -166,6 +167,67 @@ func TestNavigationCursorMove(t *testing.T) {
 	}
 }
 
+func TestPresetPreviewWaitsForNavigationToSettle(t *testing.T) {
+	now := time.Unix(100, 0)
+	var requested []string
+	var metadata []string
+	o := &Overlay{
+		presetPreviewReq: func(key string) {
+			requested = append(requested, key)
+		},
+		presetMeta: func(key string) presets.PresetMeta {
+			metadata = append(metadata, key)
+			return presets.PresetMeta{}
+		},
+	}
+	o.SetPresetTree([]string{
+		"Fractal/a.milk",
+		"Fractal/b.milk",
+	})
+	o.presetNav.Expand(o.presetNav.Selected())
+	o.presetNav.current().cursor = 1
+
+	o.schedulePreviewForSelected(now)
+	o.presetNav.current().cursor = 2
+	o.schedulePreviewForSelected(now.Add(presetPreviewDelay / 2))
+	o.requestScheduledPreview(now.Add(presetPreviewDelay))
+	o.buildPresetDetailRows()
+	if len(requested) != 0 {
+		t.Fatalf("preview requested while navigating: %v", requested)
+	}
+	if len(metadata) != 0 {
+		t.Fatalf("metadata requested while navigating: %v", metadata)
+	}
+
+	o.requestScheduledPreview(now.Add(presetPreviewDelay + presetPreviewDelay/2))
+	o.buildPresetDetailRows()
+	if len(requested) != 1 || requested[0] != "Fractal/b.milk" {
+		t.Fatalf("preview requests = %v, want final selection only", requested)
+	}
+	if len(metadata) != 1 || metadata[0] != "Fractal/b.milk" {
+		t.Fatalf("metadata requests = %v, want final selection only", metadata)
+	}
+}
+
+func TestScrollHoldMovesAtMostOncePerFrame(t *testing.T) {
+	now := time.Unix(100, 0)
+	o := &Overlay{uiPage: PagePresets}
+	hold := scrollHold{
+		holdStart:  now.Add(-3 * time.Second),
+		lastStep:   now.Add(-time.Second),
+		active:     true,
+		uiPage:     PagePresets,
+		focusPanel: 0,
+	}
+	steps := 0
+
+	o.updateScrollHold(&hold, true, now, func() { steps++ })
+
+	if steps != 1 {
+		t.Fatalf("steps in one frame = %d, want 1", steps)
+	}
+}
+
 func TestPresetTreeEqual(t *testing.T) {
 	a := []presetNode{
 		{name: "Fractal", isLeaf: false, children: []presetNode{
@@ -266,5 +328,65 @@ func TestPrevScreenToPresetsFollowsPlayingPreset(t *testing.T) {
 	}
 	if got := o.SelectedPresetKey(); got != o.presetName {
 		t.Fatalf("selected preset = %q, want playing preset %q", got, o.presetName)
+	}
+}
+
+func TestUpdateRefreshesPresetPreviewFPS(t *testing.T) {
+	fps := 12.4
+	o := &Overlay{
+		uiVisible: true,
+		uiPage:    PagePresets,
+		presetPreviewFPS: func() float64 {
+			return fps
+		},
+	}
+
+	o.Update(false, false)
+	if o.presetPreviewFPSNow != 12 {
+		t.Fatalf("preview FPS = %d, want 12", o.presetPreviewFPSNow)
+	}
+	if !o.presetsDetailDirty {
+		t.Fatal("Presets detail was not invalidated for initial FPS")
+	}
+
+	o.presetsDetailDirty = false
+	o.Update(false, false)
+	if o.presetsDetailDirty {
+		t.Fatal("unchanged preview FPS invalidated Presets detail")
+	}
+
+	fps = 13.6
+	o.Update(false, false)
+	if o.presetPreviewFPSNow != 14 || !o.presetsDetailDirty || o.presetsDirty {
+		t.Fatalf("preview FPS = %d, detail dirty = %t, list dirty = %t; want 14, true, false",
+			o.presetPreviewFPSNow, o.presetsDetailDirty, o.presetsDirty)
+	}
+}
+
+func TestFitPresetPreviewUsesPanelWidth(t *testing.T) {
+	w, h := fitPresetPreview(160, 90, 576, 446)
+	if w != 576 || h != 324 {
+		t.Fatalf("preview size = %gx%g, want 576x324", w, h)
+	}
+}
+
+func TestFitPresetPreviewConstrainsHeight(t *testing.T) {
+	w, h := fitPresetPreview(160, 90, 576, 180)
+	if w != 320 || h != 180 {
+		t.Fatalf("preview size = %gx%g, want 320x180", w, h)
+	}
+}
+
+func TestPresetPreviewSizeMatchesPanelAt720p(t *testing.T) {
+	w, h := PresetPreviewSize(1280, 720)
+	if w != 160 || h != 90 {
+		t.Fatalf("preview size = %dx%d, want 160x90", w, h)
+	}
+}
+
+func TestPresetPreviewSizePreservesWindowRatio(t *testing.T) {
+	w, h := PresetPreviewSize(1024, 768)
+	if w != 128 || h != 96 {
+		t.Fatalf("preview size = %dx%d, want 128x96", w, h)
 	}
 }

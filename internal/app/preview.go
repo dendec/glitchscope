@@ -6,20 +6,6 @@ package app
 #cgo LDFLAGS: -lGLESv2
 #include <GLES2/gl2.h>
 
-static GLuint prCreateFBO(GLuint tex) {
-	GLuint fbo;
-	glGenFramebuffers(1, &fbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
-	GLint status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	if (status != GL_FRAMEBUFFER_COMPLETE) {
-		glDeleteFramebuffers(1, &fbo);
-		return 0;
-	}
-	return fbo;
-}
-
 static void prCreateThumbTexture(GLuint *tex, GLsizei w, GLsizei h) {
 	glGenTextures(1, tex);
 	glBindTexture(GL_TEXTURE_2D, *tex);
@@ -28,6 +14,12 @@ static void prCreateThumbTexture(GLuint *tex, GLsizei w, GLsizei h) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+static void prCaptureThumb(GLuint tex, GLsizei w, GLsizei h) {
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 */
@@ -42,13 +34,16 @@ import (
 )
 
 const (
-	previewFPS         = 12
-	maxQueue           = 10
-	previewBurstFrames = 3 // frames per tick on Presets page
+	previewTargetFPS   = 15
+	previewFramePeriod = time.Second / previewTargetFPS
 )
 
-// ClearFB clears the current framebuffer to black.
-func ClearFB() {
+// ClearFB clears the current framebuffer to black at the window viewport.
+func ClearFB(w, h int) {
+	C.glBindFramebuffer(C.GL_FRAMEBUFFER, 0)
+	C.glViewport(0, 0, C.GLsizei(w), C.GLsizei(h))
+	C.glDisable(C.GL_SCISSOR_TEST)
+	C.glColorMask(C.GL_TRUE, C.GL_TRUE, C.GL_TRUE, C.GL_TRUE)
 	C.glClearColor(0, 0, 0, 1)
 	C.glClear(C.GL_COLOR_BUFFER_BIT)
 }
@@ -62,20 +57,15 @@ type previewJob struct {
 // previewRenderer manages a dedicated projectM instance for thumbnail rendering.
 // All methods must be called on the main GL thread.
 type previewRenderer struct {
-	pm         *projectm.Handle
-	fbo        C.GLuint
-	tex        C.GLuint // thumbnail capture texture
-	w, h       int      // current thumbnail render dimensions
-	queue      []previewJob
-	active     *previewJob
-	warmupLeft int
-	lastRender time.Time // last animation frame capture time
-	throttle   bool      // false = render as fast as possible (presets page)
+	pm        *projectm.Handle
+	tex       C.GLuint // thumbnail capture texture
+	w, h      int      // current thumbnail render dimensions
+	queue     []previewJob
+	active    *previewJob
+	nextFrame time.Time
 
 	// FPS measurement.
-	renderCount int
-	lastFPSTime time.Time
-	currentFPS  float64
+	meter fpsMeter
 
 	// Result of the last completed render.
 	resultKey atomic.Value // string
@@ -84,26 +74,10 @@ type previewRenderer struct {
 	ready bool // false if GL init failed
 }
 
-// ThumbSize returns the thumbnail render dimensions: 1/8 of screen size.
-func ThumbSize(winW, winH int) (w, h int) {
-	w = winW / 8
-	h = winH / 8
-	if w < 32 {
-		w = 32
-	}
-	if h < 18 {
-		h = 18
-	}
-	return w, h
-}
-
 // newPreviewRenderer creates a second projectM instance for thumbnails.
 // Call Resize() before the first ProcessNext() to set initial dimensions.
 func newPreviewRenderer() *previewRenderer {
-	r := &previewRenderer{
-		throttle:    true,
-		lastFPSTime: time.Now(),
-	}
+	r := &previewRenderer{}
 
 	pm, err := projectm.Create()
 	if err != nil {
@@ -111,6 +85,7 @@ func newPreviewRenderer() *previewRenderer {
 		return r
 	}
 	r.pm = pm
+	r.pm.SetFPS(previewTargetFPS)
 	r.pm.SetHardCutEnabled(false)
 	r.ready = true
 	return r
@@ -121,18 +96,12 @@ func (r *previewRenderer) isReady() bool {
 	return r.ready && r.pm != nil
 }
 
-// SetThrottle controls the FPS throttle. When false, ProcessNext renders
-// as fast as possible (used on Presets page where main viz is stopped).
-func (r *previewRenderer) SetThrottle(v bool) {
-	r.throttle = v
-}
-
 // RenderFPS returns the measured render FPS of the preview instance.
 func (r *previewRenderer) RenderFPS() float64 {
-	return r.currentFPS
+	return r.meter.Average()
 }
 
-// Resize recreates the capture texture and FBO at the given dimensions.
+// Resize recreates the capture texture at the given dimensions.
 // No-op if dimensions haven't changed.
 func (r *previewRenderer) Resize(w, h int) {
 	if !r.isReady() || w <= 0 || h <= 0 {
@@ -142,10 +111,6 @@ func (r *previewRenderer) Resize(w, h int) {
 		return
 	}
 	// Destroy old resources.
-	if r.fbo != 0 {
-		C.glDeleteFramebuffers(1, &r.fbo)
-		r.fbo = 0
-	}
 	if r.tex != 0 {
 		C.glDeleteTextures(1, &r.tex)
 		r.tex = 0
@@ -153,36 +118,22 @@ func (r *previewRenderer) Resize(w, h int) {
 	// Create new.
 	r.pm.SetWindowSize(w, h)
 	C.prCreateThumbTexture(&r.tex, C.GLsizei(w), C.GLsizei(h))
-	r.fbo = C.prCreateFBO(r.tex)
-	if r.fbo == 0 {
-		slog.Warn("preview FBO incomplete after resize", "w", w, "h", h)
-		r.ready = false
-		return
-	}
 	r.w, r.h = w, h
 	r.Flush() // discard stale results
 	slog.Debug("preview resized", "w", w, "h", h)
 }
 
-// Enqueue adds a preview job. Replaces the active job if key differs.
+// Enqueue selects the latest preview job. Rapid navigation must not leave
+// intermediate presets queued for rendering after the cursor has moved on.
 func (r *previewRenderer) Enqueue(key, data string) {
 	if !r.isReady() {
 		return
 	}
-	// Replace active job if different key.
-	if r.active != nil && r.active.key != key {
-		r.active = nil
+	if r.active != nil && r.active.key == key {
+		return
 	}
-	// Deduplicate in queue.
-	for _, j := range r.queue {
-		if j.key == key {
-			return
-		}
-	}
-	if len(r.queue) >= maxQueue {
-		r.queue = r.queue[1:]
-	}
-	r.queue = append(r.queue, previewJob{
+	r.active = nil
+	r.queue = append(r.queue[:0], previewJob{
 		key:  key,
 		data: data,
 	})
@@ -205,10 +156,6 @@ func (r *previewRenderer) setResult(key string, tex uint32) {
 
 // ProcessNext runs one preview step. Returns true if work was done.
 //
-// Two phases:
-//  1. Warmup: render `warmup` frames (no capture) to build feedback history
-//  2. Animation: render + capture, texture updated each frame
-//
 // The job stays active during animation so the thumbnail keeps playing.
 // A new Enqueue replaces the current job.
 func (r *previewRenderer) ProcessNext() bool {
@@ -223,63 +170,47 @@ func (r *previewRenderer) ProcessNext() bool {
 		}
 		r.active = &r.queue[0]
 		r.queue = r.queue[1:]
-		r.warmupLeft = 3 // few frames to fill projectM feedback buffer
+		r.meter.Reset()
+		r.nextFrame = time.Time{}
 		slog.Debug("preview job started", "key", r.active.key)
 		r.pm.LoadPresetData(r.active.data, false)
 	}
 
-	// Warmup phase: render to FBO without updating result.
-	if r.warmupLeft > 0 {
-		C.glBindFramebuffer(C.GL_FRAMEBUFFER, r.fbo)
-		C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
-		r.pm.RenderFrame()
-		C.glBindFramebuffer(C.GL_FRAMEBUFFER, 0)
-		r.warmupLeft--
-		return true
+	now := time.Now()
+	if !previewFrameDue(now, r.nextFrame) {
+		return false
 	}
+	r.nextFrame = now.Add(previewFramePeriod)
 
-	// Animation phase: render directly to FBO (r.tex), not fb0.
-	if r.throttle {
-		interval := time.Second / previewFPS
-		if time.Since(r.lastRender) < interval {
-			return false
-		}
-	}
-	C.glBindFramebuffer(C.GL_FRAMEBUFFER, r.fbo)
+	// projectM always renders its final composite into framebuffer 0. Copy the
+	// rendered corner into the thumbnail texture, matching RenderTarget.Capture.
 	C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
+	started := time.Now()
 	r.pm.RenderFrame()
-	C.glBindFramebuffer(C.GL_FRAMEBUFFER, 0)
+	r.meter.AddDuration(time.Since(started))
+	r.pm.SetFPS(max(1, int32(r.meter.Average()+0.5)))
+	C.prCaptureThumb(r.tex, C.GLsizei(r.w), C.GLsizei(r.h))
 	r.setResult(r.active.key, uint32(r.tex))
-	r.lastRender = time.Now()
-
-	// FPS measurement.
-	r.renderCount++
-	if elapsed := time.Since(r.lastFPSTime); elapsed >= time.Second {
-		r.currentFPS = float64(r.renderCount) / elapsed.Seconds()
-		r.renderCount = 0
-		r.lastFPSTime = time.Now()
-	}
 
 	return true
 }
 
-
+func previewFrameDue(now, nextFrame time.Time) bool {
+	return nextFrame.IsZero() || !now.Before(nextFrame)
+}
 
 // Flush cancels all pending jobs and clears the result.
 func (r *previewRenderer) Flush() {
 	r.queue = r.queue[:0]
 	r.active = nil
-	r.lastRender = time.Time{}
+	r.nextFrame = time.Time{}
+	r.meter.Reset()
 	r.resultKey.Store("")
 	r.resultTex = 0
 }
 
 // Destroy frees GL resources and the projectM instance.
 func (r *previewRenderer) Destroy() {
-	if r.fbo != 0 {
-		C.glDeleteFramebuffers(1, &r.fbo)
-		r.fbo = 0
-	}
 	if r.tex != 0 {
 		C.glDeleteTextures(1, &r.tex)
 		r.tex = 0

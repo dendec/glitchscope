@@ -1,7 +1,9 @@
 package app
 
 import (
+	"math"
 	"testing"
+	"time"
 
 	"github.com/dendec/glitchscope/internal/config"
 )
@@ -9,18 +11,58 @@ import (
 func TestFpsMeterUsesFixedWindow(t *testing.T) {
 	var meter fpsMeter
 	for i := 0; i < fpsWindow; i++ {
-		meter.Add(float64(i + 1))
+		meter.AddDuration(time.Second / time.Duration(i+1))
 	}
 	if !meter.Full() {
 		t.Fatal("expected a full FPS window")
 	}
-	if got, want := meter.Average(), 5.5; got != want {
+	if got, want := meter.Average(), 5.5; math.Abs(got-want) > 0.0001 {
 		t.Fatalf("average = %v, want %v", got, want)
 	}
 
-	meter.Add(21)
-	if got, want := meter.Average(), 7.5; got != want {
+	meter.AddDuration(time.Second / 21)
+	if got, want := meter.Average(), 7.5; math.Abs(got-want) > 0.0001 {
 		t.Fatalf("rolling average = %v, want %v", got, want)
+	}
+
+	meter.Reset()
+	if meter.Average() != 0 || meter.Full() {
+		t.Fatal("reset meter retained samples")
+	}
+}
+
+func TestVisualizerClock(t *testing.T) {
+	var clock visualizerClock
+	now := time.Unix(100, 0)
+	if !clock.Due(now) {
+		t.Fatal("first visualizer frame should be due")
+	}
+	clock.Complete(now)
+	if clock.Due(now.Add(visualizerFramePeriod - time.Nanosecond)) {
+		t.Fatal("visualizer frame should not run before its deadline")
+	}
+	if !clock.Due(now.Add(visualizerFramePeriod)) {
+		t.Fatal("visualizer frame should run at its deadline")
+	}
+	clock.Complete(now.Add(visualizerFramePeriod))
+	if got := clock.meter.Average(); math.Abs(got-visualizerTargetFPS) > 0.001 {
+		t.Fatalf("visualizer FPS = %v, want %v", got, visualizerTargetFPS)
+	}
+	clock.Reset()
+	if !clock.Due(now) || clock.meter.Average() != 0 {
+		t.Fatal("reset should make a fresh visualizer frame due without stale FPS")
+	}
+}
+
+func TestVisualizerClockDoesNotDelayAfterSlowFrame(t *testing.T) {
+	var clock visualizerClock
+	start := time.Unix(100, 0)
+	clock.Complete(start)
+
+	slowFrameEnd := start.Add(67 * time.Millisecond)
+	clock.Complete(slowFrameEnd)
+	if !clock.Due(slowFrameEnd) {
+		t.Fatal("visualizer frame should remain due after missing its deadline")
 	}
 }
 

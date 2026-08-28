@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"unsafe"
 
 	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/prof"
@@ -44,14 +45,23 @@ type overlayPlaybackSnapshot struct {
 // presenter can notify the overlay when a rescan changed it. One concern of
 // overlayPresenter, kept as its own type.
 type rescanDetector struct {
-	prevLocal []player.Album
+	prevLocal   []player.Album
+	albumsData  *player.Album
+	albumsCount int
 }
 
-// handle returns the previous local list and stores the new one.
-func (d *rescanDetector) handle(nextLocal []player.Album) []player.Album {
-	prev := d.prevLocal
-	d.prevLocal = nextLocal
-	return prev
+// handle returns local album lists only when the library snapshot changed.
+func (d *rescanDetector) handle(albums []player.Album) (prev, next []player.Album, changed bool) {
+	data := unsafe.SliceData(albums)
+	if data == d.albumsData && len(albums) == d.albumsCount {
+		return nil, nil, false
+	}
+	d.albumsData = data
+	d.albumsCount = len(albums)
+	next = player.RealAlbumsOnly(albums)
+	prev = d.prevLocal
+	d.prevLocal = next
+	return prev, next, true
 }
 
 // metadataTracker decides when fresh track metadata must be re-read: on the
@@ -140,9 +150,11 @@ func (p *overlayPresenter) Update(fps float64, adaptive bool, renderHeight int, 
 		return
 	}
 
-	// Detect local album rescan (only local albums changed, not virtual/catalog).
-	localAlbums := player.RealAlbumsOnly(playback.albums)
-	p.overlay.HandleRescan(p.rescan.handle(localAlbums), localAlbums)
+	// Detect local album rescan only when the library snapshot changed. Most
+	// frames reuse the same backing array, so avoid filtering and allocating.
+	if prev, next, changed := p.rescan.handle(playback.albums); changed {
+		p.overlay.HandleRescan(prev, next)
+	}
 
 	// Track which album the metadata belongs to, so needsTrackInfos can
 	// detect album switches on the next frame.
