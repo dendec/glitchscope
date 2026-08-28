@@ -4,7 +4,7 @@
 
 Rework the Presets page navigation to mirror the Library/NC pattern:
 - **Left panel**: hierarchical category tree (like NC directory navigation)
-- **Right panel**: preset info + thumbnail preview (visible only when a .milk file is selected)
+- **Right panel**: stable preset detail view + optional thumbnail preview
 
 ---
 
@@ -16,7 +16,8 @@ The presets page is a flat two-column layout:
 - No metadata, no preview, no info panel
 
 Data model: `PresetCat{Name, Presets []string}` — flat categories built from
-preset path prefixes (`Category/Subcategory/preset.milk` → two levels).
+preset path prefixes. The new tree must be built from canonical keys returned
+by the preset store, not from the current two-level category projection.
 
 ---
 
@@ -41,14 +42,16 @@ Navigation:
 - UP/DOWN moves cursor within current level
 - RIGHT or ENTER on a category: expand (push children level)
 - LEFT or BACKSPACE: collapse (pop to parent)
-- ENTER on a .milk: load the preset
+- ENTER on a .milk: confirm it as active without mutating the main visualizer
 - RIGHT on a .milk: no-op
 - Right panel never receives focus — it's a derived view of the selected node
 - Currently-playing preset marked with `▸` (like Library track indicator)
 
 ### Right Panel — Preset Info
 
-Visible only when cursor is on a .milk entry (not a category folder).
+The layout remains stable for every selection. A `.milk` entry shows preset
+metadata and preview state; a category shows category information or an empty
+state, but the right panel never receives focus.
 
 ```
 Phat-Zoom artifacts.milk
@@ -77,7 +80,7 @@ New types:
 type presetNode struct {
     name     string       // display name (category or .milk basename without ext)
     key      string       // full preset key (empty for directories)
-    children []presetNode // subcategories + presets (sorted)
+    children []presetNode // subcategories + presets (sorted; tree is immutable after build)
     isLeaf   bool         // true = .milk file, false = directory
 }
 
@@ -90,7 +93,10 @@ type presetTree struct {
 Build the tree from `presetNames []string` (already sorted):
 - Split each key by `/` → create intermediate directory nodes
 - Leaf nodes are the .milk files
-- Sort children alphabetically at each level
+- Keep root-level `.milk` files in the root; do not invent a `Default/` node
+- Sort directories before files, then sort each group lexicographically
+- Derive leaf-ness from `isLeaf` field, not from `key == ""`. This keeps
+  the semantic explicit and safe if virtual categories with keys appear later.
 
 ### 2. Left Panel Navigation
 
@@ -154,7 +160,7 @@ for the `PagePresets` case. The right panel never receives focus.
 | UP/DOWN | Move cursor within level | Move cursor within level |
 | RIGHT | Expand: push children level | No-op (stay on entry) |
 | LEFT | Collapse: pop to parent | Collapse: pop to parent |
-| ENTER | Expand: push children level | Load preset |
+| ENTER | Expand: push children level | Confirm preset for activation on exit |
 | BACKSPACE / B | Collapse: pop to parent | Collapse: pop to parent |
 
 This is the same model as NC directory navigation, applied to the preset
@@ -170,10 +176,10 @@ case PagePresets:
         if node == nil {
             break
         }
-        if !node.isLeaf {
+        if node.key == "" {
             o.presetNav.Expand(node)
         } else {
-            o.loadPresetByKey(node.key)
+            o.confirmPreset(node.key)
         }
     case LEFT, BACKSPACE, 'b':
         o.presetNav.Collapse()
@@ -186,9 +192,11 @@ The right panel is **stateless and unfocusable** — it has no cursor, no
 scroll state, no independent selection. It is a pure rendering of
 `buildPresetDetail(node)` where `node = navigation.Selected()`.
 
-When the selected node changes (cursor moves), the right panel texture
-is rebuilt. When the node is a directory, the right panel is hidden
-(no texture).
+When the selected node changes (cursor moves), the right panel detail is
+rebuilt. The panel keeps a stable layout: a directory shows category
+information or an empty-state message, while a `.milk` node shows preset
+metadata and preview state. The right panel has no cursor or independent
+selection.
 
 Scrolling long content reuses the existing `infoMarquee` horizontal
 scroll mechanism — no new scroll state needed. The marquee activates
@@ -215,7 +223,7 @@ type PresetMeta struct {
 }
 ```
 
-**Parsing** (`internal/presets/parse.go`):
+**Parsing** (`internal/presets/metadata.go`):
 
 Parser contract — handles real .milk files, not just idealized key=value:
 - Recognizes `[preset00]` section headers; keys outside sections ignored
@@ -224,31 +232,31 @@ Parser contract — handles real .milk files, not just idealized key=value:
 - Handles repeated keys: last value wins (MilkDrop behavior)
 - Counts `shapecode_N_enabled=1` (not just presence of `shapecode_N`)
 - Distinguishes `*_enabled=0` from absent key (explicit disabled vs unused)
-- `per_frame_N` / `per_pixel_N` counting skips entries inside code blocks
-  (lines that are clearly shader code, not key=value assignments)
+- `per_frame_N` / `per_pixel_N` counting only considers recognized assignment
+    lines; code text without a matching assignment is ignored
 - Unknown keys are silently ignored (no error)
-- Corrupted/unparseable files return partial metadata with nil error
-  (caller decides whether to show partial data)
+- Invalid numeric values return partial metadata plus an error; the caller may
+    show valid fields with an `incomplete` status
 - Does NOT extract WaveColor yet — field added when UI decides how to
   render it (premature data leads to premature coupling)
 
 **Validation against real presets**: before implementation, sample 50+
-.milk files from `dist/presets-cream-of-the-crop/` to confirm `fRating`,
+`.milk` files from an available preset bundle to confirm `fRating`,
 `fDecay`, `fWarpAnimSpeed`, `fVideoEchoZoom` are consistently present
 and parseable. If a field is missing in >20% of presets, omit it from
 the UI rather than showing zeros.
 
 **Cache belongs to the store**, not the UI:
-- `presets.go` owns the cache (`metaCache map[string]*PresetMeta`)
+- `presets.go` owns the cache (`metaCache map[string]PresetMeta`)
 - `ReadMeta(key)` reads from cache or parses on first access
 - Cache is invalidated on store reload (user adds .milk files)
-- UI receives `*PresetMeta` via callback/provider — no knowledge of
+- UI receives `PresetMeta` and an error via callback/provider — no knowledge of
   where or how it was cached
 - This enables UI tests to mock metadata without a real preset store:
 
 ```go
 // In overlay_presets.go — provider callback type.
-type presetMetaProvider func(key string) *PresetMeta
+type presetMetaProvider func(key string) (PresetMeta, error)
 
 // In overlay.go:
 presetMeta presetMetaProvider // set by app, mocked in tests
@@ -256,12 +264,21 @@ presetMeta presetMetaProvider // set by app, mocked in tests
 
 **Display** (`internal/ui/render_presets.go`):
 - Right panel shows info when cursor is on a .milk node
-- Hidden (no texture) when cursor is on a directory
+- Stable category/empty-state detail when cursor is on a directory
 - Rebuild texture when cursor moves to a different .milk entry
 
 ### 4. Thumbnail Preview
 
-#### Why NOT the main projectM instance
+While this page is visible, the main visualizer does not render. The window
+background is cleared to black before the overlay and dedicated preview are
+drawn. Both timer-based switching and projectM automatic hard cuts are paused;
+they resume with a fresh timer interval after leaving the page.
+
+Moving the cursor only changes metadata and preview. Pressing ENTER confirms a
+preset for activation. The confirmed preset is loaded into the main projectM
+instance, and only then updates the bottom bar and playing indicator in the
+tree, after the user leaves the Presets page or closes the menu. Leaving without
+confirmation keeps the previously playing preset.
 
 The main `pm` handle owns the active visualization state:
 - `SetWindowSize` mutates global GL viewport + projection
@@ -286,32 +303,51 @@ processed as a bounded job queue inside the existing frame loop.
 ┌─────────────────────────────────────────────────┐
 │ main loop (run_loop.go)                         │
 │                                                 │
-│ 1. Process preview jobs (budget: 1 per frame)   │
-│    ├─ load next job from previewQueue           │
-│    ├─ pmPreview.SetWindowSize(thumbW, thumbH)   │
-│    ├─ pmPreview.LoadPresetData(data, false)     │
-│    ├─ pmPreview.RenderFrame() × N warmup        │
-│    ├─ Capture via FBO → GL texture              │
+│ 1. Process one preview step per main frame       │
+│    ├─ load job and preset (first step)          │
+│    ├─ feed deterministic preview PCM            │
+│    ├─ pmPreview.RenderFrame()                    │
+│    ├─ capture via FBO → GL texture              │
 │    └─ store texture ID in thumbCache            │
 │                                                 │
-│ 2. Normal frame: pm.RenderFrame() → rt → overlay│
+│ 2. Presets page: clear black → preview → overlay│
 └─────────────────────────────────────────────────┘
 ```
 
 **Key constraints:**
 - Preview jobs are serialized with the main render — never concurrent
-- Budget: 1 thumbnail per frame (~16ms on 60fps). On ARM may need 1 per 2–3 frames.
+- One preview step is processed per main frame. The first rendered frame is
+    captured immediately so the thumbnail appears without a warmup delay.
+- Every preview render is timed. The displayed FPS is the uncapped moving
+    average render capacity over the last 10 frames on the current hardware.
+- Preview animation is paced at a maximum of 15 FPS; the 60 Hz main loop continues to
+    process input and draw the overlay on ticks where preview rendering is skipped.
+    `SetFPS` exposes the measured moving-average value to MilkDrop expressions;
+    the main-loop scheduler independently enforces the actual render interval.
 - `pmPreview` is created once at init, destroyed at close
 - FBO is created once at thumbnail size, reused for all captures
 - Preview queue depth capped at 10; older requests discarded when full
+
+`projectM` advances preset time from its internal wall clock on each
+`RenderFrame()` call. `SetFPS()` only sets the `fps` value exposed to MilkDrop
+expressions; it does not set the time step or make several immediate frames
+simulate elapsed time. A preview must not use `sleep` to advance time because
+that would block the main render loop.
+
+The main loop remains at 60 Hz and samples the current audio waveform once per
+tick. The scheduler renders at most one preview frame every 1/15 second.
+Ticks without preview rendering still process input and draw the UI. Rendering
+multiple preview frames per tick would repeatedly analyze the same PCM snapshot
+and distort beat attenuation. The displayed FPS is updated from the measured
+render cost after every preview frame. The preview render target uses one eighth
+of the window width and height; the UI scales that low-resolution image up when
+placing it in the right panel.
 
 **Preview renderer** (`internal/app/preview.go`):
 
 ```go
 type previewRenderer struct {
     pm        *projectm.Handle   // dedicated projectM instance
-    fbo       C.GLuint           // framebuffer object
-    tex       C.GLuint           // capture texture
     queue     []previewJob       // pending render requests
     maxQueue  int
     thumbW    int
@@ -324,50 +360,41 @@ type previewJob struct {
     priority int     // lower = more urgent (selected preset > visible > background)
 }
 
-// ProcessNext runs one preview job if available. Called once per frame from Run().
-// Returns the GL texture ID if a new thumbnail was rendered, 0 otherwise.
+// ProcessNext runs one preview step. Called once per main frame from Run().
+// It loads a job, renders and captures a frame, and records its render time.
+// Returns the GL texture ID only when a new thumbnail was rendered.
 func (r *previewRenderer) ProcessNext() uint32 {
     if len(r.queue) == 0 {
         return 0
     }
-    job := r.queue[0]
-    r.queue = r.queue[1:]
 
-    // Bind FBO, set small viewport
-    C.glBindFramebuffer(C.GL_FRAMEBUFFER, r.fbo)
-    C.glViewport(0, 0, C.GLsizei(r.thumbW), C.GLsizei(r.thumbH))
-
-    // Load + render on the dedicated instance
-    r.pm.SetWindowSize(r.thumbW, r.thumbH)
-    r.pm.LoadPresetData(string(job.data), false)
-    for i := 0; i < 3; i++ { // warmup frames
-        r.pm.RenderFrame()
-    }
-
-    // Capture to texture
-    C.glBindTexture(C.GL_TEXTURE_2D, r.tex)
-    C.glCopyTexSubImage2D(C.GL_TEXTURE_2D, 0, 0, 0, 0, 0,
-        C.GLsizei(r.thumbW), C.GLsizei(r.thumbH))
-    C.glBindTexture(C.GL_TEXTURE_2D, 0)
-
-    // Restore main FBO
-    C.glBindFramebuffer(C.GL_FRAMEBUFFER, 0)
-
-    return uint32(r.tex)
+    // Each call performs one bounded render and capture step.
+    // GL/FBO operations are delegated to a thin GL helper.
+    return r.processStep()
 }
+
+The preview renderer feeds a deterministic short PCM signal to `pmPreview`
+before each frame. A 1000 Hz sine wave is a valid minimal signal, but a
+small composite signal with bass, mid, treble, and periodic transients gives
+more representative results for beat- and spectrum-dependent presets. This
+PCM is sent only to `pmPreview`; it is never played through the speakers.
 ```
 
 **UI integration** (`internal/ui/render_presets.go`):
-- `thumbCache map[string]uint32` — preset key → GL texture ID
-- On cursor move to .milk entry: check cache, if miss → enqueue preview job
-- Draw cached texture in right panel above metadata text
-- If not yet rendered: show "loading..." placeholder, re-check next frame
-- On preset store reload: flush thumb cache + queue
+- On cursor move to a `.milk` entry, update detail state and request one preview
+    job if the key is not already cached. Scheduling happens in navigation/update
+    code, never from the renderer.
+- Draw the cached texture in the right panel above metadata text
+- If not yet rendered: show a "loading..." placeholder, re-check next frame
+- Apply a result only when its request ID and key still match the selected node
+- On preset store reload: flush the cache and pending requests
 
 **Memory budget:**
-- 1 FBO + 1 capture texture at 160×90×4 = 57.6 KiB (reused for all renders)
-- thumbCache: up to 50 textures × 160×90×4 = 2.7 MiB (LRU eviction)
-- Total: ~2.8 MiB — acceptable on ARM handhelds
+- A staging FBO/texture may be reused, but every cached thumbnail needs its own
+    texture. One shared capture texture must never be stored under multiple keys.
+- `thumbCache`: up to 50 textures × 160×90×4 = 2.7 MiB (LRU eviction)
+- If per-thumbnail copies are too expensive, v1 uses one current preview
+    texture instead of a multi-entry cache.
 
 #### Fallback: metadata-only (no thumbnails)
 
@@ -378,19 +405,96 @@ If FBO is not available (some ARM GL ES 2.0 drivers don't support
 - `previewRenderer` gracefully degrades: `ProcessNext()` returns 0
 - Log a warning once at init
 
+**Preview delivery to UI**:
+
+`ProcessNext()` is called in `Run()` (app layer) and stores the result
+internally. The UI checks it during render:
+
+```go
+// In previewRenderer:
+type previewRenderer struct {
+    ...
+    resultKey string   // key of the last rendered thumbnail
+    resultTex uint32   // GL texture ID of the last rendered thumbnail
+    resultID  uint64   // request ID that produced this result
+}
+
+func (r *previewRenderer) HasResult(key string) (tex uint32, ok bool) {
+    if r.resultKey == key && r.resultTex != 0 {
+        return r.resultTex, true
+    }
+    return 0, false
+}
+```
+
+The UI never calls GL directly — it only draws the texture ID returned
+by `HasResult`. The app layer owns the full lifecycle.
+
+#### Concurrency model
+
+v1: all metadata and preview work happens on the main thread (via
+provider callbacks and `ProcessNext`). No mutex needed.
+
+If background metadata loading is added later, `ReadMeta` must be
+wrapped with `sync.Mutex` or use `sync.Map`. This is explicitly
+documented as a future concern, not implemented now.
+
+#### Recursive user scan depth limit
+
+`scanUser()` recursively discovers `.milk` files in the user presets
+directory. Maximum depth is **3** (Category/Subcategory/File). This
+prevents stalls on slow ARM storage and is enforced with a depth
+parameter:
+
+```go
+func scanUser(dir string, depth int, maxDepth int, out *presetStore) {
+    if depth > maxDepth {
+        return
+    }
+    ...
+}
+```
+
+#### GL spike checklist (must pass before Phase 4b)
+
+All items must be checked on both desktop and target ARM:
+
+```
+□ pmPreview created without errors on existing GL context
+□ pmPreview.RenderFrame() does not change main pm preset or feedback
+□ FBO status = GL_FRAMEBUFFER_COMPLETE at thumbnail size
+□ GL state fully restored after capture (viewport, FBO, active texture, program)
+□ App.Close() destroys pmPreview before main pm (correct teardown order)
+□ No GL errors reported after 10 consecutive preview renders
+□ Main visualizer remains stopped during preview rendering
+□ Window viewport is restored after preview rendering
+□ No visible flicker or feedback reset occurs when leaving the page
+□ Preview FPS reflects measured render time after every frame
+□ Preview latency and main-loop frame time measured on desktop and target ARM
+```
+
+If any check fails → ship metadata-only detail view, preview disabled.
+
+#### Required GL spike before implementation
+
+Before adding the full preview feature, run the checklist above in a
+small prototype. If any check fails, ship metadata-only and keep
+preview disabled.
+
 ### 5. File Changes
 
 | File | Changes |
 |---|---|
 | `internal/presets/metadata.go` | **New** — PresetMeta struct + ParseMeta function |
-| `internal/presets/metadata_test.go` | **New** — tests for .milk parsing (real samples) |
-| `internal/presets/presets.go` | Add Keys(), ReadMeta() with cache, invalidation on reload |
+| `internal/presets/metadata_test.go` | **New** — parser fixtures and malformed-value tests |
+| `internal/presets/presets.go` | Add Keys(), ReadMeta() with cache, invalidation on reload, recursive user scan |
 | `internal/ui/overlay_presets.go` | Rework: presetTree, presetNavigation, tree building |
 | `internal/ui/overlay_presets_test.go` | **New** — tests for tree building + navigation |
 | `internal/ui/render_presets.go` | Rework: left panel tree rendering, right panel info + thumbnail |
 | `internal/ui/overlay.go` | Update Overlay struct: presetNavigation, presetMeta callback |
 | `internal/ui/overlay_input.go` | Update cursor/selection handlers for tree navigation |
-| `internal/app/preview.go` | **New** — previewRenderer with dedicated projectM + FBO |
+| `internal/app/preview.go` | **New** — preview job lifecycle and dedicated projectM instance; no raw GL calls |
+| `internal/projectm/preview.go` | **New** — thin projectM/GL preview helper after the GL spike |
 | `internal/app/app.go` | Create previewRenderer, wire presetMeta callback |
 | `internal/app/run_loop.go` | Add preview job processing step before main render |
 
@@ -398,12 +502,13 @@ If FBO is not available (some ARM GL ES 2.0 drivers don't support
 
 `internal/presets/presets.go`:
 - Add `func Keys() []string` — returns sorted preset keys (already available as `store.names`)
-- Add `func ReadMeta(key string) *PresetMeta` — reads from cache or parses on first access
-- Cache stored in `presetStore.metaCache map[string]*PresetMeta`
+- Add `func ReadMeta(key string) (PresetMeta, error)` — reads from cache or parses on first access
+- Cache stored in `presetStore.metaCache map[string]PresetMeta`
 - Cache invalidated in `Open()` (store reload)
-- `ReadMeta` is safe to call from any goroutine (cache is populated once
-  at store load, never mutated after; if concurrency is needed later,
-  add `sync.Once` per key)
+- Synchronize cache access if metadata is loaded asynchronously; a Go map is
+    not safe for concurrent reads and writes
+- `scanUser()` recursively discovers supported `.milk` files, or the maximum
+    supported depth is explicitly documented and tested
 
 ### 7. Preset Page Entry Point
 
@@ -432,23 +537,34 @@ When entering the Presets page:
 
 3. **Phase 3 — Right panel info** (metadata display)
    - Right panel renders PresetMeta for selected .milk
-   - Hidden when cursor on directory
+    - Stable category/empty-state detail when cursor is on a directory
    - Rating as stars, complexity metrics, wave mode name
    - Scrollable for small screens
 
-4. **Phase 4 — Thumbnail rendering** (FBO + preview instance)
-   - `internal/app/preview.go` — previewRenderer (dedicated projectM + FBO)
-   - Main-loop integration (1 job per frame budget)
-   - thumbCache in Overlay (LRU, max 50)
-   - Draw thumbnail in right panel above metadata
-   - Fallback: metadata-only if FBO unavailable
-   - Performance tuning on ARM (warmup frames, job frequency)
+4. **Phase 4a — GL preview spike** (before production thumbnail code)
+    - Verify second projectM instance, FBO completeness and GL state restore
+    - Verify the main visualizer is unchanged after one preview render
+    - Verify creation/destruction on desktop and target ARM
+    - Decide between multi-entry cache and one-current-preview fallback
 
-5. **Phase 5 — Polish**
+5. **Phase 4b — Thumbnail rendering** (only if the spike passes)
+    - `internal/app/preview.go` — preview job lifecycle and bounded queue
+    - Thin GL/projectM helper for offscreen render and capture
+        - Main-loop integration with one bounded preview step per frame
+        - Capture and display the first preview frame immediately
+        - Measure each render and report uncapped capacity over a 10-frame window
+        - Feed deterministic preview PCM before each preview frame
+        - Do not use `SetFPS` or `sleep` as a substitute for a controllable time step
+    - Per-key texture ownership with LRU eviction, or one-current-preview v1
+    - Draw thumbnail in the stable right detail panel
+    - Fallback: metadata-only if FBO is unavailable or too slow
+    - Performance tuning on ARM (job frequency)
+
+6. **Phase 5 — Polish**
    - Auto-expand to playing preset on page entry
    - Smooth expand/collapse animation (optional)
    - Currently-playing indicator in tree
-   - Keyboard hints for right panel scroll
+    - Keyboard hints for tree navigation and passive detail state
 
 ---
 
@@ -456,8 +572,10 @@ When entering the Presets page:
 
 | Risk | Mitigation |
 |---|---|
-| FBO unavailable on ARM | Fallback to metadata-only; check `glCheckFramebufferStatus` at init |
-| Thumbnail render too slow on ARM | Reduce warmup to 1 frame; process 1 job per 3 frames; skip if load > 80% |
-| GL state leaking from preview | Strict save/restore: bind FBO, viewport, then restore after capture |
-| Preview instance conflicts with main | Separate `projectm.Handle` — no shared mutable state between instances |
-| Cache memory growth | LRU with max 50 entries; evict oldest on overflow |
+| FBO unavailable on ARM | Run the spike first; fallback to metadata-only; check `glCheckFramebufferStatus` |
+| Thumbnail render too slow on ARM | Process one preview step per 2–3 main frames; skip if load > 80% |
+| Preview does not advance far enough in time | Accept early real-time state for v1; do not add `sleep`; a controllable time step would require changing projectM's `TimeKeeper` API |
+| GL state leaking from preview | Encapsulate save/restore in the GL helper and test the main visualization afterward |
+| Preview instance conflicts with main | Separate `projectm.Handle`, main-thread serialization, and spike validation |
+| Stale preview replaces current detail | Match both request ID and preset key before applying result |
+| Cache memory growth | LRU with max 50 entries and explicit texture ownership; otherwise one-current-preview v1 |
