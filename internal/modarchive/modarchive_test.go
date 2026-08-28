@@ -4,10 +4,13 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -235,6 +238,105 @@ func TestSnapshotArchiveRejectsFullResponse(t *testing.T) {
 	if _, err := FetchDirectory(t.TempDir(), archiveURL); err == nil || !strings.Contains(err.Error(), "HTTP 200") {
 		t.Fatalf("FetchDirectory error = %v, want rejected non-range response", err)
 	}
+}
+
+func TestFetchSuffixRangeRejectsOversizedResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Range", "bytes 0-9/10")
+		writer.WriteHeader(http.StatusPartialContent)
+		_, _ = writer.Write([]byte("0123456789"))
+	}))
+	defer server.Close()
+
+	if _, _, _, err := fetchSuffixRange(context.Background(), server.URL, 4, nil); err == nil || !strings.Contains(err.Error(), "requested at most 4") {
+		t.Fatalf("fetchSuffixRange error = %v, want oversized response rejection", err)
+	}
+}
+
+func TestFetchSuffixRangeRejectsWrongOffset(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Range", "bytes 2-5/10")
+		writer.WriteHeader(http.StatusPartialContent)
+		_, _ = writer.Write([]byte("2345"))
+	}))
+	defer server.Close()
+
+	if _, _, _, err := fetchSuffixRange(context.Background(), server.URL, 4, nil); err == nil || !strings.Contains(err.Error(), "unexpected suffix range") {
+		t.Fatalf("fetchSuffixRange error = %v, want wrong offset rejection", err)
+	}
+}
+
+func TestParseContentRangeRejectsInvalidBounds(t *testing.T) {
+	for _, header := range []string{
+		"items 0-9/10",
+		"bytes 9-0/10",
+		"bytes 0-10/10",
+		"bytes 0-9/*",
+		"bytes 0-9/10 trailing",
+	} {
+		if _, _, _, err := parseContentRange(header); err == nil {
+			t.Errorf("parseContentRange(%q) succeeded", header)
+		}
+	}
+}
+
+func TestParseCentralDirectoryDecodesLegacyCP437Name(t *testing.T) {
+	name := []byte{'t', 0x84, 's', 't', '.', 'm', 'o', 'd'}
+	central := testCentralDirectoryEntry(name, 0)
+
+	records, err := parseCentralDirectory(central, 1, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if records[0].name != "täst.mod" {
+		t.Fatalf("name = %q, want %q", records[0].name, "täst.mod")
+	}
+}
+
+func TestParseCentralDirectoryRejectsInvalidFlaggedUTF8Name(t *testing.T) {
+	central := testCentralDirectoryEntry([]byte{'t', 0x84, '.', 'm', 'o', 'd'}, 0x800)
+
+	if _, err := parseCentralDirectory(central, 1, 100); err == nil || !strings.Contains(err.Error(), "invalid UTF-8") {
+		t.Fatalf("parseCentralDirectory error = %v, want invalid UTF-8", err)
+	}
+}
+
+func TestExtractArchiveBlockDecodesLegacyCP437Name(t *testing.T) {
+	rawName := []byte{'t', 0x84, 's', 't', '.', 'm', 'o', 'd'}
+	content := []byte("legacy module")
+	block := make([]byte, 30+len(rawName)+len(content))
+	binary.LittleEndian.PutUint32(block, zipLocalHeader)
+	binary.LittleEndian.PutUint16(block[26:], uint16(len(rawName)))
+	copy(block[30:], rawName)
+	copy(block[30+len(rawName):], content)
+	item := DirItem{
+		Name:           "täst.mod",
+		Size:           int64(len(content)),
+		CompressedSize: uint64(len(content)),
+		CRC32:          crc32.ChecksumIEEE(content),
+	}
+	targetPath := filepath.Join(t.TempDir(), "täst.mod")
+
+	path, err := extractArchiveBlock(block, item, targetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	extracted, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(extracted, content) {
+		t.Fatalf("content = %q, want %q", extracted, content)
+	}
+}
+
+func testCentralDirectoryEntry(name []byte, flags uint16) []byte {
+	central := make([]byte, 46+len(name))
+	binary.LittleEndian.PutUint32(central, zipCentralHeader)
+	binary.LittleEndian.PutUint16(central[8:], flags)
+	binary.LittleEndian.PutUint16(central[28:], uint16(len(name)))
+	copy(central[46:], name)
+	return central
 }
 
 func testRangeBounds(header string, total int64) (int64, int64, error) {

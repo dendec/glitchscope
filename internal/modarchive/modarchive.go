@@ -285,6 +285,11 @@ func urlHash(targetURL string) string {
 
 // ResetMemCache clears the in-memory cache (primarily for testing).
 func ResetMemCache() {
+	snapshotMu.Lock()
+	defer snapshotMu.Unlock()
+	snapshotBucketMem.clear()
+	snapshotNavigationKeys = make(map[string]struct{})
+
 	memCacheMu.Lock()
 	memCache = make(map[string][]DirItem)
 	memCacheMu.Unlock()
@@ -302,6 +307,10 @@ func FetchDirectoryCached(baseDir string, targetURL string) ([]DirItem, bool) {
 		return items, true
 	}
 	memCacheMu.RUnlock()
+
+	if items, ok := fetchSnapshotCatalogDirectory(targetURL); ok {
+		return items, true
+	}
 
 	indexDir, err := IndexDir(baseDir)
 	if err != nil {

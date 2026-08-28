@@ -15,12 +15,14 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/dendec/glitchscope/internal/formats"
 	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/util"
+	"golang.org/x/text/encoding/charmap"
 )
 
 const (
@@ -211,12 +213,12 @@ func parseCentralDirectory(data []byte, count uint16, centralOffset int64) ([]ar
 		if entryEnd > len(data) {
 			return nil, errors.New("truncated central directory entry")
 		}
-		nameBytes := data[offset+46 : offset+46+nameLen]
-		if !utf8.Valid(nameBytes) {
-			return nil, errors.New("non-UTF-8 ZIP entry name is unsupported")
+		name, err := decodeZIPName(data[offset+46:offset+46+nameLen], binary.LittleEndian.Uint16(data[offset+8:]))
+		if err != nil {
+			return nil, err
 		}
 		records = append(records, archiveRecord{
-			name:             string(nameBytes),
+			name:             name,
 			offset:           int64(binary.LittleEndian.Uint32(data[offset+42:])),
 			compressedSize:   uint64(binary.LittleEndian.Uint32(data[offset+20:])),
 			uncompressedSize: uint64(binary.LittleEndian.Uint32(data[offset+24:])),
@@ -243,6 +245,20 @@ func parseCentralDirectory(data []byte, count uint16, centralOffset int64) ([]ar
 	return records, nil
 }
 
+func decodeZIPName(nameBytes []byte, flags uint16) (string, error) {
+	if utf8.Valid(nameBytes) {
+		return string(nameBytes), nil
+	}
+	if flags&0x800 != 0 {
+		return "", errors.New("invalid UTF-8 ZIP entry name")
+	}
+	decoded, err := charmap.CodePage437.NewDecoder().Bytes(nameBytes)
+	if err != nil {
+		return "", fmt.Errorf("decode CP437 ZIP entry name: %w", err)
+	}
+	return string(decoded), nil
+}
+
 func supportedArchiveEntry(name string) (string, bool) {
 	if strings.HasSuffix(name, "/") {
 		return "", false
@@ -261,23 +277,46 @@ func supportedArchiveEntry(name string) (string, bool) {
 	return "", false
 }
 
+func validArchiveItem(item DirItem) bool {
+	if item.Size < 0 || item.ArchiveOffset < 0 || item.ArchiveEndOffset <= item.ArchiveOffset {
+		return false
+	}
+	if item.CompressedSize > uint64(item.ArchiveEndOffset-item.ArchiveOffset) {
+		return false
+	}
+	return item.Compression == 0 || item.Compression == 8
+}
+
 func fetchSuffixRange(ctx context.Context, targetURL string, size int64, onProgress func(int64, int64)) ([]byte, int64, int64, error) {
+	if size <= 0 {
+		return nil, 0, 0, errors.New("invalid suffix range size")
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 	req.Header.Set("Range", fmt.Sprintf("bytes=-%d", size))
-	data, start, total, err := doRangeRequest(req, onProgress)
+	data, start, total, err := doRangeRequest(req, size, onProgress)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	if start != max(int64(0), total-size) {
+		return nil, 0, 0, errors.New("server returned an unexpected suffix range")
+	}
 	return data, start, total, err
 }
 
 func fetchByteRange(ctx context.Context, targetURL string, start, end int64, onProgress func(int64, int64)) ([]byte, int64, error) {
+	if start < 0 || end < start {
+		return nil, 0, errors.New("invalid byte range")
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
 		return nil, 0, err
 	}
 	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
-	data, actualStart, total, err := doRangeRequest(req, onProgress)
+	expectedSize := end - start + 1
+	data, actualStart, total, err := doRangeRequest(req, expectedSize, onProgress)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -287,7 +326,7 @@ func fetchByteRange(ctx context.Context, targetURL string, start, end int64, onP
 	return data, total, nil
 }
 
-func doRangeRequest(req *http.Request, onProgress func(int64, int64)) ([]byte, int64, int64, error) {
+func doRangeRequest(req *http.Request, maxBytes int64, onProgress func(int64, int64)) ([]byte, int64, int64, error) {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, 0, 0, err
@@ -297,22 +336,57 @@ func doRangeRequest(req *http.Request, onProgress func(int64, int64)) ([]byte, i
 		return nil, 0, 0, fmt.Errorf("range request: HTTP %d", resp.StatusCode)
 	}
 
-	var start, end, total int64
-	if _, err := fmt.Sscanf(resp.Header.Get("Content-Range"), "bytes %d-%d/%d", &start, &end, &total); err != nil {
+	start, end, total, err := parseContentRange(resp.Header.Get("Content-Range"))
+	if err != nil {
 		return nil, 0, 0, fmt.Errorf("invalid Content-Range: %w", err)
+	}
+	responseBytes := end - start + 1
+	if responseBytes > maxBytes {
+		return nil, 0, 0, fmt.Errorf("range response is %d bytes, requested at most %d", responseBytes, maxBytes)
 	}
 	reader := io.Reader(resp.Body)
 	if onProgress != nil {
-		reader = &rangeProgressReader{reader: reader, total: end - start + 1, onProgress: onProgress}
+		reader = &rangeProgressReader{reader: reader, total: responseBytes, onProgress: onProgress}
 	}
-	data, err := io.ReadAll(io.LimitReader(reader, end-start+2))
+	data, err := io.ReadAll(io.LimitReader(reader, responseBytes+1))
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	if int64(len(data)) != end-start+1 {
+	if int64(len(data)) != responseBytes {
 		return nil, 0, 0, errors.New("truncated range response")
 	}
 	return data, start, total, nil
+}
+
+func parseContentRange(header string) (start, end, total int64, err error) {
+	value, ok := strings.CutPrefix(header, "bytes ")
+	if !ok {
+		return 0, 0, 0, errors.New("missing bytes unit")
+	}
+	rangeValue, totalValue, ok := strings.Cut(value, "/")
+	if !ok {
+		return 0, 0, 0, errors.New("missing total size")
+	}
+	startValue, endValue, ok := strings.Cut(rangeValue, "-")
+	if !ok {
+		return 0, 0, 0, errors.New("missing range end")
+	}
+	start, err = strconv.ParseInt(startValue, 10, 64)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("parse start: %w", err)
+	}
+	end, err = strconv.ParseInt(endValue, 10, 64)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("parse end: %w", err)
+	}
+	total, err = strconv.ParseInt(totalValue, 10, 64)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("parse total: %w", err)
+	}
+	if start < 0 || end < start || total <= end {
+		return 0, 0, 0, errors.New("invalid range bounds")
+	}
+	return start, end, total, nil
 }
 
 func downloadArchiveEntry(ctx context.Context, baseDir, entryURL string, onProgress func(int64, int64)) (string, error) {
@@ -341,7 +415,7 @@ func downloadArchiveEntry(ctx context.Context, baseDir, entryURL string, onProgr
 	if item == nil {
 		return "", fmt.Errorf("archive entry %q not found", entryName)
 	}
-	if item.ArchiveOffset < 0 || item.ArchiveEndOffset <= item.ArchiveOffset || item.CompressedSize > uint64(item.ArchiveEndOffset-item.ArchiveOffset) {
+	if !validArchiveItem(*item) {
 		return "", errors.New("invalid cached archive entry bounds")
 	}
 
@@ -370,7 +444,11 @@ func extractArchiveBlock(block []byte, item DirItem, targetPath string) (string,
 	if dataOffset > len(block) || item.CompressedSize > uint64(len(block)-dataOffset) {
 		return "", errors.New("truncated ZIP entry data")
 	}
-	if string(block[30:30+nameLen]) != item.Name {
+	localName, err := decodeZIPName(block[30:30+nameLen], binary.LittleEndian.Uint16(block[6:]))
+	if err != nil {
+		return "", fmt.Errorf("decode ZIP local name: %w", err)
+	}
+	if localName != item.Name {
 		return "", errors.New("ZIP local and central names differ")
 	}
 	compressed := bytes.NewReader(block[dataOffset : dataOffset+int(item.CompressedSize)])

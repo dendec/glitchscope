@@ -49,47 +49,57 @@ func SaveCatalog(baseDir string, cat *Catalog) error {
 // Reports whether a non-empty catalog was found.
 func InitCatalog(baseDir string) bool {
 	cat := LoadCatalog(baseDir)
-	if cat == nil || len(cat.Directories) == 0 {
+	hasCatalog := cat != nil && len(cat.Directories) > 0
+	if !hasCatalog {
 		slog.Info("modarchive: catalog file not found or empty")
-		return false
-	}
-	rootItems := cat.Directories[BaseURL]
-	hasSnapshot := false
-	for _, item := range rootItems {
-		if strings.Trim(item.Name, "/") == SnapshotDir {
-			hasSnapshot = true
-			break
-		}
-	}
-	if !hasSnapshot {
-		rootItems = append(rootItems, DirItem{
-			Name:      SnapshotDir,
-			URL:       BaseURL + SnapshotDir + "/",
-			Kind:      KindDir,
-			CleanName: SnapshotLabel,
-		})
-		sort.Slice(rootItems, func(i, j int) bool {
-			return strings.ToLower(rootItems[i].CleanName) < strings.ToLower(rootItems[j].CleanName)
-		})
-		cat.Directories[BaseURL] = rootItems
-	}
-
-	memCacheMu.Lock()
-	for urlPath, items := range cat.Directories {
-		// Empty entries may have been generated before a newly supported
-		// extension was added. Let FetchDirectory refresh those listings.
-		if len(items) == 0 {
-			continue
-		}
-		for i := range items {
-			if items[i].Kind == KindDir {
-				items[i].CleanName = FormatDirName(items[i].CleanName)
+	} else {
+		rootItems := cat.Directories[BaseURL]
+		hasSnapshot := false
+		for _, item := range rootItems {
+			if strings.Trim(item.Name, "/") == SnapshotDir {
+				hasSnapshot = true
+				break
 			}
 		}
-		memCache[urlPath] = items
-	}
-	memCacheMu.Unlock()
+		if !hasSnapshot {
+			rootItems = append(rootItems, snapshotRootItem())
+			sort.Slice(rootItems, func(i, j int) bool {
+				return strings.ToLower(rootItems[i].CleanName) < strings.ToLower(rootItems[j].CleanName)
+			})
+			cat.Directories[BaseURL] = rootItems
+		}
 
-	slog.Info("modarchive: preloaded catalog from disk", "directories", len(cat.Directories), "age", time.Since(cat.UpdatedAt).Round(time.Hour))
-	return true
+		memCacheMu.Lock()
+		for urlPath, items := range cat.Directories {
+			// Empty entries may have been generated before a newly supported
+			// extension was added. Let FetchDirectory refresh those listings.
+			if len(items) == 0 {
+				continue
+			}
+			for i := range items {
+				if items[i].Kind == KindDir {
+					items[i].CleanName = FormatDirName(items[i].CleanName)
+				}
+			}
+			memCache[urlPath] = items
+		}
+		memCacheMu.Unlock()
+
+		slog.Info("modarchive: preloaded catalog from disk", "directories", len(cat.Directories), "age", time.Since(cat.UpdatedAt).Round(time.Hour))
+	}
+
+	hasSnapshotCatalog := InitSnapshotCatalog(baseDir)
+	if !hasCatalog && hasSnapshotCatalog {
+		cacheSnapshotOnlyRoot()
+	}
+	return hasCatalog || hasSnapshotCatalog
+}
+
+func snapshotRootItem() DirItem {
+	return DirItem{
+		Name:      SnapshotDir,
+		URL:       BaseURL + SnapshotDir + "/",
+		Kind:      KindDir,
+		CleanName: SnapshotLabel,
+	}
 }
