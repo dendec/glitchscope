@@ -20,6 +20,7 @@ func main() {
 		verbose      bool
 		catalogOnly  bool
 		snapshotOnly bool
+		addendumOnly bool
 	)
 
 	flag.StringVar(&targetDir, "dir", ".", "Base directory to output the catalog to (saves to <dir>/.cache/modarchive/catalog)")
@@ -27,14 +28,21 @@ func main() {
 	flag.BoolVar(&verbose, "v", false, "Verbose logging for each fetched directory")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging for each fetched directory")
 	flag.BoolVar(&catalogOnly, "catalog-only", false, "Build only the additions catalog")
-	flag.BoolVar(&snapshotOnly, "snapshot-only", false, "Build only the 1980-2007 snapshot catalog")
+	flag.BoolVar(&snapshotOnly, "snapshot-only", false, "Build only the 1987-2007 snapshot catalog")
+	flag.BoolVar(&addendumOnly, "addendum-only", false, "Build only the 2007 addendum catalog")
 	flag.Parse()
 	if concurrency < 1 {
 		fmt.Fprintln(os.Stderr, "concurrency must be at least 1")
 		os.Exit(2)
 	}
-	if catalogOnly && snapshotOnly {
-		fmt.Fprintln(os.Stderr, "catalog-only and snapshot-only cannot be combined")
+	selectedModes := 0
+	for _, selected := range []bool{catalogOnly, snapshotOnly, addendumOnly} {
+		if selected {
+			selectedModes++
+		}
+	}
+	if selectedModes > 1 {
+		fmt.Fprintln(os.Stderr, "catalog-only, snapshot-only, and addendum-only cannot be combined")
 		os.Exit(2)
 	}
 
@@ -47,7 +55,7 @@ func main() {
 
 	slog.Info("starting modarchive catalog crawler", "concurrency", concurrency, "output", targetDir, "verbose", verbose)
 
-	if !snapshotOnly {
+	if !snapshotOnly && !addendumOnly {
 		startTime := time.Now()
 		cat := crawlCatalog(targetDir, concurrency, verbose)
 		if err := modarchive.SaveCatalog(targetDir, cat); err != nil {
@@ -57,7 +65,7 @@ func main() {
 		logCatalogComplete(targetDir, cat, startTime)
 	}
 
-	if !catalogOnly {
+	if !catalogOnly && !addendumOnly {
 		startTime := time.Now()
 		buckets, err := crawlSnapshot(targetDir, concurrency, verbose)
 		if err != nil {
@@ -73,6 +81,25 @@ func main() {
 			"tracks", countTracks(buckets),
 			"elapsed", time.Since(startTime).Round(time.Second),
 			"file", modarchive.SnapshotCatalogPath(targetDir),
+		)
+	}
+
+	if !catalogOnly && !snapshotOnly {
+		startTime := time.Now()
+		buckets, err := crawlAddendum(targetDir, concurrency, verbose)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error building addendum catalog: %v\n", err)
+			os.Exit(1)
+		}
+		if err := modarchive.SaveAddendumCatalog(targetDir, buckets); err != nil {
+			fmt.Fprintf(os.Stderr, "error saving addendum catalog: %v\n", err)
+			os.Exit(1)
+		}
+		slog.Info("modarchive addendum build complete",
+			"buckets", len(buckets),
+			"tracks", countTracks(buckets),
+			"elapsed", time.Since(startTime).Round(time.Second),
+			"file", modarchive.AddendumCatalogPath(targetDir),
 		)
 	}
 }
@@ -129,6 +156,26 @@ func crawlSnapshot(baseDir string, concurrency int, verbose bool) (map[string][]
 	}
 	sort.Strings(archiveURLs)
 	return fetchDirectories(archiveURLs, baseDir, concurrency, verbose, "snapshot bucket")
+}
+
+func crawlAddendum(baseDir string, concurrency int, verbose bool) (map[string][]modarchive.DirItem, error) {
+	addendumURL := modarchive.BaseURL + modarchive.AddendumDir + "/"
+	items, err := modarchive.FetchDirectory(baseDir, addendumURL)
+	if err != nil {
+		return nil, fmt.Errorf("fetch addendum root: %w", err)
+	}
+
+	archiveURLs := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.Kind == modarchive.KindArchive {
+			archiveURLs = append(archiveURLs, item.URL)
+		}
+	}
+	if len(archiveURLs) == 0 {
+		return nil, fmt.Errorf("addendum contains no bucket archives")
+	}
+	sort.Strings(archiveURLs)
+	return fetchDirectories(archiveURLs, baseDir, concurrency, verbose, "addendum bucket")
 }
 
 func fetchDirectories(urls []string, baseDir string, concurrency int, verbose bool, label string) (map[string][]modarchive.DirItem, error) {

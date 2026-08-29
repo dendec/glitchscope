@@ -30,13 +30,16 @@
 локального файла — чистая функция `extractMetaFromFile` (`meta.go`), без
 side effects, переиспользуется при on-demand заполнении и refresh комментария.
 
-**ModArchive snapshot 1980-2007** представлен как дерево виртуальных папок:
-буква → bucket ZIP → треки. `internal/modarchive` получает central directory
-bucket ZIP хвостовым HTTP Range-запросом и кэширует индекс; сборка поставляет
-все известные bucket-индексы в `.cache/modarchive/1980-2007.gsa`. GSA хранит
-каждый bucket независимо сжатым и читает его лениво, поэтому навигация не
-требует сети и не загружает весь snapshot-индекс в память. Выбранный entry
-скачивается отдельным Range от его local header до следующего local header.
+**ModArchive snapshot 1987-2007** представлен как дерево виртуальных папок:
+буква → bucket ZIP → треки. Официальный addendum 2007 представлен соседним
+источником с bucket ZIP верхнего уровня. `internal/modarchive` получает central
+directory bucket ZIP хвостовым HTTP Range-запросом и кэширует индекс; сборка
+поставляет все известные индексы основного snapshot в
+`.cache/modarchive/1980-2007.gsa`, а addendum — в
+`.cache/modarchive/2007-addendum.gsa`. GSA хранит каждый bucket независимо
+сжатым и читает его лениво, поэтому навигация по обоим источникам не требует
+сети и не загружает весь индекс в память. Выбранный entry скачивается отдельным
+Range от его local header до следующего local header.
 Полный внешний ZIP не скачивается даже как fallback: ответ без `206 Partial
 Content` считается ошибкой. Прямые module entries распаковываются из `store`
 или `deflate`; вложенные однотрековые ZIP после этого извлекаются локально.
