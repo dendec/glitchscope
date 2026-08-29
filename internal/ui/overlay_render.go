@@ -23,6 +23,8 @@ const (
 	panelWidthPct = 45 // each panel occupies this % of screen width
 
 	headerMarginX = 5 // left margin for the stats/preset-name text
+
+	cursorHighlightAlpha = 0.33
 )
 
 func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
@@ -209,12 +211,12 @@ func drawPanelBorder(o *Overlay, x, y, w, h float32, winW, winH, viewW, viewH in
 	glDrawFilledRect(o.programRect, x+w-bw, y, bw, h, bR, bG, bB, 1, winW, winH, viewW, viewH)
 }
 
-// drawScrollbar draws a track+thumb scrollbar in theme text color.
+// drawScrollbar draws a track+thumb scrollbar in the theme scrollbar color.
 func drawScrollbar(o *Overlay, sbX, panelY, panelH float32, totalItems, visibleItems, scrollPos int, winW, winH, viewW, viewH int) {
 	if totalItems <= visibleItems {
 		return
 	}
-	tc := o.textColor()
+	tc := o.palette().scrollbar
 	r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
 	thumbW := float32(o.scrollbarWidthPx())
 	// Track.
@@ -695,7 +697,7 @@ func availableRowTextWidth(panelW int) int {
 
 // drawCursorHighlight draws a subtle highlight behind the focused row.
 func (o *Overlay) drawCursorHighlight(x, y, w, h float32, winW, winH, viewW, viewH int) {
-	tc := o.textColor()
+	tc := o.palette().cursor
 	r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
 	// Textures start at the row origin and place glyphs after their scaled
 	// outline padding. Keep the highlight aligned with the glyph row.
@@ -705,7 +707,7 @@ func (o *Overlay) drawCursorHighlight(x, y, w, h float32, winW, winH, viewW, vie
 		lineGap = 1
 	}
 	padding := textPadding(o.fontSize) + lineGap
-	glDrawFilledRect(o.programRect, x, y+float32(padding), w, h, r, g, b, 0.12, winW, winH, viewW, viewH)
+	glDrawFilledRect(o.programRect, x, y+float32(padding), w, h, r, g, b, cursorHighlightAlpha, winW, winH, viewW, viewH)
 }
 
 // renderStatsOnly draws a minimal stats bar (FPS/MEM/CPU) without the full UI.

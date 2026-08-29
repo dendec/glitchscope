@@ -250,34 +250,65 @@ func (p PresetInterval) Validate() error {
 type Theme int
 
 const (
-	ThemeDark  Theme = iota // dark background, light text (default)
-	ThemeLight              // light background, dark text
+	ThemeDark         Theme = iota // dark background, light text (default)
+	ThemeLight                     // light background, dark text
+	ThemeAmber                     // warm terminal palette
+	ThemeCyan                      // cool night palette
+	ThemeSolarized                 // Solarized dark palette
+	ThemeHighContrast              // black background, yellow focus
+	ThemeForest                    // deep green palette with a warm focus
+	ThemeSynthwave                 // neon cyan and pink palette
+	ThemeCherry                    // dark red palette with a mint focus
+	themeCount
 )
 
-func (t Theme) String() string {
-	switch t {
-	case ThemeDark:
-		return "Dark"
-	case ThemeLight:
-		return "Light"
-	default:
-		return "Unknown"
-	}
+type themeSpec struct {
+	theme Theme
+	name  string
+	json  string
 }
 
-func AllThemes() []Theme { return []Theme{ThemeDark, ThemeLight} }
+var themeSpecs = [...]themeSpec{
+	{ThemeDark, "Dark", "dark"},
+	{ThemeLight, "Light", "light"},
+	{ThemeAmber, "Amber", "amber"},
+	{ThemeCyan, "Cyan", "cyan"},
+	{ThemeSolarized, "Solarized", "solarized"},
+	{ThemeHighContrast, "High Contrast", "high-contrast"},
+	{ThemeForest, "Forest", "forest"},
+	{ThemeSynthwave, "Synthwave", "synthwave"},
+	{ThemeCherry, "Cherry", "cherry"},
+}
+
+func (t Theme) spec() (themeSpec, bool) {
+	for _, spec := range themeSpecs {
+		if spec.theme == t {
+			return spec, true
+		}
+	}
+	return themeSpec{}, false
+}
+
+func (t Theme) String() string {
+	if spec, ok := t.spec(); ok {
+		return spec.name
+	}
+	return "Unknown"
+}
+
+func AllThemes() []Theme {
+	themes := make([]Theme, len(themeSpecs))
+	for i, spec := range themeSpecs {
+		themes[i] = spec.theme
+	}
+	return themes
+}
 
 func (t Theme) MarshalJSON() ([]byte, error) {
-	var s string
-	switch t {
-	case ThemeDark:
-		s = "dark"
-	case ThemeLight:
-		s = "light"
-	default:
-		s = "unknown"
+	if spec, ok := t.spec(); ok {
+		return json.Marshal(spec.json)
 	}
-	return json.Marshal(s)
+	return json.Marshal("unknown")
 }
 
 func (t *Theme) UnmarshalJSON(data []byte) error {
@@ -285,15 +316,13 @@ func (t *Theme) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
-	switch s {
-	case "dark":
-		*t = ThemeDark
-	case "light":
-		*t = ThemeLight
-	default:
-		return fmt.Errorf("unknown theme: %s", s)
+	for _, spec := range themeSpecs {
+		if spec.json == s {
+			*t = spec.theme
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("unknown theme: %s", s)
 }
 
 // Transparency sets UI overlay opacity (0–100).
@@ -350,7 +379,7 @@ func (s Settings) Validate() error {
 	if err := s.PresetInterval.Validate(); err != nil {
 		return fmt.Errorf("preset interval: %w", err)
 	}
-	if s.UI.Theme < ThemeDark || s.UI.Theme > ThemeLight {
+	if _, ok := s.UI.Theme.spec(); !ok {
 		return fmt.Errorf("ui theme: invalid theme %d", s.UI.Theme)
 	}
 	if err := s.UI.Transparency.Validate(); err != nil {

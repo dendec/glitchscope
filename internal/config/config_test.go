@@ -65,6 +65,39 @@ func TestSettingsValidateCoversAllDomains(t *testing.T) {
 	}
 }
 
+func TestThemesRoundTrip(t *testing.T) {
+	themes := AllThemes()
+	if len(themes) != int(themeCount) {
+		t.Fatalf("AllThemes has %d themes, want %d", len(themes), themeCount)
+	}
+	seenThemes := make(map[Theme]bool, len(themes))
+	seen := make(map[string]bool, len(themes))
+	for _, theme := range themes {
+		if seenThemes[theme] {
+			t.Fatalf("duplicate theme: %d", theme)
+		}
+		seenThemes[theme] = true
+
+		data, err := json.Marshal(theme)
+		if err != nil {
+			t.Fatalf("marshal %s: %v", theme, err)
+		}
+		name := string(data)
+		if seen[name] {
+			t.Fatalf("duplicate theme JSON name: %s", name)
+		}
+		seen[name] = true
+
+		var decoded Theme
+		if err := json.Unmarshal(data, &decoded); err != nil {
+			t.Fatalf("unmarshal %s: %v", name, err)
+		}
+		if decoded != theme {
+			t.Fatalf("theme round trip: got %v, want %v", decoded, theme)
+		}
+	}
+}
+
 func TestUpscaleFilterStrings(t *testing.T) {
 	if FilterSmooth.String() != "Smooth" {
 		t.Fatal("Smooth string mismatch")
