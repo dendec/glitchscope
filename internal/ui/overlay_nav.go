@@ -618,6 +618,41 @@ func (o *Overlay) breadcrumbText() string {
 	return strings.Join(parts, "/")
 }
 
+type modArchiveNavigationTarget struct {
+	url   string
+	label string
+}
+
+// modArchiveNavigationTargets returns the directory levels needed to restore
+// an album. The displayed path and parent navigation then match the hierarchy
+// the user would traverse manually.
+func modArchiveNavigationTargets(albumURL string) []modArchiveNavigationTarget {
+	parsed, err := url.Parse(albumURL)
+	if err != nil {
+		return nil
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return nil
+	}
+
+	targets := make([]modArchiveNavigationTarget, 0, len(parts))
+	for index, part := range parts {
+		targetURL := modarchive.BaseURL + strings.Join(parts[:index+1], "/")
+		label := part
+		if index == 0 {
+			label = modarchive.FormatDirName(part)
+		}
+		if index < len(parts)-1 || strings.HasSuffix(parsed.Path, "/") {
+			targetURL += "/"
+		} else if filepath.Ext(part) != "" {
+			label = strings.TrimSuffix(part, filepath.Ext(part))
+		}
+		targets = append(targets, modArchiveNavigationTarget{url: targetURL, label: label})
+	}
+	return targets
+}
+
 // switchToNC replaces the source stack with a Music source and an NC level
 // at dirPath (musicDir, falling back to baseDir, when empty). Used for source
 // selection and local deep-links.
@@ -888,8 +923,6 @@ func (o *Overlay) navigateToModArchiveTrack(path string) {
 		return
 	}
 
-	album := all[albumIdx]
-
 	// Build navigation tree: source root → modarchive → directory.
 	// Temporarily enable online so the source root shows the provider entry;
 	// restore the original state afterward.
@@ -900,21 +933,12 @@ func (o *Overlay) navigateToModArchiveTrack(path string) {
 	o.online = savedOnline
 	o.pushLevel(navLevel{ctx: ctxCatalog, label: "modarchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
 
-	// Try to enter the directory if we can resolve it from the URL.
-	parsed, err := url.Parse(albumURL)
-	if err == nil {
-		dirURL := modarchive.BaseURL + strings.TrimPrefix(parsed.Path, "/")
-		dirEntries := o.buildModArchiveEntries(dirURL)
+	// Restore each virtual snapshot directory so parent navigation mirrors the
+	// tree the user would traverse manually.
+	for _, target := range modArchiveNavigationTargets(albumURL) {
+		dirEntries := o.buildModArchiveEntries(target.url)
 		if dirEntries != nil {
-			o.pushLevel(navLevel{ctx: ctxCatalog, label: filepath.Base(parsed.Path), entries: dirEntries})
-		}
-	}
-
-	// If the album has tracks, build the track list.
-	if len(album.Tracks) > 0 {
-		trackEntries := o.buildCatalogTrackEntries(albumIdx)
-		if len(trackEntries) > 0 {
-			o.pushLevel(navLevel{ctx: ctxCatalog, label: album.Name, entries: trackEntries})
+			o.pushLevel(navLevel{ctx: ctxCatalog, label: target.label, entries: dirEntries})
 		}
 	}
 

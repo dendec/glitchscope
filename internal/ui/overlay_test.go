@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/dendec/glitchscope/internal/filesystem"
@@ -901,6 +902,122 @@ func TestBreadcrumbText(t *testing.T) {
 	)
 	if got := o.breadcrumbText(); got != "/music/Modland/Protracker/Nested/Author" {
 		t.Fatalf("elision: got %q", got)
+	}
+}
+
+func TestModArchiveNavigationTargets(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want []modArchiveNavigationTarget
+	}{
+		{
+			name: "snapshot archive",
+			url:  modarchive.BaseURL + modarchive.SnapshotDir + "/B/B0.zip",
+			want: []modArchiveNavigationTarget{
+				{url: modarchive.BaseURL + modarchive.SnapshotDir + "/", label: "1987-2007"},
+				{url: modarchive.BaseURL + modarchive.SnapshotDir + "/B/", label: "B"},
+				{url: modarchive.BaseURL + modarchive.SnapshotDir + "/B/B0.zip", label: "B0"},
+			},
+		},
+		{
+			name: "yearly addition directory",
+			url:  modarchive.BaseURL + "modarchive_2009_additions/AHX/M/",
+			want: []modArchiveNavigationTarget{
+				{url: modarchive.BaseURL + "modarchive_2009_additions/", label: "2009"},
+				{url: modarchive.BaseURL + "modarchive_2009_additions/AHX/", label: "AHX"},
+				{url: modarchive.BaseURL + "modarchive_2009_additions/AHX/M/", label: "M"},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := modArchiveNavigationTargets(test.url); !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("navigation targets = %#v, want %#v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestNavigateToRestoredModArchiveSnapshotTrackBreadcrumb(t *testing.T) {
+	bucketURL := modarchive.BaseURL + modarchive.SnapshotDir + "/B/B0.zip"
+	trackURL := bucketURL + "#boom-crash-m00.mod"
+	albums := []player.Album{{
+		Name:   "ModArchive: 1987-2007/B/B0.zip",
+		Path:   player.ModArchivePrefix + bucketURL,
+		Tracks: []string{player.ModArchivePrefix + trackURL},
+	}}
+	o := &Overlay{
+		modArchiveItems: map[string][]modarchive.DirItem{
+			modarchive.BaseURL: {{Name: modarchive.SnapshotDir, URL: modarchive.BaseURL + modarchive.SnapshotDir + "/", Kind: modarchive.KindDir}},
+			modarchive.BaseURL + modarchive.SnapshotDir + "/":   {{Name: "B", URL: modarchive.BaseURL + modarchive.SnapshotDir + "/B/", Kind: modarchive.KindDir}},
+			modarchive.BaseURL + modarchive.SnapshotDir + "/B/": {{Name: "B0.zip", URL: bucketURL, Kind: modarchive.KindArchive, CleanName: "B0"}},
+			bucketURL: {{Name: "boom-crash-m00.mod", URL: trackURL, Kind: modarchive.KindFile}},
+		},
+		libAlbums: func() []player.Album { return albums },
+	}
+	o.refreshAlbumsCache()
+
+	o.NavigateToTrack(player.ModArchivePrefix + trackURL)
+
+	if got := o.breadcrumbText(); got != "/modarchive/1987-2007/B/B0" {
+		t.Fatalf("restored snapshot breadcrumb = %q, want %q", got, "/modarchive/1987-2007/B/B0")
+	}
+
+	o.albumCursor = 0
+	if o.Select() {
+		t.Fatal("selecting restored snapshot parent unexpectedly started playback")
+	}
+	if got := o.breadcrumbText(); got != "/modarchive/1987-2007/B" {
+		t.Fatalf("breadcrumb after parent = %q, want %q", got, "/modarchive/1987-2007/B")
+	}
+
+	o.albumCursor = 0
+	o.Select()
+	if got := o.breadcrumbText(); got != "/modarchive/1987-2007" {
+		t.Fatalf("breadcrumb after second parent = %q, want %q", got, "/modarchive/1987-2007")
+	}
+
+	o.albumCursor = 0
+	o.Select()
+	if got := o.breadcrumbText(); got != "/modarchive" {
+		t.Fatalf("breadcrumb after third parent = %q, want %q", got, "/modarchive")
+	}
+}
+
+func TestNavigateToRestoredModArchiveAdditionTrackBreadcrumb(t *testing.T) {
+	additionURL := modarchive.BaseURL + "modarchive_2009_additions/"
+	formatURL := additionURL + "AHX/"
+	directoryURL := formatURL + "M/"
+	trackURL := directoryURL + "m0d_-_sundown.ahx.zip"
+	albums := []player.Album{{
+		Name:   "ModArchive: 2009/AHX/M",
+		Path:   player.ModArchivePrefix + directoryURL,
+		Tracks: []string{player.ModArchivePrefix + trackURL},
+	}}
+	o := &Overlay{
+		modArchiveItems: map[string][]modarchive.DirItem{
+			modarchive.BaseURL: {{Name: "modarchive_2009_additions", URL: additionURL, Kind: modarchive.KindDir}},
+			additionURL:        {{Name: "AHX", URL: formatURL, Kind: modarchive.KindDir}},
+			formatURL:          {{Name: "M", URL: directoryURL, Kind: modarchive.KindDir}},
+			directoryURL:       {{Name: "m0d_-_sundown.ahx.zip", URL: trackURL, Kind: modarchive.KindFile}},
+		},
+		libAlbums: func() []player.Album { return albums },
+	}
+	o.refreshAlbumsCache()
+
+	o.NavigateToTrack(player.ModArchivePrefix + trackURL)
+
+	if got := o.breadcrumbText(); got != "/modarchive/2009/AHX/M" {
+		t.Fatalf("restored addition breadcrumb = %q, want %q", got, "/modarchive/2009/AHX/M")
+	}
+
+	o.albumCursor = 0
+	if o.Select() {
+		t.Fatal("selecting restored addition parent unexpectedly started playback")
+	}
+	if got := o.breadcrumbText(); got != "/modarchive/2009/AHX" {
+		t.Fatalf("breadcrumb after parent = %q, want %q", got, "/modarchive/2009/AHX")
 	}
 }
 
