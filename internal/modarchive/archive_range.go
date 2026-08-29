@@ -60,10 +60,11 @@ func (r *rangeProgressReader) Read(buffer []byte) (int, error) {
 }
 
 func isSnapshotDirectoryURL(targetURL *url.URL) bool {
-	return strings.HasPrefix(strings.TrimPrefix(targetURL.Path, "/"), SnapshotDir+"/")
+	urlPath := strings.TrimPrefix(targetURL.Path, "/")
+	return strings.HasPrefix(urlPath, SnapshotDir+"/") || strings.HasPrefix(urlPath, AddendumDir+"/")
 }
 
-// IsSnapshotArchiveURL reports whether targetURL names a bucket ZIP in the official snapshot.
+// IsSnapshotArchiveURL reports whether targetURL names a bucket ZIP in an official snapshot directory.
 func IsSnapshotArchiveURL(targetURL string) bool {
 	u, err := url.Parse(targetURL)
 	if err != nil {

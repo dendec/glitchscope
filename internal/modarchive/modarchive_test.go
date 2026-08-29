@@ -24,6 +24,7 @@ func TestFormatDirName(t *testing.T) {
 		{"modarchive_2008_additions", "2008"},
 		{"modarchive_2023_additions", "2023"},
 		{SnapshotDir, SnapshotLabel},
+		{AddendumDir, AddendumLabel},
 		{"MOD", "MOD"},
 		{"XM", "XM"},
 		{"", "ModArchive"},
@@ -44,6 +45,7 @@ func TestParseDirectoryListing_Root(t *testing.T) {
 <body>
 <table>
 <tr><td><a href="modarchive_2007_official_snapshot_120000_modules">modarchive_2007_official_snapshot</a></td></tr>
+<tr><td><a href="modarchive_2007_official_snapshot_addendum1">modarchive_2007_official_snapshot_addendum1</a></td></tr>
 <tr><td><a href="modarchive_2008_additions">modarchive_2008_additions</a></td></tr>
 <tr><td><a href="modarchive_2023_additions">modarchive_2023_additions</a></td></tr>
 <tr><td><a href="kiarchive.zip">kiarchive.zip</a></td></tr>
@@ -56,18 +58,21 @@ func TestParseDirectoryListing_Root(t *testing.T) {
 		t.Fatalf("ParseDirectoryListing root failed: %v", err)
 	}
 
-	if len(items) != 3 {
-		t.Fatalf("expected 3 items, got %d", len(items))
+	if len(items) != 4 {
+		t.Fatalf("expected 4 items, got %d", len(items))
 	}
 
 	if items[0].CleanName != SnapshotLabel || items[0].Kind != KindDir {
 		t.Errorf("unexpected item 0: %+v", items[0])
 	}
-	if items[1].CleanName != "2008" || items[1].Kind != KindDir {
+	if items[1].CleanName != AddendumLabel || items[1].Kind != KindDir {
 		t.Errorf("unexpected item 1: %+v", items[1])
 	}
-	if items[2].CleanName != "2023" || items[2].Kind != KindDir {
+	if items[2].CleanName != "2008" || items[2].Kind != KindDir {
 		t.Errorf("unexpected item 2: %+v", items[2])
+	}
+	if items[3].CleanName != "2023" || items[3].Kind != KindDir {
+		t.Errorf("unexpected item 3: %+v", items[3])
 	}
 }
 
@@ -126,6 +131,19 @@ func TestParseDirectoryListing_SnapshotArchive(t *testing.T) {
 	}
 	if items[0].Kind != KindArchive || items[0].CleanName != "A0" {
 		t.Fatalf("snapshot item = %+v, want archive A0", items[0])
+	}
+}
+
+func TestParseDirectoryListing_AddendumArchive(t *testing.T) {
+	htmlBody := `<a href="A-.zip">A-.zip</a>`
+	targetURL := BaseURL + AddendumDir + "/"
+
+	items, err := ParseDirectoryListing(htmlBody, targetURL)
+	if err != nil {
+		t.Fatalf("ParseDirectoryListing addendum failed: %v", err)
+	}
+	if len(items) != 1 || items[0].Kind != KindArchive || items[0].CleanName != "A-" {
+		t.Fatalf("addendum items = %+v, want archive A-", items)
 	}
 }
 

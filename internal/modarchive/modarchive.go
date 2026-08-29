@@ -26,7 +26,9 @@ import (
 const (
 	BaseURL       = "http://modarchive.textfiles.com/"
 	SnapshotDir   = "modarchive_2007_official_snapshot_120000_modules"
-	SnapshotLabel = "1980-2007"
+	SnapshotLabel = "1987-2007"
+	AddendumDir   = "modarchive_2007_official_snapshot_addendum1"
+	AddendumLabel = "2007"
 	cacheDirName  = "modarchive-cache"
 	indexSubDir   = "index"
 	filesSubDir   = "files"
@@ -143,6 +145,9 @@ func FormatDirName(raw string) string {
 	if raw == SnapshotDir {
 		return SnapshotLabel
 	}
+	if raw == AddendumDir {
+		return AddendumLabel
+	}
 	// modarchive_2023_additions -> 2023
 	if matches := yearAdditionsExtract.FindStringSubmatch(raw); len(matches) == 2 {
 		return matches[1]
@@ -199,10 +204,11 @@ func ParseDirectoryListing(htmlBody string, currentURL string) ([]DirItem, error
 			continue
 		}
 
-		// If root directory, only accept the official snapshot and yearly additions.
+		// If root directory, only accept the official archives and yearly additions.
 		if isRoot {
 			trimmedHref := strings.TrimPrefix(href, "/")
-			if strings.Trim(trimmedHref, "/") != SnapshotDir && !yearAdditionsRegex.MatchString(trimmedHref) {
+			rootName := strings.Trim(trimmedHref, "/")
+			if rootName != SnapshotDir && rootName != AddendumDir && !yearAdditionsRegex.MatchString(trimmedHref) {
 				continue
 			}
 		}
@@ -223,7 +229,7 @@ func ParseDirectoryListing(htmlBody string, currentURL string) ([]DirItem, error
 		name := strings.Trim(href, "/")
 
 		// If href points to a folder path without trailing slash, check text
-		if !isDir && (strings.HasSuffix(text, "/") || yearAdditionsRegex.MatchString(name) || name == SnapshotDir) {
+		if !isDir && (strings.HasSuffix(text, "/") || yearAdditionsRegex.MatchString(name) || name == SnapshotDir || name == AddendumDir) {
 			isDir = true
 		}
 

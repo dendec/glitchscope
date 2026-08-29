@@ -54,15 +54,12 @@ func InitCatalog(baseDir string) bool {
 		slog.Info("modarchive: catalog file not found or empty")
 	} else {
 		rootItems := cat.Directories[BaseURL]
-		hasSnapshot := false
-		for _, item := range rootItems {
-			if strings.Trim(item.Name, "/") == SnapshotDir {
-				hasSnapshot = true
-				break
+		for _, required := range []DirItem{snapshotRootItem(), addendumRootItem()} {
+			if !hasRootItem(rootItems, required.Name) {
+				rootItems = append(rootItems, required)
 			}
 		}
-		if !hasSnapshot {
-			rootItems = append(rootItems, snapshotRootItem())
+		if len(rootItems) != len(cat.Directories[BaseURL]) {
 			sort.Slice(rootItems, func(i, j int) bool {
 				return strings.ToLower(rootItems[i].CleanName) < strings.ToLower(rootItems[j].CleanName)
 			})
@@ -88,11 +85,11 @@ func InitCatalog(baseDir string) bool {
 		slog.Info("modarchive: preloaded catalog from disk", "directories", len(cat.Directories), "age", time.Since(cat.UpdatedAt).Round(time.Hour))
 	}
 
-	hasSnapshotCatalog := InitSnapshotCatalog(baseDir)
-	if !hasCatalog && hasSnapshotCatalog {
-		cacheSnapshotOnlyRoot()
+	hasOfflineCatalog := InitSnapshotCatalog(baseDir)
+	if !hasCatalog && hasOfflineCatalog {
+		cacheOfflineOnlyRoot()
 	}
-	return hasCatalog || hasSnapshotCatalog
+	return hasCatalog || hasOfflineCatalog
 }
 
 func snapshotRootItem() DirItem {
@@ -102,4 +99,22 @@ func snapshotRootItem() DirItem {
 		Kind:      KindDir,
 		CleanName: SnapshotLabel,
 	}
+}
+
+func addendumRootItem() DirItem {
+	return DirItem{
+		Name:      AddendumDir,
+		URL:       BaseURL + AddendumDir + "/",
+		Kind:      KindDir,
+		CleanName: AddendumLabel,
+	}
+}
+
+func hasRootItem(items []DirItem, name string) bool {
+	for _, item := range items {
+		if strings.Trim(item.Name, "/") == name {
+			return true
+		}
+	}
+	return false
 }

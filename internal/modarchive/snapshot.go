@@ -18,6 +18,7 @@ import (
 
 const (
 	snapshotCatalogFile = "1980-2007.gsa"
+	addendumCatalogFile = "2007-addendum.gsa"
 	snapshotMaxBuckets  = 2048
 	snapshotCacheSize   = 8
 )
@@ -120,6 +121,7 @@ func (r snapshotRecord) dirItem(archiveURL string) (DirItem, bool) {
 var (
 	snapshotMu             sync.Mutex
 	snapshotCatalog        *archive.Archive
+	addendumCatalog        *archive.Archive
 	snapshotBucketMem      = newSnapshotBucketCache()
 	snapshotNavigationKeys = make(map[string]struct{})
 )
@@ -130,11 +132,26 @@ func SnapshotCatalogPath(baseDir string) string {
 	return filepath.Join(cacheDir, snapshotCatalogFile)
 }
 
+// AddendumCatalogPath returns the bundled 2007 addendum index path.
+func AddendumCatalogPath(baseDir string) string {
+	cacheDir, _ := CacheDir(baseDir)
+	return filepath.Join(cacheDir, addendumCatalogFile)
+}
+
 // SaveSnapshotCatalog writes bucket indexes as independently compressed GSA entries.
 func SaveSnapshotCatalog(baseDir string, buckets map[string][]DirItem) error {
+	return saveOfflineCatalog(SnapshotCatalogPath(baseDir), buckets, snapshotCatalogEntryName)
+}
+
+// SaveAddendumCatalog writes 2007 addendum bucket indexes as independently compressed GSA entries.
+func SaveAddendumCatalog(baseDir string, buckets map[string][]DirItem) error {
+	return saveOfflineCatalog(AddendumCatalogPath(baseDir), buckets, addendumCatalogEntryName)
+}
+
+func saveOfflineCatalog(targetPath string, buckets map[string][]DirItem, entryNameForURL func(string) (string, bool)) error {
 	entries := make([]archive.SourceEntry, 0, len(buckets))
 	for archiveURL, items := range buckets {
-		entryName, ok := snapshotCatalogEntryName(archiveURL)
+		entryName, ok := entryNameForURL(archiveURL)
 		if !ok {
 			return fmt.Errorf("invalid snapshot archive URL %q", archiveURL)
 		}
@@ -162,7 +179,6 @@ func SaveSnapshotCatalog(baseDir string, buckets map[string][]DirItem) error {
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 
-	targetPath := SnapshotCatalogPath(baseDir)
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return fmt.Errorf("snapshot catalog mkdir: %w", err)
 	}
@@ -194,6 +210,12 @@ func InitSnapshotCatalog(baseDir string) bool {
 	defer snapshotMu.Unlock()
 	closeSnapshotCatalogLocked()
 
+	hasSnapshot := initMainSnapshotCatalogLocked(baseDir)
+	hasAddendum := initAddendumCatalogLocked(baseDir)
+	return hasSnapshot || hasAddendum
+}
+
+func initMainSnapshotCatalogLocked(baseDir string) bool {
 	catalog, err := archive.Open(SnapshotCatalogPath(baseDir), snapshotMaxBuckets)
 	if err != nil {
 		slog.Debug("modarchive: snapshot catalog unavailable", "error", err)
@@ -244,6 +266,42 @@ func InitSnapshotCatalog(baseDir string) bool {
 	return true
 }
 
+func initAddendumCatalogLocked(baseDir string) bool {
+	catalog, err := archive.Open(AddendumCatalogPath(baseDir), snapshotMaxBuckets)
+	if err != nil {
+		slog.Debug("modarchive: addendum catalog unavailable", "error", err)
+		return false
+	}
+
+	rootItems := make([]DirItem, 0, len(catalog.Entries()))
+	for _, entry := range catalog.Entries() {
+		if entry.Name == "" || strings.Contains(entry.Name, "/") || !strings.EqualFold(path.Ext(entry.Name), ".zip") {
+			_ = catalog.Close()
+			slog.Warn("modarchive: invalid addendum catalog entry", "entry", entry.Name)
+			return false
+		}
+		rootItems = append(rootItems, DirItem{
+			Name:      entry.Name,
+			URL:       BaseURL + AddendumDir + "/" + entry.Name,
+			Kind:      KindArchive,
+			CleanName: strings.TrimSuffix(entry.Name, path.Ext(entry.Name)),
+		})
+	}
+	sort.Slice(rootItems, func(i, j int) bool {
+		return strings.ToLower(rootItems[i].CleanName) < strings.ToLower(rootItems[j].CleanName)
+	})
+
+	addendumURL := BaseURL + AddendumDir + "/"
+	memCacheMu.Lock()
+	memCache[addendumURL] = rootItems
+	snapshotNavigationKeys[addendumURL] = struct{}{}
+	memCacheMu.Unlock()
+
+	addendumCatalog = catalog
+	slog.Info("modarchive: addendum catalog opened", "buckets", len(catalog.Entries()))
+	return true
+}
+
 // CloseSnapshotCatalog closes the bundled snapshot index.
 func CloseSnapshotCatalog() {
 	snapshotMu.Lock()
@@ -251,14 +309,14 @@ func CloseSnapshotCatalog() {
 	closeSnapshotCatalogLocked()
 }
 
-func cacheSnapshotOnlyRoot() {
+func cacheOfflineOnlyRoot() {
 	snapshotMu.Lock()
 	defer snapshotMu.Unlock()
-	if snapshotCatalog == nil {
+	if snapshotCatalog == nil && addendumCatalog == nil {
 		return
 	}
 	memCacheMu.Lock()
-	memCache[BaseURL] = []DirItem{snapshotRootItem()}
+	memCache[BaseURL] = []DirItem{snapshotRootItem(), addendumRootItem()}
 	memCacheMu.Unlock()
 	snapshotNavigationKeys[BaseURL] = struct{}{}
 }
@@ -267,6 +325,10 @@ func closeSnapshotCatalogLocked() {
 	if snapshotCatalog != nil {
 		_ = snapshotCatalog.Close()
 		snapshotCatalog = nil
+	}
+	if addendumCatalog != nil {
+		_ = addendumCatalog.Close()
+		addendumCatalog = nil
 	}
 	snapshotBucketMem.clear()
 	memCacheMu.Lock()
@@ -278,20 +340,24 @@ func closeSnapshotCatalogLocked() {
 }
 
 func fetchSnapshotCatalogDirectory(targetURL string) ([]DirItem, bool) {
-	entryName, ok := snapshotCatalogEntryName(targetURL)
+	entryName, catalogKind, ok := offlineCatalogEntry(targetURL)
 	if !ok {
 		return nil, false
 	}
 
 	snapshotMu.Lock()
 	defer snapshotMu.Unlock()
-	if snapshotCatalog == nil {
+	catalog := snapshotCatalog
+	if catalogKind == AddendumDir {
+		catalog = addendumCatalog
+	}
+	if catalog == nil {
 		return nil, false
 	}
 	if items, ok := snapshotBucketMem.get(targetURL); ok {
 		return items, true
 	}
-	data, err := snapshotCatalog.Read(entryName)
+	data, err := catalog.Read(entryName)
 	if err != nil {
 		slog.Warn("modarchive: snapshot bucket read failed", "url", targetURL, "error", err)
 		return nil, false
@@ -319,16 +385,34 @@ func fetchSnapshotCatalogDirectory(targetURL string) ([]DirItem, bool) {
 }
 
 func snapshotCatalogEntryName(targetURL string) (string, bool) {
+	return officialCatalogEntryName(targetURL, SnapshotDir, 1)
+}
+
+func addendumCatalogEntryName(targetURL string) (string, bool) {
+	return officialCatalogEntryName(targetURL, AddendumDir, 0)
+}
+
+func offlineCatalogEntry(targetURL string) (string, string, bool) {
+	if entryName, ok := snapshotCatalogEntryName(targetURL); ok {
+		return entryName, SnapshotDir, true
+	}
+	if entryName, ok := addendumCatalogEntryName(targetURL); ok {
+		return entryName, AddendumDir, true
+	}
+	return "", "", false
+}
+
+func officialCatalogEntryName(targetURL, sourceDir string, slashCount int) (string, bool) {
 	parsed, err := url.Parse(targetURL)
 	base, baseErr := url.Parse(BaseURL)
 	if err != nil || baseErr != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
 		!strings.EqualFold(parsed.Scheme, base.Scheme) || !strings.EqualFold(parsed.Host, base.Host) ||
-		!IsSnapshotArchiveURL(targetURL) {
+		!strings.EqualFold(path.Ext(parsed.Path), ".zip") {
 		return "", false
 	}
-	prefix := "/" + SnapshotDir + "/"
+	prefix := "/" + sourceDir + "/"
 	entryName := strings.TrimPrefix(parsed.Path, prefix)
-	if entryName == parsed.Path || strings.Count(entryName, "/") != 1 {
+	if entryName == parsed.Path || strings.Count(entryName, "/") != slashCount {
 		return "", false
 	}
 	return entryName, true

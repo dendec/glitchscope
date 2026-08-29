@@ -53,10 +53,10 @@ func TestCatalog_SaveLoadInit(t *testing.T) {
 
 	// Verify memCache contains preloaded directories
 	items, ok := FetchDirectoryCached(tmpDir, BaseURL)
-	if !ok || len(items) != 2 {
-		t.Fatalf("expected snapshot plus preloaded root item, got ok=%v, count=%d", ok, len(items))
+	if !ok || len(items) != 3 {
+		t.Fatalf("expected official sources plus preloaded root item, got ok=%v, count=%d", ok, len(items))
 	}
-	if items[0].CleanName != SnapshotLabel || items[1].CleanName != "2023" {
+	if items[0].CleanName != SnapshotLabel || items[1].CleanName != AddendumLabel || items[2].CleanName != "2023" {
 		t.Errorf("unexpected root items: %+v", items)
 	}
 }
@@ -134,6 +134,80 @@ func TestSnapshotCatalogBuildsNavigationAndLoadsBucket(t *testing.T) {
 	}
 }
 
+func TestAddendumCatalogBuildsNavigationAndLoadsBucket(t *testing.T) {
+	ResetMemCache()
+	CloseSnapshotCatalog()
+	defer func() {
+		CloseSnapshotCatalog()
+		ResetMemCache()
+	}()
+
+	baseDir := t.TempDir()
+	archiveURL := BaseURL + AddendumDir + "/A-.zip"
+	if err := SaveAddendumCatalog(baseDir, map[string][]DirItem{
+		archiveURL: {{
+			Name:             "addendum.mod",
+			Kind:             KindFile,
+			Size:             123,
+			ArchiveOffset:    10,
+			ArchiveEndOffset: 99,
+			CompressedSize:   42,
+			CRC32:            1234,
+			Compression:      8,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !InitSnapshotCatalog(baseDir) {
+		t.Fatal("InitSnapshotCatalog returned false with addendum catalog")
+	}
+	buckets, ok := FetchDirectoryCached(baseDir, BaseURL+AddendumDir+"/")
+	if !ok || len(buckets) != 1 || buckets[0].CleanName != "A-" {
+		t.Fatalf("addendum buckets = %+v, ok=%v", buckets, ok)
+	}
+	items, ok := FetchDirectoryCached(baseDir, archiveURL)
+	if !ok || len(items) != 1 || items[0].Name != "addendum.mod" || items[0].ArchiveOffset != 10 {
+		t.Fatalf("addendum items = %+v, ok=%v", items, ok)
+	}
+}
+
+func TestOfflineCatalogsOpenTogether(t *testing.T) {
+	ResetMemCache()
+	CloseSnapshotCatalog()
+	defer func() {
+		CloseSnapshotCatalog()
+		ResetMemCache()
+	}()
+
+	baseDir := t.TempDir()
+	writeTestSnapshotCatalog(t, baseDir, "A/A0.zip", "snapshot.mod")
+	addendumURL := BaseURL + AddendumDir + "/A-.zip"
+	if err := SaveAddendumCatalog(baseDir, map[string][]DirItem{
+		addendumURL: {{
+			Name:             "addendum.mod",
+			Kind:             KindFile,
+			Size:             1,
+			ArchiveOffset:    1,
+			ArchiveEndOffset: 3,
+			CompressedSize:   1,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !InitSnapshotCatalog(baseDir) {
+		t.Fatal("InitSnapshotCatalog returned false")
+	}
+	snapshotURL := BaseURL + SnapshotDir + "/A/A0.zip"
+	if items, ok := FetchDirectoryCached(baseDir, snapshotURL); !ok || len(items) != 1 || items[0].Name != "snapshot.mod" {
+		t.Fatalf("snapshot items = %+v, ok=%v", items, ok)
+	}
+	if items, ok := FetchDirectoryCached(baseDir, addendumURL); !ok || len(items) != 1 || items[0].Name != "addendum.mod" {
+		t.Fatalf("addendum items = %+v, ok=%v", items, ok)
+	}
+}
+
 func TestSnapshotCatalogSaveAndInitWithoutMainCatalog(t *testing.T) {
 	ResetMemCache()
 	CloseSnapshotCatalog()
@@ -163,7 +237,7 @@ func TestSnapshotCatalogSaveAndInitWithoutMainCatalog(t *testing.T) {
 		t.Fatal("InitCatalog returned false with snapshot catalog")
 	}
 	root, ok := FetchDirectoryCached(baseDir, BaseURL)
-	if !ok || len(root) != 1 || root[0].CleanName != SnapshotLabel {
+	if !ok || len(root) != 2 || root[0].CleanName != SnapshotLabel || root[1].CleanName != AddendumLabel {
 		t.Fatalf("root items = %+v, ok=%v", root, ok)
 	}
 	items, ok := FetchDirectoryCached(baseDir, archiveURL)
@@ -279,6 +353,19 @@ func TestSnapshotCatalogEntryNameRequiresOfficialOrigin(t *testing.T) {
 	}
 	if _, ok := snapshotCatalogEntryName(official + "?download=1"); ok {
 		t.Fatal("snapshot URL with query was accepted")
+	}
+}
+
+func TestAddendumCatalogEntryNameRequiresOfficialOrigin(t *testing.T) {
+	official := BaseURL + AddendumDir + "/A-.zip"
+	if _, ok := addendumCatalogEntryName(official); !ok {
+		t.Fatal("official addendum URL was rejected")
+	}
+	if _, ok := addendumCatalogEntryName(BaseURL + SnapshotDir + "/A/A0.zip"); ok {
+		t.Fatal("snapshot URL was accepted as an addendum URL")
+	}
+	if _, ok := addendumCatalogEntryName("https://example.test/" + AddendumDir + "/A-.zip"); ok {
+		t.Fatal("foreign addendum origin was accepted")
 	}
 }
 
