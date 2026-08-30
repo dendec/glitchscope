@@ -145,11 +145,11 @@ func (o *Overlay) micLabel() string {
 
 func (o *Overlay) buildSourceEntries() []navEntry {
 	entries := []navEntry{{label: "music/", kind: entrySource, source: sourceMusic, albumIdx: -1}}
+	if o.favoritesView != nil && o.favoritesView.TotalCount() > 0 {
+		entries = append(entries, navEntry{label: "favorites/", kind: entrySource, source: sourceFavorites, albumIdx: -1})
+	}
 	if len(o.micDevices) > 0 || o.micActive {
 		entries = append(entries, navEntry{label: o.micLabel(), kind: entrySource, source: sourceMicrophone, albumIdx: -1})
-	}
-	if o.favoritesView != nil {
-		entries = append(entries, navEntry{label: "favorites/", kind: entrySource, source: sourceFavorites, albumIdx: -1})
 	}
 	slog.Debug("buildSourceEntries", "online", o.online)
 	if o.online {
