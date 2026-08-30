@@ -52,7 +52,7 @@ MODARCHIVE_CATALOG := .cache/modarchive/catalog
 MODARCHIVE_SNAPSHOT := .cache/modarchive/1980-2007.gsa
 MODARCHIVE_ADDENDUM := .cache/modarchive/2007-addendum.gsa
 
-.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill
+.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font
 
 DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
 
@@ -61,6 +61,9 @@ builder:
 	@if ! docker image inspect $(DOCKER_BUILDER) > /dev/null 2>&1; then \
 		docker build -t $(DOCKER_BUILDER) -f Dockerfile.builder .; \
 	fi
+
+subset-font:
+	@./scripts/subset-font.sh
 
 lint: builder
 	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) golangci-lint run --verbose --timeout=5m ./cmd/... ./internal/...'

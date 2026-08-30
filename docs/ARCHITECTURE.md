@@ -13,7 +13,7 @@
 | Навигация и focus | `internal/ui` | rendered lists and breadcrumbs |
 | Playback queue | `internal/app` playback state | player commands, overlay snapshot |
 | Удаление файлов | `internal/app/delete_service.go` | confirmation UI, rescan |
-| Favourites | `internal/player` (`favourites.go`) | overlay navigation, input actions, JSON storage |
+| Favorites | `internal/player` (`favorites.go`) | overlay navigation, input actions, JSON storage |
 | Remote catalogs | `internal/modland`, `internal/modarchive` | provider navigation and downloads |
 
 **Каталоговые альбомы** (modland/modarchive) хранятся в `lib.Albums` через

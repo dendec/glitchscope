@@ -189,9 +189,9 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 }
 
 func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h int) bool {
-	favouriteMode := a.favouriteMode()
+	favoriteMode := a.favoriteMode()
 	for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
-		act := a.inp.ProcessEvent(e, favouriteMode, now)
+		act := a.inp.ProcessEvent(e, favoriteMode, now)
 		if act == input.ActionQuit {
 			return false
 		}
@@ -205,7 +205,7 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 		}
 	}
 
-	if hold := a.inp.PollFavouriteHold(favouriteMode, now); hold != input.ActionNone {
+	if hold := a.inp.PollFavoriteHold(favoriteMode, now); hold != input.ActionNone {
 		a.handleAction(hold, w, h)
 	}
 

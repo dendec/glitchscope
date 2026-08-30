@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// PlaylistID identifies a favourites playlist.
+// PlaylistID identifies a favorites playlist.
 type PlaylistID string
 
 // String returns the human-readable label for the playlist.
@@ -33,7 +33,7 @@ const (
 // playlistOrder defines the cycle order and display order.
 var playlistOrder = []PlaylistID{PlaylistStar, PlaylistHeart, PlaylistNote}
 
-// PlaylistSpec describes one favourites playlist for UI display.
+// PlaylistSpec describes one favorites playlist for UI display.
 type PlaylistSpec struct {
 	ID     PlaylistID
 	Symbol rune
@@ -51,42 +51,52 @@ var playlistSpecs = []PlaylistSpec{
 // not modify the returned slice.
 func PlaylistSpecs() []PlaylistSpec { return playlistSpecs }
 
-// favouritesFile is the on-disk JSON format.
-type favouritesFile struct {
+// PlaylistSymbol returns the symbol for a playlist ID, or "" if unknown.
+func PlaylistSymbol(id PlaylistID) string {
+	for _, s := range playlistSpecs {
+		if s.ID == id {
+			return string(s.Symbol)
+		}
+	}
+	return ""
+}
+
+// favoritesFile is the on-disk JSON format.
+type favoritesFile struct {
 	Version   int                     `json:"version"`
 	Playlists map[PlaylistID][]string `json:"playlists"`
 }
 
-// Favourites manages three mutually exclusive playlists. A track can be in at
+// Favorites manages three mutually exclusive playlists. A track can be in at
 // most one playlist. All mutations are transactional: the on-disk file is
 // updated atomically before in-memory state changes.
-type Favourites struct {
+type Favorites struct {
 	playlists map[PlaylistID][]string
 	lookup    map[string]PlaylistID // path → playlist, O(1)
 	path      string                // file path for Save
 	writable  bool                  // false when loaded from corrupted file
 }
 
-// LoadFavourites reads favourites from path. A missing file returns empty
-// writable favourites. A corrupted file returns read-only favourites with an
+// LoadFavorites reads favorites from path. A missing file returns empty
+// writable favorites. A corrupted file returns read-only favorites with an
 // error; the original file is never overwritten.
-func LoadFavourites(path string) (*Favourites, error) {
+func LoadFavorites(path string) (*Favorites, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			slog.Debug("favourites: file not found, using empty", "path", path)
+			slog.Debug("favorites: file not found, using empty", "path", path)
 			return newEmpty(path, true), nil
 		}
-		return nil, fmt.Errorf("favourites read: %w", err)
+		return nil, fmt.Errorf("favorites read: %w", err)
 	}
 
-	var raw favouritesFile
+	var raw favoritesFile
 	if err := json.Unmarshal(data, &raw); err != nil {
-		slog.Warn("favourites: malformed JSON", "path", path, "error", err)
-		return newEmpty(path, false), fmt.Errorf("favourites decode: %w", err)
+		slog.Warn("favorites: malformed JSON", "path", path, "error", err)
+		return newEmpty(path, false), fmt.Errorf("favorites decode: %w", err)
 	}
 	if raw.Version != 1 {
-		return newEmpty(path, false), fmt.Errorf("favourites: unsupported version %d", raw.Version)
+		return newEmpty(path, false), fmt.Errorf("favorites: unsupported version %d", raw.Version)
 	}
 	if raw.Playlists == nil {
 		raw.Playlists = make(map[PlaylistID][]string)
@@ -104,18 +114,18 @@ func LoadFavourites(path string) (*Favourites, error) {
 	}
 	for id, tracks := range raw.Playlists {
 		if !known[id] {
-			return newEmpty(path, false), fmt.Errorf("favourites: unknown playlist %q", id)
+			return newEmpty(path, false), fmt.Errorf("favorites: unknown playlist %q", id)
 		}
 		for _, track := range tracks {
 			if track == "" {
-				return newEmpty(path, false), fmt.Errorf("favourites: empty path in playlist %q", id)
+				return newEmpty(path, false), fmt.Errorf("favorites: empty path in playlist %q", id)
 			}
 			normalised, err := normalisePath(track)
 			if err != nil {
-				return newEmpty(path, false), fmt.Errorf("favourites: invalid path %q: %w", track, err)
+				return newEmpty(path, false), fmt.Errorf("favorites: invalid path %q: %w", track, err)
 			}
 			if prev, exists := seen[normalised]; exists {
-				return newEmpty(path, false), fmt.Errorf("favourites: duplicate path %q in playlists %q and %q", track, prev, id)
+				return newEmpty(path, false), fmt.Errorf("favorites: duplicate path %q in playlists %q and %q", track, prev, id)
 			}
 			seen[normalised] = id
 			playlists[id] = append(playlists[id], normalised)
@@ -129,25 +139,25 @@ func LoadFavourites(path string) (*Favourites, error) {
 		}
 	}
 
-	slog.Info("favourites: loaded", "path", path,
-		"star", len(playlists[PlaylistStar]),
-		"heart", len(playlists[PlaylistHeart]),
-		"note", len(playlists[PlaylistNote]))
-	return &Favourites{playlists: playlists, lookup: lookup, path: path, writable: true}, nil
+	slog.Info("favorites: loaded", "path", path,
+		string(PlaylistStar), len(playlists[PlaylistStar]),
+		string(PlaylistHeart), len(playlists[PlaylistHeart]),
+		string(PlaylistNote), len(playlists[PlaylistNote]))
+	return &Favorites{playlists: playlists, lookup: lookup, path: path, writable: true}, nil
 }
 
-// NewReadOnlyFavourites returns an empty read-only Favourites. Used when the
+// NewReadOnlyFavorites returns an empty read-only Favorites. Used when the
 // on-disk file is corrupted and must not be overwritten.
-func NewReadOnlyFavourites() *Favourites {
+func NewReadOnlyFavorites() *Favorites {
 	return newEmpty("", false)
 }
 
-func newEmpty(path string, writable bool) *Favourites {
+func newEmpty(path string, writable bool) *Favorites {
 	playlists := make(map[PlaylistID][]string, len(playlistOrder))
 	for _, id := range playlistOrder {
 		playlists[id] = nil
 	}
-	return &Favourites{playlists: playlists, lookup: make(map[string]PlaylistID), path: path, writable: writable}
+	return &Favorites{playlists: playlists, lookup: make(map[string]PlaylistID), path: path, writable: writable}
 }
 
 // normalisePath canonicalises a track path. Local paths get Abs+Clean; virtual
@@ -164,12 +174,12 @@ func normalisePath(track string) (string, error) {
 }
 
 // GetPlaylist returns which playlist the track belongs to, or empty string.
-func (f *Favourites) GetPlaylist(trackPath string) PlaylistID {
+func (f *Favorites) GetPlaylist(trackPath string) PlaylistID {
 	return f.lookup[trackPath]
 }
 
 // Symbol returns the display symbol for the track's playlist, or "".
-func (f *Favourites) Symbol(trackPath string) string {
+func (f *Favorites) Symbol(trackPath string) string {
 	id := f.lookup[trackPath]
 	for _, spec := range playlistSpecs {
 		if spec.ID == id {
@@ -180,7 +190,7 @@ func (f *Favourites) Symbol(trackPath string) string {
 }
 
 // Tracks returns a copy of the track list for the given playlist.
-func (f *Favourites) Tracks(id PlaylistID) []string {
+func (f *Favorites) Tracks(id PlaylistID) []string {
 	tracks := f.playlists[id]
 	out := make([]string, len(tracks))
 	copy(out, tracks)
@@ -188,12 +198,12 @@ func (f *Favourites) Tracks(id PlaylistID) []string {
 }
 
 // Count returns the number of tracks in the given playlist.
-func (f *Favourites) Count(id PlaylistID) int {
+func (f *Favorites) Count(id PlaylistID) int {
 	return len(f.playlists[id])
 }
 
 // TotalCount returns the total number of tracks across all playlists.
-func (f *Favourites) TotalCount() int {
+func (f *Favorites) TotalCount() int {
 	n := 0
 	for _, id := range playlistOrder {
 		n += len(f.playlists[id])
@@ -207,13 +217,13 @@ func (f *Favourites) TotalCount() int {
 //
 // The on-disk file is written atomically before in-memory state changes.
 // Returns the new playlist ID (PlaylistID("") when removed).
-func (f *Favourites) Cycle(trackPath string) (PlaylistID, error) {
+func (f *Favorites) Cycle(trackPath string) (PlaylistID, error) {
 	if !f.writable {
-		return "", fmt.Errorf("favourites: read-only")
+		return "", fmt.Errorf("favorites: read-only")
 	}
 	normalised, err := normalisePath(trackPath)
 	if err != nil {
-		return "", fmt.Errorf("favourites: normalise: %w", err)
+		return "", fmt.Errorf("favorites: normalise: %w", err)
 	}
 
 	current := f.lookup[normalised]
@@ -245,24 +255,24 @@ func (f *Favourites) Cycle(trackPath string) (PlaylistID, error) {
 
 	// Transactional write.
 	if err := f.save(newPlaylists); err != nil {
-		return current, fmt.Errorf("favourites: save: %w", err)
+		return current, fmt.Errorf("favorites: save: %w", err)
 	}
 
 	f.playlists = newPlaylists
 	f.lookup = newLookup
-	slog.Debug("favourites: cycle", "path", normalised, "from", current, "to", next)
+	slog.Debug("favorites: cycle", "path", normalised, "from", current, "to", next)
 	return next, nil
 }
 
 // Remove deletes the track from whichever playlist it belongs to.
 // The on-disk file is written atomically before in-memory state changes.
-func (f *Favourites) Remove(trackPath string) error {
+func (f *Favorites) Remove(trackPath string) error {
 	if !f.writable {
-		return fmt.Errorf("favourites: read-only")
+		return fmt.Errorf("favorites: read-only")
 	}
 	normalised, err := normalisePath(trackPath)
 	if err != nil {
-		return fmt.Errorf("favourites: normalise: %w", err)
+		return fmt.Errorf("favorites: normalise: %w", err)
 	}
 
 	current := f.lookup[normalised]
@@ -288,12 +298,12 @@ func (f *Favourites) Remove(trackPath string) error {
 
 	// Transactional write.
 	if err := f.save(newPlaylists); err != nil {
-		return fmt.Errorf("favourites: save: %w", err)
+		return fmt.Errorf("favorites: save: %w", err)
 	}
 
 	f.playlists = newPlaylists
 	f.lookup = newLookup
-	slog.Debug("favourites: remove", "path", normalised, "from", current)
+	slog.Debug("favorites: remove", "path", normalised, "from", current)
 	return nil
 }
 
@@ -323,47 +333,47 @@ func removeTrack(tracks []string, track string) []string {
 	return tracks
 }
 
-// save writes the favourites atomically (temp+rename).
+// save writes the favorites atomically (temp+rename).
 // Order is preserved exactly as in-memory (no sorting).
-func (f *Favourites) save(playlists map[PlaylistID][]string) error {
+func (f *Favorites) save(playlists map[PlaylistID][]string) error {
 	if f.path == "" {
-		return fmt.Errorf("favourites: no path set")
+		return fmt.Errorf("favorites: no path set")
 	}
 
 	dir := filepath.Dir(f.path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("favourites mkdir: %w", err)
+		return fmt.Errorf("favorites mkdir: %w", err)
 	}
 
-	raw := favouritesFile{Version: 1, Playlists: playlists}
+	raw := favoritesFile{Version: 1, Playlists: playlists}
 
-	tmp, err := os.CreateTemp(dir, "favourites*.tmp")
+	tmp, err := os.CreateTemp(dir, "favorites*.tmp")
 	if err != nil {
-		return fmt.Errorf("favourites temp: %w", err)
+		return fmt.Errorf("favorites temp: %w", err)
 	}
 	tmpPath := tmp.Name()
 
 	if err := json.NewEncoder(tmp).Encode(raw); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("favourites encode: %w", err)
+		return fmt.Errorf("favorites encode: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("favourites close: %w", err)
+		return fmt.Errorf("favorites close: %w", err)
 	}
 	if err := os.Rename(tmpPath, f.path); err != nil {
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("favourites rename: %w", err)
+		return fmt.Errorf("favorites rename: %w", err)
 	}
 	return nil
 }
 
 // Writable reports whether mutations are allowed.
-func (f *Favourites) Writable() bool { return f.writable }
+func (f *Favorites) Writable() bool { return f.writable }
 
-// FavouriteTrackTitle returns a display name for a favourited track path.
-func FavouriteTrackTitle(path string) string {
+// FavoriteTrackTitle returns a display name for a favourited track path.
+func FavoriteTrackTitle(path string) string {
 	if IsModland(path) || IsModArchive(path) {
 		remote := RemotePath(path)
 		if u, err := url.Parse(remote); err == nil && u.Fragment != "" {

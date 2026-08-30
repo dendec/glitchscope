@@ -129,35 +129,40 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	for i := start; i < end; i++ {
 		name := o.albums[i]
 		prefix := "  "
+		suffix := ""
 		if o.isNC() {
 			// NC: highlight by file path match.
 			e := o.albumEntries[i]
 			if e.IsNCFile() && e.filePath == o.playingPath {
 				prefix = "▸ "
 			}
-			// Show favourite symbol if track is in a playlist.
-			if e.IsNCFile() && o.favouritesView != nil {
-				sym := o.favouritesView.Symbol(e.filePath)
+			// Show favourite symbol as suffix if track is in a playlist.
+			if e.IsNCFile() && o.favoritesView != nil {
+				sym := o.favoritesView.Symbol(e.filePath)
 				if sym != "" {
-					prefix = sym + " "
+					suffix = " " + sym
 				}
 			}
-		} else if o.topLevel().ctx == ctxFavourites {
-			// Favourites: show symbol and now-playing marker.
+		} else if o.topLevel().ctx == ctxFavorites {
+			// Inside playlist: only now-playing marker.
 			e := o.albumEntries[i]
-			if e.IsFavouriteTrack() {
-				sym := o.favouritesView.Symbol(e.filePath)
+			if e.IsFavoriteTrack() && e.filePath == o.playingPath {
+				prefix = "▸ "
+			}
+		} else {
+			if name == o.playingAlbum {
+				prefix = "▸ "
+			}
+			// Catalog tracks: show favourite symbol.
+			if o.favoritesView != nil {
+				e := o.albumEntries[i]
+				sym := o.favoritesView.Symbol(e.filePath)
 				if sym != "" {
-					prefix = sym + " "
-				}
-				if e.filePath == o.playingPath {
-					prefix = "▸ "
+					suffix = " " + sym
 				}
 			}
-		} else if name == o.playingAlbum {
-			prefix = "▸ "
 		}
-		line := prefix + name
+		line := prefix + name + suffix
 		rows = append(rows, listRow{text: line, active: i == cursor && o.panelEntered && o.focusPanel == 0})
 		if i == cursor && o.focusPanel == 0 {
 			o.rebuildMarqueeLine(&o.marqueeL, line, maxTextPx, false)
@@ -242,13 +247,8 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 			suffix = "  " + formatDuration(info.Duration)
 		}
 		prefix := "  "
-		if o.favouritesView != nil {
-			if symbol := o.favouritesView.Symbol(info.Path); symbol != "" {
-				prefix = symbol + " "
-			}
-		}
 		if info.Path == o.playingPath {
-			prefix = "▸ " + prefix
+			prefix = "▸ "
 		}
 		line := prefix + title + suffix
 		rows = append(rows, listRow{text: line, active: i == o.trackCursor && o.panelEntered && o.focusPanel == 1})

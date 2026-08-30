@@ -1,11 +1,11 @@
-# Favourites — план реализации
+Favorites — план реализации
 
-В source root всегда отображается виртуальная папка `Favourites/`. В ней находятся
+В source root всегда отображается виртуальная папка `favorites/`. В ней находятся
 только непустые плейлисты `★ Star`, `♥ Heart` и `♪ Note`. Один трек может входить
 только в один плейлист.
 
-При запуске трека из favourites текущей playback queue становится снимок всего
-плейлиста в порядке добавления. Последующие изменения favourites не меняют уже
+При запуске трека из favorites текущей playback queue становится снимок всего
+плейлиста в порядке добавления. Последующие изменения favorites не меняют уже
 запущенную queue.
 
 Назначение выполняется на выбранном playable track:
@@ -18,12 +18,12 @@
 
 ## 1. Владение и хранение
 
-`internal/player` владеет моделью favourites, нормализацией track path и JSON
+`internal/player` владеет моделью favorites, нормализацией track path и JSON
 storage. `internal/app` связывает её с input, playback queue и UI.
 `internal/ui` только отображает read-only view и владеет навигацией.
 
-Файл `favourites.json` хранится рядом с `settings.json`. Путь возвращает
-`config.FavouritesPath()`.
+Файл `favorites.json` хранится рядом с `settings.json`. Путь возвращает
+`config.FavoritesPath()`.
 
 ```json
 {
@@ -38,7 +38,7 @@ storage. `internal/app` связывает её с input, playback queue и UI.
 
 Правила:
 
-- missing file означает пустые writable favourites;
+- missing file означает пустые writable favorites;
 - malformed JSON, неизвестная версия или playlist ID, пустой path, неверный тип,
   trailing JSON и duplicate path возвращают ошибку;
 - duplicate path внутри одного или разных плейлистов запрещён;
@@ -54,12 +54,12 @@ provider prefix и остаётся в canonical form provider-а.
 rename заменяет in-memory state. Ошибка записи не меняет состояние.
 
 Если существующий файл не загрузился, app показывает ошибку и использует пустой
-read-only view. Favourite actions отключены, исходный файл не перезаписывается.
+read-only view. Favorite actions отключены, исходный файл не перезаписывается.
 Сохранения на `App.Close` нет: каждая мутация уже записана атомарно.
 
 Новый владелец и эти инварианты добавляются в `docs/ARCHITECTURE.md`.
 
-## 2. Модель — `internal/player/favourites.go`
+## 2. Модель — `internal/player/favorites.go`
 
 ```go
 type PlaylistID string
@@ -78,24 +78,24 @@ type PlaylistSpec struct {
 
 func PlaylistSpecs() []PlaylistSpec
 
-type Favourites struct {
+type Favorites struct {
     playlists map[PlaylistID][]string
     lookup    map[string]PlaylistID
     path      string
     writable  bool
 }
 
-func LoadFavourites(path string) (*Favourites, error)
-func NewReadOnlyFavourites() *Favourites
+func LoadFavorites(path string) (*Favorites, error)
+func NewReadOnlyFavorites() *Favorites
 
-func (f *Favourites) GetPlaylist(trackPath string) PlaylistID
-func (f *Favourites) Symbol(trackPath string) string
-func (f *Favourites) Tracks(id PlaylistID) []string
-func (f *Favourites) Count(id PlaylistID) int
-func (f *Favourites) TotalCount() int
+func (f *Favorites) GetPlaylist(trackPath string) PlaylistID
+func (f *Favorites) Symbol(trackPath string) string
+func (f *Favorites) Tracks(id PlaylistID) []string
+func (f *Favorites) Count(id PlaylistID) int
+func (f *Favorites) TotalCount() int
 
-func (f *Favourites) Cycle(trackPath string) (PlaylistID, error)
-func (f *Favourites) Remove(trackPath string) error
+func (f *Favorites) Cycle(trackPath string) (PlaylistID, error)
+func (f *Favorites) Remove(trackPath string) error
 ```
 
 `Tracks` и `PlaylistSpecs` возвращают копии. `Cycle` выполняет:
@@ -109,7 +109,7 @@ Path удаляется из старого массива и добавляет
 
 ## 3. Input
 
-Новые действия: `ActionFavourite` и `ActionFavouriteRemove`.
+Новые действия: `ActionFavorite` и `ActionFavoriteRemove`.
 
 | Устройство | Ввод | Результат |
 |---|---|---|
@@ -128,7 +128,7 @@ track. На других страницах, folders и source root X ничег
 
 ```go
 func (in *Input) ProcessEvent(event sdl.Event, favouriteMode bool, now time.Time) Action
-func (in *Input) PollFavouriteHold(favouriteMode bool, now time.Time) Action
+func (in *Input) PollFavoriteHold(favouriteMode bool, now time.Time) Action
 ```
 
 В favourite mode button-down начинает hold. Release до 500 ms возвращает cycle;
@@ -139,11 +139,11 @@ func (in *Input) PollFavouriteHold(favouriteMode bool, now time.Time) Action
 
 ## 4. App и async playback
 
-После settings app загружает favourites и передаёт overlay read-only view. При
-ошибке используется `NewReadOnlyFavourites()` и показывается уведомление.
+После settings app загружает favorites и передаёт overlay read-only view. При
+ошибке используется `NewReadOnlyFavorites()` и показывается уведомление.
 
-Favourite actions применяются только к `overlay.SelectedTrack()`. После успешной
-мутации app вызывает `overlay.RefreshFavourites()`. Ошибка записи показывается
+Favorite actions применяются только к `overlay.SelectedTrack()`. После успешной
+мутации app вызывает `overlay.RefreshFavorites()`. Ошибка записи показывается
 через notifier; UI и in-memory state остаются прежними.
 
 Для playable entry overlay возвращает:
@@ -180,8 +180,8 @@ Queue заменяется только после успешного совпа
 
 ## 5. UI и навигация
 
-Добавляются `sourceFavourites`, `ctxFavourites`, `entryFavouriteFolder` и
-`entryFavouriteTrack`. Это virtual entries: они не проходят через `stat`,
+Добавляются `sourceFavorites`, `ctxFavorites`, `entryFavoriteFolder` и
+`entryFavoriteTrack`. Это virtual entries: они не проходят через `stat`,
 filesystem delete или rescan. Playlist ID передаётся через `navEntry.format`
 как строка ("star", "heart", "note").
 
@@ -189,38 +189,40 @@ filesystem delete или rescan. Playlist ID передаётся через `na
 scroll, focus, Back и Enter:
 
 ```text
-source root -> Favourites/ -> playlist -> tracks
+source root -> Favorites/ -> playlist -> tracks
 ```
 
-- `Favourites/` отображается всегда;
+- `favorites/` отображается всегда;
 - внутри видны только непустые playlists в порядке `PlaylistSpecs()`;
 - Enter на playlist открывает tracks в порядке добавления;
 - Enter на track запускает async playback с pending queue;
-- Back возвращает в `Favourites/`, затем в source root;
+- Back возвращает в `favorites/`, затем в source root;
 - display name — существующий `player.TrackTitle(path)`.
 
 Overlay хранит read-only interface:
 
 ```go
-type FavouritesView interface {
+type FavoritesView interface {
     GetPlaylist(path string) player.PlaylistID
     Symbol(path string) string
     Tracks(id player.PlaylistID) []string
     Count(id player.PlaylistID) int
 }
 
-func (o *Overlay) SetFavourites(view FavouritesView)
-func (o *Overlay) RefreshFavourites()
+func (o *Overlay) SetFavorites(view FavoritesView)
+func (o *Overlay) RefreshFavorites()
 func (o *Overlay) SelectedTrack() (SelectedTrack, bool)
 ```
 
 Refresh перестраивает source root и открытый favourite playlist. Выбранный path
 сохраняется, если он остался; иначе cursor clamp-ится. После удаления последнего
-track overlay возвращается в `Favourites/`.
+track overlay возвращается в `favorites/`.
 
-В track lists перед именем отображается `★`, `♥` или `♪` цветом
-`palette().cursor`. Hint `Fav` показывается для любого playable track. Hint
-`Remove` показывается только для track, который уже входит в favourites.
+В track lists (NC mode) после имени отображается `★`, `♥` или `♪` как суффикс.
+Внутри playlists символы не отображаются — только `▸` для now-playing.
+F-действие игнорируется при просмотре внутри favorites playlist.
+Hint `Fav` показывается для любого playable track. Hint `Remove` показывается
+только для track, который уже входит в favorites.
 
 Glyphs `U+2605`, `U+2665` и `U+266A` добавляются в `font_ranges.json`; build
 проверяет их наличие в итоговом OTF.
@@ -251,7 +253,7 @@ Glyphs `U+2605`, `U+2665` и `U+266A` добавляются в `font_ranges.jso
 
 ### UI
 
-- `Favourites/` присутствует при пустом состоянии, пустые playlists скрыты;
+- `favorites/` присутствует при пустом состоянии, пустые playlists скрыты;
 - Back, Enter, cursor и scroll используют общий nav stack;
 - selection возвращает полный playlist и index;
 - refresh сохраняет выбранный path и закрывает пустой playlist;
@@ -260,7 +262,7 @@ Glyphs `U+2605`, `U+2665` и `U+266A` добавляются в `font_ranges.jso
 ## 7. Порядок реализации
 
 1. **Core:** model, strict load, transactional storage, path helper, tests,
-   `FavouritesPath()` и architecture doc.
+   `favoritesPath()` и architecture doc.
 2. **Input:** actions, context-aware short/long press и tests.
 3. **App/playback:** load policy, handlers, request-ID pending queue и tests.
 4. **UI:** virtual navigation, refresh, indicators, hints, font и tests.

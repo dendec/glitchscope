@@ -78,8 +78,8 @@ type App struct {
 
 	deleteSvc *deleteService
 
-	favourites     *player.Favourites
-	favouritesPath string
+	favorites     *player.Favorites
+	favoritesPath string
 
 	seek           seekControl // continuous-seek drivetrain state
 	onPresetsPage  bool        // true when UI is on Presets page (main viz stopped)
@@ -321,7 +321,7 @@ func (a *App) testSignal() []float32 {
 func (a *App) Init() {
 	a.initAudio()
 	a.initLibrary()
-	a.initFavourites()
+	a.initFavorites()
 	a.deleteSvc = newDeleteService(baseDir())
 	if a.deleteSvc.baseErr != nil {
 		slog.Error("delete service unavailable", "error", a.deleteSvc.baseErr)
@@ -566,27 +566,27 @@ func (a *App) addModlandAlbums(catalogAlbums []modland.Album) {
 	a.lib.AddVirtualAlbums(albums)
 }
 
-func (a *App) initFavourites() {
-	a.favouritesPath = config.FavouritesPath()
-	f, err := player.LoadFavourites(a.favouritesPath)
+func (a *App) initFavorites() {
+	a.favoritesPath = config.FavoritesPath()
+	f, err := player.LoadFavorites(a.favoritesPath)
 	if err != nil {
-		slog.Warn("favourites: load failed, using read-only", "error", err)
-		a.favourites = player.NewReadOnlyFavourites()
+		slog.Warn("favorites: load failed, using read-only", "error", err)
+		a.favorites = player.NewReadOnlyFavorites()
 		if a.overlay != nil {
-			a.overlay.SetFavourites(a.favourites)
-			a.overlay.ShowTrack("Favourites: load error, read-only")
+			a.overlay.SetFavorites(a.favorites)
+			a.overlay.ShowTrack("favorites: load error, read-only")
 		}
 		return
 	}
-	a.favourites = f
+	a.favorites = f
 	if a.overlay != nil {
-		a.overlay.SetFavourites(f)
+		a.overlay.SetFavorites(f)
 	}
-	slog.Info("favourites: loaded", "path", a.favouritesPath, "total", a.favourites.TotalCount())
+	slog.Info("favorites: loaded", "path", a.favoritesPath, "total", a.favorites.TotalCount())
 }
 
-// favouriteMode reports whether the X button should trigger favourite actions.
-func (a *App) favouriteMode() bool {
+// favoriteMode reports whether the X button should trigger favourite actions.
+func (a *App) favoriteMode() bool {
 	if a.overlay == nil || !a.overlay.UIVisible() {
 		return false
 	}

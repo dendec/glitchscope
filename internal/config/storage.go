@@ -17,12 +17,12 @@ func SettingsPath() string {
 	return "settings.json"
 }
 
-// FavouritesPath returns the favourites file location, adjacent to settings.json.
-func FavouritesPath() string {
+// FavoritesPath returns the favorites file location, adjacent to settings.json.
+func FavoritesPath() string {
 	if p := os.Getenv("XDG_DATA_HOME"); p != "" {
-		return filepath.Join(p, "favourites.json")
+		return filepath.Join(p, "favorites.json")
 	}
-	return "favourites.json"
+	return "favorites.json"
 }
 
 // LoadSettings reads and validates a settings file. Missing files return defaults.

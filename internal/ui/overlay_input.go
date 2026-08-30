@@ -536,14 +536,14 @@ func (o *Overlay) Select() bool {
 					o.switchToNC(o.musicDir)
 				case sourceMicrophone:
 					o.micMenuRequested = true
-				case sourceFavourites:
+				case sourceFavorites:
 					o.switchToProvider(e.source)
 				case sourceModland, sourceModArchive:
 					o.switchToProvider(e.source)
 				}
 				return false
-			case e.kind == entryFavouriteFolder:
-				o.switchToFavouritesPlaylist(player.PlaylistID(e.format))
+			case e.kind == entryFavoriteFolder:
+				o.switchToFavoritesPlaylist(player.PlaylistID(e.format))
 				return false
 			case e.kind == entryMicrophoneDevice:
 				o.micDeviceSelected = e.device
@@ -558,7 +558,7 @@ func (o *Overlay) Select() bool {
 				return false
 			case e.IsNCFile():
 				return true // play the file
-			case e.IsFavouriteTrack():
+			case e.IsFavoriteTrack():
 				return true // play the favourite track
 			case e.IsCatalogTrack():
 				slog.Debug("Select: catalog track", "albumIdx", e.albumIdx, "trackIdx", e.trackIdx)
@@ -712,7 +712,7 @@ func (o *Overlay) FocusPanel() int { return o.focusPanel }
 
 func (o *Overlay) IsNCMode() bool { return o.isNC() }
 
-func (o *Overlay) IsFavouritesMode() bool { return o.topLevel().ctx == ctxFavourites }
+func (o *Overlay) IsFavoritesMode() bool { return o.topLevel().ctx == ctxFavorites }
 
 func (o *Overlay) IsCatalogMode() bool { return o.isCatalog() }
 

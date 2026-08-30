@@ -34,9 +34,9 @@ const (
 	// Seek actions.
 	ActionSeekForward
 	ActionSeekBackward
-	// Favourite actions.
-	ActionFavourite       // cycle: Star→Heart→Note→None
-	ActionFavouriteRemove // remove from any playlist
+	// Favorite actions.
+	ActionFavorite       // cycle: Star→Heart→Note→None
+	ActionFavoriteRemove // remove from any playlist
 )
 
 const axisDeadZone int16 = 8000
@@ -73,8 +73,8 @@ func (in *Input) Close() {
 }
 
 // ProcessEvent translates an SDL event into an Action.
-// favouriteMode enables the X button for favouriting instead of play/pause.
-func (in *Input) ProcessEvent(event sdl.Event, favouriteMode bool, now time.Time) Action {
+// favoriteMode enables the X button for favouriting instead of play/pause.
+func (in *Input) ProcessEvent(event sdl.Event, favoriteMode bool, now time.Time) Action {
 	switch e := event.(type) {
 	case *sdl.QuitEvent:
 		return ActionQuit
@@ -90,10 +90,10 @@ func (in *Input) ProcessEvent(event sdl.Event, favouriteMode bool, now time.Time
 
 	case *sdl.ControllerButtonEvent:
 		if e.Type == sdl.CONTROLLERBUTTONDOWN {
-			return in.buttonDown(e.Button, favouriteMode, now)
+			return in.buttonDown(e.Button, favoriteMode, now)
 		}
 		if e.Type == sdl.CONTROLLERBUTTONUP {
-			return in.buttonUp(e.Button, favouriteMode)
+			return in.buttonUp(e.Button, favoriteMode)
 		}
 
 	case *sdl.ControllerAxisEvent:
@@ -107,7 +107,7 @@ func (in *Input) ProcessEvent(event sdl.Event, favouriteMode bool, now time.Time
 			}
 		case sdl.CONTROLLERDEVICEREMOVED:
 			if in.joyIdx >= 0 {
-				in.ResetFavouriteHold()
+				in.ResetFavoriteHold()
 				in.Close()
 				in.tryOpenController()
 			}
@@ -202,16 +202,16 @@ func keyToAction(key sdl.Keycode) Action {
 	case sdl.K_PERIOD:
 		return ActionSeekForward
 	case sdl.K_f:
-		return ActionFavourite
+		return ActionFavorite
 	case sdl.K_DELETE:
-		return ActionFavouriteRemove
+		return ActionFavoriteRemove
 	}
 	return ActionNone
 }
 
 // buttonDown handles CONTROLLERBUTTONDOWN events.
-// favouriteMode repurposes the X button from play/pause to favourite cycle.
-func (in *Input) buttonDown(btn uint8, favouriteMode bool, now time.Time) Action {
+// favoriteMode repurposes the X button from play/pause to favourite cycle.
+func (in *Input) buttonDown(btn uint8, favoriteMode bool, now time.Time) Action {
 	switch btn {
 	case sdl.CONTROLLER_BUTTON_A:
 		return ActionBack
@@ -220,7 +220,7 @@ func (in *Input) buttonDown(btn uint8, favouriteMode bool, now time.Time) Action
 	case sdl.CONTROLLER_BUTTON_X:
 		return ActionRandomPreset
 	case sdl.CONTROLLER_BUTTON_Y:
-		if favouriteMode {
+		if favoriteMode {
 			in.longPressDownAt = now
 			in.longPressActive = true
 			in.longPressFired = false
@@ -248,35 +248,35 @@ func (in *Input) buttonDown(btn uint8, favouriteMode bool, now time.Time) Action
 }
 
 // buttonUp handles CONTROLLERBUTTONUP events.
-func (in *Input) buttonUp(btn uint8, favouriteMode bool) Action {
-	if btn == sdl.CONTROLLER_BUTTON_Y && favouriteMode && in.longPressActive {
+func (in *Input) buttonUp(btn uint8, favoriteMode bool) Action {
+	if btn == sdl.CONTROLLER_BUTTON_Y && favoriteMode && in.longPressActive {
 		in.longPressActive = false
 		if !in.longPressFired {
-			return ActionFavourite
+			return ActionFavorite
 		}
 		return ActionNone
 	}
 	return ActionNone
 }
 
-// PollFavouriteHold checks if X has been held > 500 ms for remove.
-func (in *Input) PollFavouriteHold(favouriteMode bool, now time.Time) Action {
-	if !favouriteMode || !in.longPressActive || in.longPressFired {
+// PollFavoriteHold checks if X has been held > 500 ms for remove.
+func (in *Input) PollFavoriteHold(favoriteMode bool, now time.Time) Action {
+	if !favoriteMode || !in.longPressActive || in.longPressFired {
 		return ActionNone
 	}
 	if in.controller.Button(sdl.CONTROLLER_BUTTON_Y) == 0 {
 		in.longPressActive = false
-		return ActionFavourite
+		return ActionFavorite
 	}
 	if now.Sub(in.longPressDownAt) > 500*time.Millisecond {
 		in.longPressFired = true
-		return ActionFavouriteRemove
+		return ActionFavoriteRemove
 	}
 	return ActionNone
 }
 
-// ResetFavouriteHold clears long-press state.
-func (in *Input) ResetFavouriteHold() {
+// ResetFavoriteHold clears long-press state.
+func (in *Input) ResetFavoriteHold() {
 	in.longPressActive = false
 	in.longPressFired = false
 }

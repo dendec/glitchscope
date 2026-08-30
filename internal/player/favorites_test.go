@@ -7,7 +7,7 @@ import (
 )
 
 // mustCycle is a test helper that cycles and fails on error.
-func mustCycle(t *testing.T, f *Favourites, track string) PlaylistID {
+func mustCycle(t *testing.T, f *Favorites, track string) PlaylistID {
 	t.Helper()
 	kind, err := f.Cycle(track)
 	if err != nil {
@@ -16,12 +16,12 @@ func mustCycle(t *testing.T, f *Favourites, track string) PlaylistID {
 	return kind
 }
 
-func TestFavouritesCycle(t *testing.T) {
+func TestFavoritesCycle(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 	track := filepath.Join(dir, "music", "test.mod")
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,14 +72,14 @@ func TestFavouritesCycle(t *testing.T) {
 	}
 }
 
-func TestFavouritesRoundTrip(t *testing.T) {
+func TestFavoritesRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 	track1 := filepath.Join(dir, "a.mod")
 	track2 := filepath.Join(dir, "b.xm")
 	track3 := filepath.Join(dir, "c.it")
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestFavouritesRoundTrip(t *testing.T) {
 	mustCycle(t, f, track3) // → Star
 
 	// Reload from disk.
-	f2, err := LoadFavourites(path)
+	f2, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,44 +115,44 @@ func TestFavouritesRoundTrip(t *testing.T) {
 	}
 }
 
-func TestFavouritesEmptyLoad(t *testing.T) {
+func TestFavoritesEmptyLoad(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "nonexistent.json")
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !f.Writable() {
-		t.Fatal("empty favourites should be writable")
+		t.Fatal("empty favorites should be writable")
 	}
 	if f.TotalCount() != 0 {
 		t.Fatalf("total count: got %d, want 0", f.TotalCount())
 	}
 }
 
-func TestFavouritesReadOnlyOnCorrupt(t *testing.T) {
+func TestFavoritesReadOnlyOnCorrupt(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 	if err := os.WriteFile(path, []byte("{bad json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err == nil {
 		t.Fatal("expected error for corrupt file")
 	}
 	if f.Writable() {
-		t.Fatal("corrupt favourites should be read-only")
+		t.Fatal("corrupt favorites should be read-only")
 	}
 }
 
-func TestFavouritesDuplicateRejected(t *testing.T) {
+func TestFavoritesDuplicateRejected(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 	track := filepath.Join(dir, "a.mod")
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,12 +169,12 @@ func TestFavouritesDuplicateRejected(t *testing.T) {
 	}
 }
 
-func TestFavouritesRemove(t *testing.T) {
+func TestFavoritesRemove(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 	track := filepath.Join(dir, "a.mod")
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,11 +195,11 @@ func TestFavouritesRemove(t *testing.T) {
 	}
 }
 
-func TestFavouritesRemoveNonexistent(t *testing.T) {
+func TestFavoritesRemoveNonexistent(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,12 +209,12 @@ func TestFavouritesRemoveNonexistent(t *testing.T) {
 	}
 }
 
-func TestFavouritesSymbol(t *testing.T) {
+func TestFavoritesSymbol(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 	track := filepath.Join(dir, "a.mod")
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,12 +244,12 @@ func TestFavouritesSymbol(t *testing.T) {
 	}
 }
 
-func TestFavouritesTracksReturnsCopy(t *testing.T) {
+func TestFavoritesTracksReturnsCopy(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 	track := filepath.Join(dir, "a.mod")
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,12 +264,12 @@ func TestFavouritesTracksReturnsCopy(t *testing.T) {
 	}
 }
 
-func TestFavouritesVirtualPath(t *testing.T) {
+func TestFavoritesVirtualPath(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 	virtualTrack := "modland:http://modland.textfiles.com/mods/a/test.mod"
 
-	f, err := LoadFavourites(path)
+	f, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +279,7 @@ func TestFavouritesVirtualPath(t *testing.T) {
 		t.Fatalf("virtual cycle: got %q, want %q", kind, PlaylistStar)
 	}
 
-	f2, err := LoadFavourites(path)
+	f2, err := LoadFavorites(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +288,7 @@ func TestFavouritesVirtualPath(t *testing.T) {
 	}
 }
 
-func TestFavouritesTrackTitle(t *testing.T) {
+func TestFavoritesTrackTitle(t *testing.T) {
 	tests := []struct {
 		path string
 		want string
@@ -298,22 +298,22 @@ func TestFavouritesTrackTitle(t *testing.T) {
 		{"modarchive:http://example.com/files/a/b/file.zip#nested.mod", "nested.mod"},
 	}
 	for _, tt := range tests {
-		got := FavouriteTrackTitle(tt.path)
+		got := FavoriteTrackTitle(tt.path)
 		if got != tt.want {
-			t.Errorf("FavouriteTrackTitle(%q) = %q, want %q", tt.path, got, tt.want)
+			t.Errorf("FavoriteTrackTitle(%q) = %q, want %q", tt.path, got, tt.want)
 		}
 	}
 }
 
-func TestFavouritesPreservesOrder(t *testing.T) {
+func TestFavoritesPreservesOrder(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "favourites.json")
+	path := filepath.Join(dir, "favorites.json")
 	tracks := make([]string, 5)
 	for i := range tracks {
 		tracks[i] = filepath.Join(dir, string(rune('a'+i))+".mod")
 	}
 
-	f, _ := LoadFavourites(path)
+	f, _ := LoadFavorites(path)
 	// Add to Star in order: c, a, e, b, d
 	mustCycle(t, f, tracks[2]) // c → Star
 	mustCycle(t, f, tracks[0]) // a → Star
@@ -333,7 +333,7 @@ func TestFavouritesPreservesOrder(t *testing.T) {
 	}
 
 	// Reload and verify order is preserved.
-	f2, _ := LoadFavourites(path)
+	f2, _ := LoadFavorites(path)
 	got2 := f2.Tracks(PlaylistStar)
 	for i := range got2 {
 		if got2[i] != want[i] {

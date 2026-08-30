@@ -87,7 +87,7 @@ const (
 	ctxNC                       // NC-local filesystem browser (dirPath set)
 	ctxCatalog                  // remote catalog level: formats / albums / modarchive dirs
 	ctxMicrophone               // SDL capture-device selection
-	ctxFavourites               // favourites playlist level
+	ctxFavorites                // favorites playlist level
 )
 
 type sourceKind int
@@ -95,7 +95,7 @@ type sourceKind int
 const (
 	sourceMusic sourceKind = iota
 	sourceMicrophone
-	sourceFavourites
+	sourceFavorites
 	sourceModland
 	sourceModArchive
 )
@@ -260,7 +260,7 @@ type Overlay struct {
 	micStopRequested    bool   // one-shot: stop capture selected
 	closeInjectPending  bool
 	modArchiveItems     map[string][]modarchive.DirItem
-	favouritesView      FavouritesView
+	favoritesView       FavoritesView
 	deviceInfo          *DeviceInfo
 }
 
@@ -404,7 +404,7 @@ func (o *Overlay) HasPlayableTrack() bool {
 	if e == nil {
 		return false
 	}
-	return e.IsNCFile() || e.IsCatalogTrack() || e.IsLeafAlbum() || e.IsFavouriteTrack()
+	return e.IsNCFile() || e.IsCatalogTrack() || e.IsLeafAlbum() || e.IsFavoriteTrack()
 }
 
 // SelectedTrackPath returns the file path of the focused entry, or "".
@@ -413,14 +413,14 @@ func (o *Overlay) SelectedTrackPath() string {
 	if e == nil {
 		return ""
 	}
-	if e.IsNCFile() || e.IsFavouriteTrack() || e.IsCatalogTrack() {
+	if e.IsNCFile() || e.IsFavoriteTrack() || e.IsCatalogTrack() {
 		return e.filePath
 	}
 	return ""
 }
 
-// FavouritesView is a read-only interface for displaying favourites.
-type FavouritesView interface {
+// FavoritesView is a read-only interface for displaying favorites.
+type FavoritesView interface {
 	GetPlaylist(path string) player.PlaylistID
 	Symbol(path string) string
 	Tracks(id player.PlaylistID) []string
@@ -428,18 +428,23 @@ type FavouritesView interface {
 	TotalCount() int
 }
 
-// SetFavourites stores a read-only favourites view for display.
-func (o *Overlay) SetFavourites(view FavouritesView) {
-	o.favouritesView = view
+// SetFavorites stores a read-only favorites view for display.
+func (o *Overlay) SetFavorites(view FavoritesView) {
+	o.favoritesView = view
 	o.refreshSourceRoot()
 }
 
-// RefreshFavourites rebuilds the source root and open favourite playlist.
-func (o *Overlay) RefreshFavourites() {
+// RefreshFavorites rebuilds the source root and open favourite playlist,
+// then marks content dirty so the symbol appears immediately.
+// RefreshFavorites rebuilds the source root and open favourite playlist,
+// then marks content dirty so the symbol appears immediately.
+func (o *Overlay) RefreshFavorites() {
 	o.refreshSourceRoot()
-	if o.topLevel().ctx == ctxFavourites && o.topLevel().playlistID != "" {
-		o.rebuildCurrentFavouritePlaylist()
+	if o.topLevel().ctx == ctxFavorites && o.topLevel().playlistID != "" {
+		o.rebuildCurrentFavoritePlaylist()
 	}
+	o.albumsDirty = true
+	o.tracksDirty = true
 }
 
 func (o *Overlay) IsSettingsEditing() bool { return o.settingsEditing }
