@@ -60,6 +60,12 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 			}
 		}
 		return
+	case input.ActionFavourite:
+		a.handleFavourite()
+		return
+	case input.ActionFavouriteRemove:
+		a.handleFavouriteRemove()
+		return
 	}
 
 	if a.overlay != nil && a.overlay.UIVisible() {
@@ -111,6 +117,13 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 					a.deleteNCPath(path)
 				}
 			}
+		} else if a.overlay.IsFavouritesMode() {
+			if a.overlay.Select() && a.pl != nil {
+				path := a.overlay.SelectedTrackPath()
+				if path != "" {
+					a.playFavouriteFile(path)
+				}
+			}
 		} else {
 			selected := a.overlay.Select()
 			if a.overlay.ConsumeMicMenuRequest() {
@@ -154,6 +167,12 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 
 	case input.ActionPrevPreset:
 		a.switchScreen(winW, winH, false)
+
+	case input.ActionFavourite:
+		a.handleFavourite()
+
+	case input.ActionFavouriteRemove:
+		a.handleFavouriteRemove()
 	}
 }
 
@@ -497,6 +516,35 @@ func (a *App) playFile(path string) {
 	}
 }
 
+// playFavouriteFile plays a track from a favourites playlist. The queue becomes
+// a snapshot of the entire playlist in order; subsequent favourites changes
+// don't affect the running queue.
+func (a *App) playFavouriteFile(path string) {
+	if a.favourites == nil {
+		return
+	}
+	// Determine which playlist this track belongs to.
+	kind := a.favourites.GetPlaylist(path)
+	if kind == "" {
+		// Not in any playlist — fall back to single-file playback.
+		a.playFile(path)
+		return
+	}
+	// Snapshot the entire playlist as the playback queue.
+	tracks := a.favourites.Tracks(kind)
+	if len(tracks) == 0 {
+		return
+	}
+	idx := slices.Index(tracks, path)
+	if idx < 0 {
+		idx = 0
+	}
+	album := "Favourites " + kind.String()
+	if a.playbackState.setPlaylist(tracks, idx, album) {
+		a.playTrack(tracks[idx], album)
+	}
+}
+
 type audioScanError struct {
 	status filesystem.Status
 	err    error
@@ -591,4 +639,79 @@ func walkAudioFiles(root string) ([]string, error) {
 		return nil, &audioScanError{status: report.Status, err: fmt.Errorf("walk %s: %w", root, report.Err())}
 	}
 	return files, nil
+}
+
+// handleFavourite cycles the focused track through the favourites playlists.
+func (a *App) handleFavourite() {
+	if a.favourites == nil {
+		slog.Debug("favourites: toggle ignored", "reason", "store unavailable")
+		return
+	}
+	if !a.favourites.Writable() {
+		slog.Warn("favourites: toggle ignored", "reason", "store read-only")
+		return
+	}
+	path := ""
+	if a.overlay != nil && a.overlay.UIVisible() {
+		path = a.overlay.SelectedTrackPath()
+	}
+	if path == "" && a.pl != nil {
+		path = a.pl.TrackPath()
+	}
+	if path == "" {
+		slog.Debug("favourites: toggle ignored", "reason", "no track selected")
+		return
+	}
+	playlist, err := a.favourites.Cycle(path)
+	if err != nil {
+		slog.Warn("favourites: cycle failed", "path", path, "error", err)
+		if a.overlay != nil {
+			a.overlay.ShowTrack("Favourites: save error")
+		}
+		return
+	}
+	slog.Info("favourites: track updated", "path", path, "playlist", playlist)
+	if a.overlay != nil {
+		label := "None"
+		if playlist != "" {
+			label = playlist.String()
+		}
+		a.overlay.ShowTrack("Favourites: " + label)
+		a.overlay.RefreshFavourites()
+	}
+}
+
+// handleFavouriteRemove removes the focused track from any favourites playlist.
+func (a *App) handleFavouriteRemove() {
+	if a.favourites == nil {
+		slog.Debug("favourites: remove ignored", "reason", "store unavailable")
+		return
+	}
+	if !a.favourites.Writable() {
+		slog.Warn("favourites: remove ignored", "reason", "store read-only")
+		return
+	}
+	path := ""
+	if a.overlay != nil && a.overlay.UIVisible() {
+		path = a.overlay.SelectedTrackPath()
+	}
+	if path == "" && a.pl != nil {
+		path = a.pl.TrackPath()
+	}
+	if path == "" {
+		slog.Debug("favourites: remove ignored", "reason", "no track selected")
+		return
+	}
+	if err := a.favourites.Remove(path); err != nil {
+		slog.Warn("favourites: remove failed", "path", path, "error", err)
+		if a.overlay != nil {
+			a.overlay.ShowTrack("Favourites: save error")
+		}
+		return
+	}
+	slog.Info("favourites: track removed", "path", path)
+	if a.overlay != nil {
+		a.overlay.ShowTrack("Favourites: None")
+		a.overlay.RefreshFavourites()
+	}
 }

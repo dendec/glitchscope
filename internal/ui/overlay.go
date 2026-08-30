@@ -87,6 +87,7 @@ const (
 	ctxNC                       // NC-local filesystem browser (dirPath set)
 	ctxCatalog                  // remote catalog level: formats / albums / modarchive dirs
 	ctxMicrophone               // SDL capture-device selection
+	ctxFavourites               // favourites playlist level
 )
 
 type sourceKind int
@@ -94,6 +95,7 @@ type sourceKind int
 const (
 	sourceMusic sourceKind = iota
 	sourceMicrophone
+	sourceFavourites
 	sourceModland
 	sourceModArchive
 )
@@ -258,6 +260,7 @@ type Overlay struct {
 	micStopRequested    bool   // one-shot: stop capture selected
 	closeInjectPending  bool
 	modArchiveItems     map[string][]modarchive.DirItem
+	favouritesView      FavouritesView
 	deviceInfo          *DeviceInfo
 }
 
@@ -391,7 +394,53 @@ func (o *Overlay) SettingsCursor() int { return o.settingsCursor }
 
 func (o *Overlay) IsSettingsPage() bool { return o.uiPage == PageSettings }
 
+func (o *Overlay) IsLibraryPage() bool { return o.uiPage == PageLibrary }
+
 func (o *Overlay) IsPresetsPage() bool { return o.uiPage == PagePresets }
+
+// HasPlayableTrack reports whether the focused entry is a playable file.
+func (o *Overlay) HasPlayableTrack() bool {
+	e := o.currentEntry()
+	if e == nil {
+		return false
+	}
+	return e.IsNCFile() || e.IsCatalogTrack() || e.IsLeafAlbum() || e.IsFavouriteTrack()
+}
+
+// SelectedTrackPath returns the file path of the focused entry, or "".
+func (o *Overlay) SelectedTrackPath() string {
+	e := o.currentEntry()
+	if e == nil {
+		return ""
+	}
+	if e.IsNCFile() || e.IsFavouriteTrack() || e.IsCatalogTrack() {
+		return e.filePath
+	}
+	return ""
+}
+
+// FavouritesView is a read-only interface for displaying favourites.
+type FavouritesView interface {
+	GetPlaylist(path string) player.PlaylistID
+	Symbol(path string) string
+	Tracks(id player.PlaylistID) []string
+	Count(id player.PlaylistID) int
+	TotalCount() int
+}
+
+// SetFavourites stores a read-only favourites view for display.
+func (o *Overlay) SetFavourites(view FavouritesView) {
+	o.favouritesView = view
+	o.refreshSourceRoot()
+}
+
+// RefreshFavourites rebuilds the source root and open favourite playlist.
+func (o *Overlay) RefreshFavourites() {
+	o.refreshSourceRoot()
+	if o.topLevel().ctx == ctxFavourites && o.topLevel().playlistID != "" {
+		o.rebuildCurrentFavouritePlaylist()
+	}
+}
 
 func (o *Overlay) IsSettingsEditing() bool { return o.settingsEditing }
 

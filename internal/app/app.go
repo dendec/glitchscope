@@ -78,6 +78,9 @@ type App struct {
 
 	deleteSvc *deleteService
 
+	favourites     *player.Favourites
+	favouritesPath string
+
 	seek           seekControl // continuous-seek drivetrain state
 	onPresetsPage  bool        // true when UI is on Presets page (main viz stopped)
 	selectedPreset string      // confirmed on Presets page, loaded when the page closes
@@ -318,6 +321,7 @@ func (a *App) testSignal() []float32 {
 func (a *App) Init() {
 	a.initAudio()
 	a.initLibrary()
+	a.initFavourites()
 	a.deleteSvc = newDeleteService(baseDir())
 	if a.deleteSvc.baseErr != nil {
 		slog.Error("delete service unavailable", "error", a.deleteSvc.baseErr)
@@ -560,6 +564,36 @@ func (a *App) addModlandAlbums(catalogAlbums []modland.Album) {
 		}
 	}
 	a.lib.AddVirtualAlbums(albums)
+}
+
+func (a *App) initFavourites() {
+	a.favouritesPath = config.FavouritesPath()
+	f, err := player.LoadFavourites(a.favouritesPath)
+	if err != nil {
+		slog.Warn("favourites: load failed, using read-only", "error", err)
+		a.favourites = player.NewReadOnlyFavourites()
+		if a.overlay != nil {
+			a.overlay.SetFavourites(a.favourites)
+			a.overlay.ShowTrack("Favourites: load error, read-only")
+		}
+		return
+	}
+	a.favourites = f
+	if a.overlay != nil {
+		a.overlay.SetFavourites(f)
+	}
+	slog.Info("favourites: loaded", "path", a.favouritesPath, "total", a.favourites.TotalCount())
+}
+
+// favouriteMode reports whether the X button should trigger favourite actions.
+func (a *App) favouriteMode() bool {
+	if a.overlay == nil || !a.overlay.UIVisible() {
+		return false
+	}
+	if !a.overlay.IsLibraryPage() {
+		return false
+	}
+	return a.overlay.HasPlayableTrack()
 }
 
 func (a *App) initInput() {

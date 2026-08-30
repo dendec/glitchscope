@@ -20,12 +20,13 @@ type UIHint struct {
 // Abstract action keys that a hint can surface. They are mapped to the actual
 // keyboard or gamepad control by the active mapping (see controlLabel).
 const (
-	hintSelect = "select"
-	hintBack   = "back"
-	hintFocus  = "focus"
-	hintMove   = "move"
-	hintPages  = "pages"
-	hintPlay   = "play"
+	hintSelect    = "select"
+	hintBack      = "back"
+	hintFocus     = "focus"
+	hintMove      = "move"
+	hintPages     = "pages"
+	hintPlay      = "play"
+	hintFavourite = "favourite"
 )
 
 // controlLabel returns the concrete control label for an abstract action under
@@ -45,6 +46,8 @@ func (o *Overlay) controlLabel(action string) string {
 			return "L1/R1"
 		case hintPlay:
 			return "X"
+		case hintFavourite:
+			return "X"
 		}
 		return "?"
 	}
@@ -61,6 +64,8 @@ func (o *Overlay) controlLabel(action string) string {
 		return "P"
 	case hintPlay:
 		return "Space"
+	case hintFavourite:
+		return "F"
 	}
 	return "?"
 }
@@ -189,11 +194,23 @@ func (o *Overlay) libraryHints() []UIHint {
 	if !o.isNC() && o.topLevel().ctx == ctxSourceRoot {
 		backVerb = "Close"
 	}
-	return []UIHint{
+	hints := []UIHint{
 		{Key: o.controlLabel(hintSelect), Label: "Open"},
 		{Key: o.controlLabel(hintBack), Label: backVerb},
 		{Key: o.controlLabel(hintMove), Label: "Item"},
 	}
+	if o.HasPlayableTrack() && o.favouritesView != nil {
+		e := o.currentEntry()
+		if e != nil {
+			sym := o.favouritesView.Symbol(e.filePath)
+			if sym != "" {
+				hints = append(hints, UIHint{Key: o.controlLabel(hintFavourite), Label: "Remove"})
+			} else {
+				hints = append(hints, UIHint{Key: o.controlLabel(hintFavourite), Label: "Fav"})
+			}
+		}
+	}
+	return hints
 }
 
 // buildHintsText joins hints into one footer line, dropping trailing hints

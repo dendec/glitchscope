@@ -189,8 +189,9 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 }
 
 func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h int) bool {
+	favouriteMode := a.favouriteMode()
 	for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
-		act := a.inp.ProcessEvent(e)
+		act := a.inp.ProcessEvent(e, favouriteMode, now)
 		if act == input.ActionQuit {
 			return false
 		}
@@ -202,6 +203,10 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 		} else {
 			a.handleAction(act, w, h)
 		}
+	}
+
+	if hold := a.inp.PollFavouriteHold(favouriteMode, now); hold != input.ActionNone {
+		a.handleAction(hold, w, h)
 	}
 
 	// Apply page transitions before timers so automatic preset changes are

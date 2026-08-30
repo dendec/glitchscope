@@ -135,6 +135,25 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 			if e.IsNCFile() && e.filePath == o.playingPath {
 				prefix = "▸ "
 			}
+			// Show favourite symbol if track is in a playlist.
+			if e.IsNCFile() && o.favouritesView != nil {
+				sym := o.favouritesView.Symbol(e.filePath)
+				if sym != "" {
+					prefix = sym + " "
+				}
+			}
+		} else if o.topLevel().ctx == ctxFavourites {
+			// Favourites: show symbol and now-playing marker.
+			e := o.albumEntries[i]
+			if e.IsFavouriteTrack() {
+				sym := o.favouritesView.Symbol(e.filePath)
+				if sym != "" {
+					prefix = sym + " "
+				}
+				if e.filePath == o.playingPath {
+					prefix = "▸ "
+				}
+			}
 		} else if name == o.playingAlbum {
 			prefix = "▸ "
 		}
@@ -223,8 +242,13 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 			suffix = "  " + formatDuration(info.Duration)
 		}
 		prefix := "  "
+		if o.favouritesView != nil {
+			if symbol := o.favouritesView.Symbol(info.Path); symbol != "" {
+				prefix = symbol + " "
+			}
+		}
 		if info.Path == o.playingPath {
-			prefix = "▸ "
+			prefix = "▸ " + prefix
 		}
 		line := prefix + title + suffix
 		rows = append(rows, listRow{text: line, active: i == o.trackCursor && o.panelEntered && o.focusPanel == 1})

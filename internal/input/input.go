@@ -3,6 +3,7 @@ package input
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -33,6 +34,9 @@ const (
 	// Seek actions.
 	ActionSeekForward
 	ActionSeekBackward
+	// Favourite actions.
+	ActionFavourite       // cycle: Star→Heart→Note→None
+	ActionFavouriteRemove // remove from any playlist
 )
 
 const axisDeadZone int16 = 8000
@@ -45,6 +49,11 @@ type Input struct {
 	// Axis tracking for repeat prevention.
 	lAxisY int16
 	lAxisX int16
+
+	// Long press tracking for favourite button (gamepad X / CONTROLLER_BUTTON_Y).
+	longPressDownAt time.Time
+	longPressActive bool // true while button is held
+	longPressFired  bool // true after long press threshold reached
 }
 
 // New creates an Input handler and opens the first game controller.
@@ -64,7 +73,8 @@ func (in *Input) Close() {
 }
 
 // ProcessEvent translates an SDL event into an Action.
-func (in *Input) ProcessEvent(event sdl.Event) Action {
+// favouriteMode enables the X button for favouriting instead of play/pause.
+func (in *Input) ProcessEvent(event sdl.Event, favouriteMode bool, now time.Time) Action {
 	switch e := event.(type) {
 	case *sdl.QuitEvent:
 		return ActionQuit
@@ -74,17 +84,17 @@ func (in *Input) ProcessEvent(event sdl.Event) Action {
 			return ActionNone
 		}
 		if e.Repeat != 0 {
-			// Ignore OS key-repeat: held-key acceleration is driven by
-			// polling GetKeyboardState in Overlay.Update.
 			return ActionNone
 		}
 		return keyToAction(e.Keysym.Sym)
 
 	case *sdl.ControllerButtonEvent:
-		if e.Type != sdl.CONTROLLERBUTTONDOWN {
-			return ActionNone
+		if e.Type == sdl.CONTROLLERBUTTONDOWN {
+			return in.buttonDown(e.Button, favouriteMode, now)
 		}
-		return buttonToAction(e.Button)
+		if e.Type == sdl.CONTROLLERBUTTONUP {
+			return in.buttonUp(e.Button, favouriteMode)
+		}
 
 	case *sdl.ControllerAxisEvent:
 		return axisToAction(in, e)
@@ -97,6 +107,7 @@ func (in *Input) ProcessEvent(event sdl.Event) Action {
 			}
 		case sdl.CONTROLLERDEVICEREMOVED:
 			if in.joyIdx >= 0 {
+				in.ResetFavouriteHold()
 				in.Close()
 				in.tryOpenController()
 			}
@@ -190,23 +201,32 @@ func keyToAction(key sdl.Keycode) Action {
 		return ActionSeekBackward
 	case sdl.K_PERIOD:
 		return ActionSeekForward
+	case sdl.K_f:
+		return ActionFavourite
+	case sdl.K_DELETE:
+		return ActionFavouriteRemove
 	}
 	return ActionNone
 }
 
-func buttonToAction(btn uint8) Action {
-	// SDL normalizes to Xbox layout. Nintendo labels are offset:
-	//   Nintendo A (right) = SDL B,  Nintendo B (bottom) = SDL A
-	//   Nintendo X (top)   = SDL Y,  Nintendo Y (left)  = SDL X
+// buttonDown handles CONTROLLERBUTTONDOWN events.
+// favouriteMode repurposes the X button from play/pause to favourite cycle.
+func (in *Input) buttonDown(btn uint8, favouriteMode bool, now time.Time) Action {
 	switch btn {
 	case sdl.CONTROLLER_BUTTON_A:
-		return ActionBack // Nintendo B (bottom) = back
+		return ActionBack
 	case sdl.CONTROLLER_BUTTON_B:
-		return ActionSelect // Nintendo A (right) = confirm
+		return ActionSelect
 	case sdl.CONTROLLER_BUTTON_X:
-		return ActionRandomPreset // Nintendo Y (left) = random
+		return ActionRandomPreset
 	case sdl.CONTROLLER_BUTTON_Y:
-		return ActionPlayPause // Nintendo X (top) = play/pause
+		if favouriteMode {
+			in.longPressDownAt = now
+			in.longPressActive = true
+			in.longPressFired = false
+			return ActionNone
+		}
+		return ActionPlayPause
 	case sdl.CONTROLLER_BUTTON_DPAD_UP:
 		return ActionCursorUp
 	case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
@@ -225,6 +245,40 @@ func buttonToAction(btn uint8) Action {
 		return ActionNextPreset
 	}
 	return ActionNone
+}
+
+// buttonUp handles CONTROLLERBUTTONUP events.
+func (in *Input) buttonUp(btn uint8, favouriteMode bool) Action {
+	if btn == sdl.CONTROLLER_BUTTON_Y && favouriteMode && in.longPressActive {
+		in.longPressActive = false
+		if !in.longPressFired {
+			return ActionFavourite
+		}
+		return ActionNone
+	}
+	return ActionNone
+}
+
+// PollFavouriteHold checks if X has been held > 500 ms for remove.
+func (in *Input) PollFavouriteHold(favouriteMode bool, now time.Time) Action {
+	if !favouriteMode || !in.longPressActive || in.longPressFired {
+		return ActionNone
+	}
+	if in.controller.Button(sdl.CONTROLLER_BUTTON_Y) == 0 {
+		in.longPressActive = false
+		return ActionFavourite
+	}
+	if now.Sub(in.longPressDownAt) > 500*time.Millisecond {
+		in.longPressFired = true
+		return ActionFavouriteRemove
+	}
+	return ActionNone
+}
+
+// ResetFavouriteHold clears long-press state.
+func (in *Input) ResetFavouriteHold() {
+	in.longPressActive = false
+	in.longPressFired = false
 }
 
 func axisToAction(in *Input, e *sdl.ControllerAxisEvent) Action {

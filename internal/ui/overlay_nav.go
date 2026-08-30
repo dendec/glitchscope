@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"path/filepath"
@@ -48,6 +49,8 @@ const (
 	entryParent                               // parent navigation level
 	entryNCDir                                // NC directory entry
 	entryNCFile                               // NC file entry (leaf)
+	entryFavouriteFolder                      // favourites playlist folder
+	entryFavouriteTrack                       // track in a favourites playlist
 	entryMicrophoneDevice                     // SDL capture device entry
 	entryMicrophoneStop                       // stops active capture
 	entryInfo                                 // non-selectable informational row
@@ -70,12 +73,13 @@ type navEntry struct {
 // navLevel is one visible listing in the unified navigation stack.
 // The stack bottom is the virtual source root; Back never pops it.
 type navLevel struct {
-	ctx     navCtx
-	entries []navEntry
-	cursor  int
-	scroll  int
-	dirPath string // ctxNC: the filesystem directory this level lists
-	label   string // ctxCatalog: breadcrumb label for this level
+	ctx        navCtx
+	entries    []navEntry
+	cursor     int
+	scroll     int
+	dirPath    string // ctxNC: the filesystem directory this level lists
+	label      string // ctxCatalog: breadcrumb label for this level
+	playlistID string // ctxFavourites: PlaylistID ("star", "heart", "note")
 }
 
 // splitModlandName splits "Modland: Format/Author" into format and author.
@@ -114,6 +118,10 @@ func (e *navEntry) IsCatalogTrack() bool {
 	return e != nil && e.kind == entryCatalogTrack
 }
 
+func (e *navEntry) IsFavouriteTrack() bool {
+	return e != nil && e.kind == entryFavouriteTrack
+}
+
 // relParts returns the path segments of path relative to base: nil when path
 // isn't under base, empty for base itself.
 func relParts(base, path string) []string {
@@ -139,6 +147,9 @@ func (o *Overlay) buildSourceEntries() []navEntry {
 	entries := []navEntry{{label: "music/", kind: entrySource, source: sourceMusic, albumIdx: -1}}
 	if len(o.micDevices) > 0 || o.micActive {
 		entries = append(entries, navEntry{label: o.micLabel(), kind: entrySource, source: sourceMicrophone, albumIdx: -1})
+	}
+	if o.favouritesView != nil {
+		entries = append(entries, navEntry{label: "Favourites/", kind: entrySource, source: sourceFavourites, albumIdx: -1})
 	}
 	slog.Debug("buildSourceEntries", "online", o.online)
 	if o.online {
@@ -167,6 +178,57 @@ func (o *Overlay) refreshSourceRoot() {
 		o.albumsScroll = root.scroll
 		o.syncPanels()
 	}
+}
+
+// rebuildCurrentFavouritePlaylist refreshes the entries of an open favourite
+// playlist level, preserving the cursor position when possible.
+func (o *Overlay) rebuildCurrentFavouritePlaylist() {
+	if o.favouritesView == nil {
+		return
+	}
+	lvl := o.topLevel()
+	if lvl.ctx != ctxFavourites || lvl.playlistID == "" {
+		return
+	}
+	kind := player.PlaylistID(lvl.playlistID)
+	tracks := o.favouritesView.Tracks(kind)
+	entries := make([]navEntry, len(tracks))
+	for i, path := range tracks {
+		label := player.FavouriteTrackTitle(path)
+		if symbol := o.favouritesView.Symbol(path); symbol != "" {
+			label = symbol + " " + label
+		}
+		entries[i] = navEntry{
+			label:    label,
+			kind:     entryFavouriteTrack,
+			filePath: path,
+		}
+	}
+	path := ""
+	if lvl.cursor >= 0 && lvl.cursor < len(lvl.entries) {
+		path = lvl.entries[lvl.cursor].filePath
+	}
+	o.navStack[len(o.navStack)-1] = navLevel{
+		ctx:        ctxFavourites,
+		entries:    entries,
+		cursor:     0,
+		scroll:     0,
+		label:      lvl.label,
+		playlistID: lvl.playlistID,
+	}
+	if path != "" {
+		for i, e := range entries {
+			if e.filePath == path {
+				o.navStack[len(o.navStack)-1].cursor = i
+				break
+			}
+		}
+	}
+	o.albumEntries = o.currentLevelEntries()
+	o.albums = labelsOf(o.albumEntries)
+	o.albumCursor = clampCursor(o.navStack[len(o.navStack)-1].cursor, len(o.albumEntries))
+	o.albumsScroll = 0
+	o.syncPanels()
 }
 
 // ShowMicrophoneDevices enters the capture-device selection list.
@@ -242,11 +304,18 @@ func (o *Overlay) buildCatalogTrackEntries(albumIdx int) []navEntry {
 	tracks := all[albumIdx].Tracks
 	entries := make([]navEntry, 0, len(tracks))
 	for i, track := range tracks {
+		label := player.TrackTitle(track)
+		if o.favouritesView != nil {
+			if symbol := o.favouritesView.Symbol(track); symbol != "" {
+				label = symbol + " " + label
+			}
+		}
 		entries = append(entries, navEntry{
-			label:    player.TrackTitle(track),
+			label:    label,
 			kind:     entryCatalogTrack,
 			albumIdx: albumIdx,
 			trackIdx: i,
+			filePath: track,
 		})
 	}
 	return entries
@@ -693,6 +762,8 @@ func (o *Overlay) switchToProvider(source sourceKind) {
 	o.source = source
 	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
 	switch source {
+	case sourceFavourites:
+		o.switchToFavouritesRoot()
 	case sourceModland:
 		entries := o.buildFormatEntries()
 		slog.Debug("switchToProvider modland", "formats", len(entries))
@@ -700,6 +771,56 @@ func (o *Overlay) switchToProvider(source sourceKind) {
 	case sourceModArchive:
 		o.pushLevel(navLevel{ctx: ctxCatalog, label: "modarchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
 	}
+}
+
+// switchToFavouritesRoot opens the Favourites folder showing non-empty playlists.
+func (o *Overlay) switchToFavouritesRoot() {
+	if o.favouritesView == nil {
+		return
+	}
+	entries := make([]navEntry, 0, 3)
+	for _, spec := range player.PlaylistSpecs() {
+		count := o.favouritesView.Count(spec.ID)
+		if count == 0 {
+			continue
+		}
+		entries = append(entries, navEntry{
+			label:  fmt.Sprintf("%s %s (%d)", string(spec.Symbol), spec.Label, count),
+			kind:   entryFavouriteFolder,
+			source: sourceFavourites,
+			format: string(spec.ID),
+		})
+	}
+	o.pushLevel(navLevel{ctx: ctxFavourites, entries: entries, label: "Favourites"})
+}
+
+// switchToFavouritesPlaylist opens a specific playlist showing its tracks.
+func (o *Overlay) switchToFavouritesPlaylist(kind player.PlaylistID) {
+	if o.favouritesView == nil {
+		return
+	}
+	tracks := o.favouritesView.Tracks(kind)
+	entries := make([]navEntry, len(tracks))
+	for i, path := range tracks {
+		entries[i] = navEntry{
+			label:    player.FavouriteTrackTitle(path),
+			kind:     entryFavouriteTrack,
+			filePath: path,
+		}
+	}
+	symbol := "★"
+	if len(tracks) > 0 {
+		symbol = o.favouritesView.Symbol(tracks[0])
+		if symbol == "" {
+			symbol = "★"
+		}
+	}
+	o.pushLevel(navLevel{
+		ctx:        ctxFavourites,
+		entries:    entries,
+		label:      symbol + " " + kind.String(),
+		playlistID: string(kind),
+	})
 }
 
 // ncEnterDir enters a subdirectory in NC mode.
