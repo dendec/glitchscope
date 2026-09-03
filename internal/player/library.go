@@ -255,7 +255,6 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 			}
 		}
 		if m, ok := cache.Tracks[fname]; ok {
-			slog.Debug("GetAlbumTracks cache hit", "file", fname, "title", m.Title, "artist", m.Artist, "album", m.Album)
 			info.Duration = m.Duration
 			info.BPM = m.BPM
 			info.Channels = m.Channels
@@ -271,7 +270,6 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 			info.Disc = m.Disc
 			info.Extra = m.Extra
 		} else {
-			slog.Debug("GetAlbumTracks cache miss", "file", fname)
 			// Compute metadata on demand from the local cache file (virtual
 			// paths resolved first). extractMetaFromFile is pure — no side
 			// effects — and reused by the comment refresh below.

@@ -60,7 +60,6 @@ import "C"
 
 import (
 	"fmt"
-	"log/slog"
 	"strings"
 	"unsafe"
 )
@@ -633,16 +632,11 @@ func FfmpegReadTags(path string) map[string]string {
 	defer C.free(unsafe.Pointer(cpath))
 	p := C.Ffmpeg_readTags(cpath)
 	if p == nil {
-		slog.Debug("FfmpegReadTags: no tags found", "path", path)
 		return nil
 	}
 	defer C.free(unsafe.Pointer(p))
 	raw := C.GoString(p)
 	tags := parseTags(raw)
-	slog.Debug("FfmpegReadTags", "path", path, "raw_len", len(raw), "tag_count", len(tags))
-	for k, v := range tags {
-		slog.Debug("FfmpegReadTags tag", "path", path, "key", k, "value", v)
-	}
 	return tags
 }
 
@@ -657,7 +651,6 @@ func FfmpegReadCoverArt(path string) []byte {
 		return nil
 	}
 	defer C.free(unsafe.Pointer(p))
-	slog.Debug("FfmpegReadCoverArt", "path", path, "size", int(csize))
 	return C.GoBytes(unsafe.Pointer(p), C.int(csize))
 }
 

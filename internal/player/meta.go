@@ -2,7 +2,6 @@ package player
 
 import (
 	"encoding/json"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,13 +164,6 @@ func extractMetaFromFile(path string) TrackMeta {
 				m.Comment = msg
 			}
 		}
-		slog.Debug("extractMetaFromFile (tracker)",
-			"path", filepath.Base(path),
-			"duration", m.Duration,
-			"bpm", m.BPM,
-			"channels", m.Channels,
-			"comment", truncate(m.Comment, 100),
-		)
 	} else if isFfmpegExt(ext) {
 		if fileBuf, err := os.ReadFile(path); err == nil {
 			if source, err := soloud.NewFfmpeg(fileBuf); err == nil {
@@ -214,21 +206,6 @@ func extractMetaFromFile(path string) TrackMeta {
 				m.Extra[k] = v
 			}
 		}
-		slog.Debug("extractMetaFromFile",
-			"path", filepath.Base(path),
-			"duration", m.Duration,
-			"channels", m.Channels,
-			"title", m.Title,
-			"artist", m.Artist,
-			"album", m.Album,
-			"album_artist", m.AlbumArtist,
-			"genre", m.Genre,
-			"date", m.Date,
-			"track", m.Track,
-			"composer", m.Composer,
-			"disc", m.Disc,
-			"comment", truncate(m.Comment, 100),
-		)
 	} else if w, err := soloud.LoadWav(path); err == nil {
 		m.Duration = w.GetLength()
 		w.Destroy()

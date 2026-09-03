@@ -485,7 +485,6 @@ char *Ffmpeg_readTags(const char *path) {
         return nullptr;
     }
     AVFormatContext *fmt = input.format;
-    fprintf(stderr, "[Ffmpeg_readTags] format opened: %s\n", fmt->iformat->name);
     // NOTE: avformat_find_stream_info was already called by finishOpen
     // inside openFileInput. Calling it again crashes on custom AVIO when
     // the stream has already been fully probed (e.g. M4A with cover art
@@ -499,16 +498,12 @@ char *Ffmpeg_readTags(const char *path) {
     std::string buf;
     const AVDictionaryEntry *e = nullptr;
 
-    fprintf(stderr, "[Ffmpeg_readTags] nb_streams=%u, fmt->metadata count=%d\n",
-            fmt->nb_streams, av_dict_count(fmt->metadata));
-
     // Pass 1 — format-level metadata.
     while ((e = av_dict_iterate(fmt->metadata, e))) {
         if (!e->key || !e->value) continue;
         if (strncmp(e->key, "filename", 8) == 0) continue;
         if (strncmp(e->key, "format", 6) == 0) continue;
         if (strncmp(e->key, "stream", 6) == 0) continue;
-        fprintf(stderr, "[Ffmpeg_readTags] fmt tag: %s=%s\n", e->key, e->value);
         buf += e->key;
         buf += "=";
         buf += e->value;
@@ -520,17 +515,13 @@ char *Ffmpeg_readTags(const char *path) {
     for (unsigned int i = 0; i < fmt->nb_streams; ++i) {
         const AVStream *stream = fmt->streams[i];
         if (!stream || !stream->metadata) continue;
-        int streamCount = av_dict_count(stream->metadata);
-        fprintf(stderr, "[Ffmpeg_readTags] stream[%u] metadata count=%d\n", i, streamCount);
         e = nullptr;
         while ((e = av_dict_iterate(stream->metadata, e))) {
             if (!e->key || !e->value) continue;
             if (strncmp(e->key, "filename", 8) == 0) continue;
-            fprintf(stderr, "[Ffmpeg_readTags] stream[%u] tag: %s=%s\n", i, e->key, e->value);
             // Skip if this key already appeared in buf.
             std::string needle = std::string(e->key) + "=";
             if (buf.find(needle) != std::string::npos) {
-                fprintf(stderr, "[Ffmpeg_readTags] stream[%u] tag %s skipped (duplicate)\n", i, e->key);
                 continue;
             }
             buf += e->key;
@@ -541,8 +532,6 @@ char *Ffmpeg_readTags(const char *path) {
     }
 
     closeInput(&input);  // frees format, AVIO, and FILE
-    fprintf(stderr, "[Ffmpeg_readTags] result: %zu bytes, tags=%s\n",
-            buf.size(), buf.empty() ? "NONE" : "found");
     if (buf.empty()) return nullptr;
     return strdup(buf.c_str());
 }
@@ -590,8 +579,6 @@ unsigned char *Ffmpeg_readCoverArt(const char *path, unsigned int *out_size) {
     }
     memcpy(copy, pkt->data, pkt->size);
     *out_size = static_cast<unsigned int>(pkt->size);
-    fprintf(stderr, "[Ffmpeg_readCoverArt] cover art: %u bytes, stream=%d\n",
-            *out_size, picStream);
     closeInput(&input);
     return copy;
 }

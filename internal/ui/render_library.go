@@ -387,7 +387,6 @@ func (o *Overlay) loadCoverArt(path string, maxWidth int) (uint32, int, int) {
 	o.coverArtTexW = w
 	o.coverArtTexH = h
 	o.coverArtPath = path
-	slog.Debug("cover art loaded", "path", filepath.Base(path), "w", w, "h", h)
 	return tex, w, h
 }
 
@@ -438,16 +437,6 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		}
 		// Read audio metadata for the file.
 		meta := player.ReadFileMeta(o.ncInfoFile)
-		slog.Debug("rebuildNCInfoTex",
-			"file", filepath.Base(o.ncInfoFile),
-			"title", meta.Title,
-			"artist", meta.Artist,
-			"album", meta.Album,
-			"genre", meta.Genre,
-			"date", meta.Date,
-			"duration", meta.Duration,
-			"channels", meta.Channels,
-		)
 		if meta.Title != "" {
 			lines = append(lines, "", fmt.Sprintf("  Title: %s", meta.Title))
 		}
