@@ -28,6 +28,18 @@ type TrackInfo struct {
 	Size     int64
 	Comment  string // tracker message/comment (XM/IT/MOD/S3M text)
 	Cached   bool   // true when a local cache file exists on disk
+
+	// Audio file tags (MP3/FLAC/Ogg/Opus via FFmpeg).
+	Title       string
+	Artist      string
+	Album       string
+	AlbumArtist string
+	Genre       string
+	Date        string
+	Track       string // track number string
+	Composer    string
+	Disc        string // disc number string
+	Extra       map[string]string
 }
 
 // Library manages a list of albums scanned from a music root directory.
@@ -243,11 +255,23 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 			}
 		}
 		if m, ok := cache.Tracks[fname]; ok {
+			slog.Debug("GetAlbumTracks cache hit", "file", fname, "title", m.Title, "artist", m.Artist, "album", m.Album)
 			info.Duration = m.Duration
 			info.BPM = m.BPM
 			info.Channels = m.Channels
 			info.Comment = m.Comment
+			info.Title = m.Title
+			info.Artist = m.Artist
+			info.Album = m.Album
+			info.AlbumArtist = m.AlbumArtist
+			info.Genre = m.Genre
+			info.Date = m.Date
+			info.Track = m.Track
+			info.Composer = m.Composer
+			info.Disc = m.Disc
+			info.Extra = m.Extra
 		} else {
+			slog.Debug("GetAlbumTracks cache miss", "file", fname)
 			// Compute metadata on demand from the local cache file (virtual
 			// paths resolved first). extractMetaFromFile is pure — no side
 			// effects — and reused by the comment refresh below.
@@ -260,6 +284,16 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 			info.BPM = m.BPM
 			info.Channels = m.Channels
 			info.Comment = m.Comment
+			info.Title = m.Title
+			info.Artist = m.Artist
+			info.Album = m.Album
+			info.AlbumArtist = m.AlbumArtist
+			info.Genre = m.Genre
+			info.Date = m.Date
+			info.Track = m.Track
+			info.Composer = m.Composer
+			info.Disc = m.Disc
+			info.Extra = m.Extra
 			dirty = true
 		}
 		// Always refresh the comment for tracker files, even when the rest of
@@ -274,6 +308,43 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 						dirty = true
 					}
 					slog.Debug("tracker comment", "file", filepath.Base(tp), "comment", m.Comment)
+				}
+			}
+		}
+		// Re-read audio tags when the cache has empty tag fields. This handles
+		// the case where the cache was populated before a bug fix (e.g. M4A
+		// tags not being read from stream-level metadata) and now needs to be
+		// refreshed. extractMetaFromFile is cheap (no allocation per call).
+		if info.Title == "" && info.Artist == "" && info.Album == "" &&
+			info.Genre == "" && info.Date == "" && info.Track == "" {
+			if localPath := l.resolver.ResolveLocalPath(tp); localPath != "" {
+				if m := extractMetaFromFile(localPath); m.Title != "" || m.Artist != "" || m.Album != "" {
+					info.Title = m.Title
+					info.Artist = m.Artist
+					info.Album = m.Album
+					info.AlbumArtist = m.AlbumArtist
+					info.Genre = m.Genre
+					info.Date = m.Date
+					info.Track = m.Track
+					info.Composer = m.Composer
+					info.Disc = m.Disc
+					info.Extra = m.Extra
+					if cm, ok := cache.Tracks[fname]; ok {
+						cm.Title = m.Title
+						cm.Artist = m.Artist
+						cm.Album = m.Album
+						cm.AlbumArtist = m.AlbumArtist
+						cm.Genre = m.Genre
+						cm.Date = m.Date
+						cm.Track = m.Track
+						cm.Composer = m.Composer
+						cm.Disc = m.Disc
+						cache.Tracks[fname] = cm
+						dirty = true
+					}
+					slog.Debug("refreshed tags from file", "file", filepath.Base(tp), "title", m.Title, "artist", m.Artist)
+				} else {
+					slog.Debug("tags still empty after re-read", "file", filepath.Base(tp))
 				}
 			}
 		}

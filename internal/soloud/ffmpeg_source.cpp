@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <string>
 #include <vector>
 
 extern "C" {
@@ -467,5 +468,131 @@ unsigned int Ffmpeg_getChannels(void *source) {
 }
 unsigned int Ffmpeg_getSampleRate(void *source) {
     return static_cast<unsigned int>(static_cast<SoLoud::FfmpegSource *>(source)->getSampleRate());
+}
+
+// Reads audio metadata tags from a file. Returns a newline-separated
+// list of key=value pairs. Caller must free() the returned string.
+// Returns NULL on failure.
+char *Ffmpeg_readTags(const char *path) {
+    if (!path) return nullptr;
+    // The Docker builder FFmpeg may lack the file: protocol handler, so
+    // avformat_open_input(path) fails with "Protocol not found".  Work
+    // around this by reading through a custom AVIO context — the same
+    // approach used by FfmpegSource::loadFile / openFileInput.
+    InputContext input;
+    if (!openFileInput(path, &input)) {
+        fprintf(stderr, "[Ffmpeg_readTags] openFileInput failed: %s\n", path);
+        return nullptr;
+    }
+    AVFormatContext *fmt = input.format;
+    fprintf(stderr, "[Ffmpeg_readTags] format opened: %s\n", fmt->iformat->name);
+    // NOTE: avformat_find_stream_info was already called by finishOpen
+    // inside openFileInput. Calling it again crashes on custom AVIO when
+    // the stream has already been fully probed (e.g. M4A with cover art
+    // that FFmpeg can't decode). Skip it — fmt->metadata is already
+    // populated after the first call.
+
+    // Collect tags into a buffer. Start with format-level metadata
+    // (works for MP3/FLAC/Ogg/Opus). For M4A/MOV containers the tags
+    // may live only at the stream level, so fall back to iterating
+    // stream metadata when the format dict is empty or incomplete.
+    std::string buf;
+    const AVDictionaryEntry *e = nullptr;
+
+    fprintf(stderr, "[Ffmpeg_readTags] nb_streams=%u, fmt->metadata count=%d\n",
+            fmt->nb_streams, av_dict_count(fmt->metadata));
+
+    // Pass 1 — format-level metadata.
+    while ((e = av_dict_iterate(fmt->metadata, e))) {
+        if (!e->key || !e->value) continue;
+        if (strncmp(e->key, "filename", 8) == 0) continue;
+        if (strncmp(e->key, "format", 6) == 0) continue;
+        if (strncmp(e->key, "stream", 6) == 0) continue;
+        fprintf(stderr, "[Ffmpeg_readTags] fmt tag: %s=%s\n", e->key, e->value);
+        buf += e->key;
+        buf += "=";
+        buf += e->value;
+        buf += "\n";
+    }
+
+    // Pass 2 — stream-level metadata (fallback for M4A/MOV).
+    // Only add keys not already present from the format level.
+    for (unsigned int i = 0; i < fmt->nb_streams; ++i) {
+        const AVStream *stream = fmt->streams[i];
+        if (!stream || !stream->metadata) continue;
+        int streamCount = av_dict_count(stream->metadata);
+        fprintf(stderr, "[Ffmpeg_readTags] stream[%u] metadata count=%d\n", i, streamCount);
+        e = nullptr;
+        while ((e = av_dict_iterate(stream->metadata, e))) {
+            if (!e->key || !e->value) continue;
+            if (strncmp(e->key, "filename", 8) == 0) continue;
+            fprintf(stderr, "[Ffmpeg_readTags] stream[%u] tag: %s=%s\n", i, e->key, e->value);
+            // Skip if this key already appeared in buf.
+            std::string needle = std::string(e->key) + "=";
+            if (buf.find(needle) != std::string::npos) {
+                fprintf(stderr, "[Ffmpeg_readTags] stream[%u] tag %s skipped (duplicate)\n", i, e->key);
+                continue;
+            }
+            buf += e->key;
+            buf += "=";
+            buf += e->value;
+            buf += "\n";
+        }
+    }
+
+    closeInput(&input);  // frees format, AVIO, and FILE
+    fprintf(stderr, "[Ffmpeg_readTags] result: %zu bytes, tags=%s\n",
+            buf.size(), buf.empty() ? "NONE" : "found");
+    if (buf.empty()) return nullptr;
+    return strdup(buf.c_str());
+}
+
+// Extracts embedded cover art (album art) from an audio file.
+// Returns a newly allocated buffer containing the raw image data
+// (typically JPEG). Caller must free() the returned buffer.
+// out_size receives the buffer length. Returns NULL on failure.
+unsigned char *Ffmpeg_readCoverArt(const char *path, unsigned int *out_size) {
+    if (!path || !out_size) return nullptr;
+    *out_size = 0;
+    InputContext input;
+    if (!openFileInput(path, &input)) {
+        return nullptr;
+    }
+    AVFormatContext *fmt = input.format;
+
+    // Find the attached picture stream (album art).
+    int picStream = -1;
+    for (unsigned int i = 0; i < fmt->nb_streams; ++i) {
+        if (fmt->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO &&
+            (fmt->streams[i]->disposition & AV_DISPOSITION_ATTACHED_PIC)) {
+            picStream = static_cast<int>(i);
+            break;
+        }
+    }
+    if (picStream < 0) {
+        closeInput(&input);
+        return nullptr;
+    }
+
+    // The attached picture is stored as a single packet in
+    // fmt->streams[picStream]->attached_pic. We can extract it
+    // directly without decoding.
+    AVPacket *pkt = &fmt->streams[picStream]->attached_pic;
+    if (pkt->size <= 0) {
+        closeInput(&input);
+        return nullptr;
+    }
+
+    unsigned char *copy = static_cast<unsigned char *>(av_malloc(pkt->size));
+    if (!copy) {
+        closeInput(&input);
+        return nullptr;
+    }
+    memcpy(copy, pkt->data, pkt->size);
+    *out_size = static_cast<unsigned int>(pkt->size);
+    fprintf(stderr, "[Ffmpeg_readCoverArt] cover art: %u bytes, stream=%d\n",
+            *out_size, picStream);
+    closeInput(&input);
+    return copy;
 }
 }

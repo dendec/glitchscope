@@ -166,12 +166,13 @@ func (o *Overlay) CursorDown() {
 	o.moveCursor(1)
 }
 
-func (o *Overlay) scrollNCInfo(dir int) {
+func (o *Overlay) scrollNCInfo(dir int) bool {
 	next, changed := scrollPosition(o.ncInfoScroll, dir, o.ncInfoLines, o.ncInfoVisible)
 	if changed {
 		o.ncInfoScroll = next
 		o.tracksDirty = true
 	}
+	return changed
 }
 
 // moveCursor shifts the active cursor by dir (-1 up, +1 down), scoped to the
@@ -230,7 +231,26 @@ func (o *Overlay) moveCursor(dir int) {
 	// --- Library page ---
 	if o.isNC() {
 		if o.focusPanel == 1 && o.ncRight == ncRightInfo {
-			o.scrollNCInfo(dir)
+			if o.scrollNCInfo(dir) || dir < 0 {
+				return
+			}
+			o.ncRight = ncRightPlay
+			o.tracksDirty = true
+			o.tracksContentDirty = true
+			return
+		}
+		if o.focusPanel == 1 {
+			if dir > 0 && o.ncRight == ncRightPlay {
+				o.ncRight = ncRightDelete
+			} else if dir < 0 && o.ncRight == ncRightDelete {
+				o.ncRight = ncRightPlay
+			} else if dir < 0 && o.ncRight == ncRightPlay {
+				o.ncRight = ncRightInfo
+			} else {
+				return
+			}
+			o.tracksDirty = true
+			o.tracksContentDirty = true
 			return
 		}
 		if o.focusPanel == 0 {

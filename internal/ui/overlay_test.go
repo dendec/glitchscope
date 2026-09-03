@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dendec/glitchscope/internal/filesystem"
@@ -98,6 +99,38 @@ func TestCatalogInfoFocusLeftScrollsBeforeChangingPanel(t *testing.T) {
 	}
 }
 
+func TestNCInfoFocusMovesToActionsAtScrollEnd(t *testing.T) {
+	o := &Overlay{
+		panelEntered:  true,
+		focusPanel:    1,
+		ncRight:       ncRightInfo,
+		ncInfoLines:   10,
+		ncInfoVisible: 5,
+		ncInfoScroll:  5,
+		navStack:      []navLevel{{ctx: ctxNC}},
+	}
+
+	o.moveCursor(1)
+	if o.ncRight != ncRightPlay {
+		t.Fatalf("right focus after scrolling to end = %d, want Play", o.ncRight)
+	}
+
+	o.moveCursor(1)
+	if o.ncRight != ncRightDelete {
+		t.Fatalf("right focus after Play = %d, want Delete", o.ncRight)
+	}
+
+	o.moveCursor(-1)
+	if o.ncRight != ncRightPlay {
+		t.Fatalf("right focus after Delete = %d, want Play", o.ncRight)
+	}
+
+	o.moveCursor(-1)
+	if o.ncRight != ncRightInfo {
+		t.Fatalf("right focus after Play = %d, want Info", o.ncRight)
+	}
+}
+
 func TestTrackTitleKeepsExtension(t *testing.T) {
 	tests := []struct {
 		path string
@@ -114,6 +147,29 @@ func TestTrackTitleKeepsExtension(t *testing.T) {
 				t.Fatalf("TrackTitle(%q) = %q, want %q", test.path, got, test.want)
 			}
 		})
+	}
+}
+
+func TestTrackInfoLinesFiltersAndExpandsExtraTags(t *testing.T) {
+	lines := trackInfoLines("song.m4a", &player.TrackInfo{
+		Extra: map[string]string{
+			"language":     " und ",
+			"handler_name": "AudioHandler",
+			"lyrics":       "[Intro]\r\nFirst line\nSecond line",
+			"comment":      "Comment one\r\nComment two",
+		},
+	})
+
+	joined := strings.Join(lines, "\n")
+	for _, hidden := range []string{"Language:", "Handler_name:", "AudioHandler"} {
+		if strings.Contains(joined, hidden) {
+			t.Fatalf("metadata contains hidden field %q: %q", hidden, joined)
+		}
+	}
+	for _, visible := range []string{"Lyrics:", "    [Intro]", "    First line", "    Second line", "Comment:", "    Comment one", "    Comment two"} {
+		if !strings.Contains(joined, visible) {
+			t.Fatalf("metadata is missing %q: %q", visible, joined)
+		}
 	}
 }
 

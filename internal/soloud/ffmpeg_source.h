@@ -33,6 +33,8 @@ int Ffmpeg_loadFile(void *source, const char *path);
 unsigned int Ffmpeg_getLengthMs(void *source);
 unsigned int Ffmpeg_getChannels(void *source);
 unsigned int Ffmpeg_getSampleRate(void *source);
+char *Ffmpeg_readTags(const char *path);
+unsigned char *Ffmpeg_readCoverArt(const char *path, unsigned int *out_size);
 }
 
 #endif

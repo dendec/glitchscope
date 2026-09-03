@@ -386,6 +386,10 @@ func (a *App) initAudio() {
 
 func (a *App) initLibrary() {
 	musicDir := a.findMusicDir()
+	// Ensure the music directory exists so the scanner always has a root.
+	if err := os.MkdirAll(musicDir, 0o755); err != nil {
+		slog.Warn("cannot create music dir", "path", musicDir, "error", err)
+	}
 	if a.overlay != nil {
 		a.overlay.SetMusicDir(musicDir)
 	}

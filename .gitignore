@@ -27,3 +27,5 @@ settings.json
 internal/ui/assets/unifont-full.otf
 internal/ui/assets/unifont.otf
 favorites.json
+favourites.json
+internal/soloud/soloud_test.go

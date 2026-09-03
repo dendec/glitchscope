@@ -4,6 +4,7 @@ package ui
 import (
 	"log/slog"
 	"math"
+	"reflect"
 	"time"
 
 	"github.com/dendec/glitchscope/internal/config"
@@ -155,6 +156,9 @@ type Overlay struct {
 	loadPercent     int64
 	focusPanel      int // 0=albums, 1=tracks
 
+	// Local track info panel (non-nil when showing track info in right panel).
+	infoLines []string
+
 	settingsRows        []SettingRow
 	settingsCursor      int
 	settingsValueCursor int
@@ -213,6 +217,11 @@ type Overlay struct {
 	albumsTexW, albumsTexH             int
 	tracksTex                          uint32
 	tracksTexW, tracksTexH             int
+	ncActionsTex                       uint32
+	ncActionsTexW, ncActionsTexH       int
+	coverArtTex                        uint32
+	coverArtTexW, coverArtTexH         int
+	coverArtPath                       string // file whose cover art is cached in coverArtTex
 	bottomTex                          uint32
 	bottomTexW, bottomTexH             int
 	bottomPrefixTex                    uint32
@@ -282,6 +291,8 @@ func (o *Overlay) Close() {
 	o.notif.Hide()
 	o.deleteTex(&o.albumsTex)
 	o.deleteTex(&o.tracksTex)
+	o.deleteTex(&o.ncActionsTex)
+	o.deleteTex(&o.coverArtTex)
 	o.deleteTex(&o.bottomTex)
 	o.deleteTex(&o.bottomPrefixTex)
 	o.deleteTex(&o.bottomSuffixTex)
@@ -559,7 +570,7 @@ func (o *Overlay) SetTrackInfos(infos []player.TrackInfo, cursor int) {
 	dataChanged := len(o.trackInfos) != len(infos)
 	if !dataChanged {
 		for i := range infos {
-			if o.trackInfos[i] != infos[i] {
+			if !reflect.DeepEqual(o.trackInfos[i], infos[i]) {
 				dataChanged = true
 				break
 			}

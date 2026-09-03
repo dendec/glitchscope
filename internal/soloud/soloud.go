@@ -13,6 +13,8 @@ int Ffmpeg_loadMem(void *source, const unsigned char *data, unsigned int length)
 int Ffmpeg_loadFile(void *source, const char *path);
 unsigned int Ffmpeg_getLengthMs(void *source);
 unsigned int Ffmpeg_getChannels(void *source);
+char *Ffmpeg_readTags(const char *path);
+unsigned char *Ffmpeg_readCoverArt(const char *path, unsigned int *out_size);
 unsigned int Ffmpeg_getSampleRate(void *source);
 unsigned int Wav_getChannels(Wav * aClassPtr);
 void *Gme_create(void);
@@ -58,6 +60,8 @@ import "C"
 
 import (
 	"fmt"
+	"log/slog"
+	"strings"
 	"unsafe"
 )
 
@@ -621,6 +625,61 @@ func (y *Ym) GetSampleRate() int     { return int(C.Ym_getSampleRate(y.p)) }
 func (f *Ffmpeg) GetLength() float64 { return float64(C.Ffmpeg_getLengthMs(f.p)) / 1000 }
 func (f *Ffmpeg) GetChannels() int   { return int(C.Ffmpeg_getChannels(f.p)) }
 func (f *Ffmpeg) GetSampleRate() int { return int(C.Ffmpeg_getSampleRate(f.p)) }
+
+// FfmpegReadTags reads audio metadata (title, artist, album, etc.) from a
+// file using FFmpeg. Returns a map of tag names to values, or nil on failure.
+func FfmpegReadTags(path string) map[string]string {
+	cpath := C.CString(path)
+	defer C.free(unsafe.Pointer(cpath))
+	p := C.Ffmpeg_readTags(cpath)
+	if p == nil {
+		slog.Debug("FfmpegReadTags: no tags found", "path", path)
+		return nil
+	}
+	defer C.free(unsafe.Pointer(p))
+	raw := C.GoString(p)
+	tags := parseTags(raw)
+	slog.Debug("FfmpegReadTags", "path", path, "raw_len", len(raw), "tag_count", len(tags))
+	for k, v := range tags {
+		slog.Debug("FfmpegReadTags tag", "path", path, "key", k, "value", v)
+	}
+	return tags
+}
+
+// FfmpegReadCoverArt extracts embedded cover art (album art) from an audio
+// file. Returns the raw image data (typically JPEG) or nil if absent.
+func FfmpegReadCoverArt(path string) []byte {
+	cpath := C.CString(path)
+	defer C.free(unsafe.Pointer(cpath))
+	var csize C.uint
+	p := C.Ffmpeg_readCoverArt(cpath, &csize)
+	if p == nil || csize == 0 {
+		return nil
+	}
+	defer C.free(unsafe.Pointer(p))
+	slog.Debug("FfmpegReadCoverArt", "path", path, "size", int(csize))
+	return C.GoBytes(unsafe.Pointer(p), C.int(csize))
+}
+
+// parseTags parses newline-separated key=value pairs from FFmpeg. Lines without
+// a key continue the value from the preceding tag; FFmpeg metadata such as
+// lyrics and comments may contain embedded newlines.
+func parseTags(s string) map[string]string {
+	tags := make(map[string]string)
+	currentKey := ""
+	for _, line := range strings.Split(s, "\n") {
+		if i := strings.IndexByte(line, '='); i > 0 {
+			currentKey = line[:i]
+			tags[currentKey] = line[i+1:]
+		} else if currentKey != "" {
+			tags[currentKey] += "\n" + line
+		}
+	}
+	if len(tags) == 0 {
+		return nil
+	}
+	return tags
+}
 
 // GetWave returns the current waveform data (256 float32 samples).
 // Visualization must be enabled. The slice references SoLoud's internal buffer.

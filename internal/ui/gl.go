@@ -9,6 +9,10 @@ package ui
 static unsigned int createTextProgram();
 static unsigned int createImageProgram();
 static unsigned int createRectProgram();
+static void drawOverlayImageClipped(unsigned int program, unsigned int image, float opacity,
+	float x, float y, float imageWidth, float imageHeight,
+	float clipX, float clipY, float clipW, float clipH,
+	int winW, int winH, int viewW, int viewH);
 
 static unsigned int compileShader(unsigned int type, const char *source) {
 	GLuint shader = glCreateShader(type);
@@ -94,6 +98,17 @@ static void drawOverlayTextClipped(unsigned int program, unsigned int text, floa
 	// scissor uses bottom-left origin; clipX/clipY are top-left screen coords
 	glScissor((GLint)clipX, (GLint)((float)winH - clipY - clipH), (GLsizei)clipW, (GLsizei)clipH);
 	drawText(program, text, opacity, x, y, textWidth, textHeight, winW, winH, viewW, viewH);
+	glDisable(GL_SCISSOR_TEST);
+}
+
+static void drawOverlayImageClipped(unsigned int program, unsigned int image, float opacity,
+	float x, float y, float imageWidth, float imageHeight,
+	float clipX, float clipY, float clipW, float clipH,
+	int winW, int winH, int viewW, int viewH) {
+	glEnable(GL_SCISSOR_TEST);
+	// scissor uses bottom-left origin; clipX/clipY are top-left screen coords
+	glScissor((GLint)clipX, (GLint)((float)winH - clipY - clipH), (GLsizei)clipW, (GLsizei)clipH);
+	drawText(program, image, opacity, x, y, imageWidth, imageHeight, winW, winH, viewW, viewH);
 	glDisable(GL_SCISSOR_TEST);
 }
 
@@ -231,6 +246,13 @@ func glDrawOverlayText(program, tex uint32, opacity float32, x, y, w, h float32,
 func glDrawOverlayImage(program, tex uint32, opacity float32, x, y, w, h float32, winW, winH, viewW, viewH int) {
 	C.drawOverlayText(C.uint(program), C.uint(tex), C.float(opacity),
 		C.float(x), C.float(y), C.float(w), C.float(h), C.int(winW), C.int(winH), C.int(viewW), C.int(viewH))
+}
+
+func glDrawOverlayImageClipped(program, tex uint32, opacity float32, x, y, w, h, clipX, clipY, clipW, clipH float32, winW, winH, viewW, viewH int) {
+	C.drawOverlayImageClipped(C.uint(program), C.uint(tex), C.float(opacity),
+		C.float(x), C.float(y), C.float(w), C.float(h),
+		C.float(clipX), C.float(clipY), C.float(clipW), C.float(clipH),
+		C.int(winW), C.int(winH), C.int(viewW), C.int(viewH))
 }
 
 func glDrawOverlayTextClipped(program, tex uint32, opacity float32, x, y, w, h, clipX, clipY, clipW, clipH float32, winW, winH, viewW, viewH int) {

@@ -1,13 +1,19 @@
 package ui
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/dendec/glitchscope/internal/filesystem"
 	"github.com/dendec/glitchscope/internal/player"
+	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 )
 
@@ -30,7 +36,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 	if o.albumsTex != 0 {
 		px, py := float32(0), float32(panelY)
 		drawPanelBg(o, px, py, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
-		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
+		if o.panelEntered && len(o.albums) > 0 {
 			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh)
 			o.drawCursorHighlight(px, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 		}
@@ -43,7 +49,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		}
 		drawScrollbar(o, px+float32(panelW)-sbW, py, float32(panelH), len(o.albums), am, o.albumsScroll, winW, winH, viewW, viewH)
 		// Cursor highlight row — drawn as separate overlay, no texture rebuild needed.
-		if o.panelEntered && o.focusPanel == 0 && len(o.albums) > 0 {
+		if o.panelEntered && len(o.albums) > 0 {
 			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh)
 			o.drawMarqueeCol(&o.marqueeL, px, py, float32(textW), float32(panelH), lh, rowY, winW, winH, viewW, viewH)
 		}
@@ -57,41 +63,111 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 	if o.tracksDirty {
 		o.rebuildTracksTex(panelW, panelH)
 	}
-	if o.tracksTex != 0 {
+	if o.tracksTex != 0 || o.hasNCSelection() {
 		tx, ty := float32(tracksX), float32(panelY)
 		drawPanelBg(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
-		// NC and catalog-track info panels are static info views: no cursor
-		// highlight, no marquee, and their scrollbar is driven by the shared
-		// ncInfo* scroll state instead of the track list.
-		isInfoPanel := o.isNC() || (o.currentEntry() != nil && o.currentEntry().IsCatalogTrack())
+		// NC, catalog-track, and local-album info panels are static info views.
+		isNCInfo := o.hasNCSelection()
+		isCatalogInfo := o.currentEntry() != nil && o.currentEntry().IsCatalogTrack()
+		isLocalInfo := o.infoLines != nil && !isNCInfo && !isCatalogInfo
+
+		// Cover art and metadata share one vertical scroll offset. Clip both to
+		// the complete panel so neither can escape or overlap outside it.
+		actionH := float32(0)
+		metadataH := float32(panelH)
+		if isNCInfo {
+			actionH = float32(actionBarHeight(lh))
+			metadataH -= actionH
+			if metadataH < float32(lh) {
+				metadataH = float32(lh)
+			}
+		}
+		var scrollPx float32
+		if isNCInfo || isLocalInfo || isCatalogInfo {
+			scrollPx = float32(o.ncInfoScroll * lh)
+		}
+		contentY := ty - scrollPx
+		if o.coverArtTex != 0 && o.coverArtTexW > 0 {
+			pad := float32(4)
+			imgW := float32(o.coverArtTexW)
+			imgH := float32(o.coverArtTexH)
+			imgX := tx + (float32(panelW)-imgW)/2
+			imgY := ty + pad - scrollPx
+			glDrawOverlayImageClipped(o.programImage, o.coverArtTex, 1,
+				imgX, imgY, imgW, imgH, tx, ty, float32(panelW), metadataH,
+				winW, winH, viewW, viewH)
+			contentY = ty + pad + imgH + pad - scrollPx
+		}
+		isInfoPanel := isNCInfo || isCatalogInfo || isLocalInfo
 		if !isInfoPanel {
 			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
 				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
 				o.drawCursorHighlight(tx, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 			}
 		}
+		remainH := metadataH
 		glDrawOverlayTextClipped(o.programText, o.tracksTex, 1,
-			tx, ty, float32(o.tracksTexW), float32(o.tracksTexH),
-			tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
-		if !isInfoPanel {
+			tx, contentY, float32(o.tracksTexW), float32(o.tracksTexH),
+			tx, ty, float32(panelW), remainH, winW, winH, viewW, viewH)
+		if isLocalInfo || isNCInfo || isCatalogInfo {
+			drawScrollbar(o, tx+float32(panelW)-sbW, ty, remainH, o.ncInfoLines, o.ncInfoVisible, o.ncInfoScroll, winW, winH, viewW, viewH)
+			if isNCInfo || isCatalogInfo {
+				o.drawInfoMarquee(tx, contentY, float32(textW), ty, remainH, winW, winH, viewW, viewH)
+			}
+		} else {
 			tm := panelH / lh
 			if tm < 1 {
 				tm = 1
 			}
 			tracksCount := len(o.trackInfos)
-			drawScrollbar(o, tx+float32(panelW)-sbW, ty, float32(panelH), tracksCount, tm, o.tracksScroll, winW, winH, viewW, viewH)
+			drawScrollbar(o, tx+float32(panelW)-sbW, contentY, remainH, tracksCount, tm, o.tracksScroll, winW, winH, viewW, viewH)
 			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
-				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
-				o.drawMarqueeCol(&o.marqueeR, tx, ty, float32(textW), float32(panelH), lh, rowY, winW, winH, viewW, viewH)
+				rowY := contentY + float32((o.trackCursor-o.tracksScroll)*lh)
+				o.drawMarqueeCol(&o.marqueeR, tx, contentY, float32(textW), remainH, lh, rowY, winW, winH, viewW, viewH)
 			}
-		} else {
-			drawScrollbar(o, tx+float32(panelW)-sbW, ty, float32(panelH), o.ncInfoLines, o.ncInfoVisible, o.ncInfoScroll, winW, winH, viewW, viewH)
-			o.drawInfoMarquee(tx, ty, float32(textW), float32(panelH), winW, winH, viewW, viewH)
 		}
 		if o.focusPanel == 1 {
 			drawPanelBorder(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		}
+		if isNCInfo && o.ncActionsTex != 0 {
+			actionY := ty + metadataH
+			glDrawOverlayTextClipped(o.programText, o.ncActionsTex, 1,
+				tx, actionY, float32(o.ncActionsTexW), float32(o.ncActionsTexH),
+				tx, actionY, float32(panelW), actionH, winW, winH, viewW, viewH)
+		}
 	}
+}
+
+func actionBarHeight(lh int) int {
+	return lh + 8
+}
+
+func (o *Overlay) hasNCSelection() bool {
+	if !o.isNC() {
+		return false
+	}
+	e := o.currentEntry()
+	return e != nil && e.kind != entryParent
+}
+
+func (o *Overlay) rebuildNCActionsTex() {
+	o.deleteTex(&o.ncActionsTex)
+	deleteAvailable := o.ncInfoFile != "" || (o.ncInfoIsDir && o.ncInfoDir != o.baseDir)
+	play := "  [Play]"
+	if o.ncRight == ncRightPlay {
+		play = " >[Play]"
+	}
+	delete := ""
+	if deleteAvailable {
+		delete = "    [Delete]"
+		if o.ncConfirm {
+			delete = "    [Delete?]"
+		}
+		if o.ncRight == ncRightDelete {
+			delete = "   >[Delete]"
+		}
+	}
+	o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH = o.renderTextToTex(play+delete, o.textColor())
 }
 
 func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
@@ -174,18 +250,19 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 
 func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 	o.tracksDirty = false
+	o.clearInfoPanel()
 
 	if o.isNC() {
-		o.infoMarquee.invalidate(o)
+		if !o.hasNCSelection() {
+			o.tracksContentDirty = false
+			return
+		}
 		o.rebuildNCInfoTex(maxW, maxH)
 		o.tracksContentDirty = false
 		return
 	}
 
 	if e := o.currentEntry(); e != nil && e.kind == entryParent {
-		o.deleteTex(&o.tracksTex)
-		o.marqueeR.invalidate(o)
-		o.infoMarquee.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
@@ -198,73 +275,140 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 
 	// Catalog directory/format level: no right panel.
 	if o.isCatalog() {
-		o.deleteTex(&o.tracksTex)
-		o.marqueeR.invalidate(o)
-		o.infoMarquee.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
 
 	e := o.currentEntry()
 	if e == nil || !e.IsLeafAlbum() {
-		o.deleteTex(&o.tracksTex)
-		o.marqueeR.invalidate(o)
-		o.infoMarquee.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
 
 	if len(o.trackInfos) == 0 {
-		o.deleteTex(&o.tracksTex)
-		o.marqueeR.invalidate(o)
-		o.infoMarquee.invalidate(o)
 		o.tracksContentDirty = false
 		return
 	}
 
+	// Local album track: show right-panel info for the selected track.
+	o.rebuildLocalTrackInfoTex(maxW, maxH)
+}
+
+// rebuildLocalTrackInfoTex renders the right-panel info for the currently
+// selected track in a local library album.
+func (o *Overlay) rebuildLocalTrackInfoTex(maxW, maxH int) {
+	o.tracksContentDirty = false
+
+	if o.trackCursor < 0 || o.trackCursor >= len(o.trackInfos) {
+		return
+	}
+	ti := &o.trackInfos[o.trackCursor]
+	// Load cover art for the selected track.
+	o.loadCoverArt(ti.Path, availableRowTextWidth(maxW))
+	lines := trackInfoLines(player.TrackTitle(ti.Path), ti)
+	if len(lines) == 0 {
+		return
+	}
+
+	maxTextPx := availableRowTextWidth(maxW)
+	o.infoMarquee.invalidate(o)
+	o.infoLines = lines
+	// Vertical scroll: keep the cursor line visible.
 	lh := o.face.Metrics().Height.Ceil()
-	maxRows := maxH / lh
-	if maxRows < 1 {
-		maxRows = 1
+	if lh <= 0 {
+		lh = 1
 	}
-	o.tracksScroll = scrollOffset(o.tracksScroll, o.trackCursor, len(o.trackInfos), maxRows)
-
-	o.deleteTex(&o.tracksTex)
-	o.marqueeR.invalidate(o)
-
-	start := o.tracksScroll
-	end := start + maxRows
-	if end > len(o.trackInfos) {
-		end = len(o.trackInfos)
-	}
-	maxTextPx := availableRowTextWidth(maxW) - 2*o.borderWidthPx()
+	contentRows, visibleRows := o.infoScrollMetrics(len(lines), lh, maxH)
+	o.ncInfoVisible = visibleRows
+	o.ncInfoLines = contentRows
+	o.ncInfoScroll = min(o.ncInfoScroll, max(0, contentRows-visibleRows))
 	var rows []listRow
-	for i := start; i < end; i++ {
-		info := o.trackInfos[i]
-		title := player.TrackTitle(info.Path)
-		suffix := ""
-		if info.Duration > 0 {
-			suffix = "  " + formatDuration(info.Duration)
-		}
-		prefix := "  "
-		if info.Path == o.playingPath {
-			prefix = "▸ "
-		}
-		line := prefix + title + suffix
-		rows = append(rows, listRow{text: line, active: i == o.trackCursor && o.panelEntered && o.focusPanel == 1})
-		if i == o.trackCursor && o.focusPanel == 1 {
-			o.rebuildMarqueeLine(&o.marqueeR, line, maxTextPx, false)
-		}
+	for _, line := range lines {
+		rows = append(rows, listRow{text: line})
 	}
 	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
-	o.tracksContentDirty = false
+}
+
+// infoScrollMetrics computes total content rows and visible rows for an
+// info panel, accounting for cover art height. contentRows includes the
+// cover art (converted to row units) plus text lines.
+func (o *Overlay) infoScrollMetrics(textLines, lh, panelH int) (contentRows, visibleRows int) {
+	coverArtH := 0
+	if o.coverArtTex != 0 && o.coverArtTexH > 0 {
+		coverArtH = o.coverArtTexH + 8 // 4px pad top + 4px pad bottom
+	}
+	contentRows = (coverArtH + textLines*lh + lh - 1) / lh
+	visibleRows = panelH / lh
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	return
+}
+
+// loadCoverArt extracts and decodes embedded cover art from a file,
+// scales it to maxWidth, and uploads as a GL texture. Returns the
+// texture handle, width, and height. Returns 0 if no cover art.
+func (o *Overlay) loadCoverArt(path string, maxWidth int) (uint32, int, int) {
+	if path == "" || maxWidth <= 0 {
+		return 0, 0, 0
+	}
+	// Don't re-extract if we already have this file's cover art.
+	if o.coverArtTex != 0 && o.coverArtPath == path {
+		return o.coverArtTex, o.coverArtTexW, o.coverArtTexH
+	}
+	o.deleteTex(&o.coverArtTex)
+	data := player.ExtractCoverArt(path)
+	if len(data) == 0 {
+		o.coverArtPath = path
+		o.coverArtTexW, o.coverArtTexH = 0, 0
+		return 0, 0, 0
+	}
+	img, err := jpeg.Decode(bytes.NewReader(data))
+	if err != nil {
+		slog.Debug("cover art decode failed", "path", filepath.Base(path), "error", err)
+		o.coverArtPath = path
+		return 0, 0, 0
+	}
+	// Scale to fit within maxWidth, preserving aspect ratio.
+	origW := img.Bounds().Dx()
+	origH := img.Bounds().Dy()
+	w, h := origW, origH
+	if w > maxWidth {
+		h = origH * maxWidth / origW
+		w = maxWidth
+	}
+	if w <= 0 || h <= 0 {
+		return 0, 0, 0
+	}
+	scaled := image.NewRGBA(image.Rect(0, 0, w, h))
+	xdraw.NearestNeighbor.Scale(scaled, scaled.Bounds(), img, img.Bounds(), xdraw.Over, nil)
+	tex := glUploadTexture(scaled)
+	o.coverArtTex = tex
+	o.coverArtTexW = w
+	o.coverArtTexH = h
+	o.coverArtPath = path
+	slog.Debug("cover art loaded", "path", filepath.Base(path), "w", w, "h", h)
+	return tex, w, h
+}
+
+func (o *Overlay) clearInfoPanel() {
+	o.deleteTex(&o.tracksTex)
+	o.tracksTexW = 0
+	o.tracksTexH = 0
+	o.infoLines = nil
+	o.ncInfoLines = 0
+	o.ncInfoVisible = 0
+	o.marqueeR.invalidate(o)
+	o.infoMarquee.invalidate(o)
+	o.deleteTex(&o.coverArtTex)
+	o.coverArtTexW = 0
+	o.coverArtTexH = 0
+	o.coverArtPath = ""
 }
 
 // rebuildNCInfoTex renders the right-panel NC info (file/dir details + buttons).
 func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
-	o.deleteTex(&o.tracksTex)
-	o.marqueeR.invalidate(o)
-	o.infoMarquee.invalidate(o)
+	o.rebuildNCActionsTex()
 
 	var lines []string
 	if status := o.NCListingStatus(); status != filesystem.StatusOK {
@@ -286,9 +430,91 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 			fmt.Sprintf("  Folders: %d", dirs),
 			fmt.Sprintf("  Playable files: %d", files))
 	} else if o.ncInfoFile != "" {
+		// Load cover art first (before text) so the texture is ready for rendering.
+		o.loadCoverArt(o.ncInfoFile, availableRowTextWidth(maxW))
 		// File info.
 		if info, err := os.Stat(o.ncInfoFile); err == nil {
 			lines = append(lines, fmt.Sprintf("  %s", formatSize(info.Size())))
+		}
+		// Read audio metadata for the file.
+		meta := player.ReadFileMeta(o.ncInfoFile)
+		slog.Debug("rebuildNCInfoTex",
+			"file", filepath.Base(o.ncInfoFile),
+			"title", meta.Title,
+			"artist", meta.Artist,
+			"album", meta.Album,
+			"genre", meta.Genre,
+			"date", meta.Date,
+			"duration", meta.Duration,
+			"channels", meta.Channels,
+		)
+		if meta.Title != "" {
+			lines = append(lines, "", fmt.Sprintf("  Title: %s", meta.Title))
+		}
+		if meta.Artist != "" {
+			lines = append(lines, fmt.Sprintf("  Artist: %s", meta.Artist))
+		}
+		if meta.Album != "" {
+			lines = append(lines, fmt.Sprintf("  Album: %s", meta.Album))
+		}
+		if meta.AlbumArtist != "" {
+			lines = append(lines, fmt.Sprintf("  Album Artist: %s", meta.AlbumArtist))
+		}
+		if meta.Genre != "" {
+			lines = append(lines, fmt.Sprintf("  Genre: %s", meta.Genre))
+		}
+		if meta.Date != "" {
+			lines = append(lines, fmt.Sprintf("  Date: %s", meta.Date))
+		}
+		if meta.Track != "" {
+			lines = append(lines, fmt.Sprintf("  Track: %s", meta.Track))
+		}
+		if meta.Composer != "" {
+			lines = append(lines, fmt.Sprintf("  Composer: %s", meta.Composer))
+		}
+		if meta.Disc != "" {
+			lines = append(lines, fmt.Sprintf("  Disc: %s", meta.Disc))
+		}
+		if meta.Duration > 0 {
+			lines = append(lines, fmt.Sprintf("  Length: %s", formatDuration(meta.Duration)))
+		}
+		if meta.Channels > 0 {
+			lines = append(lines, fmt.Sprintf("  Channels: %d", meta.Channels))
+		}
+		if meta.BPM > 0 {
+			lines = append(lines, fmt.Sprintf("  BPM: %.0f", meta.BPM))
+		}
+		if meta.Comment != "" {
+			lines = append(lines, "  Comment:")
+			for _, c := range strings.Split(meta.Comment, "\n") {
+				lines = append(lines, "  "+c)
+			}
+		}
+		if len(meta.Extra) > 0 {
+			// Sort extra tags alphabetically for stable display.
+			keys := make([]string, 0, len(meta.Extra))
+			for k := range meta.Extra {
+				if shouldHideExtraTag(k, meta.Extra[k]) {
+					continue
+				}
+				keys = append(keys, k)
+			}
+			slices.Sort(keys)
+			for _, k := range keys {
+				label := k
+				if len(label) > 0 {
+					label = strings.ToUpper(label[:1]) + label[1:]
+				}
+				v := normalizeMetadataLines(meta.Extra[k])
+				if strings.Contains(v, "\n") {
+					lines = append(lines, "", "  "+label+":")
+					for _, ln := range strings.Split(v, "\n") {
+						lines = append(lines, "    "+ln)
+					}
+				} else {
+					lines = append(lines, fmt.Sprintf("  %s: %s", label, v))
+				}
+			}
 		}
 	} else if len(lines) == 0 {
 		o.tracksTex, o.tracksTexW, o.tracksTexH = 0, 0, 0
@@ -304,35 +530,6 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		return
 	}
 
-	// Buttons.
-	lines = append(lines, "")
-	playLine := "  [Play]"
-	if o.focusPanel == 1 && o.ncRight == ncRightPlay {
-		playLine = " >[Play]"
-	}
-	lines = append(lines, playLine)
-
-	if o.ncConfirm {
-		deleteLine := "  [Delete?]"
-		if o.focusPanel == 1 && o.ncRight == ncRightDelete {
-			deleteLine = " >[Delete?]"
-		}
-		lines = append(lines, deleteLine, "  press Enter to confirm", "  press Backspace to cancel")
-	} else if o.ncInfoFile != "" || (o.ncInfoIsDir && o.ncInfoDir != o.baseDir) {
-		deleteLine := "  [Delete]"
-		if o.focusPanel == 1 && o.ncRight == ncRightDelete {
-			deleteLine = " >[Delete]"
-		}
-		lines = append(lines, deleteLine)
-	}
-
-	if ti := o.ncTrackInfo(); ti != nil && ti.Comment != "" {
-		lines = append(lines, "")
-		for _, cl := range strings.Split(ti.Comment, "\n") {
-			lines = append(lines, "  "+cl)
-		}
-	}
-
 	maxTextPx := availableRowTextWidth(maxW)
 	infoTextW := maxTextPx
 	for _, line := range lines {
@@ -341,34 +538,131 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		}
 	}
 	lh := o.face.Metrics().Height.Ceil()
-	maxRows := maxH / lh
-	if maxRows < 1 {
-		maxRows = 1
+	metadataH := maxH - actionBarHeight(lh)
+	if metadataH < lh {
+		metadataH = lh
 	}
-	o.ncInfoVisible = maxRows
-	o.ncInfoLines = len(lines)
-	maxScroll := max(0, len(lines)-maxRows)
+	contentRows, visibleRows := o.infoScrollMetrics(len(lines), lh, metadataH)
+	o.ncInfoVisible = visibleRows
+	o.ncInfoLines = contentRows
+	maxScroll := max(0, contentRows-visibleRows)
 	o.ncInfoScroll = min(o.ncInfoScroll, maxScroll)
-	start := o.ncInfoScroll
-	end := min(start+maxRows, len(lines))
 	var rows []listRow
-	for _, line := range lines[start:end] {
+	for _, line := range lines {
 		if infoTextW > maxTextPx {
 			line = ""
 		}
 		rows = append(rows, listRow{text: line})
 	}
 	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, infoTextW, maxW)
-	o.rebuildInfoMarquee(lines[start:end], maxTextPx, infoTextW)
+	o.rebuildInfoMarquee(lines, maxTextPx, infoTextW)
 }
 
-func (o *Overlay) ncTrackInfo() *player.TrackInfo {
-	for i := range o.trackInfos {
-		if o.trackInfos[i].Path == o.ncInfoFile {
-			return &o.trackInfos[i]
+// trackInfoLines builds right-panel info lines for a track. Pure logic, no GL.
+func trackInfoLines(title string, ti *player.TrackInfo) []string {
+	var lines []string
+	lines = append(lines, title, "")
+
+	// Audio tags
+	if ti.Title != "" {
+		lines = append(lines, fmt.Sprintf("Title: %s", ti.Title))
+	}
+	if ti.Artist != "" {
+		lines = append(lines, fmt.Sprintf("Artist: %s", ti.Artist))
+	}
+	if ti.Album != "" {
+		lines = append(lines, fmt.Sprintf("Album: %s", ti.Album))
+	}
+	if ti.AlbumArtist != "" {
+		lines = append(lines, fmt.Sprintf("Album Artist: %s", ti.AlbumArtist))
+	}
+	if ti.Genre != "" {
+		lines = append(lines, fmt.Sprintf("Genre: %s", ti.Genre))
+	}
+	if ti.Date != "" {
+		lines = append(lines, fmt.Sprintf("Date: %s", ti.Date))
+	}
+	if ti.Track != "" {
+		lines = append(lines, fmt.Sprintf("Track: %s", ti.Track))
+	}
+	if ti.Composer != "" {
+		lines = append(lines, fmt.Sprintf("Composer: %s", ti.Composer))
+	}
+	if ti.Disc != "" {
+		lines = append(lines, fmt.Sprintf("Disc: %s", ti.Disc))
+	}
+	for key, value := range ti.Extra {
+		if shouldHideExtraTag(key, value) {
+			continue
+		}
+		label := key
+		if len(label) > 0 {
+			label = strings.ToUpper(label[:1]) + label[1:]
+		}
+		value = normalizeMetadataLines(value)
+		if strings.Contains(value, "\n") {
+			lines = append(lines, "", label+":")
+			for _, line := range strings.Split(value, "\n") {
+				lines = append(lines, "    "+line)
+			}
+		} else {
+			lines = append(lines, fmt.Sprintf("%s: %s", label, value))
 		}
 	}
-	return nil
+
+	// Technical info
+	var header string
+	if ti.Duration > 0 {
+		header = fmt.Sprintf("Length: %-5s", formatDuration(ti.Duration))
+	}
+	if ti.Size > 0 {
+		if header != "" {
+			header += " "
+		}
+		header += fmt.Sprintf("Size: %s", formatSize(ti.Size))
+	}
+	if header != "" {
+		lines = append(lines, header)
+	}
+	var specs string
+	if ti.Channels > 0 {
+		specs = fmt.Sprintf("Channels: %-3d", ti.Channels)
+	}
+	if ti.BPM > 0 {
+		if specs != "" {
+			specs += " "
+		}
+		specs += fmt.Sprintf("BPM: %-3.0f", ti.BPM)
+	}
+	if specs != "" {
+		lines = append(lines, specs)
+	}
+	if ti.Comment != "" {
+		lines = append(lines, "Comment:")
+		lines = append(lines, strings.Split(ti.Comment, "\n")...)
+	}
+	return lines
+}
+
+func shouldHideExtraTag(key, value string) bool {
+	normalizedKey := strings.ToLower(strings.TrimSpace(key))
+	if normalizedKey == "handler_name" || normalizedKey == "handlername" {
+		return true
+	}
+	return normalizedKey == "language" && isUnknownMetadataValue(value)
+}
+
+func isUnknownMetadataValue(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "und", "unknown", "undefined", "n/a", "na":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeMetadataLines(value string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(value, "\r\n", "\n"), "\r", "\n")
 }
 
 // catalogTrackInfoLines builds the right-panel lines for a cached catalog
@@ -397,44 +691,7 @@ func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []play
 		if !ti.Cached {
 			return nil
 		}
-		// Cached — show metadata. Even with zero metadata the panel is
-		// visible, signalling that the file is locally available.
-		var lines []string
-		lines = append(lines, player.TrackTitle(e.label), "")
-		// Line 1: Length + Size (aligned columns)
-		var header string
-		if ti.Duration > 0 {
-			header = fmt.Sprintf("Length: %-5s", formatDuration(ti.Duration))
-		}
-		if ti.Size > 0 {
-			if header != "" {
-				header += " "
-			}
-			header += fmt.Sprintf("Size: %s", formatSize(ti.Size))
-		}
-		if header != "" {
-			lines = append(lines, header)
-		}
-		// Line 2: Channels + BPM (aligned columns)
-		var specs string
-		if ti.Channels > 0 {
-			specs = fmt.Sprintf("Channels: %-3d", ti.Channels)
-		}
-		if ti.BPM > 0 {
-			if specs != "" {
-				specs += " "
-			}
-			specs += fmt.Sprintf("BPM: %-3.0f", ti.BPM)
-		}
-		if specs != "" {
-			lines = append(lines, specs)
-		}
-		// Comment block
-		if ti.Comment != "" {
-			lines = append(lines, "Comment:")
-			lines = append(lines, strings.Split(ti.Comment, "\n")...)
-		}
-		return lines
+		return trackInfoLines(player.TrackTitle(e.label), ti)
 	}
 
 	// Track info not yet available (metadata still loading).
@@ -445,9 +702,6 @@ func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []play
 // track. Hides the panel (no texture) when the track is not cached or
 // metadata is unavailable. Long comments scroll via ncInfo* scroll state.
 func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
-	o.deleteTex(&o.tracksTex)
-	o.marqueeR.invalidate(o)
-	o.infoMarquee.invalidate(o)
 	o.tracksContentDirty = false
 
 	lines := catalogTrackInfoLines(e, o.currentAlbums(), o.trackInfos)
@@ -463,25 +717,20 @@ func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 		}
 	}
 	lh := o.face.Metrics().Height.Ceil()
-	maxRows := maxH / lh
-	if maxRows < 1 {
-		maxRows = 1
-	}
-	o.ncInfoVisible = maxRows
-	o.ncInfoLines = len(lines)
-	maxScroll := max(0, len(lines)-maxRows)
+	contentRows, visibleRows := o.infoScrollMetrics(len(lines), lh, maxH)
+	o.ncInfoVisible = visibleRows
+	o.ncInfoLines = contentRows
+	maxScroll := max(0, contentRows-visibleRows)
 	o.ncInfoScroll = min(o.ncInfoScroll, maxScroll)
-	start := o.ncInfoScroll
-	end := min(start+maxRows, len(lines))
 	var rows []listRow
-	for _, line := range lines[start:end] {
+	for _, line := range lines {
 		if infoTextW > maxTextPx {
 			line = ""
 		}
 		rows = append(rows, listRow{text: line})
 	}
 	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, infoTextW, maxW)
-	o.rebuildInfoMarquee(lines[start:end], maxTextPx, infoTextW)
+	o.rebuildInfoMarquee(lines, maxTextPx, infoTextW)
 }
 
 func (o *Overlay) rebuildInfoMarquee(lines []string, viewportW, contentW int) {
@@ -502,12 +751,12 @@ func (o *Overlay) rebuildInfoMarquee(lines []string, viewportW, contentW int) {
 	o.rebuildMarqueeLine(&o.infoMarquee, strings.Join(marqueeLines, "\n"), viewportW, false)
 }
 
-func (o *Overlay) drawInfoMarquee(x, y, w, h float32, winW, winH, viewW, viewH int) {
+func (o *Overlay) drawInfoMarquee(x, y, w, clipY, clipH float32, winW, winH, viewW, viewH int) {
 	if o.infoMarquee.tex == 0 || float32(o.infoMarquee.texW) <= w {
 		return
 	}
 	offset := max(0, min(int(o.infoMarquee.offset), o.infoMarquee.texW-int(w)))
 	glDrawOverlayTextClipped(o.programText, o.infoMarquee.tex, 1,
 		x-float32(offset), y, float32(o.infoMarquee.texW), float32(o.infoMarquee.texH),
-		x, y, w, h, winW, winH, viewW, viewH)
+		x, clipY, w, clipH, winW, winH, viewW, viewH)
 }
