@@ -394,3 +394,25 @@ func FavoriteTrackTitle(path string) string {
 	}
 	return filepath.Base(path)
 }
+
+// IsLocalPath reports whether path is a local filesystem path (not a
+// catalog URL like modland:... or modarchive:...).
+func IsLocalPath(path string) bool {
+	return !IsModland(path) && !IsModArchive(path)
+}
+
+// FilterAvailable returns only the tracks that exist on disk. Local files
+// are checked with os.Stat; catalog URLs are kept unconditionally.
+func FilterAvailable(tracks []string) []string {
+	out := make([]string, 0, len(tracks))
+	for _, t := range tracks {
+		if !IsLocalPath(t) {
+			out = append(out, t)
+			continue
+		}
+		if _, err := os.Stat(t); err == nil {
+			out = append(out, t)
+		}
+	}
+	return out
+}

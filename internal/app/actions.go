@@ -518,7 +518,8 @@ func (a *App) playFile(path string) {
 
 // playFavoriteFile plays a track from a favorites playlist. The queue becomes
 // a snapshot of the entire playlist in order; subsequent favorites changes
-// don't affect the running queue.
+// don't affect the running queue. Missing local files are auto-skipped and
+// removed from favorites.
 func (a *App) playFavoriteFile(path string) {
 	if a.favorites == nil {
 		return
@@ -527,6 +528,13 @@ func (a *App) playFavoriteFile(path string) {
 	kind := a.favorites.GetPlaylist(path)
 	if kind == "" {
 		// Not in any playlist — fall back to single-file playback.
+		if player.IsLocalPath(path) {
+			if _, err := os.Stat(path); err != nil {
+				slog.Warn("favorites: track missing, removing", "path", path)
+				_ = a.favorites.Remove(path)
+				return
+			}
+		}
 		a.playFile(path)
 		return
 	}
@@ -535,12 +543,24 @@ func (a *App) playFavoriteFile(path string) {
 	if len(tracks) == 0 {
 		return
 	}
-	idx := slices.Index(tracks, path)
-	if idx < 0 {
-		idx = 0
-	}
-	if a.playbackState.setPlaylist(tracks, idx, kind.String()) {
-		a.playTrack(tracks[idx], "")
+	// Auto-skip missing local files and remove them from favorites.
+	for idx := slices.Index(tracks, path); idx < len(tracks); idx++ {
+		if player.IsLocalPath(tracks[idx]) {
+			if _, err := os.Stat(tracks[idx]); err != nil {
+				slog.Warn("favorites: track missing, skipping", "path", tracks[idx])
+				_ = a.favorites.Remove(tracks[idx])
+				if idx < len(tracks)-1 {
+					path = tracks[idx+1]
+					continue
+				}
+				return // last track is missing, nothing to play
+			}
+		}
+		// Found an available track.
+		if a.playbackState.setPlaylist(tracks, idx, kind.String()) {
+			a.playTrack(tracks[idx], "")
+		}
+		return
 	}
 }
 

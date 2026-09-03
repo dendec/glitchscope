@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -792,13 +793,18 @@ func (o *Overlay) switchToFavoritesPlaylist(kind player.PlaylistID) {
 		return
 	}
 	tracks := o.favoritesView.Tracks(kind)
-	entries := make([]navEntry, len(tracks))
-	for i, path := range tracks {
-		entries[i] = navEntry{
+	var entries []navEntry
+	for _, path := range tracks {
+		if player.IsLocalPath(path) {
+			if _, err := os.Stat(path); err != nil {
+				continue
+			}
+		}
+		entries = append(entries, navEntry{
 			label:    player.FavoriteTrackTitle(path),
 			kind:     entryFavoriteTrack,
 			filePath: path,
-		}
+		})
 	}
 	symbol := player.PlaylistSymbol(kind)
 	if symbol == "" {

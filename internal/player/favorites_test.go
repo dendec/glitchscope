@@ -341,3 +341,39 @@ func TestFavoritesPreservesOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestFilterAvailable(t *testing.T) {
+	dir := t.TempDir()
+	// Create two files, leave one absent.
+	a := filepath.Join(dir, "a.mod")
+	b := filepath.Join(dir, "b.xm")
+	if err := os.WriteFile(a, []byte("fake"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(b, []byte("fake"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	absent := filepath.Join(dir, "missing.it")
+	remote := "modland:http://example.com/song.mod"
+
+	input := []string{a, absent, b, remote}
+	got := FilterAvailable(input)
+	want := []string{a, b, remote}
+	if len(got) != len(want) {
+		t.Fatalf("len: got %d, want %d", len(got), len(want))
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("[%d]: got %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestFilterAvailableAllMissing(t *testing.T) {
+	dir := t.TempDir()
+	absent := filepath.Join(dir, "nope.it")
+	got := FilterAvailable([]string{absent})
+	if len(got) != 0 {
+		t.Fatalf("expected empty, got %d", len(got))
+	}
+}
