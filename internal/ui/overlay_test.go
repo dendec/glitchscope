@@ -86,6 +86,23 @@ func TestCompactHeaderGeometryScalesWithHeight(t *testing.T) {
 	}
 }
 
+func TestMenuHeaderReservesBreadcrumbRowWhereNavigationHasPaths(t *testing.T) {
+	o := &Overlay{screenH: 480, uiPage: PageLibrary}
+	if got := o.menuHeaderHeight(16); got != 34 {
+		t.Fatalf("Library header height = %d, want 34", got)
+	}
+
+	o.uiPage = PagePresets
+	if got := o.menuHeaderHeight(16); got != 34 {
+		t.Fatalf("Presets header height = %d, want 34", got)
+	}
+
+	o.uiPage = PageSettings
+	if got := o.menuHeaderHeight(16); got != 18 {
+		t.Fatalf("Settings header height = %d, want 18", got)
+	}
+}
+
 func TestScrollPosition(t *testing.T) {
 	tests := []struct {
 		name                    string

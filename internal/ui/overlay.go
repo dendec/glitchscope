@@ -236,7 +236,10 @@ type Overlay struct {
 	presetNameTex                      uint32
 	presetNameTexW, presetNameTexH     int
 
-	breadcrumbDirty bool
+	breadcrumbTex                  uint32
+	breadcrumbTexW, breadcrumbTexH int
+	breadcrumbTextCache            string
+	breadcrumbDirty                bool
 
 	hintTex            uint32
 	hintTexW, hintTexH int
@@ -297,6 +300,7 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.bottomSuffixTex)
 	o.deleteTex(&o.statsTex)
 	o.deleteTex(&o.presetNameTex)
+	o.deleteTex(&o.breadcrumbTex)
 	o.deleteTex(&o.hintTex)
 	o.deleteTex(&o.settingsColL.tex)
 	o.deleteTex(&o.settingsColR.tex)

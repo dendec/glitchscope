@@ -40,13 +40,18 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	if o.pageIndicatorDirty {
 		o.rebuildPageIndicatorTextures()
 	}
+	if o.showsBreadcrumb() {
+		o.rebuildBreadcrumbTex(winW)
+	}
 	if (o.playingPath != "" || o.loading) && o.bottomDirty {
 		o.rebuildBottomTex(winW, o.face.Metrics().Height.Ceil())
 	}
 
-	// The visible menu gives the header exclusively to centered page navigation.
+	// The menu header contains centered page navigation and, where meaningful,
+	// a second row for the current navigation path.
 	lh := o.face.Metrics().Height.Ceil()
-	headerH := o.headerHeight(lh)
+	navigationHeaderH := o.headerHeight(lh)
+	headerH := o.menuHeaderHeight(lh)
 
 	// Status row grows to fit the actual texture height, but only enough to
 	// leave a single line-gap worth of breathing room below the descenders —
@@ -84,6 +89,15 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	glDrawFilledRect(o.programRect, 0, 0, float32(winW), float32(headerH), hR, hG, hB, o.bgAlpha(), winW, winH, viewW, viewH)
 
 	o.renderPageIndicator(winW, winH, viewW, viewH)
+	if o.showsBreadcrumb() && o.breadcrumbTex != 0 {
+		headerMargin := o.headerMarginX()
+		breadcrumbY := float32(navigationHeaderH - textPadding(o.fontSize))
+		breadcrumbW := float32(winW - headerMargin*2)
+		if !o.drawMarquee(&o.breadcrumbMarquee, float32(headerMargin), breadcrumbY, breadcrumbW, float32(o.breadcrumbTexH), winW, winH, viewW, viewH) {
+			glDrawOverlayText(o.programText, o.breadcrumbTex, 1,
+				float32(headerMargin), breadcrumbY, float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
+		}
+	}
 
 	switch o.uiPage {
 	case PageSettings:
@@ -271,6 +285,29 @@ func (o *Overlay) rebuildStatsTex() {
 	o.deleteTex(&o.statsTex)
 	o.statsMarquee.invalidate(o)
 	o.statsTex, o.statsTexW, o.statsTexH = renderPlainTextToTex(o.statsLine, o.statsTextFace(), statsFontSize(o.fontSize), o.textColor())
+}
+
+// rebuildBreadcrumbTex re-renders the current navigation path only when its
+// text or presentation constraints have changed.
+func (o *Overlay) rebuildBreadcrumbTex(winW int) {
+	if o.face == nil {
+		return
+	}
+	text := o.breadcrumbText()
+	if !o.breadcrumbDirty && text == o.breadcrumbTextCache {
+		return
+	}
+	o.breadcrumbDirty = false
+	o.breadcrumbTextCache = text
+	o.deleteTex(&o.breadcrumbTex)
+	if text == "" {
+		o.breadcrumbMarquee.invalidate(o)
+		return
+	}
+	maxW := winW - o.headerMarginX()*2
+	display := o.truncateEnd(text, maxW)
+	o.breadcrumbTex, o.breadcrumbTexW, o.breadcrumbTexH = o.renderTextToTex(display, o.textColor())
+	o.rebuildMarqueeLine(&o.breadcrumbMarquee, text, maxW, false)
 }
 
 func (o *Overlay) statsTextFace() font.Face {
@@ -577,6 +614,18 @@ func (o *Overlay) headerMarginX() int {
 
 func (o *Overlay) headerHeight(lineHeight int) int {
 	return lineHeight + o.scalePx(headerExtraHeightAt480)
+}
+
+func (o *Overlay) showsBreadcrumb() bool {
+	return o.uiPage == PageLibrary || o.uiPage == PagePresets
+}
+
+func (o *Overlay) menuHeaderHeight(lineHeight int) int {
+	height := o.headerHeight(lineHeight)
+	if o.showsBreadcrumb() {
+		height += lineHeight
+	}
+	return height
 }
 
 func centeredTextY(containerHeight, lineHeight, padding int) int {
