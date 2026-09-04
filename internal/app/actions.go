@@ -316,7 +316,7 @@ func (a *App) applyPresetName(name string) {
 // applySettings reads confirmed settings rows and applies changes.
 func (a *App) applySettings(winW, winH int) {
 	rows := a.overlay.SettingsRows()
-	if len(rows) < 8 {
+	if len(rows) < 9 {
 		return
 	}
 
@@ -345,6 +345,17 @@ func (a *App) applySettings(winW, winH int) {
 	if filterIndex >= 0 && filterIndex < len(filters) {
 		a.settings.Graphics.UpscaleFilter = filters[filterIndex]
 		a.rt.SetNearest(a.settings.Graphics.UpscaleFilter.IsNearest())
+	}
+
+	perfModes := config.AllPerformanceModes()
+	if idx := rows[ui.SettingPerformanceMode].Index; idx >= 0 && idx < len(perfModes) {
+		newMode := perfModes[idx]
+		if newMode != a.settings.Graphics.PerformanceMode {
+			a.settings.Graphics.PerformanceMode = newMode
+			params := newMode.Params()
+			a.vizClock.framePeriod = time.Second / time.Duration(params.VisualizerFPS)
+			a.resetAdaptiveState(winW, winH)
+		}
 	}
 
 	shuffleModes := config.AllShuffleModes()

@@ -69,13 +69,128 @@ func (f *UpscaleFilter) UnmarshalJSON(data []byte) error {
 
 func AllFilters() []UpscaleFilter { return []UpscaleFilter{FilterSmooth, FilterPixel} }
 
+// PerformanceMode selects a visualizer quality preset that trades frame rate
+// for power consumption.
+type PerformanceMode int
+
+const (
+	PerfModePerformance PerformanceMode = iota // 30 FPS visualizer, default
+	PerfModeBalanced                            // 24 FPS, moderate savings
+	PerfModeEco                                 // 15 FPS, maximum battery life
+)
+
+// ModeParams holds the tuning knobs for one performance mode.
+type ModeParams struct {
+	VisualizerFPS    int32
+	AdaptiveThreshLow  float64
+	AdaptiveThreshHigh float64
+	AdaptiveLowFrames  int
+	AdaptiveHighFrames int
+	AdaptiveCooldown   int
+	AdaptiveLowSec     float64
+	AdaptiveHighSec    float64
+	LowFPSThresh       float64
+}
+
+// Params returns the tuning parameters for mode m.
+func (m PerformanceMode) Params() ModeParams {
+	switch m {
+	case PerfModeBalanced:
+		return ModeParams{
+			VisualizerFPS:     24,
+			AdaptiveThreshLow:  17.0,
+			AdaptiveThreshHigh: 20.0,
+			AdaptiveLowFrames:  8,
+			AdaptiveHighFrames: 10,
+			AdaptiveCooldown:   12,
+			AdaptiveLowSec:     2.0,
+			AdaptiveHighSec:    4.0,
+			LowFPSThresh:       12.0,
+		}
+	case PerfModeEco:
+		return ModeParams{
+			VisualizerFPS:     15,
+			AdaptiveThreshLow:  11.0,
+			AdaptiveThreshHigh: 14.0,
+			AdaptiveLowFrames:  6,
+			AdaptiveHighFrames: 8,
+			AdaptiveCooldown:   15,
+			AdaptiveLowSec:     3.0,
+			AdaptiveHighSec:    6.0,
+			LowFPSThresh:       7.5,
+		}
+	default: // PerfModePerformance
+		return ModeParams{
+			VisualizerFPS:     30,
+			AdaptiveThreshLow:  20.0,
+			AdaptiveThreshHigh: 24.0,
+			AdaptiveLowFrames:  10,
+			AdaptiveHighFrames: 10,
+			AdaptiveCooldown:   10,
+			AdaptiveLowSec:     2.0,
+			AdaptiveHighSec:    4.0,
+			LowFPSThresh:       15.0,
+		}
+	}
+}
+
+func (m PerformanceMode) String() string {
+	switch m {
+	case PerfModePerformance:
+		return "Performance"
+	case PerfModeBalanced:
+		return "Balanced"
+	case PerfModeEco:
+		return "Eco"
+	default:
+		return "Unknown"
+	}
+}
+
+func (m PerformanceMode) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.String())
+}
+
+func (m *PerformanceMode) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch s {
+	case "Performance", "":
+		*m = PerfModePerformance
+	case "Balanced":
+		*m = PerfModeBalanced
+	case "Eco":
+		*m = PerfModeEco
+	default:
+		return fmt.Errorf("unknown performance mode: %s", s)
+	}
+	return nil
+}
+
+func (m PerformanceMode) Validate() error {
+	switch m {
+	case PerfModePerformance, PerfModeBalanced, PerfModeEco:
+		return nil
+	default:
+		return fmt.Errorf("invalid performance mode %d", m)
+	}
+}
+
+// AllPerformanceModes returns all valid performance modes.
+func AllPerformanceModes() []PerformanceMode {
+	return []PerformanceMode{PerfModePerformance, PerfModeBalanced, PerfModeEco}
+}
+
 // GraphicsSettings is the persisted user-tunable graphics parameters.
 type GraphicsSettings struct {
-	RenderWidth     int           `json:"render_width"`
-	RenderHeight    int           `json:"render_height"`
-	UpscaleFilter   UpscaleFilter `json:"upscale_filter"`
-	Adaptive        bool          `json:"adaptive"`
-	BeatSensitivity float64       `json:"beat_sensitivity"`
+	RenderWidth     int             `json:"render_width"`
+	RenderHeight    int             `json:"render_height"`
+	UpscaleFilter   UpscaleFilter   `json:"upscale_filter"`
+	Adaptive        bool            `json:"adaptive"`
+	BeatSensitivity float64         `json:"beat_sensitivity"`
+	PerformanceMode PerformanceMode `json:"performance_mode"`
 }
 
 // DefaultGraphics returns sensible defaults.
@@ -86,6 +201,7 @@ func DefaultGraphics() GraphicsSettings {
 		UpscaleFilter:   FilterPixel,
 		Adaptive:        true,
 		BeatSensitivity: 1,
+		PerformanceMode: PerfModePerformance,
 	}
 }
 
@@ -98,6 +214,9 @@ func (g *GraphicsSettings) Validate() error {
 	}
 	if math.IsNaN(g.BeatSensitivity) || math.IsInf(g.BeatSensitivity, 0) || g.BeatSensitivity < 0 || g.BeatSensitivity > 2 {
 		return fmt.Errorf("beat sensitivity must be 0..2, got %v", g.BeatSensitivity)
+	}
+	if err := g.PerformanceMode.Validate(); err != nil {
+		return fmt.Errorf("performance mode: %w", err)
 	}
 	return nil
 }

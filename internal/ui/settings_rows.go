@@ -10,12 +10,13 @@ import (
 const (
 	SettingResolution      = 0
 	SettingFilter          = 1
-	SettingShuffle         = 2
-	SettingRepeat          = 3
-	SettingPresetTimer     = 4
-	SettingTheme           = 5
-	SettingTransparency    = 6
-	SettingBeatSensitivity = 7
+	SettingPerformanceMode = 2
+	SettingShuffle         = 3
+	SettingRepeat          = 4
+	SettingPresetTimer     = 5
+	SettingTheme           = 6
+	SettingTransparency    = 7
+	SettingBeatSensitivity = 8
 )
 
 // BuildSettingsRows creates SettingRow entries from the current config.
@@ -122,9 +123,20 @@ func BuildSettingsRows(s config.Settings, winW, winH int, renderScaleExplicit bo
 		}
 	}
 
+	perfModes := config.AllPerformanceModes()
+	perfValues := make([]string, len(perfModes))
+	perfIndex := 0
+	for i, m := range perfModes {
+		perfValues[i] = m.String()
+		if m == s.Graphics.PerformanceMode {
+			perfIndex = i
+		}
+	}
+
 	return []SettingRow{
 		{Label: "Render resolution", Values: resValues, Index: resIndex},
 		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
+		{Label: "Performance mode", Values: perfValues, Index: perfIndex},
 		{Label: "Shuffle", Values: shuffleValues, Index: shuffleIndex},
 		{Label: "Repeat", Values: repeatValues, Index: repeatIndex},
 		{Label: "Preset auto-switch", Values: presetValues, Index: presetIndex},

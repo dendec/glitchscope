@@ -380,3 +380,55 @@ func TestSaveAtomic(t *testing.T) {
 		t.Fatal("unmarshal:", err)
 	}
 }
+
+func TestPerformanceModeRoundTrip(t *testing.T) {
+	for _, m := range AllPerformanceModes() {
+		b, err := json.Marshal(m)
+		if err != nil {
+			t.Fatalf("marshal %v: %v", m, err)
+		}
+		var got PerformanceMode
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatalf("unmarshal %s: %v", b, err)
+		}
+		if got != m {
+			t.Fatalf("round trip: got %v, want %v", got, m)
+		}
+	}
+}
+
+func TestPerformanceModeInvalid(t *testing.T) {
+	var m PerformanceMode
+	if err := json.Unmarshal([]byte(`"Turbo"`), &m); err == nil {
+		t.Fatal("expected error for invalid mode")
+	}
+}
+
+func TestPerformanceModeParams(t *testing.T) {
+	for _, m := range AllPerformanceModes() {
+		p := m.Params()
+		if p.VisualizerFPS <= 0 {
+			t.Fatalf("%v: VisualizerFPS = %d, want > 0", m, p.VisualizerFPS)
+		}
+		if p.AdaptiveThreshLow >= p.AdaptiveThreshHigh {
+			t.Fatalf("%v: low=%v >= high=%v", m, p.AdaptiveThreshLow, p.AdaptiveThreshHigh)
+		}
+	}
+}
+
+func TestPerformanceModeJSONInSettings(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "settings.json")
+	s := DefaultSettings()
+	s.Graphics.PerformanceMode = PerfModeEco
+	if err := SaveSettings(p, s); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadSettings(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Graphics.PerformanceMode != PerfModeEco {
+		t.Fatalf("got %v, want Eco", got.Graphics.PerformanceMode)
+	}
+}

@@ -59,6 +59,7 @@ type App struct {
 	startupFile         string
 
 	adaptive resolutionState
+	vizClock visualizerClock // visualizer frame clock, promoted from runState
 
 	// appCtx/appCancel govern background work tied to the app lifetime.
 	// Cancelled in Close() so in-flight goroutines (e.g. connectivity check)
@@ -187,7 +188,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	case renderScaleExplicit:
 		renderW, renderH = scaledDim(int(w), renderScale), scaledDim(int(h), renderScale)
 	case gs.Graphics.Adaptive && len(resolutions) > 0:
-		a.adaptive.Reset(int(w), int(h))
+		a.adaptive.Reset(int(w), int(h), gs.Graphics.PerformanceMode.Params())
 		renderW, renderH = a.adaptive.resolutions[0].Width, a.adaptive.resolutions[0].Height
 	case gs.Graphics.Adaptive:
 		slog.Warn("adaptive: empty resolution list at startup, using saved size",

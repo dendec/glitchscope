@@ -10,20 +10,26 @@ type resolutionState struct {
 	upscaleFloor int
 }
 
-func (s *resolutionState) Configure(winW, winH int, current config.RenderResolution) bool {
+// Configure sets the resolution list and snaps to the closest match.
+// params controls the adaptive thresholds for the current performance mode.
+func (s *resolutionState) Configure(winW, winH int, current config.RenderResolution, params config.ModeParams) bool {
 	s.resolutions = config.ComputeResolutions(winW, winH)
 	if len(s.resolutions) == 0 {
 		s.index = 0
+		s.policy.params = params
 		s.restartPolicy()
 		return false
 	}
 	s.index = config.ClosestResolutionIndex(s.resolutions, current)
+	s.policy.params = params
 	s.restartPolicy()
 	return true
 }
 
-func (s *resolutionState) Reset(winW, winH int) bool {
+// Reset snaps to the highest resolution and resets adaptive state.
+func (s *resolutionState) Reset(winW, winH int, params config.ModeParams) bool {
 	s.resolutions = config.ComputeResolutions(winW, winH)
+	s.policy.params = params
 	if len(s.resolutions) == 0 {
 		s.index = 0
 		s.restartPolicy()

@@ -1,14 +1,9 @@
 package app
 
+import "github.com/dendec/glitchscope/internal/config"
+
 const (
-	fpsWindow          = 10
-	adaptiveThreshLow  = 20.0
-	adaptiveThreshHigh = 24.0
-	adaptiveLowFrames  = 10  // consecutive frames below threshold to downscale
-	adaptiveHighFrames = 10  // consecutive frames above threshold to upscale
-	adaptiveLowSec     = 2.0 // time fallback for ultra-low fps (1-2 fps)
-	adaptiveHighSec    = 4.0 // time fallback for upscale
-	adaptiveCooldown   = 10  // min frames between resolution changes
+	fpsWindow = 10
 )
 
 // fpsRing is a fixed-size ring buffer of FPS samples for stability checks.
@@ -69,6 +64,7 @@ type adaptivePolicy struct {
 	lowElapsed  float64 // seconds below threshold
 	highElapsed float64 // seconds above threshold
 	cooldown    int     // frames until next change allowed
+	params      config.ModeParams
 }
 
 func (p *adaptivePolicy) Reset() {
@@ -79,12 +75,12 @@ func (p *adaptivePolicy) Reset() {
 }
 
 func (p *adaptivePolicy) Restart() {
-	*p = adaptivePolicy{}
+	*p = adaptivePolicy{params: p.params}
 }
 
 func (p *adaptivePolicy) triggerDown(current, resolutionCount int) (int, bool, bool) {
 	p.Reset()
-	p.cooldown = adaptiveCooldown
+	p.cooldown = p.params.AdaptiveCooldown
 	if current+1 < resolutionCount {
 		return current + 1, true, false
 	}
@@ -93,7 +89,7 @@ func (p *adaptivePolicy) triggerDown(current, resolutionCount int) (int, bool, b
 
 func (p *adaptivePolicy) triggerUp(current int) (int, bool, bool) {
 	p.Reset()
-	p.cooldown = adaptiveCooldown
+	p.cooldown = p.params.AdaptiveCooldown
 	return current - 1, true, false
 }
 
@@ -115,29 +111,29 @@ func (p *adaptivePolicy) Decide(fps float64, current, resolutionCount int) (next
 	p.fpsRing.Add(fps)
 
 	switch {
-	case fps < adaptiveThreshLow:
+	case fps < p.params.AdaptiveThreshLow:
 		p.lowFrames++
 		p.lowElapsed += 1.0 / max(fps, 0.1)
 		p.highFrames = 0
 		p.highElapsed = 0
 
-		if p.lowFrames >= adaptiveLowFrames && p.fpsRing.full && p.fpsRing.max() < adaptiveThreshLow {
+		if p.lowFrames >= p.params.AdaptiveLowFrames && p.fpsRing.full && p.fpsRing.max() < p.params.AdaptiveThreshLow {
 			return p.triggerDown(current, resolutionCount)
 		}
-		if p.lowElapsed >= adaptiveLowSec {
+		if p.lowElapsed >= p.params.AdaptiveLowSec {
 			return p.triggerDown(current, resolutionCount)
 		}
 
-	case fps > adaptiveThreshHigh:
+	case fps > p.params.AdaptiveThreshHigh:
 		p.highFrames++
 		p.highElapsed += 1.0 / max(fps, 0.1)
 		p.lowFrames = 0
 		p.lowElapsed = 0
 
-		if p.highFrames >= adaptiveHighFrames && p.fpsRing.full && p.fpsRing.min() > adaptiveThreshHigh && current > 0 {
+		if p.highFrames >= p.params.AdaptiveHighFrames && p.fpsRing.full && p.fpsRing.min() > p.params.AdaptiveThreshHigh && current > 0 {
 			return p.triggerUp(current)
 		}
-		if p.highElapsed >= adaptiveHighSec && current > 0 {
+		if p.highElapsed >= p.params.AdaptiveHighSec && current > 0 {
 			return p.triggerUp(current)
 		}
 

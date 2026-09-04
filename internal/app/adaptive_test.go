@@ -33,20 +33,21 @@ func TestFpsMeterUsesFixedWindow(t *testing.T) {
 
 func TestVisualizerClock(t *testing.T) {
 	var clock visualizerClock
+	clock.framePeriod = time.Second / 30
 	now := time.Unix(100, 0)
 	if !clock.Due(now) {
 		t.Fatal("first visualizer frame should be due")
 	}
 	clock.Complete(now)
-	if clock.Due(now.Add(visualizerFramePeriod - time.Nanosecond)) {
+	if clock.Due(now.Add(clock.framePeriod - time.Nanosecond)) {
 		t.Fatal("visualizer frame should not run before its deadline")
 	}
-	if !clock.Due(now.Add(visualizerFramePeriod)) {
+	if !clock.Due(now.Add(clock.framePeriod)) {
 		t.Fatal("visualizer frame should run at its deadline")
 	}
-	clock.Complete(now.Add(visualizerFramePeriod))
-	if got := clock.meter.Average(); math.Abs(got-visualizerTargetFPS) > 0.001 {
-		t.Fatalf("visualizer FPS = %v, want %v", got, visualizerTargetFPS)
+	clock.Complete(now.Add(clock.framePeriod))
+	if got := clock.meter.Average(); math.Abs(got-30) > 0.001 {
+		t.Fatalf("visualizer FPS = %v, want 30", got)
 	}
 	clock.Reset()
 	if !clock.Due(now) || clock.meter.Average() != 0 {
@@ -68,12 +69,13 @@ func TestVisualizerClockReschedulesAfterSlowFrame(t *testing.T) {
 
 func TestVisualizerClockKeepsDeadlineAfterFrameWork(t *testing.T) {
 	var clock visualizerClock
+	clock.framePeriod = time.Second / 30
 	start := time.Unix(100, 0)
 	clock.Complete(start)
 
-	frameCompleted := start.Add(visualizerFramePeriod + 20*time.Millisecond)
+	frameCompleted := start.Add(clock.framePeriod + 20*time.Millisecond)
 	clock.Complete(frameCompleted)
-	nextDeadline := start.Add(2 * visualizerFramePeriod)
+	nextDeadline := start.Add(2 * clock.framePeriod)
 	if clock.Due(nextDeadline.Add(-time.Nanosecond)) {
 		t.Fatal("visualizer frame became due before the fixed 30 FPS deadline")
 	}
@@ -84,31 +86,34 @@ func TestVisualizerClockKeepsDeadlineAfterFrameWork(t *testing.T) {
 
 func TestRunStateConsumesEachVisualizerFrameOnce(t *testing.T) {
 	var state runState
-	if state.consumeAdaptiveFrame() {
+	var viz visualizerClock
+	viz.framePeriod = time.Second / 30
+	if state.consumeAdaptiveFrame(&viz) {
 		t.Fatal("empty clock produced an adaptive sample")
 	}
 
 	now := time.Unix(100, 0)
-	state.visualizer.Complete(now)
-	if !state.consumeAdaptiveFrame() {
+	viz.Complete(now)
+	if !state.consumeAdaptiveFrame(&viz) {
 		t.Fatal("completed visualizer frame did not produce an adaptive sample")
 	}
-	if state.consumeAdaptiveFrame() {
+	if state.consumeAdaptiveFrame(&viz) {
 		t.Fatal("same visualizer frame produced two adaptive samples")
 	}
 
-	state.visualizer.Complete(now.Add(visualizerFramePeriod))
-	if !state.consumeAdaptiveFrame() {
+	viz.Complete(now.Add(viz.framePeriod))
+	if !state.consumeAdaptiveFrame(&viz) {
 		t.Fatal("next visualizer frame did not produce an adaptive sample")
 	}
 }
 
 func TestPresetTransitionSuspendsAndRestartsAdaptivePolicy(t *testing.T) {
 	var a App
-	for range adaptiveLowFrames - 1 {
-		a.adaptive.policy.Decide(adaptiveThreshLow-1, 0, 3)
+	params := config.PerfModePerformance.Params()
+	for range params.AdaptiveLowFrames - 1 {
+		a.adaptive.policy.Decide(params.AdaptiveThreshLow-1, 0, 3)
 	}
-	a.adaptive.policy.cooldown = adaptiveCooldown
+	a.adaptive.policy.cooldown = params.AdaptiveCooldown
 
 	now := time.Unix(100, 0)
 	a.suspendAdaptiveForPresetTransition(now)
@@ -124,7 +129,9 @@ func TestPresetTransitionSuspendsAndRestartsAdaptivePolicy(t *testing.T) {
 }
 
 func TestAdaptiveDownByFrames(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
+	p.params = params
 	// 9 frames: building counters, no trigger yet.
 	for i := 0; i < 9; i++ {
 		if next, changed, _ := p.Decide(15, 0, 3); changed || next != 0 {
@@ -138,7 +145,9 @@ func TestAdaptiveDownByFrames(t *testing.T) {
 }
 
 func TestAdaptiveUpByFrames(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
+	p.params = params
 	for i := 0; i < 9; i++ {
 		if next, changed, _ := p.Decide(30, 1, 3); changed || next != 1 {
 			t.Fatalf("should not change at step %d", i)
@@ -150,7 +159,9 @@ func TestAdaptiveUpByFrames(t *testing.T) {
 }
 
 func TestAdaptiveTimeFallbackUltraLowFPS(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
+	p.params = params
 	// At 2fps: each call adds 0.5s to lowElapsed.
 	// After 3 calls: lowElapsed=1.5 < 2.0, no trigger.
 	for i := 0; i < 3; i++ {
@@ -165,7 +176,9 @@ func TestAdaptiveTimeFallbackUltraLowFPS(t *testing.T) {
 }
 
 func TestAdaptiveTimeFallbackSingleFPS(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
+	p.params = params
 	// At 1fps: each call adds 1.0s. 1st call: lowElapsed=1.0 < 2.0.
 	if next, changed, _ := p.Decide(1, 0, 3); changed || next != 0 {
 		t.Fatalf("should not change at step 0")
@@ -177,7 +190,9 @@ func TestAdaptiveTimeFallbackSingleFPS(t *testing.T) {
 }
 
 func TestAdaptiveUnstableFPSBlocksTrigger(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
+	p.params = params
 	// Alternate between 19 and 21 — oscillating around threshold.
 	for i := 0; i < 20; i++ {
 		fps := 19.0
@@ -193,7 +208,9 @@ func TestAdaptiveUnstableFPSBlocksTrigger(t *testing.T) {
 }
 
 func TestAdaptiveDeadZoneResetsCounters(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
+	p.params = params
 	for i := 0; i < 8; i++ {
 		p.Decide(15, 0, 3)
 	}
@@ -206,7 +223,9 @@ func TestAdaptiveDeadZoneResetsCounters(t *testing.T) {
 }
 
 func TestAdaptiveCooldown(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
+	p.params = params
 	// 10 calls: 10th triggers cooldown=10.
 	for i := 0; i < 10; i++ {
 		p.Decide(15, 0, 3)
@@ -218,7 +237,9 @@ func TestAdaptiveCooldown(t *testing.T) {
 }
 
 func TestAdaptiveMinReached(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
+	p.params = params
 	// 9 calls building up, 10th triggers with min resolution.
 	for i := 0; i < 9; i++ {
 		p.Decide(15, 2, 3)
@@ -229,7 +250,9 @@ func TestAdaptiveMinReached(t *testing.T) {
 }
 
 func TestAdaptiveBounds(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
+	p.params = params
 	// Already at highest resolution: can't upscale.
 	for i := 0; i < 10; i++ {
 		p.Decide(30, 0, 3)
@@ -240,11 +263,13 @@ func TestAdaptiveBounds(t *testing.T) {
 }
 
 func TestResolutionStateDecidesAndUpdatesIndex(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	state := resolutionState{
 		resolutions: []config.RenderResolution{{Width: 320, Height: 180}, {Width: 480, Height: 270}},
 	}
+	state.policy.params = params
 	for i := 0; i < 10; i++ {
-		state.Decide(adaptiveThreshLow - 1)
+		state.Decide(params.AdaptiveThreshLow - 1)
 	}
 	if state.index != 1 {
 		t.Fatalf("index = %d, want 1", state.index)
@@ -255,6 +280,7 @@ func TestResolutionStateDecidesAndUpdatesIndex(t *testing.T) {
 }
 
 func TestResolutionStateBlocksFailedUpscaleForPreset(t *testing.T) {
+	params := config.PerfModePerformance.Params()
 	state := resolutionState{
 		resolutions: []config.RenderResolution{
 			{Width: 800, Height: 450},
@@ -263,29 +289,30 @@ func TestResolutionStateBlocksFailedUpscaleForPreset(t *testing.T) {
 		index:        1,
 		upscaleTrial: -1,
 	}
+	state.policy.params = params
 
-	for range adaptiveHighFrames {
-		state.Decide(adaptiveThreshHigh + 1)
+	for range params.AdaptiveHighFrames {
+		state.Decide(params.AdaptiveThreshHigh + 1)
 	}
 	if state.index != 0 {
 		t.Fatalf("first upscale index = %d, want 0", state.index)
 	}
-	for range adaptiveCooldown + adaptiveLowFrames {
-		state.Decide(adaptiveThreshLow - 1)
+	for range params.AdaptiveCooldown + params.AdaptiveLowFrames {
+		state.Decide(params.AdaptiveThreshLow - 1)
 	}
 	if state.index != 1 || state.upscaleFloor != 1 {
 		t.Fatalf("failed upscale state = (index %d, floor %d), want (1, 1)", state.index, state.upscaleFloor)
 	}
-	for range adaptiveCooldown + adaptiveHighFrames*2 {
-		state.Decide(adaptiveThreshHigh + 1)
+	for range params.AdaptiveCooldown + params.AdaptiveHighFrames*2 {
+		state.Decide(params.AdaptiveThreshHigh + 1)
 	}
 	if state.index != 1 {
 		t.Fatalf("blocked resolution was retried: index = %d, want 1", state.index)
 	}
 
 	state.RestartForPreset()
-	for range adaptiveHighFrames {
-		state.Decide(adaptiveThreshHigh + 1)
+	for range params.AdaptiveHighFrames {
+		state.Decide(params.AdaptiveThreshHigh + 1)
 	}
 	if state.index != 0 {
 		t.Fatalf("new preset did not clear upscale block: index = %d, want 0", state.index)

@@ -13,11 +13,8 @@ import (
 )
 
 const (
-	lowFPSThresh          = 15.0
-	softCutDuration       = 2500 * time.Millisecond
-	mainFramePeriod       = time.Second / 60
-	visualizerTargetFPS   = 30
-	visualizerFramePeriod = time.Second / visualizerTargetFPS
+	softCutDuration = 2500 * time.Millisecond
+	mainFramePeriod = time.Second / 60
 )
 
 type pendingPreset struct {
@@ -26,15 +23,15 @@ type pendingPreset struct {
 }
 
 type visualizerClock struct {
-	lastFrame time.Time
-	nextFrame time.Time
-	meter     fpsMeter
-	frames    uint64
+	lastFrame  time.Time
+	nextFrame  time.Time
+	meter      fpsMeter
+	frames     uint64
+	framePeriod time.Duration // per-mode visualizer frame period
 }
 
 type runState struct {
 	lastLoop          time.Time
-	visualizer        visualizerClock
 	adaptiveFrame     uint64
 	prevW             int
 	prevH             int
@@ -52,25 +49,28 @@ func (c *visualizerClock) Complete(now time.Time) {
 	}
 	c.lastFrame = now
 	c.frames++
+	if c.framePeriod == 0 {
+		c.framePeriod = time.Second / 30
+	}
 	if c.nextFrame.IsZero() {
-		c.nextFrame = now.Add(visualizerFramePeriod)
+		c.nextFrame = now.Add(c.framePeriod)
 		return
 	}
-	c.nextFrame = c.nextFrame.Add(visualizerFramePeriod)
+	c.nextFrame = c.nextFrame.Add(c.framePeriod)
 	if now.After(c.nextFrame) {
 		c.nextFrame = now
 	}
 }
 
 func (c *visualizerClock) Reset() {
-	*c = visualizerClock{}
+	*c = visualizerClock{framePeriod: c.framePeriod}
 }
 
-func (s *runState) consumeAdaptiveFrame() bool {
-	if s.adaptiveFrame == s.visualizer.frames {
+func (s *runState) consumeAdaptiveFrame(viz *visualizerClock) bool {
+	if s.adaptiveFrame == viz.frames {
 		return false
 	}
-	s.adaptiveFrame = s.visualizer.frames
+	s.adaptiveFrame = viz.frames
 	return true
 }
 
@@ -80,6 +80,7 @@ func (a *App) Run() {
 	defer ticker.Stop()
 
 	state := runState{lastLoop: time.Now()}
+	a.vizClock.framePeriod = time.Second / time.Duration(a.settings.Graphics.PerformanceMode.Params().VisualizerFPS)
 
 	for range ticker.C {
 		if a.quit.Load() {
@@ -88,7 +89,7 @@ func (a *App) Run() {
 		now := time.Now()
 		dt := now.Sub(state.lastLoop).Seconds()
 		state.lastLoop = now
-		fpsAvg := state.visualizer.meter.Average()
+		fpsAvg := a.vizClock.meter.Average()
 
 		w32, h32 := a.window.GLGetDrawableSize()
 		w, h := int(w32), int(h32)
@@ -97,24 +98,25 @@ func (a *App) Run() {
 			return
 		}
 		a.updateFramePlayback(now)
-		a.renderFrame(&state.visualizer, now, w, h)
+		a.renderFrame(now, w, h)
 	}
 }
 
 func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg float64) {
-	newVisualizerFrame := state.consumeAdaptiveFrame()
-	if state.visualizer.meter.Full() && fpsAvg < lowFPSThresh && !a.onPresetsPage {
+	newVisualizerFrame := state.consumeAdaptiveFrame(&a.vizClock)
+	lowThresh := a.settings.Graphics.PerformanceMode.Params().LowFPSThresh
+	if a.vizClock.meter.Full() && fpsAvg < lowThresh && !a.onPresetsPage {
 		presetName := ""
 		if a.presetIdx >= 0 && a.presetIdx < len(a.presetNames) {
 			presetName = a.presetNames[a.presetIdx]
 		}
 		if presetName != state.lowFPSPreset {
 			renderW, renderH := a.rt.Size()
-			slog.Warn("low fps", "fps", fpsAvg, "threshold", lowFPSThresh, "preset", presetName, "resolution", fmt.Sprintf("%dx%d", renderW, renderH))
+			slog.Warn("low fps", "fps", fpsAvg, "threshold", lowThresh, "preset", presetName, "resolution", fmt.Sprintf("%dx%d", renderW, renderH))
 			state.lowFPSPreset = presetName
 		}
 	}
-	if state.visualizer.meter.Full() && fpsAvg >= lowFPSThresh {
+	if a.vizClock.meter.Full() && fpsAvg >= lowThresh {
 		state.lowFPSPreset = "" // reset so next drop on same preset logs again
 	}
 	winChanged := w != state.prevW || h != state.prevH
@@ -127,7 +129,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 			})
 		} else if a.settings.Graphics.Adaptive {
 			cur := config.RenderResolution{Width: a.settings.Graphics.RenderWidth, Height: a.settings.Graphics.RenderHeight}
-			if a.adaptive.Configure(w, h, cur) {
+			if a.adaptive.Configure(w, h, cur, a.settings.Graphics.PerformanceMode.Params()) {
 				a.applyRenderResolution(a.adaptive.resolutions[a.adaptive.index])
 			} else {
 				slog.Warn("adaptive: empty resolution list on resize", "window", fmt.Sprintf("%dx%d", w, h))
@@ -148,7 +150,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 	state.prevW, state.prevH = w, h
 
 	if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && !a.onPresetsPage &&
-		state.visualizer.meter.Full() && newVisualizerFrame && !a.adaptiveSuspended(now) {
+		a.vizClock.meter.Full() && newVisualizerFrame && !a.adaptiveSuspended(now) {
 		if resolution, direction, changed, minReached := a.adaptive.Decide(fpsAvg); changed {
 			a.applyRenderResolution(resolution)
 			if direction > 0 {
@@ -214,10 +216,10 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 	onPresets := a.overlay != nil && a.overlay.UIVisible() && a.overlay.IsPresetsPage()
 	if onPresets && !a.onPresetsPage {
 		a.enterPresetsPage()
-		state.visualizer.Reset()
+		a.vizClock.Reset()
 	} else if !onPresets && a.onPresetsPage {
 		a.leavePresetsPage()
-		state.visualizer.Reset()
+		a.vizClock.Reset()
 	}
 
 	// Continuous seeking: velocity scales with stick deflection (or a held
@@ -300,7 +302,7 @@ func (a *App) updateFramePlayback(now time.Time) {
 	}
 }
 
-func (a *App) renderFrame(visualizer *visualizerClock, now time.Time, w, h int) {
+func (a *App) renderFrame(now time.Time, w, h int) {
 	// Preview resize (shared by both modes).
 	if a.preview != nil {
 		tW, tH := ui.PresetPreviewSize(w, h)
@@ -330,8 +332,9 @@ func (a *App) renderFrame(visualizer *visualizerClock, now time.Time, w, h int) 
 		// Schedule projectM independently from the 60 Hz input/UI loop. GL
 		// work remains on this thread; between visualizer frames, keep
 		// presenting the last captured texture.
-		if visualizer.Due(now) {
-			a.pm.SetFPS(visualizerTargetFPS)
+		if a.vizClock.Due(now) {
+			fps := int32(time.Second / a.vizClock.framePeriod)
+			a.pm.SetFPS(fps)
 			a.pm.RenderFrame()
 			a.rt.Capture()
 
@@ -340,7 +343,7 @@ func (a *App) renderFrame(visualizer *visualizerClock, now time.Time, w, h int) 
 				a.pm.PCMAddFloat(wave, projectm.Mono)
 			}
 
-			visualizer.Complete(time.Now())
+			a.vizClock.Complete(time.Now())
 		}
 
 		a.rt.BlitToScreen(w, h)
@@ -445,7 +448,7 @@ func (a *App) resetAdaptiveCounters() {
 }
 
 func (a *App) resetAdaptiveState(winW, winH int) {
-	if !a.adaptive.Reset(winW, winH) {
+	if !a.adaptive.Reset(winW, winH, a.settings.Graphics.PerformanceMode.Params()) {
 		slog.Warn("adaptive: empty resolution list", "window", fmt.Sprintf("%dx%d", winW, winH))
 		return
 	}
