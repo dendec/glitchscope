@@ -378,6 +378,62 @@ const (
 	ThemeForest                    // deep green palette with a warm focus
 	ThemeSynthwave                 // neon cyan and pink palette
 	ThemeCherry                    // dark red palette with a mint focus
+	// gamepad-osk themes
+	ThemeAyuDark
+	ThemeCandy
+	ThemeCatppuccin
+	ThemeCatppuccinFrappe
+	ThemeCGA
+	ThemeChalk
+	ThemeCobalt
+	ThemeCopper
+	ThemeCoral
+	ThemeCyberpunk
+	ThemeDracula
+	ThemeEmber
+	ThemeEverforest
+	ThemeFjord
+	ThemeGameboy
+	ThemeGold
+	ThemeGotham
+	ThemeGruvbox
+	ThemeHorizon
+	ThemeIce
+	ThemeKanagawa
+	ThemeLavender
+	ThemeMaterial
+	ThemeMatrix
+	ThemeMellow
+	ThemeMidnight
+	ThemeMonokai
+	ThemeMoss
+	ThemeNavy
+	ThemeNeon
+	ThemeNightfox
+	ThemeNord
+	ThemeOcean
+	ThemeOlive
+	ThemeOneDark
+	ThemeOxocarbon
+	ThemePalenight
+	ThemePaper
+	ThemePlum
+	ThemeRetro
+	ThemeRosePine
+	ThemeSakura
+	ThemeSand
+	ThemeSlate
+	ThemeSolarizedLight
+	ThemeSteamGreen
+	ThemeSunset
+	ThemeTeal
+	ThemeTerminal
+	ThemeTokyoNight
+	ThemeTokyoStorm
+	ThemeVapor
+	ThemeVirtualBoy
+	ThemeWine
+	ThemeZXSpectrum
 	themeCount
 )
 
@@ -397,10 +453,65 @@ var themeSpecs = [...]themeSpec{
 	{ThemeForest, "Forest", "forest"},
 	{ThemeSynthwave, "Synthwave", "synthwave"},
 	{ThemeCherry, "Cherry", "cherry"},
+	{ThemeAyuDark, "Ayu Dark", "ayu-dark"},
+	{ThemeCandy, "Candy", "candy"},
+	{ThemeCatppuccin, "Catppuccin", "catppuccin"},
+	{ThemeCatppuccinFrappe, "Catppuccin Frappe", "catppuccin-frappe"},
+	{ThemeCGA, "CGA", "cga"},
+	{ThemeChalk, "Chalk", "chalk"},
+	{ThemeCobalt, "Cobalt", "cobalt"},
+	{ThemeCopper, "Copper", "copper"},
+	{ThemeCoral, "Coral", "coral"},
+	{ThemeCyberpunk, "Cyberpunk", "cyberpunk"},
+	{ThemeDracula, "Dracula", "dracula"},
+	{ThemeEmber, "Ember", "ember"},
+	{ThemeEverforest, "Everforest", "everforest"},
+	{ThemeFjord, "Fjord", "fjord"},
+	{ThemeGameboy, "Gameboy", "gameboy"},
+	{ThemeGold, "Gold", "gold"},
+	{ThemeGotham, "Gotham", "gotham"},
+	{ThemeGruvbox, "Gruvbox", "gruvbox"},
+	{ThemeHorizon, "Horizon", "horizon"},
+	{ThemeIce, "Ice", "ice"},
+	{ThemeKanagawa, "Kanagawa", "kanagawa"},
+	{ThemeLavender, "Lavender", "lavender"},
+	{ThemeMaterial, "Material", "material"},
+	{ThemeMatrix, "Matrix", "matrix"},
+	{ThemeMellow, "Mellow", "mellow"},
+	{ThemeMidnight, "Midnight", "midnight"},
+	{ThemeMonokai, "Monokai", "monokai"},
+	{ThemeMoss, "Moss", "moss"},
+	{ThemeNavy, "Navy", "navy"},
+	{ThemeNeon, "Neon", "neon"},
+	{ThemeNightfox, "Nightfox", "nightfox"},
+	{ThemeNord, "Nord", "nord"},
+	{ThemeOcean, "Ocean", "ocean"},
+	{ThemeOlive, "Olive", "olive"},
+	{ThemeOneDark, "One Dark", "onedark"},
+	{ThemeOxocarbon, "Oxocarbon", "oxocarbon"},
+	{ThemePalenight, "Palenight", "palenight"},
+	{ThemePaper, "Paper", "paper"},
+	{ThemePlum, "Plum", "plum"},
+	{ThemeRetro, "Retro", "retro"},
+	{ThemeRosePine, "Rose Pine", "rose-pine"},
+	{ThemeSakura, "Sakura", "sakura"},
+	{ThemeSand, "Sand", "sand"},
+	{ThemeSlate, "Slate", "slate"},
+	{ThemeSolarizedLight, "Solarized Light", "solarized-light"},
+	{ThemeSteamGreen, "Steam Green", "steam-green"},
+	{ThemeSunset, "Sunset", "sunset"},
+	{ThemeTeal, "Teal", "teal"},
+	{ThemeTerminal, "Terminal", "terminal"},
+	{ThemeTokyoNight, "Tokyo Night", "tokyo-night"},
+	{ThemeTokyoStorm, "Tokyo Storm", "tokyo-storm"},
+	{ThemeVapor, "Vapor", "vapor"},
+	{ThemeVirtualBoy, "Virtual Boy", "virtual-boy"},
+	{ThemeWine, "Wine", "wine"},
+	{ThemeZXSpectrum, "ZX Spectrum", "zx-spectrum"},
 }
 
 func (t Theme) spec() (themeSpec, bool) {
-	for _, spec := range themeSpecs {
+	for _, spec := range &themeSpecs {
 		if spec.theme == t {
 			return spec, true
 		}
@@ -417,7 +528,7 @@ func (t Theme) String() string {
 
 func AllThemes() []Theme {
 	themes := make([]Theme, len(themeSpecs))
-	for i, spec := range themeSpecs {
+	for i, spec := range &themeSpecs {
 		themes[i] = spec.theme
 	}
 	return themes
@@ -435,7 +546,7 @@ func (t *Theme) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
-	for _, spec := range themeSpecs {
+	for _, spec := range &themeSpecs {
 		if spec.json == s {
 			*t = spec.theme
 			return nil
