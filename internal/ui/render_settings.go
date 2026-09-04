@@ -20,7 +20,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 	// Rebuild left column (setting names) with scroll window.
 	leftTotal := len(o.settingsRows)
 	o.albumsScroll = scrollOffset(o.albumsScroll, o.settingsCursor, leftTotal, maxRows)
-	maxTextPx := availableRowTextWidth(panelW)
+	maxTextPx := o.availableRowTextWidth(panelW)
 	var leftRows []listRow
 	leftEnd := o.albumsScroll + maxRows
 	if leftEnd > leftTotal {
@@ -101,7 +101,7 @@ func (o *Overlay) drawSettingsTextures(winW, winH, viewW, viewH int, panelW, pan
 		maxRows = 1
 	}
 
-	textW := float32(availableRowTextWidth(panelW))
+	textW := float32(o.availableRowTextWidth(panelW))
 
 	drawListColumn(o, lx, ly, colW, colH, o.settingsColL, o.panelEntered && !o.settingsEditing,
 		o.settingsCursor, o.albumsScroll, lh, winW, winH, viewW, viewH)

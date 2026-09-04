@@ -6,12 +6,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
-)
 
-var samplerRE = regexp.MustCompile(`(?i)\bsampler\s+sampler_([a-z0-9_]+)\b`)
+	"github.com/dendec/glitchscope/internal/presets"
+)
 
 func main() {
 	if len(os.Args) != 3 {
@@ -62,19 +61,8 @@ func collect(root string) ([][]string, error) {
 		if err != nil {
 			return err
 		}
-		seen := make(map[string]bool)
-		for _, match := range samplerRE.FindAllStringSubmatch(string(data), -1) {
-			name := match[1]
-			key := strings.ToLower(name)
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-			texture, kind := normalize(name)
-			if kind == "builtin" {
-				continue
-			}
-			rows = append(rows, []string{filepath.ToSlash(rel), "sampler_" + name, texture, kind})
+		for _, reference := range presets.TextureReferences(data) {
+			rows = append(rows, []string{filepath.ToSlash(rel), reference.Sampler, reference.Texture, reference.Kind})
 		}
 		return nil
 	})
@@ -90,23 +78,6 @@ func collect(root string) ([][]string, error) {
 		return false
 	})
 	return rows, nil
-}
-
-func normalize(name string) (string, string) {
-	lower := strings.ToLower(name)
-	if lower == "main" || lower == "blur1" || lower == "blur2" || lower == "blur3" || strings.HasPrefix(lower, "noise") {
-		return lower, "builtin"
-	}
-	if strings.HasPrefix(lower, "rand") && len(lower) >= 6 && lower[4] >= '0' && lower[4] <= '9' && lower[5] >= '0' && lower[5] <= '9' {
-		return lower, "random"
-	}
-	if len(lower) > 3 && lower[2] == '_' {
-		prefix := lower[:3]
-		if prefix == "fc_" || prefix == "cf_" || prefix == "fw_" || prefix == "wf_" || prefix == "pc_" || prefix == "cp_" || prefix == "pw_" || prefix == "wp_" {
-			return lower[3:], "file"
-		}
-	}
-	return lower, "file"
 }
 
 func fatal(err error) {

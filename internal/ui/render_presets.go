@@ -26,7 +26,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	o.presetCursorDirty = false
 	o.presetsDetailDirty = false
 
-	maxTextPx := availableRowTextWidth(panelW)
+	maxTextPx := o.availableRowTextWidth(panelW)
 
 	cur := o.presetNav.current()
 	if cur == nil {
@@ -112,7 +112,7 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 		maxRows = 1
 	}
 
-	textW := float32(availableRowTextWidth(panelW))
+	textW := float32(o.availableRowTextWidth(panelW))
 
 	// Left panel.
 	cur := o.presetNav.current()

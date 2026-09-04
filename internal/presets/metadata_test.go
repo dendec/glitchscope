@@ -70,6 +70,29 @@ per_pixel_2=dy=cos(y);
 	}
 }
 
+func TestParseMetaCountsUniqueExternalTextures(t *testing.T) {
+	data := []byte(`[preset00]
+warp_1=` + "`" + `shader_body {
+sampler sampler_main;
+sampler sampler_blur1;
+sampler sampler_noise_lq;
+sampler sampler_fc_clouds;
+sampler sampler_clouds;
+sampler sampler_rand00;
+sampler sampler_RAND00;
+}` + "`" + `
+`)
+
+	m := ParseMeta(data)
+	if m.Textures != 2 {
+		t.Fatalf("Textures = %d, want 2 unique external textures", m.Textures)
+	}
+	references := TextureReferences(data)
+	if len(references) != 3 {
+		t.Fatalf("texture references = %d, want 3 unique sampler declarations", len(references))
+	}
+}
+
 func TestParseMetaWhitespaceAroundEquals(t *testing.T) {
 	data := []byte(`[preset00]
 fRating = 4.500000

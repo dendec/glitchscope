@@ -332,54 +332,17 @@ func (o *Overlay) buildPresetDetailRows() []listRow {
 	}
 
 	m := o.presetMeta(o.presetDetailKey)
-	complexity := calcComplexity(m)
 
 	rows := []listRow{
-		{text: formatComplexity(complexity)},
-		{},
 		{text: fmt.Sprintf("Shapes: %d   Waves: %d", m.Shapes, m.Waves)},
 		{text: fmt.Sprintf("Equations: %d per-frame, %d per-pixel", m.PerFrameEqs, m.PerPixelEqs)},
+		{text: fmt.Sprintf("Textures: %d", m.Textures)},
 	}
 
 	// Show preview FPS when available (presets page, preview active).
 	if o.presetPreviewFPSNow > 0 {
-		rows = append(rows, listRow{}, listRow{text: fmt.Sprintf("FPS: %d", o.presetPreviewFPSNow)})
+		rows = append(rows, listRow{}, listRow{text: fmt.Sprintf("Preview FPS: %d", o.presetPreviewFPSNow)})
 	}
 
 	return rows
-}
-
-// Complexity scoring weights. Normalized so a typical complex preset (~20 per-frame,
-// ~10 per-pixel, ~5 shapes/waves) scores ~10.
-const (
-	complexityPerFrameWeight = 0.4
-	complexityPerPixelWeight = 0.6
-	complexityVisualWeight   = 0.5
-	complexityNormFactor     = 16.5 // (20*0.4 + 10*0.6 + 5*0.5)
-)
-
-// calcComplexity returns a 0–10 score based on preset complexity factors.
-func calcComplexity(m presets.PresetMeta) int {
-	score := float64(m.PerFrameEqs)*complexityPerFrameWeight +
-		float64(m.PerPixelEqs)*complexityPerPixelWeight +
-		float64(m.Shapes+m.Waves)*complexityVisualWeight
-	score = score * 10 / complexityNormFactor
-	if score > 10 {
-		score = 10
-	}
-	if score < 0 {
-		score = 0
-	}
-	return int(score + 0.5)
-}
-
-// formatComplexity renders complexity as a bar: [##########] to [----------].
-func formatComplexity(v int) string {
-	if v > 10 {
-		v = 10
-	}
-	if v < 0 {
-		v = 0
-	}
-	return "[" + strings.Repeat("#", v) + strings.Repeat("-", 10-v) + "]"
 }

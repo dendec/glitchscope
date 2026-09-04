@@ -118,6 +118,7 @@ type Overlay struct {
 	programImage        uint32
 	programRect         uint32
 	face                font.Face
+	statsFace           font.Face
 
 	notif Notifier
 
@@ -320,6 +321,9 @@ func (o *Overlay) Close() {
 	o.programRect = 0
 	if o.face != nil {
 		_ = o.face.Close()
+	}
+	if o.statsFace != nil {
+		_ = o.statsFace.Close()
 	}
 }
 
@@ -528,6 +532,10 @@ func (o *Overlay) rebuildFace() {
 		_ = o.face.Close()
 		o.face = nil
 	}
+	if o.statsFace != nil {
+		_ = o.statsFace.Close()
+		o.statsFace = nil
+	}
 	o.face, err = opentype.NewFace(f, &opentype.FaceOptions{
 		Size:    o.fontSize,
 		DPI:     72,
@@ -535,6 +543,15 @@ func (o *Overlay) rebuildFace() {
 	})
 	if err != nil {
 		slog.Error("font face", "error", err)
+		return
+	}
+	o.statsFace, err = opentype.NewFace(f, &opentype.FaceOptions{
+		Size:    statsFontSize(o.fontSize),
+		DPI:     72,
+		Hinting: font.HintingNone,
+	})
+	if err != nil {
+		slog.Error("stats font face", "error", err)
 	}
 }
 

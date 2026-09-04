@@ -53,6 +53,39 @@ func TestDisplayTrackPath(t *testing.T) {
 	}
 }
 
+func TestCompactHeaderGeometryAt640x480(t *testing.T) {
+	o := &Overlay{
+		screenH:           480,
+		fontSize:          16,
+		pageIndicatorTexW: [4]int{72, 72, 80, 48},
+	}
+
+	if got := statsFontSize(o.fontSize); got != 12 {
+		t.Fatalf("statsFontSize(16) = %.0f, want 12", got)
+	}
+	if got := o.headerHeight(16); got != 18 {
+		t.Fatalf("headerHeight(16) = %d, want 18", got)
+	}
+	if got := o.pageIndicatorX(640); got != 166 {
+		t.Fatalf("pageIndicatorX(640) = %d, want 166", got)
+	}
+}
+
+func TestCompactHeaderGeometryScalesWithHeight(t *testing.T) {
+	o := &Overlay{
+		screenH:           960,
+		fontSize:          32,
+		pageIndicatorTexW: [4]int{144, 144, 160, 96},
+	}
+
+	if got := o.headerHeight(32); got != 36 {
+		t.Fatalf("headerHeight(32) = %d, want 36", got)
+	}
+	if got := o.pageIndicatorX(1280); got != 332 {
+		t.Fatalf("pageIndicatorX(1280) = %d, want 332", got)
+	}
+}
+
 func TestScrollPosition(t *testing.T) {
 	tests := []struct {
 		name                    string

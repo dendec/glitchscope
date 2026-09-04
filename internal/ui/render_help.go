@@ -2,7 +2,7 @@ package ui
 
 // renderHelpPanels draws a topic or child-entry list on the left and its text on the right.
 func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
-	maxTextW := availableRowTextWidth(panelW)
+	maxTextW := o.availableRowTextWidth(panelW)
 	topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
 	maxRows := panelH / lh
 	if maxRows < 1 {

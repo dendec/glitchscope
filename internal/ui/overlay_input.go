@@ -300,7 +300,7 @@ func (o *Overlay) moveCursor(dir int) {
 
 func (o *Overlay) helpTextWidth() int {
 	panelW := o.screenW * panelWidthPct / 100
-	return availableRowTextWidth(panelW)
+	return o.availableRowTextWidth(panelW)
 }
 
 // focusPanelBy shifts focusPanel by delta, clamped to [0,1].

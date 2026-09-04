@@ -11,7 +11,8 @@ func (o *Overlay) renderActionHints(winW, winH, viewW, viewH int) {
 	if o.face == nil {
 		return
 	}
-	maxW := winW - headerMarginX*2
+	headerMargin := o.headerMarginX()
+	maxW := winW - headerMargin*2
 	if maxW < 1 {
 		return
 	}
@@ -34,7 +35,7 @@ func (o *Overlay) renderActionHints(winW, winH, viewW, viewH int) {
 	r, g, b := o.panelBgRGB()
 	glDrawFilledRect(o.programRect, 0, float32(hintY), float32(winW), float32(lh), r, g, b, o.bgAlpha(), winW, winH, viewW, viewH)
 	glDrawOverlayText(o.programText, o.hintTex, 1,
-		float32(headerMarginX), float32(hintY-textPadding(o.fontSize)), float32(o.hintTexW), float32(o.hintTexH), winW, winH, viewW, viewH)
+		float32(headerMargin), float32(hintY-textPadding(o.fontSize)), float32(o.hintTexW), float32(o.hintTexH), winW, winH, viewW, viewH)
 }
 
 // hintRowHeight returns the height (in pixels) the footer row occupies. It is

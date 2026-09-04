@@ -4,12 +4,22 @@ package presets
 import (
 	"bufio"
 	"bytes"
+	"regexp"
 	"strconv"
 	"strings"
 )
 
-// PresetMeta holds metadata extracted from a .milk preset file.
-// Fields reflect values available in the [preset00] section.
+var samplerRE = regexp.MustCompile(`(?i)\bsampler\s+sampler_([a-z0-9_]+)\b`)
+
+// TextureReference describes one external MilkDrop sampler declaration.
+type TextureReference struct {
+	Sampler string
+	Texture string
+	Kind    string
+}
+
+// PresetMeta holds metadata extracted from a .milk preset file, including
+// values from [preset00] and texture dependencies declared in shader code.
 type PresetMeta struct {
 	Rating        float64 // fRating (0–5)
 	Decay         float64 // fDecay
@@ -20,6 +30,7 @@ type PresetMeta struct {
 	Waves         int     // count of wavecode_N_enabled=1
 	PerFrameEqs   int     // count of per_frame_N= lines
 	PerPixelEqs   int     // count of per_pixel_N= lines
+	Textures      int     // count of unique external texture names
 }
 
 // metaCache stores parsed metadata keyed by preset key.
@@ -55,11 +66,12 @@ func InvalidateMetaCache() {
 //   - Handles repeated keys: last value wins
 //   - Counts *_enabled=1 for shapecode and wavecode
 //   - Counts per_frame_N and per_pixel_N assignment lines
+//   - Counts unique external textures declared by shader samplers
 //   - Unknown keys are silently ignored
 //
 // Returns partial metadata with nil error for unparseable files.
 func ParseMeta(data []byte) PresetMeta {
-	var m PresetMeta
+	m := PresetMeta{Textures: countUniqueTextures(TextureReferences(data))}
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	scanner.Buffer(data, 64*1024) // large presets may have long lines
@@ -124,6 +136,56 @@ func ParseMeta(data []byte) PresetMeta {
 	}
 
 	return m
+}
+
+// TextureReferences extracts unique external sampler declarations from a
+// MilkDrop preset. Built-in render targets are not texture-file dependencies.
+func TextureReferences(data []byte) []TextureReference {
+	seen := make(map[string]bool)
+	var references []TextureReference
+	for _, match := range samplerRE.FindAllSubmatch(data, -1) {
+		name := string(match[1])
+		key := strings.ToLower(name)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		texture, kind := normalizeTexture(name)
+		if kind == "builtin" {
+			continue
+		}
+		references = append(references, TextureReference{
+			Sampler: "sampler_" + name,
+			Texture: texture,
+			Kind:    kind,
+		})
+	}
+	return references
+}
+
+func countUniqueTextures(references []TextureReference) int {
+	seen := make(map[string]bool)
+	for _, reference := range references {
+		seen[strings.ToLower(reference.Texture)] = true
+	}
+	return len(seen)
+}
+
+func normalizeTexture(name string) (string, string) {
+	lower := strings.ToLower(name)
+	if lower == "main" || lower == "blur1" || lower == "blur2" || lower == "blur3" || strings.HasPrefix(lower, "noise") {
+		return lower, "builtin"
+	}
+	if strings.HasPrefix(lower, "rand") && len(lower) >= 6 && lower[4] >= '0' && lower[4] <= '9' && lower[5] >= '0' && lower[5] <= '9' {
+		return lower, "random"
+	}
+	if len(lower) > 3 && lower[2] == '_' {
+		prefix := lower[:3]
+		if prefix == "fc_" || prefix == "cf_" || prefix == "fw_" || prefix == "wf_" || prefix == "pc_" || prefix == "cp_" || prefix == "pw_" || prefix == "wp_" {
+			return lower[3:], "file"
+		}
+	}
+	return lower, "file"
 }
 
 func parseFloat(s string) float64 {

@@ -22,7 +22,8 @@ import (
 const (
 	panelWidthPct = 45 // each panel occupies this % of screen width
 
-	headerMarginX = 5 // left margin for the stats/preset-name text
+	headerMarginAt480      = 5
+	headerExtraHeightAt480 = 2
 
 	cursorHighlightAlpha = 0.33
 )
@@ -33,9 +34,6 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	}
 
 	// Rebuild header/footer text textures up front so they're ready before layout/draw below.
-	if o.statsDirty {
-		o.rebuildStatsTex()
-	}
 	if o.presetNameDirty {
 		o.rebuildPresetNameTex()
 	}
@@ -46,9 +44,9 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		o.rebuildBottomTex(winW, o.face.Metrics().Height.Ceil())
 	}
 
-	// Single header row: stats on the left, page name on the right.
+	// The visible menu gives the header exclusively to centered page navigation.
 	lh := o.face.Metrics().Height.Ceil()
-	headerH := lh
+	headerH := o.headerHeight(lh)
 
 	// Status row grows to fit the actual texture height, but only enough to
 	// leave a single line-gap worth of breathing room below the descenders —
@@ -85,13 +83,6 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	hR, hG, hB := o.panelBgRGB()
 	glDrawFilledRect(o.programRect, 0, 0, float32(winW), float32(headerH), hR, hG, hB, o.bgAlpha(), winW, winH, viewW, viewH)
 
-	if o.showFPS && o.statsTex != 0 {
-		if !o.drawMarquee(&o.statsMarquee, headerMarginX, float32(-textPadding(o.fontSize)), float32(winW-headerMarginX*2), float32(o.statsTexH), winW, winH, viewW, viewH) {
-			glDrawOverlayText(o.programText, o.statsTex, 1,
-				headerMarginX, float32(-textPadding(o.fontSize)), float32(o.statsTexW), float32(o.statsTexH), winW, winH, viewW, viewH)
-		}
-	}
-
 	o.renderPageIndicator(winW, winH, viewW, viewH)
 
 	switch o.uiPage {
@@ -113,9 +104,10 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		glDrawFilledRect(o.programRect, 0, by, float32(winW), barBackdropH, bR, bG, bB, o.bgAlpha(), winW, winH, viewW, viewH)
 
 		if o.presetNameTex != 0 {
-			if !o.drawMarquee(&o.presetNameMarquee, headerMarginX, by, float32(winW-headerMarginX*2), float32(o.presetNameTexH), winW, winH, viewW, viewH) {
+			headerMargin := o.headerMarginX()
+			if !o.drawMarquee(&o.presetNameMarquee, float32(headerMargin), by, float32(winW-headerMargin*2), float32(o.presetNameTexH), winW, winH, viewW, viewH) {
 				glDrawOverlayText(o.programText, o.presetNameTex, 1,
-					headerMarginX, by, float32(o.presetNameTexW), float32(o.presetNameTexH), winW, winH, viewW, viewH)
+					float32(headerMargin), by, float32(o.presetNameTexW), float32(o.presetNameTexH), winW, winH, viewW, viewH)
 			}
 		}
 		if o.bottomTex != 0 || o.bottomPrefixTex != 0 {
@@ -142,10 +134,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 
 	// Progress bar under the bottom line.
 	if !o.loading && o.duration > 0 {
-		barH := int(math.Round(float64(winH) / 480))
-		if barH < 2 {
-			barH = 2
-		}
+		barH := o.scalePx(2)
 		tc := o.textColor()
 		r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
 		barY := float32(winH - hintRowH - barH)
@@ -280,16 +269,44 @@ func drawListColumn(o *Overlay, x, y, w, h float32, t listTex, bordered bool, cu
 func (o *Overlay) rebuildStatsTex() {
 	o.statsDirty = false
 	o.deleteTex(&o.statsTex)
-	maxW := o.screenW - headerMarginX*2
-	display := o.truncateEnd(o.statsLine, maxW)
-	o.statsTex, o.statsTexW, o.statsTexH = o.renderTextToTex(display, o.textColor())
-	o.rebuildMarqueeLine(&o.statsMarquee, o.statsLine, maxW, false)
+	o.statsMarquee.invalidate(o)
+	o.statsTex, o.statsTexW, o.statsTexH = renderPlainTextToTex(o.statsLine, o.statsTextFace(), statsFontSize(o.fontSize), o.textColor())
+}
+
+func (o *Overlay) statsTextFace() font.Face {
+	if o.statsFace != nil {
+		return o.statsFace
+	}
+	return o.face
+}
+
+func renderPlainTextToTex(text string, face font.Face, fontSize float64, textColor color.RGBA) (uint32, int, int) {
+	if face == nil || text == "" {
+		return 0, 0, 0
+	}
+	metrics := face.Metrics()
+	bounds, _ := font.BoundString(face, text)
+	contentW := (bounds.Max.X - bounds.Min.X).Ceil()
+	contentH := metrics.Height.Ceil()
+	rgba, texW, texH, _ := newShadowedTextRGBA(contentW, contentH, fontSize, textColor, func(rgba *image.RGBA, originX, originY int) {
+		d := &font.Drawer{
+			Dst:  rgba,
+			Src:  image.NewUniform(textColor),
+			Face: face,
+			Dot: fixed.Point26_6{
+				X: fixed.I(originX) - bounds.Min.X,
+				Y: fixed.I(originY) + metrics.Ascent,
+			},
+		}
+		d.DrawString(text)
+	})
+	return glUploadTexture(rgba), texW, texH
 }
 
 func (o *Overlay) rebuildPresetNameTex() {
 	o.presetNameDirty = false
 	o.deleteTex(&o.presetNameTex)
-	maxW := o.screenW - headerMarginX*2
+	maxW := o.screenW - o.headerMarginX()*2
 	display := o.truncateEnd(o.presetName, maxW)
 	o.presetNameTex, o.presetNameTexW, o.presetNameTexH = o.renderTextToTex(display, o.textColor())
 	o.rebuildMarqueeLine(&o.presetNameMarquee, o.presetName, maxW, false)
@@ -547,11 +564,42 @@ func formatSize(bytes int64) string {
 // --- Page indicator ---
 
 const (
-	pageIndicatorGapFactor = 2.0 // horizontal gap between page indicator labels, in font-size units
+	pageIndicatorGapFactor = 0.75 // horizontal gap between page indicator labels, in font-size units
 )
 
+func statsFontSize(fontSize float64) float64 {
+	return max(10, math.Round(fontSize*0.75))
+}
+
+func (o *Overlay) headerMarginX() int {
+	return o.scalePx(headerMarginAt480)
+}
+
+func (o *Overlay) headerHeight(lineHeight int) int {
+	return lineHeight + o.scalePx(headerExtraHeightAt480)
+}
+
+func centeredTextY(containerHeight, lineHeight, padding int) int {
+	return (containerHeight-lineHeight)/2 - padding
+}
+
+func (o *Overlay) pageIndicatorWidth() int {
+	width := 0
+	for i, textureWidth := range o.pageIndicatorTexW {
+		width += textureWidth
+		if i > 0 {
+			width += int(o.fontSize * pageIndicatorGapFactor)
+		}
+	}
+	return width
+}
+
+func (o *Overlay) pageIndicatorX(winW int) int {
+	return (winW - o.pageIndicatorWidth()) / 2
+}
+
 // renderPageIndicator draws the page names (Library/Presets/Settings/Help)
-// right-aligned on the header row, at the same y as the stats line.
+// centered on the menu header row.
 func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH int) {
 	if o.pageIndicatorDirty {
 		o.rebuildPageIndicatorTextures()
@@ -559,18 +607,8 @@ func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH int) {
 	pages := []string{"Library", "Presets", "Settings", "Help"}
 	gap := int(o.fontSize * pageIndicatorGapFactor)
 
-	// Compute total width.
-	totalW := 0
-	for i := range pages {
-		totalW += o.pageIndicatorTexW[i]
-		if i > 0 {
-			totalW += gap
-		}
-	}
-
-	// Right-align with margin.
-	x := winW - headerMarginX - totalW
-	y := float32(-textPadding(o.fontSize))
+	x := o.pageIndicatorX(winW)
+	y := float32(centeredTextY(o.headerHeight(o.face.Metrics().Height.Ceil()), o.face.Metrics().Height.Ceil(), textPadding(o.fontSize)))
 
 	for i := range pages {
 		if o.pageIndicatorTex[i] != 0 {
@@ -587,9 +625,9 @@ func (o *Overlay) rebuildPageIndicatorTextures() {
 	textColor := o.textColor()
 	for i, name := range pages {
 		o.deleteTex(&o.pageIndicatorTex[i])
-		label := "  " + name + "  "
+		label := " " + name + " "
 		if UIPage(i) == o.uiPage {
-			label = "[ " + name + " ]"
+			label = "[" + name + "]"
 		}
 		o.pageIndicatorTex[i], o.pageIndicatorTexW[i], o.pageIndicatorTexH[i] = o.renderTextToTex(label, textColor)
 	}
@@ -633,11 +671,10 @@ func (o *Overlay) drawMarquee(m *marqueeState, x, y, w, h float32, winW, winH, v
 
 // availableRowTextWidth is the max glyph advance that fits in a row,
 // accounting for texture padding, scrollbar, and row edges.
-func availableRowTextWidth(panelW int) int {
-	const texturePad = 4
-	const scrollbarW = 4
-	const rowEdgePad = 4
-	width := panelW - 2*texturePad - scrollbarW - rowEdgePad
+func (o *Overlay) availableRowTextWidth(panelW int) int {
+	texturePad := o.scalePx(4)
+	rowEdgePad := o.scalePx(4)
+	width := panelW - 2*texturePad - o.scrollbarWidthPx() - rowEdgePad
 	if width < 1 {
 		return 1
 	}
@@ -668,7 +705,8 @@ func (o *Overlay) renderStatsOnly(winW, winH int) {
 		o.rebuildStatsTex()
 	}
 	if o.statsTex != 0 {
+		statsSize := statsFontSize(o.fontSize)
 		glDrawOverlayText(o.programText, o.statsTex, 1,
-			headerMarginX, float32(-textPadding(o.fontSize)), float32(o.statsTexW), float32(o.statsTexH), winW, winH, winW, winH)
+			float32(o.headerMarginX()), float32(-textPadding(statsSize)), float32(o.statsTexW), float32(o.statsTexH), winW, winH, winW, winH)
 	}
 }

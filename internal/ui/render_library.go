@@ -23,7 +23,7 @@ import (
 // renderLibraryPanels draws the albums (left) and tracks (right) panels.
 func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	// Text clip width must match truncateEnd/rebuildMarqueeLine.
-	textW := availableRowTextWidth(panelW) - 2*o.borderWidthPx()
+	textW := o.availableRowTextWidth(panelW) - 2*o.borderWidthPx()
 	if textW < 1 {
 		textW = 1
 	}
@@ -35,13 +35,15 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 	}
 	if o.albumsTex != 0 {
 		px, py := float32(0), float32(panelY)
+		textOffset := float32(textPadding(o.fontSize))
+		textY := py - textOffset
 		drawPanelBg(o, px, py, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		if o.panelEntered && len(o.albums) > 0 {
-			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh)
+			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh) - textOffset
 			o.drawCursorHighlight(px, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 		}
 		glDrawOverlayTextClipped(o.programText, o.albumsTex, 1,
-			px, py, float32(o.albumsTexW), float32(o.albumsTexH),
+			px, textY, float32(o.albumsTexW), float32(o.albumsTexH),
 			px, py, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		am := panelH / lh
 		if am < 1 {
@@ -50,7 +52,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		drawScrollbar(o, px+float32(panelW)-sbW, py, float32(panelH), len(o.albums), am, o.albumsScroll, winW, winH, viewW, viewH)
 		// Cursor highlight row — drawn as separate overlay, no texture rebuild needed.
 		if o.panelEntered && len(o.albums) > 0 {
-			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh)
+			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh) - textOffset
 			o.drawMarqueeCol(&o.marqueeL, px, py, float32(textW), float32(panelH), lh, rowY, winW, winH, viewW, viewH)
 		}
 		if o.focusPanel == 0 {
@@ -76,7 +78,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		actionH := float32(0)
 		metadataH := float32(panelH)
 		if isNCInfo {
-			actionH = float32(actionBarHeight(lh))
+			actionH = float32(o.actionBarHeight(lh))
 			metadataH -= actionH
 			if metadataH < float32(lh) {
 				metadataH = float32(lh)
@@ -88,7 +90,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		}
 		contentY := ty - scrollPx
 		if o.coverArtTex != 0 && o.coverArtTexW > 0 {
-			pad := float32(4)
+			pad := float32(o.scalePx(4))
 			imgW := float32(o.coverArtTexW)
 			imgH := float32(o.coverArtTexH)
 			imgX := tx + (float32(panelW)-imgW)/2
@@ -138,8 +140,8 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 	}
 }
 
-func actionBarHeight(lh int) int {
-	return lh + 8
+func (o *Overlay) actionBarHeight(lh int) int {
+	return lh + o.scalePx(8)
 }
 
 func (o *Overlay) hasNCSelection() bool {
@@ -200,7 +202,7 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	if end > len(o.albums) {
 		end = len(o.albums)
 	}
-	maxTextPx := availableRowTextWidth(maxW) - 2*o.borderWidthPx()
+	maxTextPx := o.availableRowTextWidth(maxW) - 2*o.borderWidthPx()
 	var rows []listRow
 	for i := start; i < end; i++ {
 		name := o.albums[i]
@@ -304,13 +306,13 @@ func (o *Overlay) rebuildLocalTrackInfoTex(maxW, maxH int) {
 	}
 	ti := &o.trackInfos[o.trackCursor]
 	// Load cover art for the selected track.
-	o.loadCoverArt(ti.Path, availableRowTextWidth(maxW))
+	o.loadCoverArt(ti.Path, o.availableRowTextWidth(maxW))
 	lines := trackInfoLines(player.TrackTitle(ti.Path), ti)
 	if len(lines) == 0 {
 		return
 	}
 
-	maxTextPx := availableRowTextWidth(maxW)
+	maxTextPx := o.availableRowTextWidth(maxW)
 	o.infoMarquee.invalidate(o)
 	o.infoLines = lines
 	// Vertical scroll: keep the cursor line visible.
@@ -335,7 +337,7 @@ func (o *Overlay) rebuildLocalTrackInfoTex(maxW, maxH int) {
 func (o *Overlay) infoScrollMetrics(textLines, lh, panelH int) (contentRows, visibleRows int) {
 	coverArtH := 0
 	if o.coverArtTex != 0 && o.coverArtTexH > 0 {
-		coverArtH = o.coverArtTexH + 8 // 4px pad top + 4px pad bottom
+		coverArtH = o.coverArtTexH + o.scalePx(8)
 	}
 	contentRows = (coverArtH + textLines*lh + lh - 1) / lh
 	visibleRows = panelH / lh
@@ -430,7 +432,7 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 			fmt.Sprintf("  Playable files: %d", files))
 	} else if o.ncInfoFile != "" {
 		// Load cover art first (before text) so the texture is ready for rendering.
-		o.loadCoverArt(o.ncInfoFile, availableRowTextWidth(maxW))
+		o.loadCoverArt(o.ncInfoFile, o.availableRowTextWidth(maxW))
 		// File info.
 		if info, err := os.Stat(o.ncInfoFile); err == nil {
 			lines = append(lines, fmt.Sprintf("  %s", formatSize(info.Size())))
@@ -510,7 +512,7 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		return
 	} else {
 		// No selected file/dir (e.g. cursor on ".."), but still show the banner.
-		maxTextPx := availableRowTextWidth(maxW)
+		maxTextPx := o.availableRowTextWidth(maxW)
 		var rows []listRow
 		for _, line := range lines {
 			rows = append(rows, listRow{text: line})
@@ -519,7 +521,7 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		return
 	}
 
-	maxTextPx := availableRowTextWidth(maxW)
+	maxTextPx := o.availableRowTextWidth(maxW)
 	infoTextW := maxTextPx
 	for _, line := range lines {
 		if width := font.MeasureString(o.face, line).Ceil(); width > infoTextW {
@@ -527,7 +529,7 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		}
 	}
 	lh := o.face.Metrics().Height.Ceil()
-	metadataH := maxH - actionBarHeight(lh)
+	metadataH := maxH - o.actionBarHeight(lh)
 	if metadataH < lh {
 		metadataH = lh
 	}
@@ -698,7 +700,7 @@ func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 		return
 	}
 
-	maxTextPx := availableRowTextWidth(maxW)
+	maxTextPx := o.availableRowTextWidth(maxW)
 	infoTextW := maxTextPx
 	for _, line := range lines {
 		if width := font.MeasureString(o.face, line).Ceil(); width > infoTextW {

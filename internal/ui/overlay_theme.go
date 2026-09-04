@@ -106,13 +106,18 @@ func (o *Overlay) transparencyAlpha() float32 {
 // bgAlpha returns the panel background alpha.
 func (o *Overlay) bgAlpha() float32 { return o.transparencyAlpha() }
 
+// scalePx converts a pixel size designed at 480p to the current screen height.
+func (o *Overlay) scalePx(at480 int) int {
+	scaled := int(math.Round(float64(at480*o.screenH) / 480))
+	if at480 > 0 && scaled < 1 {
+		return 1
+	}
+	return scaled
+}
+
 // borderWidthPx returns the focus-border thickness, scaled with screen height.
 func (o *Overlay) borderWidthPx() int {
-	w := int(math.Round(float64(o.screenH) / 480))
-	if w < 1 {
-		w = 1
-	}
-	return w
+	return o.scalePx(1)
 }
 
 // scrollbarWidthPx returns the scrollbar thickness (twice borderWidth).

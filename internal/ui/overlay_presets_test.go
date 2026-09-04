@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -360,6 +361,28 @@ func TestUpdateRefreshesPresetPreviewFPS(t *testing.T) {
 	if o.presetPreviewFPSNow != 14 || !o.presetsDetailDirty || o.presetsDirty {
 		t.Fatalf("preview FPS = %d, detail dirty = %t, list dirty = %t; want 14, true, false",
 			o.presetPreviewFPSNow, o.presetsDetailDirty, o.presetsDirty)
+	}
+}
+
+func TestPresetDetailRowsUseMeasuredFPSInsteadOfComplexity(t *testing.T) {
+	o := &Overlay{
+		presetDetailKey:     "Fractal/test.milk",
+		presetPreviewFPSNow: 42,
+		presetMeta: func(string) presets.PresetMeta {
+			return presets.PresetMeta{Shapes: 3, Waves: 2, PerFrameEqs: 17, PerPixelEqs: 8, Textures: 4}
+		},
+	}
+
+	rows := o.buildPresetDetailRows()
+	want := []listRow{
+		{text: "Shapes: 3   Waves: 2"},
+		{text: "Equations: 17 per-frame, 8 per-pixel"},
+		{text: "Textures: 4"},
+		{},
+		{text: "Preview FPS: 42"},
+	}
+	if !reflect.DeepEqual(rows, want) {
+		t.Fatalf("preset detail rows = %#v, want %#v", rows, want)
 	}
 }
 
