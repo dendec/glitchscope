@@ -11,14 +11,14 @@ import (
 const (
 	SettingShuffle         = 1
 	SettingRepeat          = 2
-	SettingPerformanceMode = 3
-	SettingPresetTimer     = 4
-	SettingResolution      = 5
-	SettingFilter          = 6
-	SettingTheme           = 7
-	SettingTransparency    = 8
-	SettingShowStats       = 9
-	SettingBeatSensitivity = 10
+	SettingPerformanceMode = 4
+	SettingPresetTimer     = 5
+	SettingResolution      = 6
+	SettingFilter          = 7
+	SettingTheme           = 9
+	SettingTransparency    = 10
+	SettingShowStats       = 11
+	SettingBeatSensitivity = 13
 )
 
 // BuildSettingsRows creates SettingRow entries from the current config.
