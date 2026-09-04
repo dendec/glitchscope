@@ -15,10 +15,10 @@ const (
 	SettingPresetTimer     = 5
 	SettingResolution      = 6
 	SettingFilter          = 7
-	SettingTheme           = 9
-	SettingTransparency    = 10
-	SettingShowStats       = 11
-	SettingBeatSensitivity = 13
+	SettingBeatSensitivity = 8
+	SettingTheme           = 10
+	SettingTransparency    = 11
+	SettingShowStats       = 12
 )
 
 // BuildSettingsRows creates SettingRow entries from the current config.
@@ -146,14 +146,12 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 		{Label: "Preset auto-switch", Values: presetValues, Index: presetIndex},
 		{Label: "Render resolution", Values: resValues, Index: resIndex},
 		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
+		{Label: "Beat sensitivity", Values: beatValues, Index: beatIndex},
 		// Appearance
 		{Header: true, Label: "── Appearance ───"},
 		{Label: "Theme", Values: themeValues, Index: themeIndex},
 		{Label: "Transparency", Values: transValues, Index: transIndex},
 		{Label: "Show stats", Values: []string{"Off", "On"}, Index: boolIndex(s.UI.ShowStats)},
-		// Audio
-		{Header: true, Label: "── Audio ───────"},
-		{Label: "Beat sensitivity", Values: beatValues, Index: beatIndex},
 	}
 }
 
