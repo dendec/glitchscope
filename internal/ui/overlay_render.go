@@ -106,7 +106,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	hR, hG, hB := o.panelBgRGB()
 	glDrawFilledRect(o.programRect, 0, 0, float32(winW), float32(headerH), hR, hG, hB, o.bgAlpha(), winW, winH, viewW, viewH)
 
-	if o.statsTex != 0 {
+	if o.showFPS && o.statsTex != 0 {
 		if !o.drawMarquee(&o.statsMarquee, headerMarginX, float32(-textPadding(o.fontSize)), float32(winW-headerMarginX*2), float32(o.statsTexH), winW, winH, viewW, viewH) {
 			glDrawOverlayText(o.programText, o.statsTex, 1,
 				headerMarginX, float32(-textPadding(o.fontSize)), float32(o.statsTexW), float32(o.statsTexH), winW, winH, viewW, viewH)
