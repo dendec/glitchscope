@@ -38,11 +38,12 @@ func LoadSettings(path string) (Settings, error) {
 
 	var raw struct {
 		Graphics *struct {
-			RenderWidth     *int           `json:"render_width"`
-			RenderHeight    *int           `json:"render_height"`
-			UpscaleFilter   *UpscaleFilter `json:"upscale_filter"`
-			Adaptive        *bool          `json:"adaptive"`
-			BeatSensitivity *float64       `json:"beat_sensitivity"`
+			RenderWidth     *int             `json:"render_width"`
+			RenderHeight    *int             `json:"render_height"`
+			UpscaleFilter   *UpscaleFilter   `json:"upscale_filter"`
+			Adaptive        *bool            `json:"adaptive"`
+			BeatSensitivity *float64         `json:"beat_sensitivity"`
+			PerformanceMode *PerformanceMode `json:"performance_mode"`
 		} `json:"graphics"`
 		Playback *struct {
 			ShuffleMode  *ShuffleMode `json:"shuffle_mode"`
@@ -56,6 +57,7 @@ func LoadSettings(path string) (Settings, error) {
 		UI             *struct {
 			Theme        *Theme        `json:"theme"`
 			Transparency *Transparency `json:"transparency"`
+			ShowStats    *bool         `json:"show_stats"`
 		} `json:"ui"`
 	}
 	if err := json.NewDecoder(f).Decode(&raw); err != nil {
@@ -80,6 +82,9 @@ func LoadSettings(path string) (Settings, error) {
 		}
 		if raw.Graphics.BeatSensitivity != nil {
 			s.Graphics.BeatSensitivity = *raw.Graphics.BeatSensitivity
+		}
+		if raw.Graphics.PerformanceMode != nil {
+			s.Graphics.PerformanceMode = *raw.Graphics.PerformanceMode
 		}
 	}
 	if raw.Playback != nil {
@@ -107,6 +112,9 @@ func LoadSettings(path string) (Settings, error) {
 		}
 		if raw.UI.Transparency != nil {
 			s.UI.Transparency = *raw.UI.Transparency
+		}
+		if raw.UI.ShowStats != nil {
+			s.UI.ShowStats = *raw.UI.ShowStats
 		}
 	}
 

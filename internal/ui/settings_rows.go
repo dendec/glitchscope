@@ -30,10 +30,11 @@ type settingOpt interface {
 // the currently active value.  Used by every settings row builder to avoid
 // repeating the same make-loop-findIndex pattern.
 func optionPair[T settingOpt](all []T, current T) (values []string, index int) {
+	currentStr := current.String()
 	values = make([]string, len(all))
 	for i, v := range all {
 		values[i] = v.String()
-		if v == current {
+		if v.String() == currentStr {
 			index = i
 		}
 	}
