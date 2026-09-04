@@ -7,7 +7,7 @@ import (
 )
 
 // Settings row indices — shared between BuildSettingsRows and applySettings.
-// Headers occupy even slots; these indices point to the actual setting rows.
+// Each index points to the actual setting row (headers are skipped).
 const (
 	SettingShuffle         = 1
 	SettingRepeat          = 2
@@ -21,117 +21,45 @@ const (
 	SettingShowStats       = 12
 )
 
+// settingOpt is a setting whose String() produces a display label.
+type settingOpt interface {
+	String() string
+}
+
+// optionPair builds (values, selectedIndex) from a list of option values and
+// the currently active value.  Used by every settings row builder to avoid
+// repeating the same make-loop-findIndex pattern.
+func optionPair[T settingOpt](all []T, current T) (values []string, index int) {
+	values = make([]string, len(all))
+	for i, v := range all {
+		values[i] = v.String()
+		if v == current {
+			index = i
+		}
+	}
+	return values, index
+}
+
 // BuildSettingsRows creates SettingRow entries from the current config.
 func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 	resolutions := config.ComputeResolutions(winW, winH)
+	resValues, resIndex := buildResolutionValues(s, resolutions)
 
-	var resValues []string
-	var resIndex int
-
-	if s.Graphics.Adaptive {
-		resValues = append(resValues, "Auto")
-		if s.Graphics.Adaptive {
-			resIndex = 0
-		} else {
-			resIndex = 1
-			for i, r := range resolutions {
-				if r.Width == s.Graphics.RenderWidth && r.Height == s.Graphics.RenderHeight {
-					resIndex = i + 1
-					break
-				}
-			}
-		}
-	} else {
-		resIndex = 0
-		for i, r := range resolutions {
-			if r.Width == s.Graphics.RenderWidth && r.Height == s.Graphics.RenderHeight {
-				resIndex = i
-				break
-			}
-		}
-	}
-
-	for _, r := range resolutions {
-		resValues = append(resValues, r.String())
-	}
-
-	if len(resolutions) == 0 && s.Graphics.Adaptive && len(resValues) == 1 {
-		resValues = append(resValues, "N/A")
-		resIndex = 0
-	}
-
-	filters := config.AllFilters()
-	filterValues := make([]string, len(filters))
-	filterIndex := 0
-	for i, f := range filters {
-		filterValues[i] = f.String()
-		if f == s.Graphics.UpscaleFilter {
-			filterIndex = i
-		}
-	}
-
-	repeatValues := make([]string, len(config.AllRepeatModes()))
-	repeatIndex := 0
-	for i, m := range config.AllRepeatModes() {
-		repeatValues[i] = m.String()
-		if m == s.Playback.Repeat {
-			repeatIndex = i
-		}
-	}
-
-	presetValues := make([]string, len(config.AllPresetIntervals()))
-	presetIndex := 0
-	for i, p := range config.AllPresetIntervals() {
-		presetValues[i] = p.String()
-		if p == s.PresetInterval {
-			presetIndex = i
-		}
-	}
-
-	shuffleValues := make([]string, len(config.AllShuffleModes()))
-	shuffleIndex := 0
-	for i, m := range config.AllShuffleModes() {
-		shuffleValues[i] = m.String()
-		if m == s.Playback.ShuffleMode {
-			shuffleIndex = i
-		}
-	}
-
-	themeValues := make([]string, len(config.AllThemes()))
-	themeIndex := 0
-	for i, t := range config.AllThemes() {
-		themeValues[i] = t.String()
-		if t == s.UI.Theme {
-			themeIndex = i
-		}
-	}
-
-	transValues := make([]string, len(config.AllTransparencies()))
-	transIndex := 0
-	for i, t := range config.AllTransparencies() {
-		transValues[i] = t.String()
-		if t == s.UI.Transparency {
-			transIndex = i
-		}
-	}
+	filterValues, filterIndex := optionPair(config.AllFilters(), s.Graphics.UpscaleFilter)
+	repeatValues, repeatIndex := optionPair(config.AllRepeatModes(), s.Playback.Repeat)
+	presetValues, presetIndex := optionPair(config.AllPresetIntervals(), s.PresetInterval)
+	shuffleValues, shuffleIndex := optionPair(config.AllShuffleModes(), s.Playback.ShuffleMode)
+	themeValues, themeIndex := optionPair(config.AllThemes(), s.UI.Theme)
+	transValues, transIndex := optionPair(config.AllTransparencies(), s.UI.Transparency)
+	perfValues, perfIndex := optionPair(config.AllPerformanceModes(), s.Graphics.PerformanceMode)
 
 	beatSensitivities := config.AllBeatSensitivities()
 	beatValues := make([]string, len(beatSensitivities))
 	beatIndex := 0
-	for i, sensitivity := range beatSensitivities {
-		beatValues[i] = fmt.Sprintf("%.2g", sensitivity)
-		if sensitivity == s.Graphics.BeatSensitivity {
+	for i, b := range beatSensitivities {
+		beatValues[i] = fmt.Sprintf("%.2g", b)
+		if b == s.Graphics.BeatSensitivity {
 			beatIndex = i
-		}
-	}
-
-	perfModes := config.AllPerformanceModes()
-	perfValues := make([]string, len(perfModes))
-	perfIndex := 0
-	for i, m := range perfModes {
-		perfValues[i] = m.String()
-		if m == s.Graphics.PerformanceMode {
-			perfIndex = i
 		}
 	}
 
@@ -153,6 +81,34 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 		{Label: "Transparency", Values: transValues, Index: transIndex},
 		{Label: "Show stats", Values: []string{"Off", "On"}, Index: boolIndex(s.UI.ShowStats)},
 	}
+}
+
+// buildResolutionValues produces the resolution option list and selected index.
+// This one can't use optionPair because "Auto" is a virtual option prepended
+// when adaptive mode is on.
+func buildResolutionValues(s config.Settings, resolutions []config.RenderResolution) ([]string, int) {
+	if s.Graphics.Adaptive {
+		values := append([]string{"Auto"}, renderResolutionStrings(resolutions)...)
+		if len(resolutions) == 0 {
+			values = append(values, "N/A")
+		}
+		return values, 0
+	}
+	values := renderResolutionStrings(resolutions)
+	for i, r := range resolutions {
+		if r.Width == s.Graphics.RenderWidth && r.Height == s.Graphics.RenderHeight {
+			return values, i
+		}
+	}
+	return values, 0
+}
+
+func renderResolutionStrings(resolutions []config.RenderResolution) []string {
+	out := make([]string, len(resolutions))
+	for i, r := range resolutions {
+		out[i] = r.String()
+	}
+	return out
 }
 
 func boolIndex(v bool) int {

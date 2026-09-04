@@ -316,7 +316,7 @@ func (a *App) applyPresetName(name string) {
 // applySettings reads confirmed settings rows and applies changes.
 func (a *App) applySettings(winW, winH int) {
 	rows := a.overlay.SettingsRows()
-	if len(rows) < 13 {
+	if len(rows) <= ui.SettingShowStats {
 		return
 	}
 
