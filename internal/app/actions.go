@@ -185,7 +185,7 @@ func (a *App) switchScreen(winW, winH int, forward bool) {
 		a.overlay.PrevScreen()
 	}
 	if a.overlay.IsSettingsPage() {
-		rows := ui.BuildSettingsRows(*a.settings, winW, winH, a.renderScaleExplicit)
+		rows := ui.BuildSettingsRows(*a.settings, winW, winH)
 		a.overlay.SetSettingsRows(rows, 0)
 	}
 }
@@ -323,12 +323,7 @@ func (a *App) applySettings(winW, winH int) {
 	resIndex := rows[ui.SettingResolution].Index
 	resolutions := config.ComputeResolutions(winW, winH)
 
-	if a.renderScaleExplicit {
-		if resIndex >= 0 && resIndex < len(resolutions) {
-			a.applyRenderResolution(resolutions[resIndex])
-		}
-		a.resetAdaptiveCounters()
-	} else if resIndex == 0 {
+	if resIndex == 0 {
 		a.settings.Graphics.Adaptive = true
 		a.resetAdaptiveState(winW, winH)
 	} else {
@@ -409,7 +404,7 @@ func (a *App) applySettings(winW, winH int) {
 		slog.Debug("settings saved", "path", a.settingsPath)
 	}
 
-	rows = ui.BuildSettingsRows(*a.settings, winW, winH, a.renderScaleExplicit)
+	rows = ui.BuildSettingsRows(*a.settings, winW, winH)
 	a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 }
 

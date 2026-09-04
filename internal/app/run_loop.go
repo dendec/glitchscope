@@ -122,12 +122,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 	winChanged := w != state.prevW || h != state.prevH
 
 	if winChanged && state.prevW > 0 && state.prevH > 0 {
-		if a.renderScaleExplicit {
-			a.applyRenderResolution(config.RenderResolution{
-				Width:  scaledDim(w, a.renderScale),
-				Height: scaledDim(h, a.renderScale),
-			})
-		} else if a.settings.Graphics.Adaptive {
+		if a.settings.Graphics.Adaptive {
 			cur := config.RenderResolution{Width: a.settings.Graphics.RenderWidth, Height: a.settings.Graphics.RenderHeight}
 			if a.adaptive.Configure(w, h, cur, a.settings.Graphics.PerformanceMode.Params()) {
 				a.applyRenderResolution(a.adaptive.resolutions[a.adaptive.index])
@@ -143,13 +138,13 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 		}
 
 		if a.overlay != nil && a.overlay.IsSettingsPage() {
-			rows := ui.BuildSettingsRows(*a.settings, w, h, a.renderScaleExplicit)
+			rows := ui.BuildSettingsRows(*a.settings, w, h)
 			a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 		}
 	}
 	state.prevW, state.prevH = w, h
 
-	if a.settings.Graphics.Adaptive && !a.renderScaleExplicit && !a.onPresetsPage &&
+	if a.settings.Graphics.Adaptive && !a.onPresetsPage &&
 		a.vizClock.meter.Full() && newVisualizerFrame && !a.adaptiveSuspended(now) {
 		if resolution, direction, changed, minReached := a.adaptive.Decide(fpsAvg); changed {
 			a.applyRenderResolution(resolution)
@@ -184,7 +179,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 		if selectedAlbum >= 0 {
 			trackAlbumIdx = selectedAlbum
 		}
-		a.presenter.Update(fpsAvg, a.settings.Graphics.Adaptive && !a.renderScaleExplicit,
+		a.presenter.Update(fpsAvg, a.settings.Graphics.Adaptive,
 			a.settings.Graphics.RenderHeight, a.prof.ReadStats(),
 			a.playbackState.snapshot(selectedAlbum, a.presenter.needsTrackInfos(trackAlbumIdx)))
 	}

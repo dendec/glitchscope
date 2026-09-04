@@ -22,13 +22,13 @@ const (
 )
 
 // BuildSettingsRows creates SettingRow entries from the current config.
-func BuildSettingsRows(s config.Settings, winW, winH int, renderScaleExplicit bool) []SettingRow {
+func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 	resolutions := config.ComputeResolutions(winW, winH)
 
 	var resValues []string
 	var resIndex int
 
-	if !renderScaleExplicit {
+	if s.Graphics.Adaptive {
 		resValues = append(resValues, "Auto")
 		if s.Graphics.Adaptive {
 			resIndex = 0
@@ -55,7 +55,7 @@ func BuildSettingsRows(s config.Settings, winW, winH int, renderScaleExplicit bo
 		resValues = append(resValues, r.String())
 	}
 
-	if len(resolutions) == 0 && !renderScaleExplicit && len(resValues) == 1 {
+	if len(resolutions) == 0 && s.Graphics.Adaptive && len(resValues) == 1 {
 		resValues = append(resValues, "N/A")
 		resIndex = 0
 	}

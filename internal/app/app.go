@@ -53,8 +53,6 @@ type App struct {
 	presetCats        []string // all preset keys for presets page tree
 	transitionPresets []string // "!"-prefixed presets for smooth transitions
 
-	renderScale         float64
-	renderScaleExplicit bool
 	startupFile         string
 
 	adaptive resolutionState
@@ -90,12 +88,10 @@ type App struct {
 
 // New creates an App with display initialised. Player/overlay/input/library
 // are created later by Init().
-func New(fullscreen bool, width, height int, renderScale float64, renderNearest bool, renderScaleExplicit, renderNearestSet bool, startupFile string) (*App, error) {
+func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	a := &App{
 		prof:                prof.NewCollector(),
 		settingsPath:        config.SettingsPath(),
-		renderScale:         renderScale,
-		renderScaleExplicit: renderScaleExplicit,
 		startupFile:         startupFile,
 		modlandSizes:        make(map[string]int64),
 		presenter:           newOverlayPresenter(nil),
@@ -176,15 +172,10 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 		slog.Warn("settings load", "error", err)
 		gs = config.DefaultSettings()
 	}
-	if renderNearestSet && renderNearest {
-		gs.Graphics.UpscaleFilter = config.FilterPixel
-	}
 
 	resolutions := config.ComputeResolutions(int(w), int(h))
 	var renderW, renderH int
 	switch {
-	case renderScaleExplicit:
-		renderW, renderH = scaledDim(int(w), renderScale), scaledDim(int(h), renderScale)
 	case gs.Graphics.Adaptive && len(resolutions) > 0:
 		a.adaptive.Reset(int(w), int(h), gs.Graphics.PerformanceMode.Params())
 		renderW, renderH = a.adaptive.resolutions[0].Width, a.adaptive.resolutions[0].Height
@@ -215,7 +206,7 @@ func New(fullscreen bool, width, height int, renderScale float64, renderNearest 
 	})
 
 	slog.Info("render size", "window", fmt.Sprintf("%dx%d", int(w), int(h)),
-		"internal", fmt.Sprintf("%dx%d", renderW, renderH), "scale", renderScale)
+		"internal", fmt.Sprintf("%dx%d", renderW, renderH))
 
 	if err := presets.Open(presetDirPath()); err != nil {
 		slog.Warn("presets dir not found", "error", err)
@@ -702,20 +693,6 @@ func (a *App) findMusicDir() string {
 		}
 	}
 	return filepath.Join(baseDir(), "music") // default even if missing
-}
-
-func scaledDim(v int, scale float64) int {
-	if scale >= 1.0 {
-		return v
-	}
-	if scale < 0.1 {
-		scale = 0.1
-	}
-	d := int(float64(v) * scale)
-	if d > v {
-		d = v
-	}
-	return d
 }
 
 func presetDirPath() string {
