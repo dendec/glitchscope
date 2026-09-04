@@ -45,31 +45,10 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	if (o.playingPath != "" || o.loading) && o.bottomDirty {
 		o.rebuildBottomTex(winW, o.face.Metrics().Height.Ceil())
 	}
-	if o.uiPage == PageLibrary || o.uiPage == PagePresets {
-		o.rebuildBreadcrumbTex(winW)
-	}
 
-	// Header/footer lines use the same row pitch (lh) as the panels.
+	// Single header row: stats on the left, page name on the right.
 	lh := o.face.Metrics().Height.Ceil()
-
-	// Page-indicator row grows to fit the actual texture height (shadow
-	// padding can exceed lh) so its bottom isn't clipped by the panels
-	// that start right below the header.
-	indicatorRowH := lh
-	for _, h := range o.pageIndicatorTexH {
-		if h > indicatorRowH {
-			indicatorRowH = h
-		}
-	}
-
-	// The focus border is drawn inset (see drawPanelBorder), so panels can
-	// sit flush against the header/bottom bars with no reserved gap.
-	crumbRowH := 0
-	if o.uiPage == PageLibrary || o.uiPage == PagePresets {
-		crumbRowH = lh
-	}
-	headerH := lh + indicatorRowH + crumbRowH
-	indicatorY := lh
+	headerH := lh
 
 	// Status row grows to fit the actual texture height, but only enough to
 	// leave a single line-gap worth of breathing room below the descenders —
@@ -113,14 +92,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		}
 	}
 
-	o.renderPageIndicator(winW, winH, viewW, viewH, indicatorY)
-
-	if (o.uiPage == PageLibrary || o.uiPage == PagePresets) && o.breadcrumbTex != 0 {
-		if !o.drawMarquee(&o.breadcrumbMarquee, headerMarginX, float32(lh+indicatorRowH-textPadding(o.fontSize)), float32(winW-headerMarginX*2), float32(o.breadcrumbTexH), winW, winH, viewW, viewH) {
-			glDrawOverlayText(o.programText, o.breadcrumbTex, 1,
-				headerMarginX, float32(lh+indicatorRowH-textPadding(o.fontSize)), float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
-		}
-	}
+	o.renderPageIndicator(winW, winH, viewW, viewH)
 
 	switch o.uiPage {
 	case PageSettings:
@@ -312,29 +284,6 @@ func (o *Overlay) rebuildStatsTex() {
 	display := o.truncateEnd(o.statsLine, maxW)
 	o.statsTex, o.statsTexW, o.statsTexH = o.renderTextToTex(display, o.textColor())
 	o.rebuildMarqueeLine(&o.statsMarquee, o.statsLine, maxW, false)
-}
-
-// rebuildBreadcrumbTex re-renders the Library-page breadcrumb path, skipping
-// work while the path hasn't changed since the last build.
-func (o *Overlay) rebuildBreadcrumbTex(winW int) {
-	if o.face == nil {
-		return
-	}
-	text := o.breadcrumbText()
-	if !o.breadcrumbDirty && text == o.breadcrumbTextCache {
-		return
-	}
-	o.breadcrumbDirty = false
-	o.breadcrumbTextCache = text
-	o.deleteTex(&o.breadcrumbTex)
-	if text != "" {
-		maxW := winW - headerMarginX*2
-		display := o.truncateEnd(text, maxW)
-		o.breadcrumbTex, o.breadcrumbTexW, o.breadcrumbTexH = o.renderTextToTex(display, o.textColor())
-		o.rebuildMarqueeLine(&o.breadcrumbMarquee, text, maxW, false)
-	} else {
-		o.breadcrumbMarquee.invalidate(o)
-	}
 }
 
 func (o *Overlay) rebuildPresetNameTex() {
@@ -601,9 +550,9 @@ const (
 	pageIndicatorGapFactor = 2.0 // horizontal gap between page indicator labels, in font-size units
 )
 
-// renderPageIndicator draws the Library/Presets/Settings/Help row at the given y,
-// which the caller stacks directly below the stats line so it never overlaps.
-func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH, y int) {
+// renderPageIndicator draws the page names (Library/Presets/Settings/Help)
+// right-aligned on the header row, at the same y as the stats line.
+func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH int) {
 	if o.pageIndicatorDirty {
 		o.rebuildPageIndicatorTextures()
 	}
@@ -619,14 +568,14 @@ func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH, y int) {
 		}
 	}
 
-	startX := (winW - totalW) / 2
+	// Right-align with margin.
+	x := winW - headerMarginX - totalW
+	y := float32(-textPadding(o.fontSize))
 
-	x := startX
 	for i := range pages {
-		// Active page marked by square brackets (see rebuildPageIndicatorTextures).
 		if o.pageIndicatorTex[i] != 0 {
 			glDrawOverlayText(o.programText, o.pageIndicatorTex[i], 1,
-				float32(x), float32(y), float32(o.pageIndicatorTexW[i]), float32(o.pageIndicatorTexH[i]), winW, winH, viewW, viewH)
+				float32(x), y, float32(o.pageIndicatorTexW[i]), float32(o.pageIndicatorTexH[i]), winW, winH, viewW, viewH)
 		}
 		x += o.pageIndicatorTexW[i] + gap
 	}
