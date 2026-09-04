@@ -316,7 +316,7 @@ func (a *App) applyPresetName(name string) {
 // applySettings reads confirmed settings rows and applies changes.
 func (a *App) applySettings(winW, winH int) {
 	rows := a.overlay.SettingsRows()
-	if len(rows) < 13 {
+	if len(rows) < 14 {
 		return
 	}
 
@@ -387,6 +387,12 @@ func (a *App) applySettings(winW, winH int) {
 	transparencies := config.AllTransparencies()
 	if rows[ui.SettingTransparency].Index >= 0 && rows[ui.SettingTransparency].Index < len(transparencies) {
 		a.settings.UI.Transparency = transparencies[rows[ui.SettingTransparency].Index]
+	}
+
+	newShowStats := rows[ui.SettingShowStats].Index == 1
+	if newShowStats != a.settings.UI.ShowStats {
+		a.settings.UI.ShowStats = newShowStats
+		a.overlay.SetShowFPS(newShowStats)
 	}
 
 	beatSensitivities := config.AllBeatSensitivities()

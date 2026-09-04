@@ -465,10 +465,11 @@ func (t Transparency) Validate() error {
 type UISettings struct {
 	Theme        Theme        `json:"theme"`
 	Transparency Transparency `json:"transparency"`
+	ShowStats    bool         `json:"show_stats"`
 }
 
 func DefaultUI() UISettings {
-	return UISettings{Theme: ThemeDark, Transparency: 0}
+	return UISettings{Theme: ThemeDark, Transparency: 0, ShowStats: false}
 }
 
 // Settings is the full persisted settings envelope.

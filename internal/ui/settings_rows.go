@@ -11,13 +11,14 @@ import (
 const (
 	SettingShuffle         = 1
 	SettingRepeat          = 2
-	SettingPresetTimer     = 3
-	SettingPerformanceMode = 5
-	SettingResolution      = 6
-	SettingFilter          = 7
-	SettingTheme           = 9
-	SettingTransparency    = 10
-	SettingBeatSensitivity = 12
+	SettingPerformanceMode = 3
+	SettingPresetTimer     = 4
+	SettingResolution      = 5
+	SettingFilter          = 6
+	SettingTheme           = 7
+	SettingTransparency    = 8
+	SettingShowStats       = 9
+	SettingBeatSensitivity = 10
 )
 
 // BuildSettingsRows creates SettingRow entries from the current config.
@@ -139,18 +140,26 @@ func BuildSettingsRows(s config.Settings, winW, winH int, renderScaleExplicit bo
 		{Header: true, Label: "── Playback ────"},
 		{Label: "Shuffle", Values: shuffleValues, Index: shuffleIndex},
 		{Label: "Repeat", Values: repeatValues, Index: repeatIndex},
-		{Label: "Preset auto-switch", Values: presetValues, Index: presetIndex},
-		// Rendering
-		{Header: true, Label: "── Rendering ───"},
+		// Visualization
+		{Header: true, Label: "── Visualization ──"},
 		{Label: "Performance mode", Values: perfValues, Index: perfIndex},
+		{Label: "Preset auto-switch", Values: presetValues, Index: presetIndex},
 		{Label: "Render resolution", Values: resValues, Index: resIndex},
 		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
 		// Appearance
 		{Header: true, Label: "── Appearance ───"},
 		{Label: "Theme", Values: themeValues, Index: themeIndex},
 		{Label: "Transparency", Values: transValues, Index: transIndex},
+		{Label: "Show stats", Values: []string{"Off", "On"}, Index: boolIndex(s.UI.ShowStats)},
 		// Audio
 		{Header: true, Label: "── Audio ───────"},
 		{Label: "Beat sensitivity", Values: beatValues, Index: beatIndex},
 	}
+}
+
+func boolIndex(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }

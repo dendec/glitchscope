@@ -368,7 +368,7 @@ func (a *App) initAudio() {
 	a.overlay = ui.New()
 	a.presenter = newOverlayPresenter(a.overlay)
 	a.overlay.SetBaseDir(baseDir())
-	a.overlay.SetShowFPS(a.showFPS)
+	a.overlay.SetShowFPS(a.showFPS || a.settings.UI.ShowStats)
 	a.overlay.SetMicDevices(mic.InputDevices())
 	w, h := a.window.GLGetDrawableSize()
 	a.overlay.SetScreenSize(int(w), int(h))
