@@ -562,7 +562,6 @@ func (a *App) playFavoriteFile(path string) {
 				slog.Warn("favorites: track missing, skipping", "path", tracks[idx])
 				_ = a.favorites.Remove(tracks[idx])
 				if idx < len(tracks)-1 {
-					path = tracks[idx+1]
 					continue
 				}
 				return // last track is missing, nothing to play

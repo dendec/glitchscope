@@ -224,11 +224,3 @@ func ExtractCoverArt(path string) []byte {
 func ReadFileMeta(path string) TrackMeta {
 	return extractMetaFromFile(path)
 }
-
-// truncate returns s shortened to max runes, appending "…" if truncated.
-func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "…"
-}

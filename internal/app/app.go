@@ -53,7 +53,7 @@ type App struct {
 	presetCats        []string // all preset keys for presets page tree
 	transitionPresets []string // "!"-prefixed presets for smooth transitions
 
-	startupFile         string
+	startupFile string
 
 	adaptive resolutionState
 	vizClock visualizerClock // visualizer frame clock, promoted from runState
@@ -90,11 +90,11 @@ type App struct {
 // are created later by Init().
 func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	a := &App{
-		prof:                prof.NewCollector(),
-		settingsPath:        config.SettingsPath(),
-		startupFile:         startupFile,
-		modlandSizes:        make(map[string]int64),
-		presenter:           newOverlayPresenter(nil),
+		prof:         prof.NewCollector(),
+		settingsPath: config.SettingsPath(),
+		startupFile:  startupFile,
+		modlandSizes: make(map[string]int64),
+		presenter:    newOverlayPresenter(nil),
 	}
 	a.appCtx, a.appCancel = context.WithCancel(context.Background())
 

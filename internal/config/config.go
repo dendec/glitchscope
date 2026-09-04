@@ -75,13 +75,13 @@ type PerformanceMode int
 
 const (
 	PerfModePerformance PerformanceMode = iota // 30 FPS visualizer, default
-	PerfModeBalanced                            // 24 FPS, moderate savings
-	PerfModeEco                                 // 15 FPS, maximum battery life
+	PerfModeBalanced                           // 24 FPS, moderate savings
+	PerfModeEco                                // 15 FPS, maximum battery life
 )
 
 // ModeParams holds the tuning knobs for one performance mode.
 type ModeParams struct {
-	VisualizerFPS    int32
+	VisualizerFPS      int32
 	AdaptiveThreshLow  float64
 	AdaptiveThreshHigh float64
 	AdaptiveLowFrames  int
@@ -97,7 +97,7 @@ func (m PerformanceMode) Params() ModeParams {
 	switch m {
 	case PerfModeBalanced:
 		return ModeParams{
-			VisualizerFPS:     24,
+			VisualizerFPS:      24,
 			AdaptiveThreshLow:  17.0,
 			AdaptiveThreshHigh: 20.0,
 			AdaptiveLowFrames:  8,
@@ -109,7 +109,7 @@ func (m PerformanceMode) Params() ModeParams {
 		}
 	case PerfModeEco:
 		return ModeParams{
-			VisualizerFPS:     15,
+			VisualizerFPS:      15,
 			AdaptiveThreshLow:  11.0,
 			AdaptiveThreshHigh: 14.0,
 			AdaptiveLowFrames:  6,
@@ -121,7 +121,7 @@ func (m PerformanceMode) Params() ModeParams {
 		}
 	default: // PerfModePerformance
 		return ModeParams{
-			VisualizerFPS:     30,
+			VisualizerFPS:      30,
 			AdaptiveThreshLow:  20.0,
 			AdaptiveThreshHigh: 24.0,
 			AdaptiveLowFrames:  10,

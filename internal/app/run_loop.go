@@ -23,10 +23,10 @@ type pendingPreset struct {
 }
 
 type visualizerClock struct {
-	lastFrame  time.Time
-	nextFrame  time.Time
-	meter      fpsMeter
-	frames     uint64
+	lastFrame   time.Time
+	nextFrame   time.Time
+	meter       fpsMeter
+	frames      uint64
 	framePeriod time.Duration // per-mode visualizer frame period
 }
 
