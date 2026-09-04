@@ -7,16 +7,17 @@ import (
 )
 
 // Settings row indices — shared between BuildSettingsRows and applySettings.
+// Headers occupy even slots; these indices point to the actual setting rows.
 const (
-	SettingResolution      = 0
-	SettingFilter          = 1
-	SettingPerformanceMode = 2
-	SettingShuffle         = 3
-	SettingRepeat          = 4
-	SettingPresetTimer     = 5
-	SettingTheme           = 6
-	SettingTransparency    = 7
-	SettingBeatSensitivity = 8
+	SettingShuffle         = 1
+	SettingRepeat          = 2
+	SettingPresetTimer     = 3
+	SettingPerformanceMode = 5
+	SettingResolution      = 6
+	SettingFilter          = 7
+	SettingTheme           = 9
+	SettingTransparency    = 10
+	SettingBeatSensitivity = 12
 )
 
 // BuildSettingsRows creates SettingRow entries from the current config.
@@ -134,14 +135,22 @@ func BuildSettingsRows(s config.Settings, winW, winH int, renderScaleExplicit bo
 	}
 
 	return []SettingRow{
-		{Label: "Render resolution", Values: resValues, Index: resIndex},
-		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
-		{Label: "Performance mode", Values: perfValues, Index: perfIndex},
+		// Playback
+		{Header: true, Label: "── Playback ────"},
 		{Label: "Shuffle", Values: shuffleValues, Index: shuffleIndex},
 		{Label: "Repeat", Values: repeatValues, Index: repeatIndex},
 		{Label: "Preset auto-switch", Values: presetValues, Index: presetIndex},
+		// Rendering
+		{Header: true, Label: "── Rendering ───"},
+		{Label: "Performance mode", Values: perfValues, Index: perfIndex},
+		{Label: "Render resolution", Values: resValues, Index: resIndex},
+		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
+		// Appearance
+		{Header: true, Label: "── Appearance ───"},
 		{Label: "Theme", Values: themeValues, Index: themeIndex},
 		{Label: "Transparency", Values: transValues, Index: transIndex},
+		// Audio
+		{Header: true, Label: "── Audio ───────"},
 		{Label: "Beat sensitivity", Values: beatValues, Index: beatIndex},
 	}
 }

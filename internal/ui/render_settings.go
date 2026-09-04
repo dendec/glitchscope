@@ -28,8 +28,12 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 	}
 	for i := o.albumsScroll; i < leftEnd; i++ {
 		row := o.settingsRows[i]
-		isCursor := i == o.settingsCursor && o.panelEntered
-		leftRows = append(leftRows, listRow{text: row.Label, active: isCursor})
+		if row.Header {
+			leftRows = append(leftRows, listRow{text: row.Label, bold: true})
+		} else {
+			isCursor := i == o.settingsCursor && o.panelEntered
+			leftRows = append(leftRows, listRow{text: row.Label, active: isCursor})
+		}
 	}
 	o.rebuildListRows(&o.settingsColL, leftRows, maxTextPx, panelW)
 
@@ -37,14 +41,16 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 	o.marqueeL.invalidate(o)
 	if o.panelEntered && !o.settingsEditing && o.settingsCursor >= o.albumsScroll && o.settingsCursor < leftEnd {
 		row := o.settingsRows[o.settingsCursor]
-		o.rebuildMarqueeLine(&o.marqueeL, row.Label, maxTextPx, true)
+		if !row.Header {
+			o.rebuildMarqueeLine(&o.marqueeL, row.Label, maxTextPx, true)
+		}
 	}
 
 	// Rebuild right column (values) with scroll window.
 	var rightRows []listRow
 	rightTotal := 0
 	rightEnd := 0
-	if o.settingsCursor < len(o.settingsRows) {
+	if o.settingsCursor < len(o.settingsRows) && !o.settingsRows[o.settingsCursor].Header {
 		row := o.settingsRows[o.settingsCursor]
 		rightTotal = len(row.Values)
 		selIdx := row.Index
@@ -72,10 +78,12 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 	o.marqueeR.invalidate(o)
 	if o.panelEntered && o.settingsEditing && o.settingsCursor < len(o.settingsRows) {
 		row := o.settingsRows[o.settingsCursor]
-		selIdx := o.settingsValueCursor
-		if selIdx >= o.tracksScroll && selIdx < rightEnd {
-			mark := "▸ "
-			o.rebuildMarqueeLine(&o.marqueeR, mark+row.Values[selIdx], maxTextPx, true)
+		if !row.Header {
+			selIdx := o.settingsValueCursor
+			if selIdx >= o.tracksScroll && selIdx < rightEnd {
+				mark := "▸ "
+				o.rebuildMarqueeLine(&o.marqueeR, mark+row.Values[selIdx], maxTextPx, true)
+			}
 		}
 	}
 

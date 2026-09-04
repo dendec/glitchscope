@@ -207,9 +207,15 @@ func (o *Overlay) moveCursor(dir int) {
 				o.settingsValueCursor = next
 				o.settingsDirty = true
 			}
-		} else if next := o.settingsCursor + dir; next >= 0 && next < len(o.settingsRows) {
-			o.settingsCursor = next
-			o.settingsDirty = true
+		} else {
+			next := o.settingsCursor + dir
+			for next >= 0 && next < len(o.settingsRows) && o.settingsRows[next].Header {
+				next += dir
+			}
+			if next >= 0 && next < len(o.settingsRows) {
+				o.settingsCursor = next
+				o.settingsDirty = true
+			}
 		}
 		return
 	}

@@ -78,6 +78,7 @@ type SettingRow struct {
 	Label  string
 	Values []string
 	Index  int
+	Header bool // non-selectable group separator, rendered bold
 }
 
 // navCtx selects the navigation model for a stack level.
@@ -389,6 +390,16 @@ func (o *Overlay) SetMusicDir(dir string) {
 
 func (o *Overlay) SetSettingsRows(rows []SettingRow, cursor int) {
 	o.settingsRows = rows
+	// Skip header rows to land on the first selectable setting.
+	for cursor < len(rows) && rows[cursor].Header {
+		cursor++
+	}
+	if cursor >= len(rows) {
+		cursor = 0
+		for cursor < len(rows) && rows[cursor].Header {
+			cursor++
+		}
+	}
 	o.settingsCursor = cursor
 	o.settingsDirty = true
 }
