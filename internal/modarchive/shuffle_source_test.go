@@ -130,9 +130,11 @@ func TestShuffleSourceRandomTrackInDirectory(t *testing.T) {
 	}
 
 	rng := rand.New(rand.NewSource(1))
+	// Use the canonical URL (Locator) — the .idx no longer stores
+	// snapshot records, so loadRecord must reconstruct from source GSA.
 	key := catalog.DirectoryKey{
 		Source:  catalog.SourceModArchive,
-		Locator: entries[0].Name,
+		Locator: entries[0].Locator,
 	}
 	track, err := src.RandomTrackInDirectory(key, rng)
 	if err != nil {
@@ -175,7 +177,7 @@ func TestShuffleSourceDirectoryList(t *testing.T) {
 	entries := src.SortedEntries()
 	key := catalog.DirectoryKey{
 		Source:  catalog.SourceModArchive,
-		Locator: entries[0].Name,
+		Locator: entries[0].Locator,
 	}
 
 	listing, err := src.DirectoryList(key)
@@ -354,9 +356,9 @@ func TestBuildSnapshotCorruptedGSA(t *testing.T) {
 	}
 
 	// buildSnapshotRecords must return an error, not nil.
-	records, err := buildSnapshotRecords(baseDir)
+	records, err := buildSnapshotDirInfos(baseDir)
 	if err == nil {
-		t.Fatalf("expected error for corrupted snapshot, got %d records", len(records))
+		t.Fatalf("expected error for corrupted snapshot, got %d dirs", len(records))
 	}
 }
 
@@ -371,9 +373,9 @@ func TestBuildAddendumCorruptedGSA(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	records, err := buildAddendumRecords(baseDir)
+	records, err := buildAddendumDirInfos(baseDir)
 	if err == nil {
-		t.Fatalf("expected error for corrupted addendum, got %d records", len(records))
+		t.Fatalf("expected error for corrupted addendum, got %d dirs", len(records))
 	}
 }
 
@@ -491,7 +493,7 @@ func TestShuffleIndexFingerprintContentSensitive(t *testing.T) {
 			"http://example.com/dir/": {
 				{Name: "a.mod", URL: "http://example.com/dir/a.mod", Kind: KindFile, Size: 200, CleanName: "a.mod"}, // size changed
 			},
-			},
+		},
 	}
 
 	fp1 := ShuffleIndexFingerprint(baseDir, cat1)
@@ -516,3 +518,196 @@ func TestShuffleSourceNeedsRebuildOnCorruptedIndex(t *testing.T) {
 	}
 }
 
+func TestSnapshotRecordsNotInIDX(t *testing.T) {
+	ResetMemCache()
+	defer ResetMemCache()
+	CloseSnapshotCatalog()
+	defer CloseSnapshotCatalog()
+
+	baseDir := t.TempDir()
+	writeMultiBucketSnapshot(t, baseDir, map[string][]snapshotRecord{
+		"A/A0.zip": {{Name: "alpha.mod", Size: 100, ArchiveOffset: 10, ArchiveEndOffset: 50, CompressedSize: 40}},
+	})
+
+	if err := BuildShuffleIndex(baseDir, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// The .idx GSA should contain only manifest.json — no snapshot records.
+	idxDir, _ := ShuffleIndexDir(baseDir)
+	idxPath := filepath.Join(idxDir, _shuffleIndexFile)
+	gsa, err := archive.Open(idxPath, _shuffleMaxBuckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gsa.Close()
+
+	names := make(map[string]bool)
+	for _, e := range gsa.Entries() {
+		names[e.Name] = true
+	}
+	if !names["manifest.json"] {
+		t.Fatal(".idx missing manifest.json")
+	}
+	if len(names) != 1 {
+		t.Fatalf(".idx has %d entries (want 1 = manifest only), entries: %v", len(names), names)
+	}
+}
+
+func TestOpenShuffleSourceRejectsVersion2(t *testing.T) {
+	baseDir := t.TempDir()
+
+	writeMultiBucketSnapshot(t, baseDir, map[string][]snapshotRecord{
+		"A/A.zip": {{Name: "a.mod", Size: 100, ArchiveOffset: 10, ArchiveEndOffset: 50, CompressedSize: 40}},
+	})
+	if err := BuildShuffleIndex(baseDir, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Overwrite manifest.json with version=2.
+	idxDir, _ := ShuffleIndexDir(baseDir)
+	idxPath := filepath.Join(idxDir, _shuffleIndexFile)
+
+	gsa, err := archive.Open(idxPath, _shuffleMaxBuckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []archive.SourceEntry
+	for _, e := range gsa.Entries() {
+		data, err := gsa.Read(e.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.Name == "manifest.json" {
+			var meta ShuffleIndexMeta
+			if err := json.Unmarshal(data, &meta); err != nil {
+				t.Fatal(err)
+			}
+			meta.Version = 2
+			data, _ = json.Marshal(meta)
+		}
+		entries = append(entries, archive.SourceEntry{Name: e.Name, Data: data})
+	}
+	gsa.Close()
+	if err := archive.Write(idxPath, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	src := OpenShuffleSource(baseDir)
+	if src != nil {
+		src.Close()
+		t.Fatal("expected nil for version=2")
+	}
+}
+
+func TestOpenShuffleSourceRejectsDirectoryCountMismatch(t *testing.T) {
+	baseDir := t.TempDir()
+
+	writeMultiBucketSnapshot(t, baseDir, map[string][]snapshotRecord{
+		"A/A.zip": {{Name: "a.mod", Size: 100, ArchiveOffset: 10, ArchiveEndOffset: 50, CompressedSize: 40}},
+	})
+	if err := BuildShuffleIndex(baseDir, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	idxDir, _ := ShuffleIndexDir(baseDir)
+	idxPath := filepath.Join(idxDir, _shuffleIndexFile)
+
+	gsa, err := archive.Open(idxPath, _shuffleMaxBuckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []archive.SourceEntry
+	for _, e := range gsa.Entries() {
+		data, err := gsa.Read(e.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.Name == "manifest.json" {
+			var meta ShuffleIndexMeta
+			if err := json.Unmarshal(data, &meta); err != nil {
+				t.Fatal(err)
+			}
+			meta.DirectoryCount = 999
+			data, _ = json.Marshal(meta)
+		}
+		entries = append(entries, archive.SourceEntry{Name: e.Name, Data: data})
+	}
+	gsa.Close()
+	if err := archive.Write(idxPath, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	src := OpenShuffleSource(baseDir)
+	if src != nil {
+		src.Close()
+		t.Fatal("expected nil for directory count mismatch")
+	}
+}
+
+func TestOpenShuffleSourceRejectsDuplicateLocator(t *testing.T) {
+	baseDir := t.TempDir()
+
+	writeMultiBucketSnapshot(t, baseDir, map[string][]snapshotRecord{
+		"A/A.zip": {{Name: "a.mod", Size: 100, ArchiveOffset: 10, ArchiveEndOffset: 50, CompressedSize: 40}},
+	})
+	if err := BuildShuffleIndex(baseDir, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	idxDir, _ := ShuffleIndexDir(baseDir)
+	idxPath := filepath.Join(idxDir, _shuffleIndexFile)
+
+	gsa, err := archive.Open(idxPath, _shuffleMaxBuckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []archive.SourceEntry
+	for _, e := range gsa.Entries() {
+		data, err := gsa.Read(e.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.Name == "manifest.json" {
+			var meta ShuffleIndexMeta
+			if err := json.Unmarshal(data, &meta); err != nil {
+				t.Fatal(err)
+			}
+			// Duplicate the first entry with a different name but same locator.
+			if len(meta.Entries) > 0 {
+				dup := meta.Entries[0]
+				dup.Name = "entries/dup.json"
+				meta.Entries = append(meta.Entries, dup)
+				meta.DirectoryCount++
+			}
+			data, _ = json.Marshal(meta)
+		}
+		entries = append(entries, archive.SourceEntry{Name: e.Name, Data: data})
+	}
+	gsa.Close()
+	if err := archive.Write(idxPath, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	src := OpenShuffleSource(baseDir)
+	if src != nil {
+		src.Close()
+		t.Fatal("expected nil for duplicate locator")
+	}
+}
+
+func TestListingVersionContentDependent(t *testing.T) {
+	locator := "http://example.com/dir/"
+	tracks1 := []ShuffleTrackEntry{{Path: "a.mod", Key: "a"}}
+	tracks2 := []ShuffleTrackEntry{{Path: "b.mod", Key: "b"}}
+	v1 := listingVersion(locator, tracks1)
+	v2 := listingVersion(locator, tracks2)
+	if v1 == v2 {
+		t.Fatalf("ListingVersion should change with different tracks: %s", v1)
+	}
+	// Same content → same version.
+	v1b := listingVersion(locator, tracks1)
+	if v1 != v1b {
+		t.Fatalf("ListingVersion not deterministic: %s != %s", v1, v1b)
+	}
+}

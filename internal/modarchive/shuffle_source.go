@@ -16,12 +16,16 @@ import (
 // It reads modarchive.idx (a GSA file) at construction time and
 // provides lazy random selection by reading only the selected
 // directory record — not the full catalog.
+//
+// The .idx contains full records only for cached directories.
+// Snapshot/addendum records are reconstructed from the source GSA
+// on demand and cached in memory.
 type ShuffleSource struct {
 	baseDir        string
 	meta           *ShuffleIndexMeta
 	locatorToEntry map[string]string // canonical URL → GSA entry name (from manifest)
-	gsa            *archive.Archive
-	records        map[string]*ShuffleDirRecord // cache: entry name → record (loaded on demand)
+	gsa            *archive.Archive  // .idx GSA (has cached dir records)
+	records        map[string]*ShuffleDirRecord
 	mu             sync.Mutex
 }
 
@@ -200,8 +204,11 @@ func (s *ShuffleSource) randomTrackFromEntry(
 }
 
 // loadRecord resolves a locator (canonical URL or GSA entry name) to
-// a full directory record, loading from the .idx GSA lazily on first
-// access and caching the result.
+// a full directory record.
+//
+// For cached directories: reads from the .idx GSA (lazy, cached).
+// For snapshot/addendum: reconstructs from the source GSA on demand
+// and caches the result.
 func (s *ShuffleSource) loadRecord(locator string) (*ShuffleDirRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -215,21 +222,93 @@ func (s *ShuffleSource) loadRecord(locator string) (*ShuffleDirRecord, error) {
 	if r, ok := s.records[entryName]; ok {
 		return r, nil
 	}
-	if s.gsa == nil {
-		return nil, fmt.Errorf("modarchive: index not open")
+
+	// Determine the source: cached dir (in .idx) vs snapshot/addendum.
+	isSnapAdd := isSnapshotOrAddendumLocator(entryName)
+	if !isSnapAdd {
+		// Also check the locator itself — caller may pass entry name.
+		isSnapAdd = isSnapshotOrAddendumLocator(locator)
 	}
 
-	data, err := s.gsa.Read(entryName)
+	var record *ShuffleDirRecord
+	if isSnapAdd {
+		// Resolve the canonical URL and bucket entry name.
+		canonicalURL := locator
+		if isSnapshotOrAddendumLocator(locator) {
+			canonicalURL = locator
+		} else {
+			// entryName is a GSA record name, need canonical URL.
+			// Look it up from the manifest.
+			for _, e := range s.meta.Entries {
+				if e.Name == entryName {
+					canonicalURL = e.Locator
+					break
+				}
+			}
+		}
+		var err error
+		record, err = s.loadSnapshotRecord(canonicalURL)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Cached directory: read from .idx GSA.
+		if s.gsa == nil {
+			return nil, fmt.Errorf("modarchive: index not open")
+		}
+		data, err := s.gsa.Read(entryName)
+		if err != nil {
+			return nil, fmt.Errorf("modarchive: read record %s: %w", entryName, err)
+		}
+		record = &ShuffleDirRecord{}
+		if err := json.Unmarshal(data, record); err != nil {
+			return nil, fmt.Errorf("modarchive: decode record %s: %w", entryName, err)
+		}
+	}
+
+	s.records[entryName] = record
+	return record, nil
+}
+
+// loadSnapshotRecord reconstructs a ShuffleDirRecord from the snapshot
+// or addendum source GSA. The locator must be a canonical URL.
+func (s *ShuffleSource) loadSnapshotRecord(locator string) (*ShuffleDirRecord, error) {
+	gsaPath := sourceGSAPath(s.baseDir, locator)
+	gsa, err := openGSA(gsaPath, _shuffleMaxBuckets)
 	if err != nil {
-		return nil, fmt.Errorf("modarchive: read record %s: %w", entryName, err)
+		return nil, fmt.Errorf("modarchive: open source GSA: %w", err)
+	}
+	if gsa == nil {
+		return nil, fmt.Errorf("modarchive: source GSA not found for %q", locator)
+	}
+	defer gsa.Close()
+
+	entryName := bucketEntryName(locator)
+	if entryName == "" {
+		return nil, fmt.Errorf("modarchive: cannot extract bucket name from %q", locator)
 	}
 
-	var record ShuffleDirRecord
-	if err := json.Unmarshal(data, &record); err != nil {
-		return nil, fmt.Errorf("modarchive: decode record %s: %w", entryName, err)
+	data, err := gsa.Read(entryName)
+	if err != nil {
+		return nil, fmt.Errorf("modarchive: read bucket %s: %w", entryName, err)
 	}
-	s.records[entryName] = &record
-	return &record, nil
+	var snapRecords []snapshotRecord
+	if err := json.Unmarshal(data, &snapRecords); err != nil {
+		return nil, fmt.Errorf("modarchive: decode bucket %s: %w", entryName, err)
+	}
+
+	tracks := snapshotRecordTracks(locator, snapRecords)
+	if len(tracks) == 0 {
+		return nil, fmt.Errorf("modarchive: bucket %q has no supported tracks", entryName)
+	}
+
+	return &ShuffleDirRecord{
+		Locator:     locator,
+		DisplayName: AlbumLabel(locator),
+		TrackCount:  uint64(len(tracks)),
+		Version:     listingVersion(locator, tracks),
+		Tracks:      tracks,
+	}, nil
 }
 
 // Close releases the underlying GSA archive.

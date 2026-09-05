@@ -29,8 +29,8 @@ type ManifestMeta struct {
 
 // ManifestEntry describes one record inside the .idx GSA file.
 type ManifestEntry struct {
-	Name           string `json:"name"`           // GSA record path, e.g. "entries/<hash>.json"
-	Locator        string `json:"locator"`         // canonical URL or local path for this directory
+	Name           string `json:"name"`    // GSA record path, e.g. "entries/<hash>.json"
+	Locator        string `json:"locator"` // canonical URL or local path for this directory
 	TrackCount     uint64 `json:"track_count"`
 	DirectoryCount uint64 `json:"directory_count,omitempty"`
 }
