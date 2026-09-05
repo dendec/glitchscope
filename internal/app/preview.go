@@ -62,6 +62,7 @@ type previewRenderer struct {
 	pm        *projectm.Handle
 	tex       C.GLuint // thumbnail capture texture
 	w, h      int      // current thumbnail render dimensions
+	thumbW, thumbH int  // actual thumb texture dimensions (may differ from w,h)
 	queue     []previewJob
 	active    *previewJob
 	nextFrame time.Time
@@ -101,6 +102,16 @@ func (r *previewRenderer) isReady() bool {
 // RenderFPS returns the measured render FPS of the preview instance.
 func (r *previewRenderer) RenderFPS() float64 {
 	return r.meter.Average()
+}
+
+// SetWindowSize updates the preview projectM render dimensions without
+// touching the thumbnail capture texture. Use before RenderFrame() when
+// the preview renders at full window size (presets page background).
+func (r *previewRenderer) SetWindowSize(w, h int) {
+	if !r.isReady() || w <= 0 || h <= 0 {
+		return
+	}
+	r.pm.SetWindowSize(w, h)
 }
 
 // Resize recreates the capture texture at the given dimensions.
@@ -233,15 +244,15 @@ func (r *previewRenderer) CaptureThumb(tW, tH int) {
 		return
 	}
 	// Recreate thumb texture if dimensions changed.
-	if tW != r.w || tH != r.h {
+	if tW != r.thumbW || tH != r.thumbH {
 		if r.tex != 0 {
 			C.glDeleteTextures(1, &r.tex)
 			r.tex = 0
 		}
 		C.prCreateThumbTexture(&r.tex, C.GLsizei(tW), C.GLsizei(tH))
-		r.w, r.h = tW, tH
+		r.thumbW, r.thumbH = tW, tH
 	}
-	C.prCaptureThumb(r.tex, C.GLsizei(r.w), C.GLsizei(r.h))
+	C.prCaptureThumb(r.tex, C.GLsizei(r.thumbW), C.GLsizei(r.thumbH))
 	if r.active != nil {
 		r.setResult(r.active.key, uint32(r.tex))
 	}
