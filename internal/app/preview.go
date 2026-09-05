@@ -54,8 +54,10 @@ type previewJob struct {
 	data string // .milk content
 }
 
-// previewRenderer manages a dedicated projectM instance for thumbnail rendering.
-// All methods must be called on the main GL thread.
+// previewRenderer manages a dedicated projectM instance for preset preview.
+// On the presets page the preview renders into the full window (as background)
+// and simultaneously captures a corner into a thumbnail texture for the
+// right-panel preview. All methods must be called on the main GL thread.
 type previewRenderer struct {
 	pm        *projectm.Handle
 	tex       C.GLuint // thumbnail capture texture
@@ -156,10 +158,14 @@ func (r *previewRenderer) setResult(key string, tex uint32) {
 
 // ProcessNext runs one preview step. Returns true if work was done.
 //
+// When fullScreen is true the preview renders at the current window size
+// (the result stays on screen as background). When false it renders into
+// the thumbnail-sized capture texture for the right-panel preview.
+//
 // The job stays active during animation so the thumbnail keeps playing.
 // A new Enqueue replaces the current job.
-func (r *previewRenderer) ProcessNext() bool {
-	if !r.isReady() || r.w == 0 || r.h == 0 {
+func (r *previewRenderer) ProcessNext(fullScreen bool) bool {
+	if !r.isReady() {
 		return false
 	}
 
@@ -182,20 +188,47 @@ func (r *previewRenderer) ProcessNext() bool {
 	}
 	r.nextFrame = now.Add(previewFramePeriod)
 
-	// projectM always renders its final composite into framebuffer 0. Copy the
-	// rendered corner into the thumbnail texture, matching RenderTarget.Capture.
-	C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
 	started := time.Now()
-	r.pm.RenderFrame()
+	if fullScreen {
+		// Render at full window size — result stays on screen as background.
+		r.pm.RenderFrame()
+	} else {
+		// Render at thumbnail size and capture into the thumb texture.
+		C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
+		r.pm.RenderFrame()
+		C.prCaptureThumb(r.tex, C.GLsizei(r.w), C.GLsizei(r.h))
+		r.setResult(r.active.key, uint32(r.tex))
+	}
 	r.meter.AddDuration(time.Since(started))
-	C.prCaptureThumb(r.tex, C.GLsizei(r.w), C.GLsizei(r.h))
-	r.setResult(r.active.key, uint32(r.tex))
 
 	return true
 }
 
 func previewFrameDue(now, nextFrame time.Time) bool {
 	return nextFrame.IsZero() || !now.Before(nextFrame)
+}
+
+// CaptureThumb copies the top-left corner of framebuffer 0 into the
+// thumbnail texture at the given dimensions. Called after a full-screen
+// ProcessNext(true) so the panel can display a mini version of the
+// background.
+func (r *previewRenderer) CaptureThumb(tW, tH int) {
+	if !r.isReady() || tW <= 0 || tH <= 0 {
+		return
+	}
+	// Recreate thumb texture if dimensions changed.
+	if tW != r.w || tH != r.h {
+		if r.tex != 0 {
+			C.glDeleteTextures(1, &r.tex)
+			r.tex = 0
+		}
+		C.prCreateThumbTexture(&r.tex, C.GLsizei(tW), C.GLsizei(tH))
+		r.w, r.h = tW, tH
+	}
+	C.prCaptureThumb(r.tex, C.GLsizei(r.w), C.GLsizei(r.h))
+	if r.active != nil {
+		r.setResult(r.active.key, uint32(r.tex))
+	}
 }
 
 // Flush cancels all pending jobs and clears the result.

@@ -301,32 +301,31 @@ func (a *App) updateFramePlayback(now time.Time) {
 }
 
 func (a *App) renderFrame(now time.Time, w, h int) {
-	// Preview resize (shared by both modes).
-	if a.preview != nil {
-		tW, tH := ui.PresetPreviewSize(w, h)
-		a.preview.Resize(tW, tH)
-	}
-
 	if a.onPresetsPage {
-		// Presets page: main viz stopped, all resources to preview.
-		// Skip rt.Capture/BlitToScreen — they would overwrite the preview
-		// with the black frame captured before preview rendered.
-		// Feed audio to preview only (skip main pm).
+		// Presets page: preview renders at full window size as background.
+		// The same frame is captured into a thumbnail texture for the panel.
 		if wave := a.readAudio(); len(wave) > 0 {
 			a.previewFeedPCM(wave)
 		} else if a.preview != nil && a.preview.isReady() {
 			a.previewFeedPCM(a.testSignal())
 		}
 
-		// Keep preview rendering in step with the 60 Hz audio snapshots. Running
-		// several frames here would repeatedly analyze the same waveform data.
-		if a.preview != nil {
-			a.preview.ProcessNext()
+		if a.preview != nil && a.preview.isReady() {
+			// Resize preview to full window for background rendering.
+			a.preview.Resize(w, h)
+			// Render one frame at full window size (stays on screen).
+			a.preview.ProcessNext(true)
+			// Capture the top-left corner into the thumbnail texture.
+			tW, tH := ui.PresetPreviewSize(w, h)
+			a.preview.CaptureThumb(tW, tH)
 		}
-		// projectM renders previews into framebuffer 0. The captured corner
-		// must not remain visible behind the translucent overlay.
-		ClearFB(w, h)
 	} else {
+		// Normal mode: restore preview to thumbnail size for future use.
+		if a.preview != nil {
+			tW, tH := ui.PresetPreviewSize(w, h)
+			a.preview.Resize(tW, tH)
+		}
+
 		// Schedule projectM independently from the 60 Hz input/UI loop. GL
 		// work remains on this thread; between visualizer frames, keep
 		// presenting the last captured texture.
