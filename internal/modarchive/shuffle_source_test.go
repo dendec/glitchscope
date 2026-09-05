@@ -340,3 +340,179 @@ func TestShuffleSourceFingerprintDeterministic(t *testing.T) {
 		t.Fatalf("fingerprint not deterministic: %s != %s", fp1.SourceHash, fp2.SourceHash)
 	}
 }
+
+func TestBuildSnapshotCorruptedGSA(t *testing.T) {
+	baseDir := t.TempDir()
+
+	// Write a corrupted snapshot GSA (bad magic).
+	gsaDir := filepath.Dir(SnapshotCatalogPath(baseDir))
+	if err := os.MkdirAll(gsaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(SnapshotCatalogPath(baseDir), []byte("not a gsa file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// buildSnapshotRecords must return an error, not nil.
+	records, err := buildSnapshotRecords(baseDir)
+	if err == nil {
+		t.Fatalf("expected error for corrupted snapshot, got %d records", len(records))
+	}
+}
+
+func TestBuildAddendumCorruptedGSA(t *testing.T) {
+	baseDir := t.TempDir()
+
+	gsaDir := filepath.Dir(AddendumCatalogPath(baseDir))
+	if err := os.MkdirAll(gsaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(AddendumCatalogPath(baseDir), []byte("bad"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	records, err := buildAddendumRecords(baseDir)
+	if err == nil {
+		t.Fatalf("expected error for corrupted addendum, got %d records", len(records))
+	}
+}
+
+func TestOpenShuffleSourceRejectsCorruptedManifest(t *testing.T) {
+	baseDir := t.TempDir()
+
+	// Build a valid index first.
+	writeMultiBucketSnapshot(t, baseDir, map[string][]snapshotRecord{
+		"A/A.zip": {{Name: "a.mod", Size: 100, ArchiveOffset: 10, ArchiveEndOffset: 50, CompressedSize: 40}},
+	})
+	if err := BuildShuffleIndex(baseDir, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Overwrite manifest.json with invalid schema.
+	idxDir, _ := ShuffleIndexDir(baseDir)
+	idxPath := filepath.Join(idxDir, _shuffleIndexFile)
+
+	// Read the existing index, replace manifest, rewrite.
+	gsa, err := archive.Open(idxPath, _shuffleMaxBuckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []archive.SourceEntry
+	for _, e := range gsa.Entries() {
+		data, err := gsa.Read(e.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.Name == "manifest.json" {
+			var meta ShuffleIndexMeta
+			if err := json.Unmarshal(data, &meta); err != nil {
+				t.Fatal(err)
+			}
+			meta.Schema = "wrong-schema"
+			data, _ = json.Marshal(meta)
+		}
+		entries = append(entries, archive.SourceEntry{Name: e.Name, Data: data})
+	}
+	gsa.Close()
+	if err := archive.Write(idxPath, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	// OpenShuffleSource should reject it.
+	src := OpenShuffleSource(baseDir)
+	if src != nil {
+		src.Close()
+		t.Fatal("expected nil for corrupted manifest schema")
+	}
+}
+
+func TestOpenShuffleSourceRejectsBadVersion(t *testing.T) {
+	baseDir := t.TempDir()
+
+	writeMultiBucketSnapshot(t, baseDir, map[string][]snapshotRecord{
+		"A/A.zip": {{Name: "a.mod", Size: 100, ArchiveOffset: 10, ArchiveEndOffset: 50, CompressedSize: 40}},
+	})
+	if err := BuildShuffleIndex(baseDir, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Overwrite manifest.json with version=0.
+	idxDir, _ := ShuffleIndexDir(baseDir)
+	idxPath := filepath.Join(idxDir, _shuffleIndexFile)
+
+	gsa, err := archive.Open(idxPath, _shuffleMaxBuckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []archive.SourceEntry
+	for _, e := range gsa.Entries() {
+		data, err := gsa.Read(e.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.Name == "manifest.json" {
+			var meta ShuffleIndexMeta
+			if err := json.Unmarshal(data, &meta); err != nil {
+				t.Fatal(err)
+			}
+			meta.Version = 0
+			data, _ = json.Marshal(meta)
+		}
+		entries = append(entries, archive.SourceEntry{Name: e.Name, Data: data})
+	}
+	gsa.Close()
+	if err := archive.Write(idxPath, entries); err != nil {
+		t.Fatal(err)
+	}
+
+	src := OpenShuffleSource(baseDir)
+	if src != nil {
+		src.Close()
+		t.Fatal("expected nil for version=0")
+	}
+}
+
+func TestShuffleIndexFingerprintContentSensitive(t *testing.T) {
+	ResetMemCache()
+	defer ResetMemCache()
+	CloseSnapshotCatalog()
+	defer CloseSnapshotCatalog()
+
+	baseDir := t.TempDir()
+	cat1 := &catalogData{
+		Directories: map[string][]DirItem{
+			"http://example.com/dir/": {
+				{Name: "a.mod", URL: "http://example.com/dir/a.mod", Kind: KindFile, Size: 100, CleanName: "a.mod"},
+			},
+		},
+	}
+	cat2 := &catalogData{
+		Directories: map[string][]DirItem{
+			"http://example.com/dir/": {
+				{Name: "a.mod", URL: "http://example.com/dir/a.mod", Kind: KindFile, Size: 200, CleanName: "a.mod"}, // size changed
+			},
+			},
+	}
+
+	fp1 := ShuffleIndexFingerprint(baseDir, cat1)
+	fp2 := ShuffleIndexFingerprint(baseDir, cat2)
+	if fp1.SourceHash == fp2.SourceHash {
+		t.Fatalf("fingerprint should change when item size changes: %s", fp1.SourceHash)
+	}
+}
+
+func TestShuffleSourceNeedsRebuildOnCorruptedIndex(t *testing.T) {
+	baseDir := t.TempDir()
+
+	// Create a corrupted index file.
+	idxDir, _ := ShuffleIndexDir(baseDir)
+	idxPath := filepath.Join(idxDir, _shuffleIndexFile)
+	if err := os.WriteFile(idxPath, []byte("not a valid gsa"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !ShuffleSourceNeedsRebuild(baseDir, nil) {
+		t.Fatal("expected NeedsRebuild=true for corrupted index")
+	}
+}
+

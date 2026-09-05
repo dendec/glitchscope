@@ -19,13 +19,14 @@ import (
 type ShuffleSource struct {
 	baseDir        string
 	meta           *ShuffleIndexMeta
-	records        map[string]*ShuffleDirRecord // entry name → record
-	locatorToEntry map[string]string            // canonical URL → entry name
+	locatorToEntry map[string]string // canonical URL → GSA entry name (from manifest)
 	gsa            *archive.Archive
+	records        map[string]*ShuffleDirRecord // cache: entry name → record (loaded on demand)
 	mu             sync.Mutex
 }
 
-// OpenShuffleSource opens modarchive.idx and loads the manifest.
+// OpenShuffleSource opens modarchive.idx and loads only the manifest.
+// Full directory records are loaded lazily on first access.
 // Returns nil if the index does not exist or is invalid.
 func OpenShuffleSource(baseDir string) *ShuffleSource {
 	idxPath := shuffleIndexPath(baseDir)
@@ -45,36 +46,24 @@ func OpenShuffleSource(baseDir string) *ShuffleSource {
 		_ = gsa.Close()
 		return nil
 	}
-	if meta.Schema != _shuffleSchema || meta.Source != catalog.SourceModArchive {
+	if err := validateShuffleManifest(&meta); err != nil {
 		_ = gsa.Close()
 		return nil
 	}
 
-	src := &ShuffleSource{
+	// Build reverse map from manifest — no record reads needed.
+	locatorToEntry := make(map[string]string, len(meta.Entries))
+	for _, entry := range meta.Entries {
+		locatorToEntry[entry.Locator] = entry.Name
+	}
+
+	return &ShuffleSource{
 		baseDir:        baseDir,
 		meta:           &meta,
-		records:        make(map[string]*ShuffleDirRecord, len(meta.Entries)),
-		locatorToEntry: make(map[string]string, len(meta.Entries)),
+		locatorToEntry: locatorToEntry,
 		gsa:            gsa,
+		records:        make(map[string]*ShuffleDirRecord),
 	}
-
-	// Build reverse map: canonical URL → GSA entry name.
-	for _, entry := range meta.Entries {
-		data, err := gsa.Read(entry.Name)
-		if err != nil {
-			gsa.Close()
-			return nil
-		}
-		var record ShuffleDirRecord
-		if err := json.Unmarshal(data, &record); err != nil {
-			gsa.Close()
-			return nil
-		}
-		src.records[entry.Name] = &record
-		src.locatorToEntry[record.Locator] = entry.Name
-	}
-
-	return src
 }
 
 func (s *ShuffleSource) Source() catalog.SourceKind { return catalog.SourceModArchive }
@@ -100,6 +89,22 @@ func (s *ShuffleSource) Fingerprint() catalog.Fingerprint {
 	return s.meta.Fingerprint
 }
 
+// rejectSampleUint64 returns a uniform random value in [0, max) using
+// rejection sampling to avoid modulo bias. Returns 0 for max=0.
+func rejectSampleUint64(rng *rand.Rand, max uint64) uint64 {
+	if max == 0 {
+		return 0
+	}
+	// Compute the largest multiple of max that fits in uint64.
+	limit := ^uint64(0) - (^uint64(0) % max) //nolint:gocritic // clear intent
+	for {
+		v := rng.Uint64()
+		if v < limit {
+			return v % max
+		}
+	}
+}
+
 // RandomTrack selects one track from all ModArchive directories using
 // track-weighted directory selection, then uniform selection within
 // the chosen directory.
@@ -108,30 +113,22 @@ func (s *ShuffleSource) RandomTrack(rng *rand.Rand) (catalog.ShuffleTrack, error
 		return catalog.ShuffleTrack{}, fmt.Errorf("modarchive: no tracks")
 	}
 
-	// Track-weighted directory selection.
-	pick := rng.Uint64() % s.meta.TrackCount
+	// Track-weighted directory selection with rejection sampling.
+	pick := rejectSampleUint64(rng, s.meta.TrackCount)
 	var cumulative uint64
 	for _, entry := range s.meta.Entries {
 		cumulative += entry.TrackCount
 		if pick < cumulative {
-			dirKey := catalog.DirectoryKey{
-				Source:  catalog.SourceModArchive,
-				Locator: entry.Name,
-			}
-			return s.randomTrackFromEntry(dirKey, &entry, rng)
+			return s.randomTrackFromEntry(entry, rng)
 		}
 	}
 	// Fallback: last entry.
 	last := s.meta.Entries[len(s.meta.Entries)-1]
-	dirKey := catalog.DirectoryKey{
-		Source:  catalog.SourceModArchive,
-		Locator: last.Name,
-	}
-	return s.randomTrackFromEntry(dirKey, &last, rng)
+	return s.randomTrackFromEntry(last, rng)
 }
 
 // RandomTrackInDirectory selects one track uniformly within a specific
-// directory. The DirectoryKey.Locator is the GSA record name (entry name).
+// directory. The DirectoryKey.Locator is the canonical URL.
 func (s *ShuffleSource) RandomTrackInDirectory(key catalog.DirectoryKey, rng *rand.Rand) (catalog.ShuffleTrack, error) {
 	record, err := s.loadRecord(key.Locator)
 	if err != nil {
@@ -178,16 +175,15 @@ func (s *ShuffleSource) DirectoryList(key catalog.DirectoryKey) (catalog.Directo
 }
 
 func (s *ShuffleSource) randomTrackFromEntry(
-	dirKey catalog.DirectoryKey,
-	entry *catalog.ManifestEntry,
+	entry catalog.ManifestEntry,
 	rng *rand.Rand,
 ) (catalog.ShuffleTrack, error) {
-	record, err := s.loadRecord(entry.Name)
+	record, err := s.loadRecord(entry.Locator)
 	if err != nil {
 		return catalog.ShuffleTrack{}, err
 	}
 	if len(record.Tracks) == 0 {
-		return catalog.ShuffleTrack{}, fmt.Errorf("modarchive: directory %q has no tracks", entry.Name)
+		return catalog.ShuffleTrack{}, fmt.Errorf("modarchive: directory %q has no tracks", entry.Locator)
 	}
 
 	idx := rng.Intn(len(record.Tracks))
@@ -203,6 +199,9 @@ func (s *ShuffleSource) randomTrackFromEntry(
 	}, nil
 }
 
+// loadRecord resolves a locator (canonical URL or GSA entry name) to
+// a full directory record, loading from the .idx GSA lazily on first
+// access and caching the result.
 func (s *ShuffleSource) loadRecord(locator string) (*ShuffleDirRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -245,7 +244,9 @@ func (s *ShuffleSource) Close() error {
 	return nil
 }
 
-// NeedsRebuild reports whether the index is missing, stale, or incompatible.
+// ShuffleSourceNeedsRebuild reports whether the index is missing, stale,
+// or incompatible. It opens the index and compares the fingerprint
+// without loading any directory records.
 func ShuffleSourceNeedsRebuild(baseDir string, cat *catalogData) bool {
 	idxPath := shuffleIndexPath(baseDir)
 	info, err := os.Stat(idxPath)
@@ -256,7 +257,6 @@ func ShuffleSourceNeedsRebuild(baseDir string, cat *catalogData) bool {
 		return true
 	}
 
-	// Quick fingerprint check: open and compare.
 	src := OpenShuffleSource(baseDir)
 	if src == nil {
 		return true
