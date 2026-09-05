@@ -23,12 +23,10 @@ const (
 	_shuffleIndexFile = "modarchive.idx"
 	// _snapshotMaxEntries is the limit for source GSA files (snapshot/
 	// addendum). These have a fixed number of buckets determined by the
-	// archive range. 2048 matches the existing snapshot catalog limit.
-	_snapshotMaxEntries uint32 = 2048
+	// archive range.
+	_snapshotMaxEntries uint32 = 32_000
 	// _idxMaxEntries is the limit for the modarchive.idx file itself.
 	// The .idx stores one entry per cached directory plus the manifest.
-	// 256K entries allows ~256K cached directories (well beyond any
-	// real ModArchive collection) while staying within uint32.
 	_idxMaxEntries uint32 = 256_000
 	_shuffleSchema        = "modarchive-shuffle-v1"
 )
@@ -71,6 +69,18 @@ type ShuffleIndexMeta struct {
 	CreatedAt      time.Time               `json:"created_at"`
 }
 
+// estimateRecordBytes returns the approximate heap size of a
+// ShuffleDirRecord in bytes. Used for memory-bounded LRU eviction.
+func estimateRecordBytes(r *ShuffleDirRecord) int64 {
+	n := int64(80) // struct overhead + Locator + DisplayName + Version headers
+	n += int64(len(r.Locator) + len(r.DisplayName) + len(r.Version))
+	n += int64(len(r.Tracks)) * 220 // per-track: ~6 strings + numeric fields
+	for _, t := range r.Tracks {
+		n += int64(len(t.Path) + len(t.Name) + len(t.Key))
+	}
+	return n
+}
+
 // listingVersion computes a content-based ListingVersion from a locator
 // and its sorted track entries. It changes when tracks are added,
 // removed, reordered, or when any track field changes.
@@ -92,7 +102,6 @@ func listingVersion(locator string, tracks []ShuffleTrackEntry) catalog.ListingV
 func dirContentHash(dirURL string, items []DirItem) string {
 	h := sha256.New()
 	fmt.Fprintf(h, "dir:%s\n", dirURL)
-	// Sort by name for determinism.
 	sorted := make([]DirItem, len(items))
 	copy(sorted, items)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -107,40 +116,28 @@ func dirContentHash(dirURL string, items []DirItem) string {
 	return hex.EncodeToString(h.Sum(nil)[:16])
 }
 
-// gsaContentHash reads a GSA file and hashes size + first 4 KiB of
-// content. This detects same-size file replacements that a pure
-// mtime/size fingerprint would miss, at the cost of one extra read.
-// The collision probability is bounded: same size, same first 4 KiB,
-// but different full content → ~2^{-32} for the partial hash and
-// ~2^{-16} for size match (practical: ~2^{-48}).
+// gsaContentHash reads the entire GSA file and hashes its full content.
+// This detects any byte-level change including same-size replacements,
+// unlike a prefix-only hash which would miss tail modifications.
 func gsaContentHash(path string) string {
 	h := sha256.New()
-	info, err := os.Stat(path)
-	if err != nil {
-		return ""
-	}
-	fmt.Fprintf(h, "size:%d\n", info.Size())
 	f, err := os.Open(path)
 	if err != nil {
 		return ""
 	}
 	defer f.Close()
-	buf := make([]byte, 4096)
-	n, _ := io.ReadAtLeast(f, buf, len(buf))
-	if n > 0 {
-		fmt.Fprintf(h, "head:%x\n", buf[:n])
+	if _, err := io.Copy(h, f); err != nil {
+		return ""
 	}
 	return hex.EncodeToString(h.Sum(nil)[:16])
 }
 
 // ShuffleIndexFingerprint computes a fingerprint from the snapshot GSA files
 // and the catalog data. It detects changes that require an index rebuild.
-// Uses GSA content hash (size + first 4 KiB) instead of pure mtime to
-// detect same-size file replacements.
+// Uses full content hash for GSA files to detect any byte-level change.
 func ShuffleIndexFingerprint(baseDir string, cat *catalogData) catalog.Fingerprint {
 	h := sha256.New()
 
-	// GSA file content hashes.
 	for _, p := range []string{
 		SnapshotCatalogPath(baseDir),
 		AddendumCatalogPath(baseDir),
@@ -150,7 +147,6 @@ func ShuffleIndexFingerprint(baseDir string, cat *catalogData) catalog.Fingerpri
 		}
 	}
 
-	// Cached directory content hashes (sorted for determinism).
 	if cat != nil {
 		urls := make([]string, 0, len(cat.Directories))
 		for u := range cat.Directories {
@@ -194,10 +190,6 @@ type dirSummary struct {
 //
 // Snapshot/addendum records are NOT duplicated; they are reconstructed
 // from the source GSA on demand by loadSnapshotRecord.
-//
-// Builder memory: snapshot/addendum directories contribute only compact
-// dirSummary (locator + count), not full track slices. Cached dirs do
-// carry tracks since they have no other source.
 func BuildShuffleIndex(baseDir string, cat *catalogData) error {
 	dir, err := ShuffleIndexDir(baseDir)
 	if err != nil {
@@ -206,17 +198,16 @@ func BuildShuffleIndex(baseDir string, cat *catalogData) error {
 
 	fp := ShuffleIndexFingerprint(baseDir, cat)
 
-	// Collect summaries — not full dirInfo — to limit builder memory.
 	var allDirs []dirSummary
 
-	// 1. Snapshot buckets from GSA — metadata only, no .idx record.
+	// 1. Snapshot buckets from GSA — stream summaries, no track accumulation.
 	snapshotSummaries, err := buildSnapshotDirSummaries(baseDir)
 	if err != nil {
 		return fmt.Errorf("snapshot records: %w", err)
 	}
 	allDirs = append(allDirs, snapshotSummaries...)
 
-	// 2. Addendum buckets from GSA — metadata only.
+	// 2. Addendum buckets from GSA — same streaming pattern.
 	addendumSummaries, err := buildAddendumDirSummaries(baseDir)
 	if err != nil {
 		return fmt.Errorf("addendum records: %w", err)
@@ -228,7 +219,6 @@ func BuildShuffleIndex(baseDir string, cat *catalogData) error {
 	if err != nil {
 		return fmt.Errorf("cached directories: %w", err)
 	}
-	// Merge cached entries into allDirs for the manifest.
 	for _, ce := range cachedEntries {
 		allDirs = append(allDirs, dirSummary{
 			locator:    ce.locator,
@@ -238,12 +228,16 @@ func BuildShuffleIndex(baseDir string, cat *catalogData) error {
 		})
 	}
 
-	// Sort by locator for deterministic output.
+	// Guard against exceeding index capacity.
+	if uint64(len(allDirs))+1 > uint64(_idxMaxEntries) {
+		return fmt.Errorf("modarchive: too many directories %d (max %d cached + manifest)",
+			len(allDirs), _idxMaxEntries-1)
+	}
+
 	sort.Slice(allDirs, func(i, j int) bool {
 		return allDirs[i].locator < allDirs[j].locator
 	})
 
-	// Build manifest with compact entries.
 	var totalTracks uint64
 	entries := make([]catalog.ManifestEntry, len(allDirs))
 	for i, d := range allDirs {
@@ -266,7 +260,6 @@ func BuildShuffleIndex(baseDir string, cat *catalogData) error {
 		CreatedAt:      time.Now(),
 	}
 
-	// Build GSA entries: manifest + cached dir records only.
 	gsaEntries := make([]archive.SourceEntry, 0, len(cachedRecordEntries)+1)
 	manifestData, err := json.Marshal(meta)
 	if err != nil {
@@ -306,9 +299,8 @@ func BuildShuffleIndex(baseDir string, cat *catalogData) error {
 }
 
 // buildCachedDirEntries processes all cached directories from the catalog.
-// It returns both manifest summaries and GSA record entries.
-// Only supported files are included (verified via supportedArchiveEntry).
-func buildCachedDirEntries(cat *catalogData) (summaries []dirSummary, records []archive.SourceEntry, err error) {
+// Returns manifest summaries and serialized GSA record entries.
+func buildCachedDirEntries(cat *catalogData) ([]dirSummary, []archive.SourceEntry, error) {
 	if cat == nil {
 		return nil, nil, nil
 	}
@@ -323,13 +315,12 @@ func buildCachedDirEntries(cat *catalogData) (summaries []dirSummary, records []
 		}
 		cached = append(cached, rawEntry{dirURL: dirURL, items: items})
 	}
-	// Sort for deterministic output.
 	sort.Slice(cached, func(i, j int) bool {
 		return cached[i].dirURL < cached[j].dirURL
 	})
 
-	summaries = make([]dirSummary, 0, len(cached))
-	records = make([]archive.SourceEntry, 0, len(cached))
+	summaries := make([]dirSummary, 0, len(cached))
+	records := make([]archive.SourceEntry, 0, len(cached))
 
 	for _, ce := range cached {
 		tracks := cachedDirTracks(ce.dirURL, ce.items)
@@ -374,16 +365,11 @@ func openGSA(path string, maxEntries uint32) (*archive.Archive, error) {
 	return gsa, nil
 }
 
-// dirSummaryRaw is an intermediate type for snapshot/addendum dir summaries
-// that also carries the track slice needed for version computation.
-type dirSummaryRaw struct {
-	summary dirSummary
-	tracks  []ShuffleTrackEntry
-}
-
-// buildSnapshotDirSummaries reads snapshot GSA and returns compact summaries.
-// Track data is freed after version computation — only locator + count
-// survive into the returned dirSummary slice.
+// buildSnapshotDirSummaries reads snapshot GSA and streams compact
+// summaries. Each bucket is processed immediately: tracks are counted,
+// the summary is emitted, and the track slice is released before the
+// next bucket is read. Peak memory ≈ O(largest_bucket) rather than
+// O(total_snapshot_tracks).
 func buildSnapshotDirSummaries(baseDir string) ([]dirSummary, error) {
 	gsa, err := openGSA(SnapshotCatalogPath(baseDir), _snapshotMaxEntries)
 	if err != nil {
@@ -394,7 +380,7 @@ func buildSnapshotDirSummaries(baseDir string) ([]dirSummary, error) {
 	}
 	defer gsa.Close()
 
-	var raws []dirSummaryRaw
+	var summaries []dirSummary
 	for _, entry := range gsa.Entries() {
 		data, err := gsa.Read(entry.Name)
 		if err != nil {
@@ -404,30 +390,22 @@ func buildSnapshotDirSummaries(baseDir string) ([]dirSummary, error) {
 		if err := json.Unmarshal(data, &snapRecords); err != nil {
 			return nil, fmt.Errorf("decode bucket %s: %w", entry.Name, err)
 		}
+
 		bucketURL := BaseURL + SnapshotDir + "/" + entry.Name
 		tracks := snapshotRecordTracks(bucketURL, snapRecords)
-		if len(tracks) > 0 {
-			raws = append(raws, dirSummaryRaw{
-				summary: dirSummary{
-					locator:    bucketURL,
-					trackCount: uint64(len(tracks)),
-				},
-				tracks: tracks,
+		count := uint64(len(tracks))
+
+		if count > 0 {
+			summaries = append(summaries, dirSummary{
+				locator:    bucketURL,
+				trackCount: count,
 			})
 		}
-	}
-
-	// Build compact summaries — release track data.
-	summaries := make([]dirSummary, len(raws))
-	for i, r := range raws {
-		summaries[i] = r.summary
-		// Allow GC to reclaim track slices.
-		raws[i].tracks = nil
 	}
 	return summaries, nil
 }
 
-// buildAddendumDirSummaries reads addendum GSA and returns compact summaries.
+// buildAddendumDirSummaries reads addendum GSA and streams compact summaries.
 func buildAddendumDirSummaries(baseDir string) ([]dirSummary, error) {
 	gsa, err := openGSA(AddendumCatalogPath(baseDir), _snapshotMaxEntries)
 	if err != nil {
@@ -438,7 +416,7 @@ func buildAddendumDirSummaries(baseDir string) ([]dirSummary, error) {
 	}
 	defer gsa.Close()
 
-	var raws []dirSummaryRaw
+	var summaries []dirSummary
 	for _, entry := range gsa.Entries() {
 		data, err := gsa.Read(entry.Name)
 		if err != nil {
@@ -448,23 +426,17 @@ func buildAddendumDirSummaries(baseDir string) ([]dirSummary, error) {
 		if err := json.Unmarshal(data, &snapRecords); err != nil {
 			return nil, fmt.Errorf("decode addendum bucket %s: %w", entry.Name, err)
 		}
+
 		bucketURL := BaseURL + AddendumDir + "/" + entry.Name
 		tracks := snapshotRecordTracks(bucketURL, snapRecords)
-		if len(tracks) > 0 {
-			raws = append(raws, dirSummaryRaw{
-				summary: dirSummary{
-					locator:    bucketURL,
-					trackCount: uint64(len(tracks)),
-				},
-				tracks: tracks,
+		count := uint64(len(tracks))
+
+		if count > 0 {
+			summaries = append(summaries, dirSummary{
+				locator:    bucketURL,
+				trackCount: count,
 			})
 		}
-	}
-
-	summaries := make([]dirSummary, len(raws))
-	for i, r := range raws {
-		summaries[i] = r.summary
-		raws[i].tracks = nil
 	}
 	return summaries, nil
 }
@@ -513,8 +485,7 @@ func snapshotRecordTracks(bucketURL string, snapRecords []snapshotRecord) []Shuf
 }
 
 // cachedDirTracks extracts track entries from cached DirItem list.
-// Only entries whose name passes supportedArchiveEntry are included,
-// ensuring the resulting TrackCount matches actually playable files.
+// Only entries whose name passes supportedArchiveEntry are included.
 func cachedDirTracks(dirURL string, items []DirItem) []ShuffleTrackEntry {
 	var tracks []ShuffleTrackEntry
 	for _, item := range items {
@@ -523,7 +494,7 @@ func cachedDirTracks(dirURL string, items []DirItem) []ShuffleTrackEntry {
 		}
 		cleanName, ok := supportedArchiveEntry(item.Name)
 		if !ok {
-			continue // skip unsupported formats — don't inflate TrackCount
+			continue
 		}
 		playURL := player.ModArchivePrefix + item.URL
 		tracks = append(tracks, ShuffleTrackEntry{
@@ -541,7 +512,6 @@ func isSnapshotOrAddendumDir(u string) bool {
 }
 
 // recordEntryName derives a GSA record name from a directory locator.
-// Uses a hash to avoid path-length issues and ensure uniqueness.
 func recordEntryName(locator string) string {
 	return "entries/" + urlHash(locator) + ".json"
 }
@@ -553,7 +523,7 @@ func shuffleIndexPath(baseDir string) string {
 }
 
 // isSnapshotOrAddendumLocator returns true if the locator belongs to the
-// snapshot or addendum source GSA (as opposed to a cached directory).
+// snapshot or addendum source GSA.
 func isSnapshotOrAddendumLocator(locator string) bool {
 	return strings.Contains(locator, "/"+SnapshotDir+"/") || strings.Contains(locator, "/"+AddendumDir+"/")
 }
@@ -567,11 +537,8 @@ func sourceGSAPath(baseDir, locator string) string {
 }
 
 // bucketEntryName extracts the GSA entry name from a snapshot/addendum
-// canonical URL. E.g. "http://modarchive.textfiles.com/.../A/A0.zip"
-// → "A/A0.zip".
+// canonical URL.
 func bucketEntryName(locator string) string {
-	// The locator is BaseURL + sourceDir + "/" + entryName.
-	// Find the entry name after the source dir prefix.
 	for _, prefix := range []string{"/" + SnapshotDir + "/", "/" + AddendumDir + "/"} {
 		if idx := strings.LastIndex(locator, prefix); idx >= 0 {
 			return locator[idx+len(prefix):]
@@ -581,8 +548,6 @@ func bucketEntryName(locator string) string {
 }
 
 // catalogData is a minimal struct for accessing the catalog's directory map.
-// Defined here to avoid circular imports with the catalog package during
-// the migration phase; will be replaced by catalog.DirectoryCache later.
 type catalogData struct {
 	Directories map[string][]DirItem
 }
@@ -634,25 +599,42 @@ func validateShuffleManifest(meta *ShuffleIndexMeta) error {
 	return nil
 }
 
-// ValidateCachedRecordPresence checks that every non-snapshot manifest
-// entry has a corresponding record in the GSA. Snapshot/addendum entries
-// are expected to be absent (reconstructed from source GSA).
-func ValidateCachedRecordPresence(meta *ShuffleIndexMeta, gsa *archive.Archive) error {
+// validateCachedRecordNames checks that every non-snapshot manifest
+// entry has a corresponding record name in the GSA index, without
+// reading or decompressing any record data. This is O(N) over the
+// entry name set and suitable for the startup path.
+func validateCachedRecordNames(meta *ShuffleIndexMeta, gsa *archive.Archive) error {
+	gsaNames := make(map[string]struct{}, len(gsa.Entries()))
+	for _, e := range gsa.Entries() {
+		gsaNames[e.Name] = struct{}{}
+	}
 	for _, entry := range meta.Entries {
 		if isSnapshotOrAddendumLocator(entry.Locator) {
-			continue // these are not stored in .idx
+			continue
 		}
-		data, err := gsa.Read(entry.Name)
-		if err != nil {
-			return fmt.Errorf("cached record %q for %q not found in index: %w", entry.Name, entry.Locator, err)
+		if _, ok := gsaNames[entry.Name]; !ok {
+			return fmt.Errorf("modarchive: cached record %q for %q not found in index", entry.Name, entry.Locator)
 		}
-		var record ShuffleDirRecord
-		if err := json.Unmarshal(data, &record); err != nil {
-			return fmt.Errorf("cached record %q decode: %w", entry.Name, err)
-		}
-		if record.TrackCount != entry.TrackCount {
-			return fmt.Errorf("cached record %q track count %d != manifest %d", entry.Name, record.TrackCount, entry.TrackCount)
-		}
+	}
+	return nil
+}
+
+// validateCachedRecordIdentity performs full identity checks on a cached
+// record at lazy-load time: Locator, Name, TrackCount, Version.
+func validateCachedRecordIdentity(record *ShuffleDirRecord, entry catalog.ManifestEntry) error {
+	if record.Locator != entry.Locator {
+		return fmt.Errorf("modarchive: record locator %q != manifest %q", record.Locator, entry.Locator)
+	}
+	if entry.Name != recordEntryName(record.Locator) {
+		return fmt.Errorf("modarchive: record entry name %q != recordEntryName(%q)", entry.Name, record.Locator)
+	}
+	if uint64(len(record.Tracks)) != record.TrackCount {
+		return fmt.Errorf("modarchive: record %q track count %d != len(Tracks) %d",
+			record.Locator, record.TrackCount, len(record.Tracks))
+	}
+	if record.TrackCount != entry.TrackCount {
+		return fmt.Errorf("modarchive: record %q track count %d != manifest %d",
+			record.Locator, record.TrackCount, entry.TrackCount)
 	}
 	return nil
 }

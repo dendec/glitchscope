@@ -130,8 +130,6 @@ func TestShuffleSourceRandomTrackInDirectory(t *testing.T) {
 	}
 
 	rng := rand.New(rand.NewSource(1))
-	// Use the canonical URL (Locator) — the .idx no longer stores
-	// snapshot records, so loadRecord must reconstruct from source GSA.
 	key := catalog.DirectoryKey{
 		Source:  catalog.SourceModArchive,
 		Locator: entries[0].Locator,
@@ -699,37 +697,59 @@ func TestListingVersionContentDependent(t *testing.T) {
 	}
 }
 
-func TestRecordCacheEviction(t *testing.T) {
-	c := newRecordCache(3)
-	for i := range 5 {
-		key := "key" + string(rune('0'+i))
-		c.put(key, &ShuffleDirRecord{Locator: key})
+func TestRecordCacheEvictionByMemory(t *testing.T) {
+	c := newRecordCache()
+	// Create records that are estimated > maxCachedBytes/2 each.
+	largeTracks := make([]ShuffleTrackEntry, 100_000)
+	for i := range largeTracks {
+		largeTracks[i] = ShuffleTrackEntry{
+			Path: "http://example.com/dir/track" + string(rune('A'+i%26)) + ".mod",
+			Name: "track.mod",
+			Key:  "key",
+			Size: 1000,
+		}
 	}
-	// Only the last 3 should remain.
-	if len(c.entries) != 3 {
-		t.Fatalf("cache size = %d, want 3", len(c.entries))
+	r1 := &ShuffleDirRecord{Locator: "dir1", Tracks: largeTracks}
+	r2 := &ShuffleDirRecord{Locator: "dir2", Tracks: largeTracks}
+	r3 := &ShuffleDirRecord{Locator: "dir3", Tracks: largeTracks}
+
+	c.put("dir1", r1)
+	c.put("dir2", r2)
+	c.put("dir3", r3)
+
+	// At most one large record should survive the memory budget.
+	if len(c.entries) > 1 {
+		t.Fatalf("expected ≤1 entries under memory budget, got %d (totalBytes=%d)",
+			len(c.entries), c.totalBytes)
 	}
-	if _, ok := c.entries["key0"]; ok {
-		t.Fatal("key0 should have been evicted")
-	}
-	if _, ok := c.entries["key1"]; ok {
-		t.Fatal("key1 should have been evicted")
-	}
-	if _, ok := c.entries["key2"]; !ok {
-		t.Fatal("key2 should still be present")
+	if c.totalBytes > maxCachedBytes {
+		t.Fatalf("totalBytes %d exceeds budget %d", c.totalBytes, maxCachedBytes)
 	}
 }
 
 func TestRecordCacheAccessOrder(t *testing.T) {
-	c := newRecordCache(4)
-	c.put("a", &ShuffleDirRecord{Locator: "a"})
-	c.put("b", &ShuffleDirRecord{Locator: "b"})
-	c.put("c", &ShuffleDirRecord{Locator: "c"})
-	c.put("d", &ShuffleDirRecord{Locator: "d"})
-	// Access "a" to make it recently used.
+	// Create records large enough that 2 exceed half the budget.
+	c := newRecordCache()
+	// ~116.6K tracks ≈ 24.8 MiB per record: two fit just under the 50 MiB
+	// budget (with ~419 KiB headroom), but adding "medium" on top of two
+	// "big" pushes the total over it.
+	hugeTracks := make([]ShuffleTrackEntry, 116_591)
+	for i := range hugeTracks {
+		hugeTracks[i] = ShuffleTrackEntry{Path: "p", Name: "n", Key: "k"}
+	}
+	mediumTracks := make([]ShuffleTrackEntry, 2000)
+	for i := range mediumTracks {
+		mediumTracks[i] = ShuffleTrackEntry{Path: "p", Name: "n", Key: "k"}
+	}
+	medium := &ShuffleDirRecord{Locator: "x", Tracks: mediumTracks}
+	big := &ShuffleDirRecord{Locator: "x", Tracks: hugeTracks}
+
+	c.put("a", big)
+	c.put("b", big)
+	// Access "a" to protect it from eviction.
 	c.get("a")
-	// Add "e" — should evict "b" (oldest unaccessed), not "a".
-	c.put("e", &ShuffleDirRecord{Locator: "e"})
+	// "c" pushes totalBytes over budget → evict oldest ("b").
+	c.put("c", medium)
 	if _, ok := c.entries["a"]; !ok {
 		t.Fatal("a should still be present (was recently accessed)")
 	}
@@ -739,12 +759,10 @@ func TestRecordCacheAccessOrder(t *testing.T) {
 }
 
 func TestRecordCacheNormalize(t *testing.T) {
-	c := newRecordCache(2)
-	// Set high counter.
+	c := newRecordCache()
 	c.accessCounter = 1<<49 - 1
 	c.put("a", &ShuffleDirRecord{Locator: "a"})
 	c.put("b", &ShuffleDirRecord{Locator: "b"})
-	// Access "a" to trigger normalization.
 	c.get("a")
 	if c.accessCounter >= 1<<48 {
 		t.Fatalf("counter should have been normalized, got %d", c.accessCounter)
@@ -794,7 +812,6 @@ func TestBuildSkipsUnsupportedCachedFiles(t *testing.T) {
 	}
 	defer src.Close()
 
-	// TrackCount should be 1 (only the .mod file), not 3.
 	if src.TrackCount() != 1 {
 		t.Fatalf("TrackCount = %d, want 1 (unsupported files excluded)", src.TrackCount())
 	}
@@ -803,7 +820,6 @@ func TestBuildSkipsUnsupportedCachedFiles(t *testing.T) {
 func TestOpenRejectsMissingCachedRecord(t *testing.T) {
 	baseDir := t.TempDir()
 
-	// Build valid index.
 	writeMultiBucketSnapshot(t, baseDir, map[string][]snapshotRecord{
 		"A/A.zip": {{Name: "a.mod", Size: 100, ArchiveOffset: 10, ArchiveEndOffset: 50, CompressedSize: 40}},
 	})
@@ -811,7 +827,6 @@ func TestOpenRejectsMissingCachedRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Manually add a cached entry to the manifest without its record.
 	idxDir, _ := ShuffleIndexDir(baseDir)
 	idxPath := filepath.Join(idxDir, _shuffleIndexFile)
 
@@ -830,7 +845,6 @@ func TestOpenRejectsMissingCachedRecord(t *testing.T) {
 			if err := json.Unmarshal(data, &meta); err != nil {
 				t.Fatal(err)
 			}
-			// Add a fake cached entry (not snapshot/addendum).
 			meta.Entries = append(meta.Entries, catalog.ManifestEntry{
 				Name:       "entries/ff.json",
 				Locator:    "http://example.com/cached/",
@@ -847,7 +861,6 @@ func TestOpenRejectsMissingCachedRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// OpenShuffleSource should reject: cached record not in GSA.
 	src := OpenShuffleSource(baseDir)
 	if src != nil {
 		src.Close()
@@ -855,7 +868,7 @@ func TestOpenRejectsMissingCachedRecord(t *testing.T) {
 	}
 }
 
-func TestGSASameSizeReplacementDetected(t *testing.T) {
+func TestGSATailReplacementDetected(t *testing.T) {
 	ResetMemCache()
 	defer ResetMemCache()
 	CloseSnapshotCatalog()
@@ -863,28 +876,107 @@ func TestGSASameSizeReplacementDetected(t *testing.T) {
 
 	baseDir := t.TempDir()
 
-	// Build a snapshot GSA.
 	writeMultiBucketSnapshot(t, baseDir, map[string][]snapshotRecord{
 		"A/A.zip": {{Name: "a.mod", Size: 100, ArchiveOffset: 10, ArchiveEndOffset: 50, CompressedSize: 40}},
 	})
 
 	fp1 := ShuffleIndexFingerprint(baseDir, nil)
 
-	// Replace with different content of the same size.
-	newRecords := []snapshotRecord{{Name: "b.xm", Size: 999, ArchiveOffset: 20, ArchiveEndOffset: 100, CompressedSize: 80}}
-	data, _ := json.Marshal(newRecords)
-	// Pad data to match original file size exactly.
-	origInfo, _ := os.Stat(SnapshotCatalogPath(baseDir))
-	for int64(len(data)) < origInfo.Size() {
-		data = append(data, ' ')
+	// Overwrite with data that differs only at the end.
+	origData, err := os.ReadFile(SnapshotCatalogPath(baseDir))
+	if err != nil {
+		t.Fatal(err)
 	}
-	data = data[:int(origInfo.Size())]
-	if err := os.WriteFile(SnapshotCatalogPath(baseDir), data, 0o644); err != nil {
+	newData := make([]byte, len(origData))
+	copy(newData, origData)
+	// Flip a byte near the end.
+	if len(newData) > 10 {
+		newData[len(newData)-5] ^= 0xFF
+	}
+	if err := os.WriteFile(SnapshotCatalogPath(baseDir), newData, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	fp2 := ShuffleIndexFingerprint(baseDir, nil)
 	if fp1.SourceHash == fp2.SourceHash {
-		t.Fatalf("fingerprint should change when GSA content changes at same size: %s", fp1.SourceHash)
+		t.Fatalf("fingerprint should change when GSA tail is modified: %s", fp1.SourceHash)
+	}
+}
+
+func TestRecordIdentityValidation(t *testing.T) {
+	// Build valid index, then tamper the .idx record to have wrong Locator.
+	baseDir := t.TempDir()
+
+	writeMultiBucketSnapshot(t, baseDir, map[string][]snapshotRecord{
+		"A/A.zip": {{Name: "a.mod", Size: 100, ArchiveOffset: 10, ArchiveEndOffset: 50, CompressedSize: 40}},
+	})
+
+	cat := &catalogData{
+		Directories: map[string][]DirItem{
+			"http://example.com/dir/": {
+				{Name: "track.mod", URL: "http://example.com/dir/track.mod", Kind: KindFile, CleanName: "track.mod"},
+			},
+		},
+	}
+	if err := BuildShuffleIndex(baseDir, cat); err != nil {
+		t.Fatal(err)
+	}
+
+	idxDir, _ := ShuffleIndexDir(baseDir)
+	idxPath := filepath.Join(idxDir, _shuffleIndexFile)
+
+	// Rewrite: change the record's Locator to something wrong.
+	gsa, err := archive.Open(idxPath, _idxMaxEntries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var srcEntries []archive.SourceEntry
+	for _, e := range gsa.Entries() {
+		data, err := gsa.Read(e.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.Name != "manifest.json" {
+			var record ShuffleDirRecord
+			if err := json.Unmarshal(data, &record); err == nil {
+				record.Locator = "http://WRONG/"
+				data, _ = json.Marshal(record)
+			}
+		}
+		srcEntries = append(srcEntries, archive.SourceEntry{Name: e.Name, Data: data})
+	}
+	gsa.Close()
+	if err := archive.Write(idxPath, srcEntries); err != nil {
+		t.Fatal(err)
+	}
+
+	src := OpenShuffleSource(baseDir)
+	if src == nil {
+		t.Fatal("OpenShuffleSource returned nil (name check should pass)")
+	}
+	defer src.Close()
+
+	rng := rand.New(rand.NewSource(1))
+	_, err = src.RandomTrack(rng)
+	if err == nil {
+		t.Fatal("expected identity validation error from loadRecord")
+	}
+}
+
+func TestEstimateRecordBytes(t *testing.T) {
+	r := &ShuffleDirRecord{
+		Locator:     "http://modarchive.textfiles.com/data/www/mods/A/A0.zip",
+		DisplayName: "A0",
+		Tracks: []ShuffleTrackEntry{
+			{Path: "http://modarchive.textfiles.com/data/www/mods/A/A0.zip:a.mod", Name: "a.mod", Key: "a.mod"},
+			{Path: "http://modarchive.textfiles.com/data/www/mods/A/A0.zip:b.xm", Name: "b.xm", Key: "b.xm"},
+		},
+	}
+	estimated := estimateRecordBytes(r)
+	if estimated < 500 {
+		t.Fatalf("estimate too low: %d", estimated)
+	}
+	if estimated > 100_000 {
+		t.Fatalf("estimate too high: %d", estimated)
 	}
 }
