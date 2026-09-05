@@ -23,23 +23,29 @@ func CatalogPath(baseDir string) string {
 	return filepath.Join(cacheDir, "catalog")
 }
 
-// LoadCatalog reads the ModArchive catalog from disk if present.
+// LoadCatalog reads the ModArchive catalog from disk if present. Supports
+// both legacy gzip and new zstd formats. Gzip files are transparently
+// migrated to zstd in the background.
 func LoadCatalog(baseDir string) *Catalog {
 	MigrateLegacyCache(baseDir)
 	path := CatalogPath(baseDir)
 
 	var cat Catalog
-	if err := util.LoadGzipJSON(path, &cat); err != nil {
+	migrateFn, err := util.LoadZstdOrGzipJSON(path, &cat)
+	if err != nil {
 		return nil
+	}
+	if migrateFn != nil {
+		go migrateFn()
 	}
 
 	return &cat
 }
 
-// SaveCatalog writes the catalog to disk as gzipped JSON.
+// SaveCatalog writes the ModArchive catalog to disk as zstd-compressed JSON.
 func SaveCatalog(baseDir string, cat *Catalog) error {
 	path := CatalogPath(baseDir)
-	if err := util.SaveGzipJSON(path, cat); err != nil {
+	if err := util.SaveZstdJSON(path, cat); err != nil {
 		return fmt.Errorf("modarchive catalog save: %w", err)
 	}
 	return nil

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 
 	"github.com/dendec/glitchscope/internal/catalog"
 	"github.com/dendec/glitchscope/internal/config"
@@ -134,10 +135,12 @@ type playbackState struct {
 	playlistAlbum string
 
 	// shuffleCatalog is the runtime coordinator over the three provider
-	// shuffle indexes, built synchronously at app startup (see
+	// shuffle indexes, built at startup or lazily in the background (see
 	// shuffle_catalog.go). Nil until built, or if no source is available;
 	// advanceShuffleLazy falls back to legacy pool-based selection then.
-	shuffleCatalog *catalog.ShuffleCatalog
+	// Accessed atomically so a background goroutine can install it without
+	// blocking the render thread.
+	shuffleCatalog atomic.Pointer[catalog.ShuffleCatalog]
 }
 
 // play starts playback of a track. It syncs the playlist/library cursor and
@@ -328,7 +331,8 @@ func (s *playbackState) advanceShuffled(settings config.PlaybackSettings) (track
 // coordinator or the requested source is unavailable so the caller falls
 // back to legacy pool-based selection.
 func (s *playbackState) advanceShuffleLazy(settings config.PlaybackSettings) (trackRef, bool) {
-	if s.shuffleCatalog == nil || s.shuffle.rng == nil {
+	cat := s.shuffleCatalog.Load()
+	if cat == nil || s.shuffle.rng == nil {
 		return trackRef{}, false
 	}
 
@@ -342,9 +346,9 @@ func (s *playbackState) advanceShuffleLazy(settings config.PlaybackSettings) (tr
 		if !ok {
 			return trackRef{}, false
 		}
-		t, err = s.shuffleCatalog.RandomTrackFromSource(kind, s.shuffle.rng)
+		t, err = cat.RandomTrackFromSource(kind, s.shuffle.rng)
 	case config.ShuffleAll:
-		t, err = s.shuffleCatalog.RandomTrackAll(s.shuffle.rng)
+		t, err = cat.RandomTrackAll(s.shuffle.rng)
 	default:
 		return trackRef{}, false
 	}
@@ -386,7 +390,11 @@ func (s *playbackState) materializeShuffleTrack(t catalog.ShuffleTrack) {
 			return
 		}
 	}
-	idx := s.shuffleCatalog.SourceIndex(t.Source)
+	cat := s.shuffleCatalog.Load()
+	if cat == nil {
+		return
+	}
+	idx := cat.SourceIndex(t.Source)
 	if idx == nil {
 		return
 	}

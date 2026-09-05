@@ -76,6 +76,9 @@ func (s *runState) consumeAdaptiveFrame(viz *visualizerClock) bool {
 
 // Run enters the main loop. Must be called after Init().
 func (a *App) Run() {
+	// Extract textures on the first frame — avoids blocking startup.
+	a.ensureTextures(a.pm)
+
 	ticker := time.NewTicker(mainFramePeriod)
 	defer ticker.Stop()
 

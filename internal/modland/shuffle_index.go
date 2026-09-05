@@ -408,6 +408,14 @@ func validateRecordIdentity(record *ShuffleAlbumRecord, entry catalog.ManifestEn
 // ShuffleIndexNeedsRebuild reports whether the index is missing, stale, or
 // incompatible. It opens the index and compares the fingerprint without
 // loading any album record.
+// ShuffleIndexStale reports whether the given fingerprint (from an already-
+// opened index) is outdated compared to the current catalog file.
+// Used to avoid a second GSA open when the fast path already opened the source.
+func ShuffleIndexStale(baseDir string, indexFP catalog.Fingerprint) bool {
+	fp := ShuffleIndexFingerprint(baseDir)
+	return indexFP.SourceHash != fp.SourceHash
+}
+
 func ShuffleIndexNeedsRebuild(baseDir string) bool {
 	idxPath := shuffleIndexPath(baseDir)
 	info, err := os.Stat(idxPath)

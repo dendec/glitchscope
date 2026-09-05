@@ -53,6 +53,99 @@ func TestJSONAtomic(t *testing.T) {
 	}
 }
 
+func TestZstdJSON(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "sub", "test.zst")
+
+	original := sampleData{Name: "test_zstd", Count: 77}
+	if err := util.SaveZstdJSON(file, original); err != nil {
+		t.Fatalf("SaveZstdJSON failed: %v", err)
+	}
+
+	var loaded sampleData
+	if err := util.LoadZstdJSON(file, &loaded); err != nil {
+		t.Fatalf("LoadZstdJSON failed: %v", err)
+	}
+
+	if loaded.Name != original.Name || loaded.Count != original.Count {
+		t.Errorf("got %+v, want %+v", loaded, original)
+	}
+}
+
+func TestLoadZstdOrGzipJSON_ZstdFile(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "test.zst")
+
+	original := sampleData{Name: "zstd_first", Count: 10}
+	if err := util.SaveZstdJSON(file, original); err != nil {
+		t.Fatalf("SaveZstdJSON failed: %v", err)
+	}
+
+	var loaded sampleData
+	migrateFn, err := util.LoadZstdOrGzipJSON(file, &loaded)
+	if err != nil {
+		t.Fatalf("LoadZstdOrGzipJSON failed: %v", err)
+	}
+	if migrateFn != nil {
+		t.Fatal("expected no migration callback for zstd file")
+	}
+	if loaded != original {
+		t.Errorf("got %+v, want %+v", loaded, original)
+	}
+}
+
+func TestLoadZstdOrGzipJSON_GzipFile(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "test.gz")
+
+	original := sampleData{Name: "gzip_legacy", Count: 55}
+	if err := util.SaveGzipJSON(file, original); err != nil {
+		t.Fatalf("SaveGzipJSON failed: %v", err)
+	}
+
+	var loaded sampleData
+	migrateFn, err := util.LoadZstdOrGzipJSON(file, &loaded)
+	if err != nil {
+		t.Fatalf("LoadZstdOrGzipJSON failed: %v", err)
+	}
+	if migrateFn == nil {
+		t.Fatal("expected migration callback for gzip file")
+	}
+	if loaded != original {
+		t.Errorf("got %+v, want %+v", loaded, original)
+	}
+
+	// Run migration and verify the file is now zstd-readable.
+	migrateFn()
+	var reloaded sampleData
+	if err := util.LoadZstdJSON(file, &reloaded); err != nil {
+		t.Fatalf("LoadZstdJSON after migration failed: %v", err)
+	}
+	if reloaded != original {
+		t.Errorf("after migration: got %+v, want %+v", reloaded, original)
+	}
+}
+
+func TestIsGzipFile(t *testing.T) {
+	dir := t.TempDir()
+	gzFile := filepath.Join(dir, "test.gz")
+	zstFile := filepath.Join(dir, "test.zst")
+
+	if err := util.SaveGzipJSON(gzFile, sampleData{Name: "gz"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := util.SaveZstdJSON(zstFile, sampleData{Name: "zs"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !util.IsGzipFile(gzFile) {
+		t.Error("expected gzip file to be detected")
+	}
+	if util.IsGzipFile(zstFile) {
+		t.Error("expected zstd file not to be detected as gzip")
+	}
+}
+
 func TestExtractModuleFromZip(t *testing.T) {
 	dir := t.TempDir()
 	zipPath := filepath.Join(dir, "test.zip")

@@ -10,11 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/dendec/glitchscope/internal/archive"
 	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/filesystem"
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/mic"
 	"github.com/dendec/glitchscope/internal/modarchive"
@@ -56,6 +58,8 @@ type App struct {
 	settings          *config.Settings
 	settingsPath      string
 	textureDir        string
+	texturesOnce      sync.Once     // ensures textures are extracted at most once
+	shuffleWg         sync.WaitGroup // tracks background shuffle build goroutine
 	presetNames       []string
 	presetIdx         int
 	presetCats        []string // all preset keys for presets page tree
@@ -151,28 +155,8 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 
 	a.preview = newPreviewRenderer()
 
-	// Keep bundled and user textures in one temporary search directory. User
-	// files are copied last so they override matching bundled textures.
-	extractedDir, extractErr := os.MkdirTemp("", "glitchscope-textures-")
-	if extractErr == nil {
-		a.textureDir = extractedDir
-		textureArchive, archiveErr := archive.Open(filepath.Join(presetDirPath(), "textures.gsa"), 10000)
-		if archiveErr == nil {
-			_, extractErr = textureArchive.Extract(extractedDir)
-			_ = textureArchive.Close()
-			if extractErr != nil {
-				slog.Warn("texture archive extract failed", "error", extractErr)
-			}
-		} else if !os.IsNotExist(archiveErr) {
-			slog.Warn("texture archive open failed", "error", archiveErr)
-		}
-		if copyErr := copyPresetTextures(presetDirPath(), extractedDir); copyErr != nil {
-			slog.Warn("preset texture copy failed", "error", copyErr)
-		}
-		pm.SetTextureSearchPaths([]string{extractedDir})
-	} else {
-		slog.Warn("texture temporary directory creation failed", "error", extractErr)
-	}
+	// Texture extraction is deferred to the first render frame (ensureTextures)
+	// to avoid blocking startup. projectM uses built-in textures until then.
 
 	w, h := win.GLGetDrawableSize()
 
@@ -226,6 +210,9 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 }
 
 func (a *App) Close() {
+	// Wait for background shuffle build to finish before tearing down
+	// resources it may be using (shuffle sources, baseDir, etc.).
+	a.shuffleWg.Wait()
 	// Abort background work (e.g. the connectivity probe) before tearing down
 	// resources it may observe, so no in-flight goroutine touches a freed overlay.
 	if a.appCancel != nil {
@@ -408,13 +395,25 @@ func (a *App) initLibrary() {
 	a.lib.SetBaseDir(baseDir())
 	slog.Info("music scan", "albums", lib.AlbumCount(), "ms", time.Since(t).Milliseconds())
 
-	// Load catalogs from cache only (no download on startup). Cached catalogs
-	// are usable while offline, so expose their sources immediately.
+	// Load catalogs from cache in parallel (no download on startup).
+	// Each provider is independent; running them concurrently saves ~1-2s
+	// on slow ARM CPUs where gzip/zstd decompression is CPU-bound.
 	slog.Debug("initLibrary: loading catalogs from cache", "baseDir", baseDir())
-	hasModland := a.loadModlandFromCache()
-	hasModArchive := modarchive.InitCatalog(baseDir())
+	t = time.Now()
+	var hasModland, hasModArchive bool
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		hasModland = a.loadModlandFromCache()
+	}()
+	go func() {
+		defer wg.Done()
+		hasModArchive = modarchive.InitCatalog(baseDir())
+	}()
+	wg.Wait()
 	slog.Debug("initLibrary: catalogs loaded", "hasModland", hasModland, "hasModArchive", hasModArchive,
-		"libAlbums", a.lib.AlbumCount())
+		"libAlbums", a.lib.AlbumCount(), "ms", time.Since(t).Milliseconds())
 	if hasModland || hasModArchive {
 		slog.Debug("initLibrary: cached catalogs found, setting online")
 		a.online.Store(true)
@@ -424,7 +423,21 @@ func (a *App) initLibrary() {
 	}
 
 	a.updateLocalShuffleSource(albums, scanStatus)
-	a.buildShuffleCatalog()
+	// Build shuffle catalog only when shuffle is actually enabled.
+	if a.settings != nil && a.settings.Playback.ShuffleMode != config.ShuffleOff {
+		// Run the (potentially slow) shuffle build in the background so
+		// the UI and first audio frame are not blocked. The render thread
+		// reads shuffleCatalog via atomic.Pointer — it will be nil until
+		// the goroutine finishes, causing advanceShuffleLazy to fall back
+		// to legacy pool-based selection transparently.
+		a.shuffleWg.Add(1)
+		go func() {
+			defer a.shuffleWg.Done()
+			a.buildShuffleCatalog()
+		}()
+	} else {
+		slog.Debug("initLibrary: shuffle off, skipping shuffle catalog build")
+	}
 
 	// Wire catalog album creation: when the overlay navigates into a
 	// modarchive directory with files, it delegates album creation to the
@@ -572,6 +585,17 @@ func (a *App) addModlandAlbums(catalogAlbums []modland.Album) {
 	a.lib.AddVirtualAlbums(albums)
 }
 
+// ensureShuffleCatalog builds the shuffle catalog lazily if it was skipped
+// at startup (shuffle was off). Called when the user switches to a shuffle
+// mode at runtime. Runs in the background to avoid blocking the UI.
+func (a *App) ensureShuffleCatalog() {
+	if a.shuffleCatalog.Load() != nil {
+		return
+	}
+	a.updateLocalShuffleSource(a.lib.Albums, filesystem.StatusOK)
+	go a.buildShuffleCatalog()
+}
+
 func (a *App) initFavorites() {
 	a.favoritesPath = config.FavoritesPath()
 	f, err := player.LoadFavorites(a.favoritesPath)
@@ -685,6 +709,37 @@ func (a *App) initPreset() {
 			return a.preview.RenderFPS()
 		})
 	}
+}
+
+// ensureTextures extracts the texture archive exactly once, on first call.
+// Subsequent calls are no-ops. This is safe to call from any goroutine
+// thanks to sync.Once, but the caller must ensure the GL context is current
+// if pm.SetTextureSearchPaths needs it (it doesn't — it just stores paths).
+func (a *App) ensureTextures(pm *projectm.Handle) {
+	a.texturesOnce.Do(func() {
+		t := time.Now()
+		extractedDir, extractErr := os.MkdirTemp("", "glitchscope-textures-")
+		if extractErr != nil {
+			slog.Warn("texture temporary directory creation failed", "error", extractErr)
+			return
+		}
+		a.textureDir = extractedDir
+		textureArchive, archiveErr := archive.Open(filepath.Join(presetDirPath(), "textures.gsa"), 10000)
+		if archiveErr == nil {
+			_, extractErr = textureArchive.Extract(extractedDir)
+			_ = textureArchive.Close()
+			if extractErr != nil {
+				slog.Warn("texture archive extract failed", "error", extractErr)
+			}
+		} else if !os.IsNotExist(archiveErr) {
+			slog.Warn("texture archive open failed", "error", archiveErr)
+		}
+		if copyErr := copyPresetTextures(presetDirPath(), extractedDir); copyErr != nil {
+			slog.Warn("preset texture copy failed", "error", copyErr)
+		}
+		pm.SetTextureSearchPaths([]string{extractedDir})
+		slog.Info("textures extracted", "ms", time.Since(t).Milliseconds())
+	})
 }
 
 func baseDir() string {

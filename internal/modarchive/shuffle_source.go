@@ -482,6 +482,8 @@ func (s *ShuffleSource) Close() error {
 
 // ShuffleSourceNeedsRebuild reports whether the index is missing, stale,
 // or incompatible.
+// ShuffleSourceNeedsRebuild reports whether the on-disk index is stale
+// compared to the on-disk cached-directory catalog.
 func ShuffleSourceNeedsRebuild(baseDir string, cat *catalogData) bool {
 	idxPath := shuffleIndexPath(baseDir)
 	info, err := os.Stat(idxPath)
@@ -500,6 +502,14 @@ func ShuffleSourceNeedsRebuild(baseDir string, cat *catalogData) bool {
 
 	currentFP := ShuffleIndexFingerprint(baseDir, cat)
 	return src.Fingerprint().SourceHash != currentFP.SourceHash
+}
+
+// ShuffleIndexStale reports whether the given fingerprint (from an already-
+// opened index) is outdated compared to the current cached-directory catalog.
+// Used to avoid a second GSA open when the fast path already opened the source.
+func ShuffleIndexStale(baseDir string, indexFP catalog.Fingerprint) bool {
+	fp := ShuffleIndexFingerprint(baseDir, cachedCatalogData(baseDir))
+	return indexFP.SourceHash != fp.SourceHash
 }
 
 // SortedEntries returns manifest entries in deterministic order for testing.

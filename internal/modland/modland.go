@@ -128,16 +128,22 @@ func MigrateLegacyCache(baseDir string) {
 	}
 }
 
-// LoadCatalog reads the catalog from disk.
+// LoadCatalog reads the catalog from disk. Supports both legacy gzip and
+// new zstd formats. If a gzip file is found it is transparently migrated
+// to zstd in the background.
 func LoadCatalog(baseDir string) *Catalog {
 	MigrateLegacyCache(baseDir)
 	path := CatalogPath(baseDir)
 	slog.Debug("modland: LoadCatalog", "path", path)
 
 	var entry cacheEntry
-	if err := util.LoadGzipJSON(path, &entry); err != nil {
+	migrateFn, err := util.LoadZstdOrGzipJSON(path, &entry)
+	if err != nil {
 		slog.Debug("modland: LoadCatalog failed", "path", path, "error", err)
 		return nil
+	}
+	if migrateFn != nil {
+		go migrateFn()
 	}
 
 	if !entry.UpdatedAt.IsZero() {
@@ -153,7 +159,7 @@ func LoadCatalog(baseDir string) *Catalog {
 	return cat
 }
 
-// SaveCatalog writes the catalog to disk as gzipped JSON.
+// SaveCatalog writes the catalog to disk as zstd-compressed JSON.
 func SaveCatalog(baseDir string, cat *Catalog) error {
 	path := CatalogPath(baseDir)
 	entry := cacheEntry{
@@ -161,7 +167,7 @@ func SaveCatalog(baseDir string, cat *Catalog) error {
 		ExcludedFormats: cat.ExcludedFormats,
 		UpdatedAt:       cat.UpdatedAt,
 	}
-	if err := util.SaveGzipJSON(path, entry); err != nil {
+	if err := util.SaveZstdJSON(path, entry); err != nil {
 		return fmt.Errorf("modland catalog save: %w", err)
 	}
 	return nil

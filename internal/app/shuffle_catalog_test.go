@@ -63,14 +63,15 @@ func TestBuildShuffleCatalogWithOnlyLocalSource(t *testing.T) {
 	a.updateLocalShuffleSource(testAlbums(), filesystem.StatusOK)
 	a.buildShuffleCatalog()
 
-	if a.shuffleCatalog == nil {
+	cat := a.shuffleCatalog.Load()
+	if cat == nil {
 		t.Fatal("expected shuffleCatalog to be built")
 	}
-	if a.shuffleCatalog.SourceIndex(catalog.SourceLocal) == nil {
+	if cat.SourceIndex(catalog.SourceLocal) == nil {
 		t.Fatal("expected local source to be registered in the catalog")
 	}
-	if a.shuffleCatalog.TotalTrackCount() != 2 {
-		t.Fatalf("TotalTrackCount = %d, want 2", a.shuffleCatalog.TotalTrackCount())
+	if cat.TotalTrackCount() != 2 {
+		t.Fatalf("TotalTrackCount = %d, want 2", cat.TotalTrackCount())
 	}
 }
 
@@ -78,10 +79,11 @@ func TestBuildShuffleCatalogWithNoSources(t *testing.T) {
 	a := &App{}
 	a.buildShuffleCatalog()
 
-	if a.shuffleCatalog == nil {
+	cat := a.shuffleCatalog.Load()
+	if cat == nil {
 		t.Fatal("expected shuffleCatalog to be built even with no sources")
 	}
-	if len(a.shuffleCatalog.Available()) != 0 {
-		t.Fatalf("Available() = %d, want 0", len(a.shuffleCatalog.Available()))
+	if len(cat.Available()) != 0 {
+		t.Fatalf("Available() = %d, want 0", len(cat.Available()))
 	}
 }

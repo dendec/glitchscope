@@ -149,6 +149,9 @@ dist-arm64: builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG)
 	@cp $(MODARCHIVE_CATALOG) $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/catalog
 	@cp $(MODARCHIVE_SNAPSHOT) $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/1980-2007.gsa
 	@cp $(MODARCHIVE_ADDENDUM) $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/2007-addendum.gsa
+	@# Deploy prebuilt shuffle indexes (platform-independent GSA archives).
+	@mkdir -p $(ARM64_DIST_DIR)/glitchscope/.cache/shuffle
+	@cp $(ARM64_DIST_DIR)/../linux-amd64/.cache/shuffle/*.idx $(ARM64_DIST_DIR)/glitchscope/.cache/shuffle/ 2>/dev/null || true
 	@echo "=== $(ARM64_DIST_DIR)/ ==="
 	@ls -lhR $(ARM64_DIST_DIR)/
 
@@ -167,6 +170,9 @@ dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_
 	@cp $(MODARCHIVE_CATALOG) dist/portmaster_build/glitchscope/.cache/modarchive/catalog
 	@cp $(MODARCHIVE_SNAPSHOT) dist/portmaster_build/glitchscope/.cache/modarchive/1980-2007.gsa
 	@cp $(MODARCHIVE_ADDENDUM) dist/portmaster_build/glitchscope/.cache/modarchive/2007-addendum.gsa
+	@# Copy prebuilt shuffle indexes (platform-independent).
+	@mkdir -p dist/portmaster_build/glitchscope/.cache/shuffle
+	@cp $(ARM64_DIST_DIR)/glitchscope/.cache/shuffle/*.idx dist/portmaster_build/glitchscope/.cache/shuffle/ 2>/dev/null || true
 	cp portmaster/port.json dist/portmaster_build/glitchscope/
 	cp portmaster/screenshot.png dist/portmaster_build/glitchscope/
 	cp portmaster/gameinfo.xml dist/portmaster_build/glitchscope/ 2>/dev/null; true
@@ -201,8 +207,11 @@ deploy: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE)
 	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/catalog $(DEVICE_DIR)/.cache/modarchive/catalog
 	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/1980-2007.gsa $(DEVICE_DIR)/.cache/modarchive/1980-2007.gsa
 	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/modarchive/2007-addendum.gsa $(DEVICE_DIR)/.cache/modarchive/2007-addendum.gsa
+	# Deploy prebuilt shuffle indexes.
+	adb shell "mkdir -p $(DEVICE_DIR)/.cache/shuffle"
+	adb push $(ARM64_DIST_DIR)/glitchscope/.cache/shuffle/ $(DEVICE_DIR)/.cache/shuffle/
 	adb shell "killall -9 glitchscope 2>/dev/null; true"
-	@echo "=== Deployed binary + presets + textures + catalogs ==="
+	@echo "=== Deployed binary + presets + textures + catalogs + shuffle indexes ==="
 
 # Push test music to device (optional, for quick testing).
 deploy-music:

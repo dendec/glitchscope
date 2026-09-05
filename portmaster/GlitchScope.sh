@@ -44,6 +44,6 @@ pm_message "Loading GlitchScope... (Compiling shaders)"
 $GPTOKEYB "glitchscope" &
 
 pm_platform_helper "$GAMEDIR/glitchscope"
-./glitchscope -fullscreen -show-fps
+./glitchscope -fullscreen
 
 pm_finish

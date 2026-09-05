@@ -55,10 +55,10 @@ func fakeModlandTrack() catalog.ShuffleTrack {
 func TestAdvanceShuffleLazyUsesCoordinatorForShuffleSource(t *testing.T) {
 	fake := &fakeSourceIndex{source: catalog.SourceModland, tracks: []catalog.ShuffleTrack{fakeModlandTrack()}}
 	state := playbackState{
-		pl:             &player.Player{},
-		lib:            &player.Library{Albums: []player.Album{{Name: "Modland: Protracker/Fake", Path: "modland:Protracker/Fake", Tracks: []string{"modland:Protracker/Fake/song.mod"}}}},
-		shuffleCatalog: catalog.NewShuffleCatalog(fake),
+		pl:  &player.Player{},
+		lib: &player.Library{Albums: []player.Album{{Name: "Modland: Protracker/Fake", Path: "modland:Protracker/Fake", Tracks: []string{"modland:Protracker/Fake/song.mod"}}}},
 	}
+	state.shuffleCatalog.Store(catalog.NewShuffleCatalog(fake))
 	state.shuffle.rng = rand.New(rand.NewSource(1))
 	// currentSource() reads the current album; point it at the modland album.
 	state.lib.SelectAlbum(0)
@@ -84,10 +84,10 @@ func TestAdvanceShuffleLazyFallsBackWithoutCatalog(t *testing.T) {
 func TestAdvanceShuffleLazyMaterializesRemoteAlbum(t *testing.T) {
 	fake := &fakeSourceIndex{source: catalog.SourceModland, tracks: []catalog.ShuffleTrack{fakeModlandTrack()}}
 	state := playbackState{
-		pl:             &player.Player{},
-		lib:            &player.Library{}, // no albums materialized yet
-		shuffleCatalog: catalog.NewShuffleCatalog(fake),
+		pl:  &player.Player{},
+		lib: &player.Library{}, // no albums materialized yet
 	}
+	state.shuffleCatalog.Store(catalog.NewShuffleCatalog(fake))
 	state.shuffle.rng = rand.New(rand.NewSource(1))
 
 	track, ok := state.advanceShuffleLazy(config.PlaybackSettings{ShuffleMode: config.ShuffleAll})
@@ -116,10 +116,10 @@ func TestAdvanceShuffleLazyMaterializesRemoteAlbum(t *testing.T) {
 func TestAdvanceShuffleLazyUnknownSourceFallsBack(t *testing.T) {
 	fake := &fakeSourceIndex{source: catalog.SourceModland, tracks: []catalog.ShuffleTrack{fakeModlandTrack()}}
 	state := playbackState{
-		pl:             &player.Player{},
-		lib:            &player.Library{}, // currentSource() defaults to "local"
-		shuffleCatalog: catalog.NewShuffleCatalog(fake),
+		pl:  &player.Player{},
+		lib: &player.Library{}, // currentSource() defaults to "local"
 	}
+	state.shuffleCatalog.Store(catalog.NewShuffleCatalog(fake))
 	state.shuffle.rng = rand.New(rand.NewSource(1))
 
 	// Local has no registered source index in the fake catalog, so

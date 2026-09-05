@@ -359,6 +359,10 @@ func (a *App) applySettings(winW, winH int) {
 		if newMode != a.settings.Playback.ShuffleMode {
 			a.settings.Playback.ShuffleMode = newMode
 			a.playbackState.shuffle.reset()
+			// Lazy-build the shuffle catalog if it was skipped at startup.
+			if newMode != config.ShuffleOff {
+				a.ensureShuffleCatalog()
+			}
 		}
 	}
 
