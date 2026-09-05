@@ -159,6 +159,7 @@ func rejectSampleUint64(rng *rand.Rand, max uint64) uint64 {
 type ShuffleSource struct {
 	meta           *ShuffleIndexMeta
 	locatorToEntry map[string]string // album name → GSA entry name
+	formatToEntry  map[string]string // format name → GSA entry name
 	gsa            *archive.Archive
 	records        *recordCache
 	mu             sync.Mutex
@@ -202,10 +203,19 @@ func OpenShuffleSource(baseDir string) *ShuffleSource {
 		}
 		locatorToEntry[entry.Locator] = entry.Name
 	}
+	formatToEntry := make(map[string]string, len(meta.FormatEntries))
+	for _, entry := range meta.FormatEntries {
+		if _, ok := gsaNames[entry.Name]; !ok {
+			_ = gsa.Close()
+			return nil
+		}
+		formatToEntry[entry.Locator] = entry.Name
+	}
 
 	return &ShuffleSource{
 		meta:           &meta,
 		locatorToEntry: locatorToEntry,
+		formatToEntry:  formatToEntry,
 		gsa:            gsa,
 		records:        newRecordCache(),
 	}
@@ -281,6 +291,48 @@ func (s *ShuffleSource) DirectoryList(key catalog.DirectoryKey) (catalog.Directo
 		DisplayName: record.DisplayName,
 		Entries:     entries,
 	}, nil
+}
+
+// Formats returns compact per-format metadata in stable (sorted) order,
+// read directly from the manifest — no GSA record read required. This
+// gives the "formats" branch of format -> albums -> tracks navigation.
+func (s *ShuffleSource) Formats() []FormatSummary {
+	if s.meta == nil {
+		return nil
+	}
+	out := make([]FormatSummary, len(s.meta.FormatEntries))
+	for i, e := range s.meta.FormatEntries {
+		out[i] = FormatSummary{Name: e.Locator, AlbumCount: e.DirectoryCount, TrackCount: e.TrackCount}
+	}
+	return out
+}
+
+// AlbumsInFormat returns the album summaries for one format, giving fast
+// format -> albums navigation without reading every album's full track
+// list. Reads a single small GSA record.
+func (s *ShuffleSource) AlbumsInFormat(format string) ([]FormatAlbumSummary, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entryName, ok := s.formatToEntry[format]
+	if !ok {
+		return nil, fmt.Errorf("modland: unknown format %q", format)
+	}
+	if s.gsa == nil {
+		return nil, fmt.Errorf("modland: index not open")
+	}
+	data, err := s.gsa.Read(entryName)
+	if err != nil {
+		return nil, fmt.Errorf("modland: read format record %s: %w", entryName, err)
+	}
+	var record ShuffleFormatRecord
+	if err := json.Unmarshal(data, &record); err != nil {
+		return nil, fmt.Errorf("modland: decode format record %s: %w", entryName, err)
+	}
+	if record.Format != format {
+		return nil, fmt.Errorf("modland: format record %q != manifest %q", record.Format, format)
+	}
+	return record.Albums, nil
 }
 
 func (s *ShuffleSource) randomTrackFromEntry(entry catalog.ManifestEntry, rng *rand.Rand) (catalog.ShuffleTrack, error) {

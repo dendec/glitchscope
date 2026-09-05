@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dendec/glitchscope/internal/archive"
@@ -41,6 +42,30 @@ type ShuffleTrackEntry struct {
 	Size int64  `json:"size"`
 }
 
+// FormatAlbumSummary is one album's compact metadata inside a format record.
+// It provides fast format -> albums navigation without reading every full
+// album record (which also carries the track list).
+type FormatAlbumSummary struct {
+	Locator     string `json:"locator"` // Album.Name, matches ManifestEntry.Locator
+	DisplayName string `json:"display_name"`
+	TrackCount  uint64 `json:"track_count"`
+}
+
+// ShuffleFormatRecord lists every album belonging to one format, for the
+// format -> albums navigation branch.
+type ShuffleFormatRecord struct {
+	Format string               `json:"format"`
+	Albums []FormatAlbumSummary `json:"albums"`
+}
+
+// FormatSummary is compact per-format metadata read directly from the
+// manifest (no GSA record read required).
+type FormatSummary struct {
+	Name       string
+	AlbumCount uint64
+	TrackCount uint64
+}
+
 // ShuffleIndexMeta is the manifest stored as manifest.json inside modland.idx.
 type ShuffleIndexMeta struct {
 	Schema         string                  `json:"schema"`
@@ -50,7 +75,11 @@ type ShuffleIndexMeta struct {
 	TrackCount     uint64                  `json:"track_count"`
 	DirectoryCount uint64                  `json:"directory_count"`
 	Entries        []catalog.ManifestEntry `json:"entries"`
-	CreatedAt      time.Time               `json:"created_at"`
+	// FormatEntries lists one entry per format, giving fast format -> albums
+	// navigation. Locator is the format name; DirectoryCount is the album
+	// count within the format; TrackCount is the format's total tracks.
+	FormatEntries []catalog.ManifestEntry `json:"format_entries"`
+	CreatedAt     time.Time               `json:"created_at"`
 }
 
 // estimateRecordBytes returns the approximate heap size of a
@@ -110,6 +139,21 @@ func recordEntryName(locator string) string {
 	return "albums/" + hex.EncodeToString(h[:16]) + ".json"
 }
 
+// formatEntryName derives a GSA record name from a format name.
+func formatEntryName(format string) string {
+	h := sha256.Sum256([]byte(format))
+	return "formats/" + hex.EncodeToString(h[:16]) + ".json"
+}
+
+// formatOf returns the format name for an album — the first path segment
+// of Album.Name (e.g. "Protracker" for "Protracker/Curt Cool").
+func formatOf(albumName string) string {
+	if i := strings.IndexByte(albumName, '/'); i >= 0 {
+		return albumName[:i]
+	}
+	return albumName
+}
+
 // shuffleIndexPath returns the full path to modland.idx.
 func shuffleIndexPath(baseDir string) string {
 	dir, _ := ShuffleIndexDir(baseDir)
@@ -127,10 +171,6 @@ func BuildShuffleIndex(baseDir string, cat *Catalog) error {
 
 	fp := ShuffleIndexFingerprint(baseDir)
 
-	if uint64(len(cat.Albums))+1 > uint64(_idxMaxEntries) {
-		return fmt.Errorf("modland: too many albums %d (max %d)", len(cat.Albums), _idxMaxEntries-1)
-	}
-
 	entries := make([]catalog.ManifestEntry, 0, len(cat.Albums))
 	gsaEntries := make([]archive.SourceEntry, 0, len(cat.Albums)+1)
 	var totalTracks uint64
@@ -138,6 +178,9 @@ func BuildShuffleIndex(baseDir string, cat *Catalog) error {
 	albums := make([]Album, len(cat.Albums))
 	copy(albums, cat.Albums)
 	sort.Slice(albums, func(i, j int) bool { return albums[i].Name < albums[j].Name })
+
+	formatAlbums := make(map[string][]FormatAlbumSummary)
+	var formatOrder []string
 
 	for _, album := range albums {
 		if len(album.Tracks) == 0 {
@@ -170,6 +213,44 @@ func BuildShuffleIndex(baseDir string, cat *Catalog) error {
 			TrackCount: record.TrackCount,
 		})
 		totalTracks += record.TrackCount
+
+		format := formatOf(album.Name)
+		if _, ok := formatAlbums[format]; !ok {
+			formatOrder = append(formatOrder, format)
+		}
+		formatAlbums[format] = append(formatAlbums[format], FormatAlbumSummary{
+			Locator:     album.Name,
+			DisplayName: album.Name,
+			TrackCount:  record.TrackCount,
+		})
+	}
+
+	sort.Strings(formatOrder)
+	formatEntries := make([]catalog.ManifestEntry, 0, len(formatOrder))
+
+	if uint64(len(entries))+uint64(len(formatOrder))+1 > uint64(_idxMaxEntries) {
+		return fmt.Errorf("modland: too many entries %d (max %d)", len(entries)+len(formatOrder)+1, _idxMaxEntries)
+	}
+
+	for _, format := range formatOrder {
+		summaries := formatAlbums[format]
+		var formatTracks uint64
+		for _, s := range summaries {
+			formatTracks += s.TrackCount
+		}
+		formatRecord := ShuffleFormatRecord{Format: format, Albums: summaries}
+		data, err := json.Marshal(formatRecord)
+		if err != nil {
+			return fmt.Errorf("modland: encode format %q: %w", format, err)
+		}
+		name := formatEntryName(format)
+		gsaEntries = append(gsaEntries, archive.SourceEntry{Name: name, Data: data})
+		formatEntries = append(formatEntries, catalog.ManifestEntry{
+			Name:           name,
+			Locator:        format,
+			TrackCount:     formatTracks,
+			DirectoryCount: uint64(len(summaries)),
+		})
 	}
 
 	meta := ShuffleIndexMeta{
@@ -180,6 +261,7 @@ func BuildShuffleIndex(baseDir string, cat *Catalog) error {
 		TrackCount:     totalTracks,
 		DirectoryCount: uint64(len(entries)),
 		Entries:        entries,
+		FormatEntries:  formatEntries,
 		CreatedAt:      time.Now(),
 	}
 	manifestData, err := json.Marshal(meta)
@@ -263,6 +345,43 @@ func validateShuffleManifest(meta *ShuffleIndexMeta) error {
 	}
 	if totalTracks != meta.TrackCount {
 		return fmt.Errorf("modland: manifest track count %d, entries sum %d", meta.TrackCount, totalTracks)
+	}
+	if err := validateFormatEntries(meta); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateFormatEntries checks structural consistency of the format-level
+// manifest entries: unique names/locators, correct entry-name derivation,
+// and that format track counts sum to the album-level total.
+func validateFormatEntries(meta *ShuffleIndexMeta) error {
+	seenNames := make(map[string]struct{}, len(meta.FormatEntries))
+	seenLocators := make(map[string]struct{}, len(meta.FormatEntries))
+	var totalTracks uint64
+	for _, entry := range meta.FormatEntries {
+		if entry.Name == "" {
+			return errors.New("modland: format entry with empty name")
+		}
+		if entry.Locator == "" {
+			return fmt.Errorf("modland: format entry %q has empty locator", entry.Name)
+		}
+		if entry.Name != formatEntryName(entry.Locator) {
+			return fmt.Errorf("modland: format entry name %q != formatEntryName(%q) = %q",
+				entry.Name, entry.Locator, formatEntryName(entry.Locator))
+		}
+		if _, ok := seenNames[entry.Name]; ok {
+			return fmt.Errorf("modland: duplicate format entry name %q", entry.Name)
+		}
+		seenNames[entry.Name] = struct{}{}
+		if _, ok := seenLocators[entry.Locator]; ok {
+			return fmt.Errorf("modland: duplicate format %q", entry.Locator)
+		}
+		seenLocators[entry.Locator] = struct{}{}
+		totalTracks += entry.TrackCount
+	}
+	if len(meta.FormatEntries) > 0 && totalTracks != meta.TrackCount {
+		return fmt.Errorf("modland: format track count %d, want %d", totalTracks, meta.TrackCount)
 	}
 	return nil
 }

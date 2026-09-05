@@ -14,6 +14,9 @@ func testCatalog() *Catalog {
 				{Name: "song1.mod", Size: 100},
 				{Name: "song2.mod", Size: 200},
 			}},
+			{Name: "Protracker/Skaven", Tracks: []Track{
+				{Name: "song3.mod", Size: 150},
+			}},
 			{Name: "ScreamTracker3/Purple Motion", Tracks: []Track{
 				{Name: "tune.s3m", Size: 300},
 			}},
@@ -36,11 +39,11 @@ func TestBuildAndOpenModlandShuffleIndex(t *testing.T) {
 	if src.Source() != catalog.SourceModland {
 		t.Fatalf("Source = %v, want Modland", src.Source())
 	}
-	if src.TrackCount() != 3 {
-		t.Fatalf("TrackCount = %d, want 3", src.TrackCount())
+	if src.TrackCount() != 4 {
+		t.Fatalf("TrackCount = %d, want 4", src.TrackCount())
 	}
-	if src.DirectoryCount() != 2 {
-		t.Fatalf("DirectoryCount = %d, want 2", src.DirectoryCount())
+	if src.DirectoryCount() != 3 {
+		t.Fatalf("DirectoryCount = %d, want 3", src.DirectoryCount())
 	}
 }
 
@@ -70,8 +73,8 @@ func TestModlandRandomTrackNeverEmpty(t *testing.T) {
 		}
 		seen[tr.Path] = true
 	}
-	if len(seen) != 3 {
-		t.Fatalf("expected all 3 tracks to be reachable, saw %d", len(seen))
+	if len(seen) != 4 {
+		t.Fatalf("expected all 4 tracks to be reachable, saw %d", len(seen))
 	}
 }
 
@@ -119,6 +122,84 @@ func TestModlandDirectoryList(t *testing.T) {
 	}
 	if listing.Entries[0].Name != "tune.s3m" {
 		t.Fatalf("Name = %q, want tune.s3m", listing.Entries[0].Name)
+	}
+}
+
+func TestModlandFormats(t *testing.T) {
+	baseDir := t.TempDir()
+	if err := BuildShuffleIndex(baseDir, testCatalog()); err != nil {
+		t.Fatal(err)
+	}
+	src := OpenShuffleSource(baseDir)
+	if src == nil {
+		t.Fatal("OpenShuffleSource returned nil")
+	}
+	defer src.Close()
+
+	formats := src.Formats()
+	if len(formats) != 2 {
+		t.Fatalf("Formats() = %d, want 2", len(formats))
+	}
+	byName := map[string]FormatSummary{}
+	for _, f := range formats {
+		byName[f.Name] = f
+	}
+	pt, ok := byName["Protracker"]
+	if !ok {
+		t.Fatal("missing Protracker format")
+	}
+	if pt.AlbumCount != 2 || pt.TrackCount != 3 {
+		t.Fatalf("Protracker = %+v, want AlbumCount=2 TrackCount=3", pt)
+	}
+	st, ok := byName["ScreamTracker3"]
+	if !ok {
+		t.Fatal("missing ScreamTracker3 format")
+	}
+	if st.AlbumCount != 1 || st.TrackCount != 1 {
+		t.Fatalf("ScreamTracker3 = %+v, want AlbumCount=1 TrackCount=1", st)
+	}
+}
+
+func TestModlandAlbumsInFormat(t *testing.T) {
+	baseDir := t.TempDir()
+	if err := BuildShuffleIndex(baseDir, testCatalog()); err != nil {
+		t.Fatal(err)
+	}
+	src := OpenShuffleSource(baseDir)
+	if src == nil {
+		t.Fatal("OpenShuffleSource returned nil")
+	}
+	defer src.Close()
+
+	albums, err := src.AlbumsInFormat("Protracker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(albums) != 2 {
+		t.Fatalf("AlbumsInFormat(Protracker) = %d, want 2", len(albums))
+	}
+	names := map[string]bool{}
+	for _, a := range albums {
+		names[a.Locator] = true
+	}
+	if !names["Protracker/Curt Cool"] || !names["Protracker/Skaven"] {
+		t.Fatalf("AlbumsInFormat(Protracker) = %+v, missing expected albums", albums)
+	}
+}
+
+func TestModlandAlbumsInFormatUnknown(t *testing.T) {
+	baseDir := t.TempDir()
+	if err := BuildShuffleIndex(baseDir, testCatalog()); err != nil {
+		t.Fatal(err)
+	}
+	src := OpenShuffleSource(baseDir)
+	if src == nil {
+		t.Fatal("OpenShuffleSource returned nil")
+	}
+	defer src.Close()
+
+	if _, err := src.AlbumsInFormat("NoSuchFormat"); err == nil {
+		t.Fatal("expected error for unknown format")
 	}
 }
 
