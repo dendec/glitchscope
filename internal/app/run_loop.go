@@ -314,7 +314,7 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 			// Resize preview to full window for background rendering.
 			a.preview.Resize(w, h)
 			// Render one frame at full window size (stays on screen).
-			a.preview.ProcessNext(true)
+			a.preview.RenderFrame()
 			// Capture the top-left corner into the thumbnail texture.
 			tW, tH := ui.PresetPreviewSize(w, h)
 			a.preview.CaptureThumb(tW, tH)

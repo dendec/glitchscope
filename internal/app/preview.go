@@ -158,13 +158,9 @@ func (r *previewRenderer) setResult(key string, tex uint32) {
 
 // ProcessNext runs one preview step. Returns true if work was done.
 //
-// When fullScreen is true the preview renders at the current window size
-// (the result stays on screen as background). When false it renders into
-// the thumbnail-sized capture texture for the right-panel preview.
-//
 // The job stays active during animation so the thumbnail keeps playing.
 // A new Enqueue replaces the current job.
-func (r *previewRenderer) ProcessNext(fullScreen bool) bool {
+func (r *previewRenderer) ProcessNext() bool {
 	if !r.isReady() {
 		return false
 	}
@@ -188,17 +184,38 @@ func (r *previewRenderer) ProcessNext(fullScreen bool) bool {
 	}
 	r.nextFrame = now.Add(previewFramePeriod)
 
+	// Render at thumbnail size and capture into the thumb texture.
+	C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
 	started := time.Now()
-	if fullScreen {
-		// Render at full window size — result stays on screen as background.
-		r.pm.RenderFrame()
-	} else {
-		// Render at thumbnail size and capture into the thumb texture.
-		C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
-		r.pm.RenderFrame()
-		C.prCaptureThumb(r.tex, C.GLsizei(r.w), C.GLsizei(r.h))
-		r.setResult(r.active.key, uint32(r.tex))
+	r.pm.RenderFrame()
+	r.meter.AddDuration(time.Since(started))
+	C.prCaptureThumb(r.tex, C.GLsizei(r.w), C.GLsizei(r.h))
+	r.setResult(r.active.key, uint32(r.tex))
+
+	return true
+}
+
+// RenderFrame renders one preview frame at the current window size into
+// framebuffer 0. The result stays on screen as background.
+// Unlike ProcessNext, this always renders when called — no frame throttling.
+func (r *previewRenderer) RenderFrame() bool {
+	if !r.isReady() {
+		return false
 	}
+
+	if r.active == nil {
+		if len(r.queue) == 0 {
+			return false
+		}
+		r.active = &r.queue[0]
+		r.queue = r.queue[1:]
+		r.meter.Reset()
+		slog.Debug("preview job started", "key", r.active.key)
+		r.pm.LoadPresetData(r.active.data, false)
+	}
+
+	started := time.Now()
+	r.pm.RenderFrame()
 	r.meter.AddDuration(time.Since(started))
 
 	return true
@@ -209,9 +226,8 @@ func previewFrameDue(now, nextFrame time.Time) bool {
 }
 
 // CaptureThumb copies the top-left corner of framebuffer 0 into the
-// thumbnail texture at the given dimensions. Called after a full-screen
-// ProcessNext(true) so the panel can display a mini version of the
-// background.
+// thumbnail texture at the given dimensions. Called after RenderFrame()
+// so the panel can display a mini version of the background.
 func (r *previewRenderer) CaptureThumb(tW, tH int) {
 	if !r.isReady() || tW <= 0 || tH <= 0 {
 		return
