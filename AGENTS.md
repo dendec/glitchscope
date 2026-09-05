@@ -260,6 +260,9 @@ mechanical wrappers. Keep them thin — put business logic in the caller.
 - `docs/SEEK-DESIGN.md` — the seek/перемотка architecture (accelerating seek
   drivetrain + pre-render layer). Read it before touching seeking or the
   tracker/chip pre-render path in `internal/player`.
+- `.github/instructions/shuffle-optimization.instructions.md` — implementation
+  contract for memory-efficient shuffle across local, Modland, and ModArchive;
+  read it before changing shuffle, catalog indexing, or catalog navigation.
 - `README.md` — user-facing features and build instructions.
 - Keep docs in sync with behavior; a change is "complete" only when its
   implementation, tests, and docs are all updated together.

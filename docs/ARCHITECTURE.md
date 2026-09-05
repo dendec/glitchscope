@@ -15,6 +15,7 @@
 | Удаление файлов | `internal/app/delete_service.go` | confirmation UI, rescan |
 | Favorites | `internal/player` (`favorites.go`) | overlay navigation, input actions, JSON storage |
 | Remote catalogs | `internal/modland`, `internal/modarchive` | provider navigation and downloads |
+| Provider-neutral directory cache | `internal/catalog` | provider loaders, shuffle selection, UI listings |
 
 **Каталоговые альбомы** (modland/modarchive) хранятся в `lib.Albums` через
 `Library.AddCatalogAlbum`. Overlay создаёт альбомы on-the-fly во время навигации
@@ -46,6 +47,14 @@ Content` считается ошибкой. Прямые module entries расп
 или `deflate`; вложенные однотрековые ZIP после этого извлекаются локально.
 Виртуальный track path хранит имя entry во fragment внешнего URL, а итоговый
 cache path по-прежнему определяет только `internal/player.Resolver`.
+
+Для будущего lazy shuffle `internal/catalog` содержит только provider-neutral
+типы ключей, listing values, fingerprints и bounded directory cache. Провайдеры
+владеют декодированием и persistent index records, `internal/app` — политикой
+выбора и playback orchestration, а `internal/player.Library` — только текущим
+playback/navigation context и materialized catalog albums, а не полным remote
+shuffle pool. Подробный migration contract находится в
+[shuffle-optimization.instructions.md](../.github/instructions/shuffle-optimization.instructions.md).
 
 ## Правила изменений
 
