@@ -25,7 +25,11 @@ const (
 	headerMarginAt480      = 5
 	headerExtraHeightAt480 = 2
 
-	cursorHighlightAlpha = 0.33
+	// Design-time alpha values for decorative UI elements. Scaled by
+	// uiAlpha() at draw time so they respect the Transparency setting.
+	alphaAccentHighlight = float32(0.33) // cursor / selection highlight
+	alphaTrackBg         = float32(0.15) // progress bar background, scrollbar track
+	alphaTrackFill       = float32(0.70) // progress bar fill, scrollbar thumb
 )
 
 func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
@@ -152,7 +156,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		tc := o.textColor()
 		r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
 		barY := float32(winH - hintRowH - barH)
-		glDrawFilledRect(o.programRect, 0, barY, float32(winW), float32(barH), r, g, b, 0.15, winW, winH, viewW, viewH)
+		glDrawFilledRect(o.programRect, 0, barY, float32(winW), float32(barH), r, g, b, o.uiAlpha(alphaTrackBg), winW, winH, viewW, viewH)
 		progress := o.position / o.duration
 		if progress > 1 {
 			progress = 1
@@ -160,7 +164,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		if progress < 0 {
 			progress = 0
 		}
-		glDrawFilledRect(o.programRect, 0, barY, float32(float64(winW)*progress), float32(barH), r, g, b, 0.7, winW, winH, viewW, viewH)
+		glDrawFilledRect(o.programRect, 0, barY, float32(float64(winW)*progress), float32(barH), r, g, b, o.uiAlpha(alphaTrackFill), winW, winH, viewW, viewH)
 	}
 
 	// Context action-hints footer: always shown across pages, at the very bottom.
@@ -195,7 +199,7 @@ func drawScrollbar(o *Overlay, sbX, panelY, panelH float32, totalItems, visibleI
 	r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
 	thumbW := float32(o.scrollbarWidthPx())
 	// Track.
-	glDrawFilledRect(o.programRect, sbX, panelY, thumbW, panelH, r, g, b, 0.15, winW, winH, viewW, viewH)
+	glDrawFilledRect(o.programRect, sbX, panelY, thumbW, panelH, r, g, b, o.uiAlpha(alphaTrackBg), winW, winH, viewW, viewH)
 	// Thumb.
 	thumbH := panelH * float32(visibleItems) / float32(totalItems)
 	if thumbH < 8 {
@@ -206,7 +210,7 @@ func drawScrollbar(o *Overlay, sbX, panelY, panelH float32, totalItems, visibleI
 		maxScroll = 1
 	}
 	thumbY := panelY + (panelH-thumbH)*float32(scrollPos)/float32(maxScroll)
-	glDrawFilledRect(o.programRect, sbX, thumbY, thumbW, thumbH, r, g, b, 0.7, winW, winH, viewW, viewH)
+	glDrawFilledRect(o.programRect, sbX, thumbY, thumbW, thumbH, r, g, b, o.uiAlpha(alphaTrackFill), winW, winH, viewW, viewH)
 }
 
 // scrollOffset returns the first visible row keeping cursor within the window.
@@ -755,7 +759,7 @@ func (o *Overlay) drawCursorHighlight(x, y, w, h float32, winW, winH, viewW, vie
 		lineGap = 1
 	}
 	padding := textPadding(o.fontSize) + lineGap
-	glDrawFilledRect(o.programRect, x, y+float32(padding), w, h, r, g, b, cursorHighlightAlpha, winW, winH, viewW, viewH)
+	glDrawFilledRect(o.programRect, x, y+float32(padding), w, h, r, g, b, o.uiAlpha(alphaAccentHighlight), winW, winH, viewW, viewH)
 }
 
 // renderStatsOnly draws a minimal stats bar (FPS/MEM/CPU) without the full UI.

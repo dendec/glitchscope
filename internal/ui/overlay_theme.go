@@ -328,6 +328,15 @@ func (o *Overlay) transparencyAlpha() float32 {
 // bgAlpha returns the panel background alpha.
 func (o *Overlay) bgAlpha() float32 { return o.transparencyAlpha() }
 
+// uiAlpha scales a design-time alpha by the current transparency so that
+// decorative elements (cursor highlight, progress bar, scrollbar) fade
+// together with panel backgrounds when the user increases Transparency.
+// Panel borders are intentionally excluded — the focus ring must remain
+// visible at all times.
+func (o *Overlay) uiAlpha(base float32) float32 {
+	return base * o.transparencyAlpha()
+}
+
 // scalePx converts a pixel size designed at 480p to the current screen height.
 func (o *Overlay) scalePx(at480 int) int {
 	scaled := int(math.Round(float64(at480*o.screenH) / 480))
