@@ -6,6 +6,15 @@ import (
 	"path/filepath"
 )
 
+// ShuffleIndexDir returns the directory for a source's shuffle index file.
+func ShuffleIndexDir(baseDir, source string) (string, error) {
+	dir := filepath.Join(baseDir, ".cache", "shuffle")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("shuffle index mkdir: %w", err)
+	}
+	return dir, nil
+}
+
 // WriteIndexAtomically writes caller-validated data to a temporary file in dir
 // and atomically renames it to filename. The previous file is preserved until
 // the rename succeeds.
