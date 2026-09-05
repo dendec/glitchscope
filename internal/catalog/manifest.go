@@ -42,8 +42,31 @@ func (m *ManifestMeta) Validate() error {
 	if m.Version != ManifestVersion {
 		return fmt.Errorf("manifest version: got %d, want %d", m.Version, ManifestVersion)
 	}
+	if m.Source < SourceLocal || m.Source > SourceModArchive {
+		return fmt.Errorf("manifest source: got %d", m.Source)
+	}
 	if m.Entries == nil {
 		m.Entries = []ManifestEntry{}
+	}
+	seen := make(map[string]struct{}, len(m.Entries))
+	var entryTracks uint64
+	var entryDirectories uint64
+	for _, entry := range m.Entries {
+		if entry.Name == "" {
+			return fmt.Errorf("manifest entry: empty name")
+		}
+		if _, ok := seen[entry.Name]; ok {
+			return fmt.Errorf("manifest entry: duplicate name %q", entry.Name)
+		}
+		seen[entry.Name] = struct{}{}
+		entryTracks += entry.TrackCount
+		entryDirectories += entry.DirectoryCount
+	}
+	if entryTracks != m.TrackCount {
+		return fmt.Errorf("manifest track count: entries=%d, total=%d", entryTracks, m.TrackCount)
+	}
+	if entryDirectories > m.DirectoryCount {
+		return fmt.Errorf("manifest directory count: entries=%d, total=%d", entryDirectories, m.DirectoryCount)
 	}
 	return nil
 }

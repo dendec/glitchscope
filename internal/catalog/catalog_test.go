@@ -113,6 +113,15 @@ func TestShuffleCatalogRandomTrackAllNoSources(t *testing.T) {
 	}
 }
 
+func TestWeightedIndexStaysWithinTotal(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	for range 1000 {
+		if got := weightedIndex(rng, 7); got >= 7 {
+			t.Fatalf("weightedIndex = %d, want value below 7", got)
+		}
+	}
+}
+
 func TestShuffleCatalogRandomTrackFromSource(t *testing.T) {
 	local := &mockIndex{
 		source: SourceLocal,

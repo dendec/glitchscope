@@ -61,6 +61,58 @@ func TestManifestValidateBadVersion(t *testing.T) {
 	}
 }
 
+func TestManifestValidateBadSource(t *testing.T) {
+	m := &ManifestMeta{Schema: ManifestSchema, Version: ManifestVersion, Source: SourceKind(99)}
+	if err := m.Validate(); err == nil {
+		t.Fatal("expected error for bad source")
+	}
+}
+
+func TestManifestValidateEntryCounts(t *testing.T) {
+	tests := []struct {
+		name    string
+		entries []ManifestEntry
+		tracks  uint64
+		wantErr bool
+	}{
+		{
+			name:    "track count mismatch",
+			entries: []ManifestEntry{{Name: "tracks.json", TrackCount: 1}},
+			tracks:  2,
+			wantErr: true,
+		},
+		{
+			name: "duplicate names",
+			entries: []ManifestEntry{
+				{Name: "tracks.json", TrackCount: 1},
+				{Name: "tracks.json", TrackCount: 1},
+			},
+			tracks:  2,
+			wantErr: true,
+		},
+		{
+			name:    "valid entries",
+			entries: []ManifestEntry{{Name: "tracks.json", TrackCount: 2}},
+			tracks:  2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &ManifestMeta{
+				Schema:     ManifestSchema,
+				Version:    ManifestVersion,
+				Source:     SourceLocal,
+				Entries:    tt.entries,
+				TrackCount: tt.tracks,
+			}
+			if err := m.Validate(); (err != nil) != tt.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestManifestValidateNilEntries(t *testing.T) {
 	m := &ManifestMeta{Schema: ManifestSchema, Version: ManifestVersion}
 	if err := m.Validate(); err != nil {

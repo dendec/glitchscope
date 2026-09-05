@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-// WriteIndexAtomically writes data to a temporary file in dir, validates it,
+// WriteIndexAtomically writes caller-validated data to a temporary file in dir
 // and atomically renames it to filename. The previous file is preserved until
 // the rename succeeds.
 func WriteIndexAtomically(dir, filename string, data []byte) error {

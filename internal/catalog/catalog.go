@@ -62,7 +62,7 @@ func (c *ShuffleCatalog) RandomTrackAll(rng *rand.Rand) (ShuffleTrack, error) {
 	if total == 0 {
 		return ShuffleTrack{}, ErrNoSourceAvailable
 	}
-	pick := rng.Uint64() % total
+	pick := weightedIndex(rng, total)
 	var cumulative uint64
 	var selected SourceIndex
 	for _, idx := range available {
@@ -77,6 +77,16 @@ func (c *ShuffleCatalog) RandomTrackAll(rng *rand.Rand) (ShuffleTrack, error) {
 	}
 
 	return selected.RandomTrack(rng)
+}
+
+func weightedIndex(rng *rand.Rand, total uint64) uint64 {
+	threshold := -total % total
+	for {
+		value := rng.Uint64()
+		if value >= threshold {
+			return value % total
+		}
+	}
 }
 
 // RandomTrackFromSource selects a track from a specific source.
