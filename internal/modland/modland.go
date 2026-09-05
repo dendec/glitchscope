@@ -33,6 +33,17 @@ func (a *Album) TrackPath(i int) string {
 	return a.Name + "/" + a.Tracks[i].Name
 }
 
+// PathPrefix identifies a virtual modland track path, matching
+// player.ModlandPrefix. Duplicated here to avoid a package dependency
+// on internal/player.
+const PathPrefix = "modland:"
+
+// ModlandPrefixTrackPath returns the playback path for a modland-relative
+// track path (as returned by Album.TrackPath).
+func ModlandPrefixTrackPath(remotePath string) string {
+	return PathPrefix + remotePath
+}
+
 // Catalog is the parsed modland module listing.
 type Catalog struct {
 	Albums          []Album
