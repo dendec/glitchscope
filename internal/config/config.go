@@ -299,10 +299,10 @@ func (m *RepeatMode) UnmarshalJSON(data []byte) error {
 type ShuffleMode int
 
 const (
-	ShuffleOff   ShuffleMode = iota // sequential
-	ShuffleAlbum                    // random within current album
-	ShuffleLocal                    // random across local albums only
-	ShuffleAll                      // random across all tracks (local + modland)
+	ShuffleOff    ShuffleMode = iota // sequential
+	ShuffleAlbum                     // random within current album
+	ShuffleSource                    // random across the current source
+	ShuffleAll                       // random across all tracks and sources
 )
 
 func (m ShuffleMode) String() string {
@@ -311,8 +311,8 @@ func (m ShuffleMode) String() string {
 		return "Off"
 	case ShuffleAlbum:
 		return "Shuffle Album"
-	case ShuffleLocal:
-		return "Shuffle Local"
+	case ShuffleSource:
+		return "Shuffle Source"
 	case ShuffleAll:
 		return "Shuffle All"
 	default:
@@ -329,8 +329,8 @@ func (m ShuffleMode) MarshalJSON() ([]byte, error) {
 		s = "off"
 	case ShuffleAlbum:
 		s = "shuffle_album"
-	case ShuffleLocal:
-		s = "shuffle_local"
+	case ShuffleSource:
+		s = "shuffle_source"
 	case ShuffleAll:
 		s = "shuffle_all"
 	default:
@@ -349,8 +349,9 @@ func (m *ShuffleMode) UnmarshalJSON(data []byte) error {
 		case "shuffle_album":
 			*m = ShuffleAlbum
 			return nil
-		case "shuffle_local":
-			*m = ShuffleLocal
+		case "shuffle_source", "shuffle_local":
+			// shuffle_local was the previous name for this mode.
+			*m = ShuffleSource
 			return nil
 		case "shuffle_all":
 			*m = ShuffleAll
@@ -372,7 +373,7 @@ func (m *ShuffleMode) UnmarshalJSON(data []byte) error {
 }
 
 func AllShuffleModes() []ShuffleMode {
-	return []ShuffleMode{ShuffleOff, ShuffleAlbum, ShuffleLocal, ShuffleAll}
+	return []ShuffleMode{ShuffleOff, ShuffleAlbum, ShuffleSource, ShuffleAll}
 }
 
 // PlaybackSettings holds shuffle/repeat configuration.

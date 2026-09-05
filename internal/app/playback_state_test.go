@@ -92,7 +92,7 @@ func TestShufflePlaylistCoversAllTracks(t *testing.T) {
 	}
 	state.shuffle.rng = rand.New(rand.NewSource(42))
 	settings := config.PlaybackSettings{
-		ShuffleMode: config.ShuffleAll,
+		ShuffleMode: config.ShuffleAlbum,
 		Repeat:      config.RepeatOff,
 	}
 
@@ -130,7 +130,7 @@ func TestShufflePlaylistRepeatAllCycles(t *testing.T) {
 	}
 	state.shuffle.rng = rand.New(rand.NewSource(42))
 	settings := config.PlaybackSettings{
-		ShuffleMode: config.ShuffleAll,
+		ShuffleMode: config.ShuffleAlbum,
 		Repeat:      config.RepeatAll,
 	}
 
@@ -220,10 +220,12 @@ func TestShuffleAlbumStaysWithinAlbum(t *testing.T) {
 	}
 }
 
-func TestShuffleLocalExcludesRemote(t *testing.T) {
+func TestShuffleSourceStaysWithinCurrentSource(t *testing.T) {
 	lib := &player.Library{Albums: []player.Album{
-		{Name: "Local", Path: "/music/local", Tracks: []string{"local1.mod", "local2.mod"}},
-		{Name: "Modland", Path: "modland:MODS", Tracks: []string{"remote1.mod"}},
+		{Name: "Local A", Path: "/music/a", Tracks: []string{"local-a.mod"}},
+		{Name: "Local B", Path: "/music/b", Tracks: []string{"local-b.mod"}},
+		{Name: "Modland", Path: "modland:MODS", Tracks: []string{"modland.mod"}},
+		{Name: "ModArchive", Path: "modarchive:archive", Tracks: []string{"modarchive.mod"}},
 	}}
 	state := playbackState{
 		pl:  &player.Player{},
@@ -231,9 +233,10 @@ func TestShuffleLocalExcludesRemote(t *testing.T) {
 	}
 	state.shuffle.rng = rand.New(rand.NewSource(42))
 	settings := config.PlaybackSettings{
-		ShuffleMode: config.ShuffleLocal,
+		ShuffleMode: config.ShuffleSource,
 		Repeat:      config.RepeatOff,
 	}
+	lib.SelectAlbum(0)
 
 	seen := make(map[string]bool)
 	for range 2 {
@@ -243,11 +246,65 @@ func TestShuffleLocalExcludesRemote(t *testing.T) {
 		}
 		seen[track.path] = true
 	}
-	if _, ok := seen["remote1.mod"]; ok {
-		t.Fatal("remote track was included in ShuffleLocal")
+	if _, ok := seen["modland.mod"]; ok {
+		t.Fatal("Modland track was included in local ShuffleSource")
+	}
+	if _, ok := seen["modarchive.mod"]; ok {
+		t.Fatal("ModArchive track was included in local ShuffleSource")
 	}
 	if len(seen) != 2 {
 		t.Fatalf("saw %d tracks, want 2 local tracks", len(seen))
+	}
+}
+
+func TestShuffleSourceUsesSelectedRemoteProvider(t *testing.T) {
+	lib := &player.Library{Albums: []player.Album{
+		{Name: "Modland A", Path: "modland:MODS/A", Tracks: []string{"modland-a.mod"}},
+		{Name: "Modland B", Path: "modland:MODS/B", Tracks: []string{"modland-b.mod"}},
+		{Name: "ModArchive", Path: "modarchive:archive", Tracks: []string{"modarchive.mod"}},
+	}}
+	state := playbackState{pl: &player.Player{}, lib: lib}
+	state.shuffle.rng = rand.New(rand.NewSource(42))
+	lib.SelectAlbum(0)
+
+	pool, _ := state.shufflePool(config.PlaybackSettings{ShuffleMode: config.ShuffleSource})
+	if len(pool) != 2 {
+		t.Fatalf("Modland ShuffleSource pool len = %d, want 2", len(pool))
+	}
+	for _, track := range pool {
+		if track.path == "modarchive.mod" {
+			t.Fatal("ModArchive track was included in Modland ShuffleSource")
+		}
+	}
+}
+
+func TestShuffleAllIncludesOutsideActivePlaylist(t *testing.T) {
+	lib := &player.Library{Albums: []player.Album{
+		{Name: "Current", Path: "/music/current", Tracks: []string{"current.mod"}},
+		{Name: "Other", Path: "/music/other", Tracks: []string{"other.mod"}},
+	}}
+	state := playbackState{
+		pl:            &player.Player{},
+		lib:           lib,
+		playlist:      []string{"current.mod"},
+		playlistIdx:   0,
+		playlistAlbum: "Current",
+	}
+	state.shuffle.rng = rand.New(rand.NewSource(42))
+	pool, _ := state.shufflePool(config.PlaybackSettings{ShuffleMode: config.ShuffleAll})
+	if len(pool) != 2 {
+		t.Fatalf("ShuffleAll pool len = %d, want 2", len(pool))
+	}
+	seen := map[string]bool{}
+	for range 2 {
+		track, ok := state.advance(config.PlaybackSettings{ShuffleMode: config.ShuffleAll})
+		if !ok {
+			t.Fatal("ShuffleAll ended before visiting the library")
+		}
+		seen[track.path] = true
+	}
+	if !seen["other.mod"] {
+		t.Fatal("ShuffleAll did not include the track outside the active playlist")
 	}
 }
 
@@ -314,7 +371,7 @@ func TestShuffleExhaustedNoRepeatReturnsFalse(t *testing.T) {
 	}
 	state.shuffle.rng = rand.New(rand.NewSource(42))
 	settings := config.PlaybackSettings{
-		ShuffleMode: config.ShuffleAll,
+		ShuffleMode: config.ShuffleAlbum,
 		Repeat:      config.RepeatOff,
 	}
 
@@ -523,7 +580,7 @@ func TestShuffleKeepsPlaylistCursorInSync(t *testing.T) {
 	}
 	state.shuffle.rng = rand.New(rand.NewSource(42))
 	settings := config.PlaybackSettings{
-		ShuffleMode: config.ShuffleAll,
+		ShuffleMode: config.ShuffleAlbum,
 		Repeat:      config.RepeatOff,
 	}
 
@@ -568,7 +625,7 @@ func TestShuffleFullCyclePlaylist(t *testing.T) {
 	}
 	state.shuffle.rng = rand.New(rand.NewSource(99))
 	settings := config.PlaybackSettings{
-		ShuffleMode: config.ShuffleAll,
+		ShuffleMode: config.ShuffleAlbum,
 		Repeat:      config.RepeatOff,
 	}
 

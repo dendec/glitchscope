@@ -452,10 +452,10 @@ func TestShuffleModeRoundTrip(t *testing.T) {
 func TestShuffleModeCanonicalFormat(t *testing.T) {
 	// MarshalJSON must produce lowercase strings.
 	want := map[ShuffleMode]string{
-		ShuffleOff:   `"off"`,
-		ShuffleAlbum: `"shuffle_album"`,
-		ShuffleLocal: `"shuffle_local"`,
-		ShuffleAll:   `"shuffle_all"`,
+		ShuffleOff:    `"off"`,
+		ShuffleAlbum:  `"shuffle_album"`,
+		ShuffleSource: `"shuffle_source"`,
+		ShuffleAll:    `"shuffle_all"`,
 	}
 	for mode, expected := range want {
 		b, err := json.Marshal(mode)
@@ -483,6 +483,16 @@ func TestShuffleModeInvalid(t *testing.T) {
 	var m ShuffleMode
 	if err := json.Unmarshal([]byte(`"Turbo"`), &m); err == nil {
 		t.Fatal("expected error for invalid mode")
+	}
+}
+
+func TestShuffleModeLegacyLocalName(t *testing.T) {
+	var mode ShuffleMode
+	if err := json.Unmarshal([]byte(`"shuffle_local"`), &mode); err != nil {
+		t.Fatal("legacy shuffle name unmarshal:", err)
+	}
+	if mode != ShuffleSource {
+		t.Fatalf("got %v, want ShuffleSource", mode)
 	}
 }
 

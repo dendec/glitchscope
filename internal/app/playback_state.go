@@ -290,9 +290,8 @@ func (s *playbackState) repeatOne() (trackRef, bool) {
 }
 
 // advanceShuffled picks the next track from the shuffled order, rebuilding
-// when the source or mode changes. When a playlist is active, it is the
-// shuffle pool (user's explicit context). Otherwise the pool is derived from
-// the library according to ShuffleMode.
+// when the source or mode changes. Shuffle Album stays within the active
+// playlist when one exists; broader modes derive their pool from the library.
 func (s *playbackState) advanceShuffled(settings config.PlaybackSettings) (trackRef, bool) {
 	pool, key := s.shufflePool(settings)
 	if s.shuffle.needsRebuild(key, settings.Repeat) {
@@ -308,14 +307,15 @@ func (s *playbackState) advanceShuffled(settings config.PlaybackSettings) (track
 
 // shufflePool returns the track pool and identity key for shuffling.
 func (s *playbackState) shufflePool(settings config.PlaybackSettings) ([]trackRef, string) {
-	if len(s.playlist) > 0 {
-		return s.playlistTracks(), s.playlistKey()
-	}
 	switch settings.ShuffleMode {
 	case config.ShuffleAlbum:
+		if len(s.playlist) > 0 {
+			return s.playlistTracks(), s.playlistKey()
+		}
 		return s.currentAlbumTracks(), s.albumKey()
-	case config.ShuffleLocal:
-		return s.localTracks(), s.libraryKey("local")
+	case config.ShuffleSource:
+		source := s.currentSource()
+		return s.sourceTracks(source), s.libraryKey("source:" + source)
 	case config.ShuffleAll:
 		return s.allTracks(), s.libraryKey("all")
 	default:
@@ -418,10 +418,29 @@ func (s *playbackState) currentAlbumTracks() []trackRef {
 	return tracks
 }
 
-func (s *playbackState) localTracks() []trackRef {
+func (s *playbackState) currentSource() string {
+	if s.lib != nil {
+		album := s.lib.CurrentAlbum()
+		if player.IsModland(album.Path) {
+			return "modland"
+		}
+		if player.IsModArchive(album.Path) {
+			return "modarchive"
+		}
+	}
+	return "local"
+}
+
+func (s *playbackState) sourceTracks(source string) []trackRef {
 	var all []trackRef
 	for _, album := range s.lib.Albums {
-		if player.IsModland(album.Path) || player.IsModArchive(album.Path) {
+		albumSource := "local"
+		if player.IsModland(album.Path) {
+			albumSource = "modland"
+		} else if player.IsModArchive(album.Path) {
+			albumSource = "modarchive"
+		}
+		if albumSource != source {
 			continue
 		}
 		for _, path := range album.Tracks {

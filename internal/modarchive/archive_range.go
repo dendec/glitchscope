@@ -43,22 +43,6 @@ type archiveRecord struct {
 	flags            uint16
 }
 
-type rangeProgressReader struct {
-	reader     io.Reader
-	read       int64
-	total      int64
-	onProgress func(int64, int64)
-}
-
-func (r *rangeProgressReader) Read(buffer []byte) (int, error) {
-	read, err := r.reader.Read(buffer)
-	if read > 0 {
-		r.read += int64(read)
-		r.onProgress(r.read, r.total)
-	}
-	return read, err
-}
-
 func isSnapshotDirectoryURL(targetURL *url.URL) bool {
 	urlPath := strings.TrimPrefix(targetURL.Path, "/")
 	return strings.HasPrefix(urlPath, SnapshotDir+"/") || strings.HasPrefix(urlPath, AddendumDir+"/")
@@ -292,12 +276,9 @@ func fetchSuffixRange(ctx context.Context, targetURL string, size int64, onProgr
 	if size <= 0 {
 		return nil, 0, 0, errors.New("invalid suffix range size")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	req.Header.Set("Range", fmt.Sprintf("bytes=-%d", size))
-	data, start, total, err := doRangeRequest(req, size, onProgress)
+	headers := make(http.Header)
+	headers.Set("Range", fmt.Sprintf("bytes=-%d", size))
+	data, start, total, err := doRangeRequest(ctx, targetURL, headers, size, onProgress)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -311,13 +292,10 @@ func fetchByteRange(ctx context.Context, targetURL string, start, end int64, onP
 	if start < 0 || end < start {
 		return nil, 0, errors.New("invalid byte range")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+	headers := make(http.Header)
+	headers.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 	expectedSize := end - start + 1
-	data, actualStart, total, err := doRangeRequest(req, expectedSize, onProgress)
+	data, actualStart, total, err := doRangeRequest(ctx, targetURL, headers, expectedSize, onProgress)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -327,8 +305,8 @@ func fetchByteRange(ctx context.Context, targetURL string, start, end int64, onP
 	return data, total, nil
 }
 
-func doRangeRequest(req *http.Request, maxBytes int64, onProgress func(int64, int64)) ([]byte, int64, int64, error) {
-	resp, err := http.DefaultClient.Do(req)
+func doRangeRequest(ctx context.Context, targetURL string, headers http.Header, maxBytes int64, onProgress func(int64, int64)) ([]byte, int64, int64, error) {
+	resp, err := util.Get(ctx, targetURL, headers)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -345,10 +323,7 @@ func doRangeRequest(req *http.Request, maxBytes int64, onProgress func(int64, in
 	if responseBytes > maxBytes {
 		return nil, 0, 0, fmt.Errorf("range response is %d bytes, requested at most %d", responseBytes, maxBytes)
 	}
-	reader := io.Reader(resp.Body)
-	if onProgress != nil {
-		reader = &rangeProgressReader{reader: reader, total: responseBytes, onProgress: onProgress}
-	}
+	reader := util.NewProgressReader(resp.Body, responseBytes, onProgress)
 	data, err := io.ReadAll(io.LimitReader(reader, responseBytes+1))
 	if err != nil {
 		return nil, 0, 0, err

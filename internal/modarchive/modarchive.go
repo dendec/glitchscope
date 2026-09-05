@@ -29,7 +29,6 @@ const (
 	SnapshotLabel = "1987-2007"
 	AddendumDir   = "modarchive_2007_official_snapshot_addendum1"
 	AddendumLabel = "2007"
-	cacheDirName  = "modarchive-cache"
 	indexSubDir   = "index"
 	filesSubDir   = "files"
 	httpTimeout   = 30 * time.Second
@@ -361,8 +360,9 @@ func fetchAndCacheDirectory(baseDir string, targetURL string) ([]DirItem, error)
 
 	cacheFile := filepath.Join(indexDir, urlHash(targetURL)+".json")
 
-	client := &http.Client{Timeout: httpTimeout}
-	resp, err := client.Get(targetURL)
+	ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
+	defer cancel()
+	resp, err := util.Get(ctx, targetURL, nil)
 	if err != nil {
 		if items, cacheErr := loadCachedIndex(cacheFile); cacheErr == nil && len(items) > 0 {
 			slog.Warn("modarchive: network failed, using expired cache", "url", targetURL, "error", err)

@@ -10,9 +10,15 @@ import (
 )
 
 func TestDownloadWithFallback(t *testing.T) {
+	successRequests := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/fail" {
 			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		successRequests++
+		if successRequests == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -49,5 +55,8 @@ func TestDownloadWithFallback(t *testing.T) {
 	}
 	if bytesRead != int64(len("download content ok")) {
 		t.Errorf("unexpected bytesRead: %d", bytesRead)
+	}
+	if successRequests != 2 {
+		t.Fatalf("success URL requests = %d, want 2", successRequests)
 	}
 }

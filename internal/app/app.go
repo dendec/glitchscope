@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"math"
 	"math/rand"
-	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -25,6 +24,7 @@ import (
 	"github.com/dendec/glitchscope/internal/prof"
 	"github.com/dendec/glitchscope/internal/projectm"
 	"github.com/dendec/glitchscope/internal/ui"
+	"github.com/dendec/glitchscope/internal/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -433,12 +433,7 @@ func (a *App) checkConnectivity() {
 	go func() {
 		ctx, cancel := context.WithTimeout(a.appCtx, 5*time.Second)
 		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://modland.antarctica.no/", nil)
-		if err != nil {
-			slog.Info("connectivity check: request create failed", "error", err)
-			return
-		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := util.Get(ctx, "https://modland.antarctica.no/", nil)
 		if err != nil {
 			slog.Info("connectivity check: offline", "error", err)
 			return

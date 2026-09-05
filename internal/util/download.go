@@ -1,4 +1,4 @@
-// Package util provides shared utility functions for file downloading, progress tracking, and persistence.
+// Package util provides shared HTTP, download, archive, cache, and persistence utilities.
 package util
 
 import (
@@ -9,30 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 )
-
-// perReadTimeout wraps an io.Reader and fails if no data arrives within d.
-// This prevents stuck downloads without imposing a total transaction timeout
-// (which would kill large files on slow connections).
-type perReadTimeout struct {
-	r        io.Reader
-	d        time.Duration
-	lastRead time.Time
-}
-
-func (t *perReadTimeout) Read(p []byte) (int, error) {
-	n, err := t.r.Read(p)
-	if n > 0 {
-		t.lastRead = time.Now()
-	} else if t.lastRead.IsZero() {
-		t.lastRead = time.Now()
-	}
-	if err == nil && time.Since(t.lastRead) > t.d {
-		return n, fmt.Errorf("download: no data received for %s", t.d)
-	}
-	return n, err
-}
 
 // ProgressReader wraps an io.Reader and reports cumulative bytes read.
 type ProgressReader struct {
@@ -40,6 +17,14 @@ type ProgressReader struct {
 	read       int64
 	total      int64
 	onProgress func(read, total int64)
+}
+
+// NewProgressReader wraps r and reports cumulative bytes read.
+func NewProgressReader(r io.Reader, total int64, onProgress func(read, total int64)) io.Reader {
+	if onProgress == nil {
+		return r
+	}
+	return &ProgressReader{r: r, total: total, onProgress: onProgress}
 }
 
 func (pr *ProgressReader) Read(p []byte) (int, error) {
@@ -68,9 +53,6 @@ func DownloadWithFallback(ctx context.Context, urls []string, targetPath string,
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	// No total client timeout: large files on slow connections need
-	// unbounded body read time. Cancellation is handled by ctx.
-	client := &http.Client{}
 	var resp *http.Response
 	var lastErr error
 	lastStatus := 0
@@ -80,11 +62,7 @@ func DownloadWithFallback(ctx context.Context, urls []string, targetPath string,
 			return err
 		}
 		slog.Debug("downloading", "url", u)
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-		if err != nil {
-			return fmt.Errorf("download request: %w", err)
-		}
-		resp, lastErr = client.Do(req)
+		resp, lastErr = Get(ctx, u, nil)
 		if lastErr != nil || resp.StatusCode != http.StatusOK {
 			if resp != nil {
 				lastStatus = resp.StatusCode
@@ -118,12 +96,7 @@ func DownloadWithFallback(ctx context.Context, urls []string, targetPath string,
 	}
 	tmpPath := tmp.Name()
 
-	var reader io.Reader = resp.Body
-	// Guard against stuck connections: fail if no data arrives for 2 minutes.
-	reader = &perReadTimeout{r: reader, d: 2 * time.Minute}
-	if onProgress != nil {
-		reader = &ProgressReader{r: reader, total: total, onProgress: onProgress}
-	}
+	reader := NewProgressReader(resp.Body, total, onProgress)
 
 	if _, err := io.Copy(tmp, reader); err != nil {
 		tmp.Close()

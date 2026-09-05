@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/dendec/glitchscope/internal/modland"
 	"github.com/dendec/glitchscope/internal/openmpt"
+	"github.com/dendec/glitchscope/internal/util"
 	"github.com/dendec/glitchscope/internal/xmp"
 )
 
@@ -72,8 +74,6 @@ func main() {
 		existing[e] = true
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
-
 	for _, info := range sorted {
 		if existing[info.format] {
 			continue
@@ -82,7 +82,7 @@ func main() {
 		remotePath := info.album + "/" + info.smallest.Name
 		fmt.Printf("testing %s: %s (%d bytes)... ", info.format, info.smallest.Name, info.smallest.Size)
 
-		data, err := download(client, remotePath)
+		data, err := download(remotePath)
 		if err != nil {
 			fmt.Printf("download failed: %v\n", err)
 			continue
@@ -123,17 +123,19 @@ func main() {
 	fmt.Printf("\nexcluded %d formats (total %d): %v\n", len(excluded), len(cat.ExcludedFormats), excluded)
 }
 
-func download(client *http.Client, remotePath string) ([]byte, error) {
+func download(remotePath string) ([]byte, error) {
 	urls := []string{
 		modland.FileURL(remotePath),
 		modland.FileURLLower(remotePath),
 		modland.FileFallbackURL(remotePath),
 		modland.FileFallbackURLLower(remotePath),
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	var resp *http.Response
 	var err error
 	for _, url := range urls {
-		resp, err = client.Get(url)
+		resp, err = util.Get(ctx, url, nil)
 		if err != nil || resp.StatusCode != 200 {
 			if resp != nil {
 				resp.Body.Close()

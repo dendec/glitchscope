@@ -41,12 +41,12 @@ func DownloadAndExtract(ctx context.Context, baseDir, remoteURL string, onProgre
 	}
 	isZip := strings.HasSuffix(strings.ToLower(urlPath), ".zip")
 
-	if info, err := os.Stat(targetPath); err == nil && info.Size() > 0 {
-		slog.Debug("modarchive: track cached", "path", targetPath)
-		return targetPath, nil
-	}
-
 	if isZip {
+		if info, err := os.Stat(targetPath); err == nil && info.Size() > 0 {
+			slog.Debug("modarchive: track cached", "path", targetPath)
+			return targetPath, nil
+		}
+
 		tmpZipPath := filepath.Join(filesDir, "tmp_"+filepath.Base(rawLocalPath))
 		defer os.Remove(tmpZipPath)
 
