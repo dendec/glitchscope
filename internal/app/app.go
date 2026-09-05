@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/dendec/glitchscope/internal/archive"
-	"github.com/dendec/glitchscope/internal/catalog"
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/mic"
@@ -45,10 +44,9 @@ type App struct {
 
 	modlandSizes map[string]int64 // remote path → expected size for downloads
 
-	// shuffleCatalog is the runtime coordinator over the three provider
-	// shuffle indexes. Built/rebuilt synchronously at startup (see
-	// shuffle_catalog.go); there is deliberately no background rebuild.
-	shuffleCatalog       *catalog.ShuffleCatalog
+	// Provider shuffle-index handles, owned here for lifecycle (Close).
+	// The coordinator built from them lives on playbackState (shuffleCatalog
+	// field) since that's where lazy Source/All selection happens.
 	modlandShuffleSrc    *modland.ShuffleSource
 	modarchiveShuffleSrc *modarchive.ShuffleSource
 	localShuffleSrc      *player.LocalShuffleSource

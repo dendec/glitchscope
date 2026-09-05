@@ -642,6 +642,10 @@ func (a *App) deleteNCPath(path string) {
 		}
 		// Invalidate shuffle order — the library content has changed.
 		a.playbackState.shuffle.reset()
+		// Rescan succeeded (Library.Rescan only mutates Albums on an OK
+		// scan), so the local shuffle source may be safely rebuilt too.
+		a.updateLocalShuffleSource(a.lib.Albums, filesystem.StatusOK)
+		a.buildShuffleCatalog()
 	}
 
 	// Sync NC overlay.

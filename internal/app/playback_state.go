@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/dendec/glitchscope/internal/catalog"
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/player"
 )
@@ -131,6 +132,12 @@ type playbackState struct {
 	playlist      []string
 	playlistIdx   int
 	playlistAlbum string
+
+	// shuffleCatalog is the runtime coordinator over the three provider
+	// shuffle indexes, built synchronously at app startup (see
+	// shuffle_catalog.go). Nil until built, or if no source is available;
+	// advanceShuffleLazy falls back to legacy pool-based selection then.
+	shuffleCatalog *catalog.ShuffleCatalog
 }
 
 // play starts playback of a track. It syncs the playlist/library cursor and
@@ -292,7 +299,18 @@ func (s *playbackState) repeatOne() (trackRef, bool) {
 // advanceShuffled picks the next track from the shuffled order, rebuilding
 // when the source or mode changes. Shuffle Album stays within the active
 // playlist when one exists; broader modes derive their pool from the library.
+//
+// Shuffle Source and Shuffle All prefer the lazy ShuffleCatalog coordinator
+// (a single weighted pick per call, no stored permutation, repeats allowed)
+// and only fall back to the legacy pool-based engine when the coordinator is
+// unavailable or has no eligible source — e.g. before shuffle indexes are
+// built, or in tests that construct playbackState directly.
 func (s *playbackState) advanceShuffled(settings config.PlaybackSettings) (trackRef, bool) {
+	if settings.ShuffleMode == config.ShuffleSource || settings.ShuffleMode == config.ShuffleAll {
+		if t, ok := s.advanceShuffleLazy(settings); ok {
+			return t, true
+		}
+	}
 	pool, key := s.shufflePool(settings)
 	if s.shuffle.needsRebuild(key, settings.Repeat) {
 		filtered := excludeCurrentTrack(pool, s.pl.TrackPath())
@@ -303,6 +321,115 @@ func (s *playbackState) advanceShuffled(settings config.PlaybackSettings) (track
 		return trackRef{}, false
 	}
 	return t, true
+}
+
+// advanceShuffleLazy picks one track directly from the ShuffleCatalog
+// coordinator for Shuffle Source / Shuffle All. Returns false when the
+// coordinator or the requested source is unavailable so the caller falls
+// back to legacy pool-based selection.
+func (s *playbackState) advanceShuffleLazy(settings config.PlaybackSettings) (trackRef, bool) {
+	if s.shuffleCatalog == nil || s.shuffle.rng == nil {
+		return trackRef{}, false
+	}
+
+	var (
+		t   catalog.ShuffleTrack
+		err error
+	)
+	switch settings.ShuffleMode {
+	case config.ShuffleSource:
+		kind, ok := sourceKindOf(s.currentSource())
+		if !ok {
+			return trackRef{}, false
+		}
+		t, err = s.shuffleCatalog.RandomTrackFromSource(kind, s.shuffle.rng)
+	case config.ShuffleAll:
+		t, err = s.shuffleCatalog.RandomTrackAll(s.shuffle.rng)
+	default:
+		return trackRef{}, false
+	}
+	if err != nil {
+		return trackRef{}, false
+	}
+
+	s.materializeShuffleTrack(t)
+	return trackRef{path: t.Path, album: t.AlbumName}, true
+}
+
+// sourceKindOf maps the currentSource() string identity to a catalog.SourceKind.
+func sourceKindOf(source string) (catalog.SourceKind, bool) {
+	switch source {
+	case "local":
+		return catalog.SourceLocal, true
+	case "modland":
+		return catalog.SourceModland, true
+	case "modarchive":
+		return catalog.SourceModArchive, true
+	default:
+		return 0, false
+	}
+}
+
+// materializeShuffleTrack ensures a lazily selected remote track's directory
+// is present in the library before playback, so overlay navigation and the
+// "now playing" album name resolve correctly. It reads one directory listing
+// from the source index — never the full remote catalog — and is a no-op
+// when the album is already materialized (e.g. Modland, which is preloaded
+// in full) or for local tracks.
+func (s *playbackState) materializeShuffleTrack(t catalog.ShuffleTrack) {
+	if s.lib == nil || t.Source == catalog.SourceLocal {
+		return
+	}
+	albumPath := remoteAlbumPath(t)
+	for _, a := range s.lib.Albums {
+		if a.Path == albumPath {
+			return
+		}
+	}
+	idx := s.shuffleCatalog.SourceIndex(t.Source)
+	if idx == nil {
+		return
+	}
+	listing, err := idx.DirectoryList(t.DirectoryKey)
+	if err != nil {
+		return
+	}
+	tracks := make([]string, len(listing.Entries))
+	for i, e := range listing.Entries {
+		tracks[i] = e.Path
+	}
+	s.lib.AddCatalogAlbum(player.Album{
+		Name:   remoteAlbumDisplayName(t),
+		Path:   albumPath,
+		Tracks: tracks,
+	})
+}
+
+// remoteAlbumPath returns the player.Album.Path convention for a remote
+// ShuffleTrack's directory, matching how the app already materializes
+// Modland/ModArchive albums (see addModlandAlbums, modarchive.BuildAlbum).
+func remoteAlbumPath(t catalog.ShuffleTrack) string {
+	switch t.Source {
+	case catalog.SourceModland:
+		return player.ModlandPrefix + t.DirectoryKey.Locator
+	case catalog.SourceModArchive:
+		return player.ModArchivePrefix + t.DirectoryKey.Locator
+	default:
+		return t.DirectoryKey.Locator
+	}
+}
+
+// remoteAlbumDisplayName mirrors the existing "<Provider>: <label>" naming
+// convention used elsewhere for materialized remote albums.
+func remoteAlbumDisplayName(t catalog.ShuffleTrack) string {
+	switch t.Source {
+	case catalog.SourceModland:
+		return "Modland: " + t.AlbumName
+	case catalog.SourceModArchive:
+		return "ModArchive: " + t.AlbumName
+	default:
+		return t.AlbumName
+	}
 }
 
 // shufflePool returns the track pool and identity key for shuffling.
