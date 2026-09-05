@@ -759,7 +759,7 @@ func (o *Overlay) drawCursorHighlight(x, y, w, h float32, winW, winH, viewW, vie
 		lineGap = 1
 	}
 	padding := textPadding(o.fontSize) + lineGap
-	glDrawFilledRect(o.programRect, x, y+float32(padding), w, h, r, g, b, o.uiAlpha(alphaAccentHighlight), winW, winH, viewW, viewH)
+	glDrawFilledRect(o.programRect, x, y+float32(padding), w, h, r, g, b, alphaAccentHighlight, winW, winH, viewW, viewH)
 }
 
 // renderStatsOnly draws a minimal stats bar (FPS/MEM/CPU) without the full UI.
