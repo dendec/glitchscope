@@ -192,3 +192,23 @@ func TestModlandRecordCacheEvictionByMemory(t *testing.T) {
 		t.Fatalf("totalBytes %d exceeds budget %d", c.totalBytes, maxCachedBytes)
 	}
 }
+
+func TestModlandRecordCacheSkipsOversizedRecord(t *testing.T) {
+	c := newRecordCache()
+	oversizedTracks := make([]ShuffleTrackEntry, 500_000)
+	for i := range oversizedTracks {
+		oversizedTracks[i] = ShuffleTrackEntry{Path: "p", Name: "n"}
+	}
+	record := &ShuffleAlbumRecord{Locator: "huge", Tracks: oversizedTracks}
+	if estimateRecordBytes(record) <= maxCachedBytes {
+		t.Fatal("test record must exceed the cache budget")
+	}
+
+	c.put("huge", record)
+	if len(c.entries) != 0 {
+		t.Fatalf("expected oversized record not to be cached, got %d entries", len(c.entries))
+	}
+	if c.totalBytes != 0 {
+		t.Fatalf("totalBytes = %d, want 0", c.totalBytes)
+	}
+}

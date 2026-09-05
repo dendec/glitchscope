@@ -697,6 +697,30 @@ func TestListingVersionContentDependent(t *testing.T) {
 	}
 }
 
+func TestRecordCacheSkipsOversizedRecord(t *testing.T) {
+	c := newRecordCache()
+	// A single record bigger than the whole budget must never be retained.
+	oversizedTracks := make([]ShuffleTrackEntry, 400_000)
+	for i := range oversizedTracks {
+		oversizedTracks[i] = ShuffleTrackEntry{Path: "p", Name: "n", Key: "k"}
+	}
+	record := &ShuffleDirRecord{Locator: "huge", Tracks: oversizedTracks}
+	if estimateRecordBytes(record) <= maxCachedBytes {
+		t.Fatal("test record must exceed the cache budget")
+	}
+
+	c.put("huge", record)
+	if len(c.entries) != 0 {
+		t.Fatalf("expected oversized record not to be cached, got %d entries", len(c.entries))
+	}
+	if c.totalBytes != 0 {
+		t.Fatalf("totalBytes = %d, want 0", c.totalBytes)
+	}
+	if _, ok := c.get("huge"); ok {
+		t.Fatal("oversized record should not be retrievable from cache")
+	}
+}
+
 func TestRecordCacheEvictionByMemory(t *testing.T) {
 	c := newRecordCache()
 	// Create records that are estimated > maxCachedBytes/2 each.

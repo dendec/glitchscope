@@ -70,6 +70,23 @@ func (c *recordCache) get(key string) (*ShuffleDirRecord, bool) {
 func (c *recordCache) put(key string, record *ShuffleDirRecord) {
 	estimatedBytes := estimateRecordBytes(record)
 
+	// A record larger than the whole budget can never be retained without
+	// starving every other entry. Serve it to the caller without caching
+	// it, and drop any existing cached copy for the same key.
+	if estimatedBytes > maxCachedBytes {
+		if existing, ok := c.entries[key]; ok {
+			c.totalBytes -= existing.bytes
+			delete(c.entries, key)
+			for i, k := range c.order {
+				if k == key {
+					c.order = append(c.order[:i], c.order[i+1:]...)
+					break
+				}
+			}
+		}
+		return
+	}
+
 	if existing, ok := c.entries[key]; ok {
 		c.totalBytes -= existing.bytes
 		existing.record = record
