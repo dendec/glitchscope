@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dendec/glitchscope/internal/archive"
+	"github.com/dendec/glitchscope/internal/catalog"
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/mic"
@@ -43,6 +44,15 @@ type App struct {
 	mic *mic.Capture // active microphone capture, nil when off
 
 	modlandSizes map[string]int64 // remote path → expected size for downloads
+
+	// shuffleCatalog is the runtime coordinator over the three provider
+	// shuffle indexes. Built/rebuilt synchronously at startup (see
+	// shuffle_catalog.go); there is deliberately no background rebuild.
+	shuffleCatalog       *catalog.ShuffleCatalog
+	modlandShuffleSrc    *modland.ShuffleSource
+	modarchiveShuffleSrc *modarchive.ShuffleSource
+	localShuffleSrc      *player.LocalShuffleSource
+	localScanFingerprint string // last fingerprint from a successful (OK) scan
 
 	prof              *prof.Collector
 	settings          *config.Settings
@@ -224,6 +234,12 @@ func (a *App) Close() {
 		a.appCancel()
 	}
 	modarchive.CloseSnapshotCatalog()
+	if a.modlandShuffleSrc != nil {
+		_ = a.modlandShuffleSrc.Close()
+	}
+	if a.modarchiveShuffleSrc != nil {
+		_ = a.modarchiveShuffleSrc.Close()
+	}
 	a.savePlaybackPosition()
 	if a.pm != nil {
 		a.pm.SetPresetSwitchRequestedHandler(nil)
@@ -385,12 +401,11 @@ func (a *App) initLibrary() {
 		a.overlay.SetMusicDir(musicDir)
 	}
 	t := time.Now()
-	lib, err := player.NewLibrary(musicDir)
+	albums, scanStatus, err := player.ScanLibraryAlbums(musicDir)
 	if err != nil {
 		slog.Warn("music scan failed", "error", err)
-		// Create a minimal library so that catalog loading can still proceed.
-		lib = player.NewEmptyLibrary()
 	}
+	lib := player.NewLibraryFromScan(albums)
 	a.lib = lib
 	a.lib.SetBaseDir(baseDir())
 	slog.Info("music scan", "albums", lib.AlbumCount(), "ms", time.Since(t).Milliseconds())
@@ -409,6 +424,9 @@ func (a *App) initLibrary() {
 			a.overlay.SetOnline(true)
 		}
 	}
+
+	a.updateLocalShuffleSource(albums, scanStatus)
+	a.buildShuffleCatalog()
 
 	// Wire catalog album creation: when the overlay navigates into a
 	// modarchive directory with files, it delegates album creation to the

@@ -21,6 +21,22 @@ type LocalShuffleSource struct {
 	fp         catalog.Fingerprint
 }
 
+// ScanFingerprint computes a content-based fingerprint from a successfully
+// (StatusOK) scanned album list: it changes whenever tracks are added,
+// removed, renamed, or reordered. Callers must only derive this from an OK
+// scan; a Partial/Failed scan must keep using the previous fingerprint.
+func ScanFingerprint(albums []Album) string {
+	h := sha256.New()
+	real := RealAlbumsOnly(albums)
+	for _, a := range real {
+		fmt.Fprintf(h, "album:%s\n", a.Path)
+		for _, t := range a.Tracks {
+			fmt.Fprintf(h, "track:%s\n", t)
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil)[:16])
+}
+
 // NewLocalShuffleSource builds a shuffle index from an already-scanned
 // album list. Callers must only pass albums from a successful (OK)
 // filesystem scan; a Partial/Failed scan must keep using the previous

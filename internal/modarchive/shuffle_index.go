@@ -638,3 +638,29 @@ func validateCachedRecordIdentity(record *ShuffleDirRecord, entry catalog.Manife
 	}
 	return nil
 }
+
+// cachedCatalogData loads the on-disk cached-directory catalog (the same
+// file InitCatalog reads at startup) into the minimal shape BuildShuffleIndex
+// and ShuffleIndexFingerprint need. Returns nil if no catalog is cached yet.
+func cachedCatalogData(baseDir string) *catalogData {
+	cat := LoadCatalog(baseDir)
+	if cat == nil {
+		return nil
+	}
+	return &catalogData{Directories: cat.Directories}
+}
+
+// RebuildShuffleIndexFromCache rebuilds modarchive.idx from the persisted
+// snapshot/addendum GSA files and the on-disk cached-directory catalog.
+// Used by app startup/rescan; there is no background rebuild.
+func RebuildShuffleIndexFromCache(baseDir string) error {
+	return BuildShuffleIndex(baseDir, cachedCatalogData(baseDir))
+}
+
+// ShuffleIndexNeedsRebuildFromCache reports whether modarchive.idx is
+// missing, stale, or incompatible, using the on-disk cached-directory
+// catalog for the fingerprint (matching what RebuildShuffleIndexFromCache
+// would build from).
+func ShuffleIndexNeedsRebuildFromCache(baseDir string) bool {
+	return ShuffleSourceNeedsRebuild(baseDir, cachedCatalogData(baseDir))
+}

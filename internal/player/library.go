@@ -55,19 +55,24 @@ type Library struct {
 
 // NewLibrary scans rootDir for leaf dirs containing audio files.
 func NewLibrary(rootDir string) (*Library, error) {
-	lib := &Library{resolver: NewResolver(), albumIdx: -1, trackIdx: -1}
-	var err error
-	lib.Albums, err = scanRoot(rootDir)
+	albums, err := scanRoot(rootDir)
 	if err != nil {
 		return nil, err
 	}
+	return NewLibraryFromScan(albums), nil
+}
+
+// NewLibraryFromScan builds a Library from an already-scanned album list
+// (e.g. from ScanLibraryAlbums), without re-walking the filesystem.
+func NewLibraryFromScan(albums []Album) *Library {
+	lib := &Library{resolver: NewResolver(), albumIdx: -1, trackIdx: -1, Albums: albums}
 	if len(lib.Albums) > 0 {
 		lib.albumIdx = 0
 		if len(lib.Albums[0].Tracks) > 0 {
 			lib.trackIdx = 0
 		}
 	}
-	return lib, nil
+	return lib
 }
 
 // NewEmptyLibrary returns an empty library that can be populated later with
@@ -82,8 +87,11 @@ func (l *Library) SetBaseDir(dir string) {
 	l.resolver.SetBaseDir(dir)
 }
 
-// scanRoot walks rootDir and returns sorted Albums from the filesystem.
-func scanRoot(rootDir string) ([]Album, error) {
+// ScanLibraryAlbums walks rootDir and returns sorted Albums from the
+// filesystem, along with the scan status. Callers must not treat a
+// Partial/Failed status as authoritative: keep using the previous
+// known-good album list instead of replacing it.
+func ScanLibraryAlbums(rootDir string) ([]Album, filesystem.Status, error) {
 	dirTracks := map[string][]string{}
 	report := filesystem.Walk(context.Background(), rootDir, filesystem.Options{
 		Include: filesystem.IsAudioFile,
@@ -97,7 +105,7 @@ func scanRoot(rootDir string) ([]Album, error) {
 		for _, issue := range report.Issues {
 			slog.Warn("library scan issue", "path", issue.Path, "error", issue.Err, "status", report.Status)
 		}
-		return nil, fmt.Errorf("scan music directory: %w", report.Err())
+		return nil, report.Status, fmt.Errorf("scan music directory: %w", report.Err())
 	}
 
 	var dirs []string
@@ -116,7 +124,14 @@ func scanRoot(rootDir string) ([]Album, error) {
 			Tracks: tracks,
 		})
 	}
-	return albums, nil
+	return albums, report.Status, nil
+}
+
+// scanRoot is a status-discarding convenience wrapper over
+// ScanLibraryAlbums for callers that only need the album list or an error.
+func scanRoot(rootDir string) ([]Album, error) {
+	albums, _, err := ScanLibraryAlbums(rootDir)
+	return albums, err
 }
 
 func (l *Library) AlbumNext() string {

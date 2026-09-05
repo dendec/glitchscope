@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/dendec/glitchscope/internal/filesystem"
 )
 
 // writeFullWav creates a complete silent WAV file (0.1 s, mono, 44100 Hz,
@@ -63,6 +65,59 @@ func TestGetAlbumTracksResolvesVirtualPaths(t *testing.T) {
 	// Metadata must actually be extracted from the local file.
 	if infos[0].Duration <= 0 {
 		t.Fatalf("duration = %v, want > 0 (metadata not extracted)", infos[0].Duration)
+	}
+}
+
+func TestScanLibraryAlbumsOK(t *testing.T) {
+	dir := t.TempDir()
+	// Track goes directly in the root: shouldSkipDir excludes some prefixes
+	// (including /tmp) for *subdirectories*, so a nested fixture dir under
+	// t.TempDir() would never be descended into.
+	writeFullWav(t, dir, "track.wav")
+
+	albums, status, err := ScanLibraryAlbums(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != filesystem.StatusOK {
+		t.Fatalf("status = %v, want OK", status)
+	}
+	if len(albums) != 1 || len(albums[0].Tracks) != 1 {
+		t.Fatalf("albums = %+v, want 1 album with 1 track", albums)
+	}
+}
+
+func TestScanLibraryAlbumsMissingRoot(t *testing.T) {
+	albums, status, err := ScanLibraryAlbums(filepath.Join(t.TempDir(), "does-not-exist"))
+	if err == nil {
+		t.Fatal("expected an error for a missing root directory")
+	}
+	if status == filesystem.StatusOK {
+		t.Fatal("expected a non-OK status for a missing root directory")
+	}
+	if albums != nil {
+		t.Fatalf("expected nil albums on failure, got %+v", albums)
+	}
+}
+
+func TestNewLibraryFromScan(t *testing.T) {
+	albums := []Album{{Name: "A", Path: "/music/A", Tracks: []string{"/music/A/a.mp3"}}}
+	lib := NewLibraryFromScan(albums)
+	if lib.AlbumCount() != 1 {
+		t.Fatalf("AlbumCount = %d, want 1", lib.AlbumCount())
+	}
+	if lib.CurrentAlbumIndex() != 0 || lib.CurrentTrackIndex() != 0 {
+		t.Fatalf("cursor = (%d,%d), want (0,0)", lib.CurrentAlbumIndex(), lib.CurrentTrackIndex())
+	}
+}
+
+func TestNewLibraryFromScanEmpty(t *testing.T) {
+	lib := NewLibraryFromScan(nil)
+	if lib.AlbumCount() != 0 {
+		t.Fatalf("AlbumCount = %d, want 0", lib.AlbumCount())
+	}
+	if lib.CurrentAlbumIndex() != -1 {
+		t.Fatalf("CurrentAlbumIndex = %d, want -1", lib.CurrentAlbumIndex())
 	}
 }
 

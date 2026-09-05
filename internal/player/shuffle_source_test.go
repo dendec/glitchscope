@@ -97,3 +97,30 @@ func TestLocalShuffleSourceFingerprint(t *testing.T) {
 		t.Fatalf("Fingerprint = %+v, want TrackCount=3 DirectoryCount=2", fp)
 	}
 }
+
+func TestScanFingerprintStableAndContentDependent(t *testing.T) {
+	albums := testLocalAlbums()
+	fp1 := ScanFingerprint(albums)
+	fp2 := ScanFingerprint(albums)
+	if fp1 != fp2 {
+		t.Fatalf("ScanFingerprint not deterministic: %q != %q", fp1, fp2)
+	}
+	if fp1 == "" {
+		t.Fatal("expected a non-empty fingerprint")
+	}
+
+	changed := testLocalAlbums()
+	changed[0].Tracks = append(changed[0].Tracks, "/music/Album1/c.mp3")
+	fp3 := ScanFingerprint(changed)
+	if fp3 == fp1 {
+		t.Fatal("expected fingerprint to change when tracks change")
+	}
+}
+
+func TestScanFingerprintIgnoresVirtualAlbums(t *testing.T) {
+	albums := testLocalAlbums()
+	real := RealAlbumsOnly(albums)
+	if ScanFingerprint(albums) != ScanFingerprint(real) {
+		t.Fatal("expected virtual albums to be excluded from the fingerprint")
+	}
+}
