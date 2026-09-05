@@ -352,8 +352,12 @@ func (o *Overlay) rebuildPresetNameTex() {
 func (o *Overlay) displayTrackPath(path string) string {
 	if player.IsModArchive(path) {
 		remote := player.RemotePath(path)
-		if parsed, err := url.Parse(remote); err == nil && parsed.Path != "" {
-			remote = parsed.Path
+		entryName := ""
+		if parsed, err := url.Parse(remote); err == nil {
+			if parsed.Path != "" {
+				remote = parsed.Path
+			}
+			entryName = parsed.Fragment
 		}
 		remote = strings.TrimPrefix(filepath.ToSlash(remote), "/")
 		if strings.HasPrefix(remote, "modarchive_") {
@@ -365,6 +369,15 @@ func (o *Overlay) displayTrackPath(path string) string {
 			}
 		}
 		remote = strings.TrimSuffix(remote, ".zip")
+		if entryName != "" {
+			entryName = strings.TrimPrefix(filepath.ToSlash(entryName), "/")
+			if strings.HasSuffix(strings.ToLower(entryName), ".zip") {
+				entryName = entryName[:len(entryName)-4]
+			}
+			if entryName != "" {
+				remote = strings.TrimSuffix(remote, "/") + "/" + entryName
+			}
+		}
 		return "modarchive/" + remote
 	}
 	if player.IsModland(path) {

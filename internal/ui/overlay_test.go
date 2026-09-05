@@ -33,6 +33,11 @@ func TestDisplayTrackPath(t *testing.T) {
 			want: "modarchive/2011/M03/B/bibix-life.mo3",
 		},
 		{
+			name: "modarchive zip entry fragment",
+			path: "modarchive:http://modarchive.textfiles.com/modarchive_2007_official_snapshot_120000_modules/1/1U.zip#1up_remix.xm",
+			want: "modarchive/modarchive_2007_official_snapshot_120000_modules/1/1U/1up_remix.xm",
+		},
+		{
 			name: "modland URL",
 			path: "modland:Protracker/Curt Cool/song.mod",
 			want: "modland/Protracker/Curt Cool/song.mod",
