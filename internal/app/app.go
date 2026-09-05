@@ -96,6 +96,7 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		modlandSizes: make(map[string]int64),
 		presenter:    newOverlayPresenter(nil),
 	}
+	a.playbackState.shuffle.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	a.appCtx, a.appCancel = context.WithCancel(context.Background())
 
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK | sdl.INIT_AUDIO); err != nil {

@@ -249,6 +249,52 @@ func (m RepeatMode) String() string {
 
 func AllRepeatModes() []RepeatMode { return []RepeatMode{RepeatOff, RepeatOne, RepeatAll} }
 
+// RepeatMode JSON: lowercase strings with integer fallback for legacy files.
+
+func (m RepeatMode) MarshalJSON() ([]byte, error) {
+	var s string
+	switch m {
+	case RepeatOff:
+		s = "off"
+	case RepeatOne:
+		s = "repeat_one"
+	case RepeatAll:
+		s = "repeat_all"
+	default:
+		s = "unknown"
+	}
+	return json.Marshal(s)
+}
+
+func (m *RepeatMode) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch s {
+		case "off":
+			*m = RepeatOff
+			return nil
+		case "repeat_one":
+			*m = RepeatOne
+			return nil
+		case "repeat_all":
+			*m = RepeatAll
+			return nil
+		default:
+			return fmt.Errorf("unknown repeat mode: %s", s)
+		}
+	}
+	// Legacy: accept integer.
+	var n int
+	if err := json.Unmarshal(data, &n); err != nil {
+		return fmt.Errorf("invalid repeat mode: %w", err)
+	}
+	if n < int(RepeatOff) || n > int(RepeatAll) {
+		return fmt.Errorf("invalid repeat mode: %d", n)
+	}
+	*m = RepeatMode(n)
+	return nil
+}
+
 // ShuffleMode controls the scope of random track selection.
 type ShuffleMode int
 
@@ -272,6 +318,57 @@ func (m ShuffleMode) String() string {
 	default:
 		return "Unknown"
 	}
+}
+
+// ShuffleMode JSON: lowercase strings with integer fallback for legacy files.
+
+func (m ShuffleMode) MarshalJSON() ([]byte, error) {
+	var s string
+	switch m {
+	case ShuffleOff:
+		s = "off"
+	case ShuffleAlbum:
+		s = "shuffle_album"
+	case ShuffleLocal:
+		s = "shuffle_local"
+	case ShuffleAll:
+		s = "shuffle_all"
+	default:
+		s = "unknown"
+	}
+	return json.Marshal(s)
+}
+
+func (m *ShuffleMode) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch s {
+		case "off":
+			*m = ShuffleOff
+			return nil
+		case "shuffle_album":
+			*m = ShuffleAlbum
+			return nil
+		case "shuffle_local":
+			*m = ShuffleLocal
+			return nil
+		case "shuffle_all":
+			*m = ShuffleAll
+			return nil
+		default:
+			return fmt.Errorf("unknown shuffle mode: %s", s)
+		}
+	}
+	// Legacy: accept integer.
+	var n int
+	if err := json.Unmarshal(data, &n); err != nil {
+		return fmt.Errorf("invalid shuffle mode: %w", err)
+	}
+	if n < int(ShuffleOff) || n > int(ShuffleAll) {
+		return fmt.Errorf("invalid shuffle mode: %d", n)
+	}
+	*m = ShuffleMode(n)
+	return nil
 }
 
 func AllShuffleModes() []ShuffleMode {

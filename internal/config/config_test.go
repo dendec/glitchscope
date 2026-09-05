@@ -432,3 +432,128 @@ func TestPerformanceModeJSONInSettings(t *testing.T) {
 		t.Fatalf("got %v, want Eco", got.Graphics.PerformanceMode)
 	}
 }
+
+func TestShuffleModeRoundTrip(t *testing.T) {
+	for _, m := range AllShuffleModes() {
+		b, err := json.Marshal(m)
+		if err != nil {
+			t.Fatalf("marshal %v: %v", m, err)
+		}
+		var got ShuffleMode
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatalf("unmarshal %s: %v", b, err)
+		}
+		if got != m {
+			t.Fatalf("round trip: got %v, want %v", got, m)
+		}
+	}
+}
+
+func TestShuffleModeCanonicalFormat(t *testing.T) {
+	// MarshalJSON must produce lowercase strings.
+	want := map[ShuffleMode]string{
+		ShuffleOff:   `"off"`,
+		ShuffleAlbum: `"shuffle_album"`,
+		ShuffleLocal: `"shuffle_local"`,
+		ShuffleAll:   `"shuffle_all"`,
+	}
+	for mode, expected := range want {
+		b, err := json.Marshal(mode)
+		if err != nil {
+			t.Fatalf("marshal %v: %v", mode, err)
+		}
+		if string(b) != expected {
+			t.Fatalf("marshal %v = %s, want %s", mode, b, expected)
+		}
+	}
+}
+
+func TestShuffleModeLegacyInt(t *testing.T) {
+	// Legacy settings.json stored shuffle_mode as an integer.
+	var m ShuffleMode
+	if err := json.Unmarshal([]byte(`3`), &m); err != nil {
+		t.Fatal("legacy int unmarshal:", err)
+	}
+	if m != ShuffleAll {
+		t.Fatalf("got %v, want ShuffleAll", m)
+	}
+}
+
+func TestShuffleModeInvalid(t *testing.T) {
+	var m ShuffleMode
+	if err := json.Unmarshal([]byte(`"Turbo"`), &m); err == nil {
+		t.Fatal("expected error for invalid mode")
+	}
+}
+
+func TestRepeatModeRoundTrip(t *testing.T) {
+	for _, m := range AllRepeatModes() {
+		b, err := json.Marshal(m)
+		if err != nil {
+			t.Fatalf("marshal %v: %v", m, err)
+		}
+		var got RepeatMode
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatalf("unmarshal %s: %v", b, err)
+		}
+		if got != m {
+			t.Fatalf("round trip: got %v, want %v", got, m)
+		}
+	}
+}
+
+func TestRepeatModeCanonicalFormat(t *testing.T) {
+	// MarshalJSON must produce lowercase strings.
+	want := map[RepeatMode]string{
+		RepeatOff: `"off"`,
+		RepeatOne: `"repeat_one"`,
+		RepeatAll: `"repeat_all"`,
+	}
+	for mode, expected := range want {
+		b, err := json.Marshal(mode)
+		if err != nil {
+			t.Fatalf("marshal %v: %v", mode, err)
+		}
+		if string(b) != expected {
+			t.Fatalf("marshal %v = %s, want %s", mode, b, expected)
+		}
+	}
+}
+
+func TestRepeatModeLegacyInt(t *testing.T) {
+	var m RepeatMode
+	if err := json.Unmarshal([]byte(`2`), &m); err != nil {
+		t.Fatal("legacy int unmarshal:", err)
+	}
+	if m != RepeatAll {
+		t.Fatalf("got %v, want RepeatAll", m)
+	}
+}
+
+func TestRepeatModeInvalid(t *testing.T) {
+	var m RepeatMode
+	if err := json.Unmarshal([]byte(`"Turbo"`), &m); err == nil {
+		t.Fatal("expected error for invalid mode")
+	}
+}
+
+func TestShuffleModeJSONInSettings(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "settings.json")
+	s := DefaultSettings()
+	s.Playback.ShuffleMode = ShuffleAll
+	s.Playback.Repeat = RepeatAll
+	if err := SaveSettings(p, s); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadSettings(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Playback.ShuffleMode != ShuffleAll {
+		t.Fatalf("got %v, want ShuffleAll", got.Playback.ShuffleMode)
+	}
+	if got.Playback.Repeat != RepeatAll {
+		t.Fatalf("got %v, want RepeatAll", got.Playback.Repeat)
+	}
+}

@@ -355,9 +355,12 @@ func (a *App) applySettings(winW, winH int) {
 
 	shuffleModes := config.AllShuffleModes()
 	if rows[ui.SettingShuffle].Index >= 0 && rows[ui.SettingShuffle].Index < len(shuffleModes) {
-		a.settings.Playback.ShuffleMode = shuffleModes[rows[ui.SettingShuffle].Index]
+		newMode := shuffleModes[rows[ui.SettingShuffle].Index]
+		if newMode != a.settings.Playback.ShuffleMode {
+			a.settings.Playback.ShuffleMode = newMode
+			a.playbackState.shuffle.reset()
+		}
 	}
-	a.playbackState.regenerateShuffleOrder(a.settings.Playback)
 
 	repeatModes := config.AllRepeatModes()
 	if rows[ui.SettingRepeat].Index >= 0 && rows[ui.SettingRepeat].Index < len(repeatModes) {
@@ -637,6 +640,8 @@ func (a *App) deleteNCPath(path string) {
 			}
 			return
 		}
+		// Invalidate shuffle order — the library content has changed.
+		a.playbackState.shuffle.reset()
 	}
 
 	// Sync NC overlay.

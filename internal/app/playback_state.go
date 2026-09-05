@@ -1,8 +1,11 @@
 package app
 
 import (
+	"fmt"
+	"hash/fnv"
 	"math/rand"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/dendec/glitchscope/internal/config"
@@ -49,40 +52,117 @@ func (s *playbackState) snapshot(trackAlbumIdx int, includeTrackInfos bool) over
 	return snapshot
 }
 
-type shuffleState struct {
-	order    []trackRef
-	idx      int
-	albumIdx int
+// trackRef identifies a track for playback without coupling to the library cursor.
+type trackRef struct {
+	path  string
+	album string
 }
 
-type trackRef struct {
-	path     string
-	album    string
-	albumIdx int
-	trackIdx int
+// shuffleEngine produces a randomized order of tracks from a pool.
+// It tracks the pool identity to avoid unnecessary reshuffling.
+type shuffleEngine struct {
+	order     []trackRef
+	idx       int
+	sourceKey string     // identity of the current order's source
+	rng       *rand.Rand // injected RNG for deterministic testing
+}
+
+// reset clears the shuffle state, forcing a rebuild on the next advance.
+func (e *shuffleEngine) reset() {
+	e.order = nil
+	e.idx = 0
+	e.sourceKey = ""
+}
+
+// next returns the next track from the shuffled order. Returns false when
+// the order is exhausted; the caller should rebuild and retry.
+func (e *shuffleEngine) next() (trackRef, bool) {
+	if e.idx >= len(e.order) {
+		return trackRef{}, false
+	}
+	t := e.order[e.idx]
+	e.idx++
+	return t, true
+}
+
+// needsRebuild reports whether the engine needs a new pool. A rebuild is
+// needed when the order is empty, the source changed, or the order is
+// exhausted with RepeatAll.
+func (e *shuffleEngine) needsRebuild(key string, repeat config.RepeatMode) bool {
+	if len(e.order) == 0 {
+		return true
+	}
+	if e.sourceKey != key {
+		return true
+	}
+	return e.idx >= len(e.order) && repeat == config.RepeatAll
+}
+
+// build replaces the order with a shuffled copy of pool and resets the cursor.
+func (e *shuffleEngine) build(pool []trackRef, key string) {
+	if e.rng == nil {
+		e.rng = rand.New(rand.NewSource(0))
+	}
+	e.rng.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
+	e.order = pool
+	e.idx = 0
+	e.sourceKey = key
+}
+
+// excludeCurrentTrack returns a new slice with currentPath removed.
+// If pool has ≤1 entry or currentPath is empty, the original pool is returned.
+func excludeCurrentTrack(pool []trackRef, currentPath string) []trackRef {
+	if len(pool) <= 1 || currentPath == "" {
+		return pool
+	}
+	filtered := pool[:0]
+	for _, t := range pool {
+		if t.path != currentPath {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
 }
 
 type playbackState struct {
 	pl            *player.Player
 	lib           *player.Library
-	shuffle       shuffleState
+	shuffle       shuffleEngine
 	playlist      []string
 	playlistIdx   int
 	playlistAlbum string
 }
 
+// play starts playback of a track. It syncs the playlist/library cursor and
+// delegates to the player.
 func (s *playbackState) play(path string) bool {
 	if s.pl == nil {
 		return false
 	}
-	s.selectLibraryTrack(path)
-	if s.playlistIdx < 0 || s.playlistIdx >= len(s.playlist) || s.playlist[s.playlistIdx] != path {
-		s.playlist = nil
-		s.playlistIdx = -1
-		s.playlistAlbum = ""
-	}
+	s.selectPlaybackContext(path)
 	s.pl.PlayFileAsync(path)
 	return true
+}
+
+// selectPlaybackContext syncs the playlist and library cursors to the track
+// about to be played. Separated from launch so each concern is independently
+// testable.
+func (s *playbackState) selectPlaybackContext(path string) {
+	// Sync library cursor (silent no-op if track isn't in the library).
+	s.selectLibraryTrack(path)
+
+	// Sync playlist cursor. If the track is in the playlist, update
+	// playlistIdx so manual next/prev and shuffle continue from the right
+	// position. Only clear the playlist when the track is genuinely absent.
+	if len(s.playlist) > 0 {
+		if idx := slices.Index(s.playlist, path); idx >= 0 {
+			s.playlistIdx = idx
+			return
+		}
+	}
+	s.playlist = nil
+	s.playlistIdx = -1
+	s.playlistAlbum = ""
 }
 
 func (s *playbackState) selectLibraryTrack(path string) {
@@ -176,49 +256,137 @@ func (s *playbackState) nextTrack() (string, string, bool) {
 	return path, s.lib.CurrentAlbum().Name, true
 }
 
+// advance picks the next track according to shuffle/repeat settings.
+// Single entry point for auto-advance; manual navigation uses nextTrack/previousTrack.
 func (s *playbackState) advance(settings config.PlaybackSettings) (trackRef, bool) {
 	if s.lib == nil || s.pl == nil {
 		return trackRef{}, false
 	}
 
-	if len(s.playlist) > 0 {
-		if settings.Repeat == config.RepeatOne {
-			return trackRef{path: s.playlist[s.playlistIdx], album: s.playlistAlbum}, true
-		}
-		next := s.playlistIdx + 1
-		if next < len(s.playlist) {
-			s.playlistIdx = next
-			return trackRef{path: s.playlist[next], album: s.playlistAlbum}, true
-		}
-		if settings.Repeat == config.RepeatAll {
-			s.playlistIdx = 0
-			return trackRef{path: s.playlist[0], album: s.playlistAlbum}, true
-		}
-		return trackRef{}, false
-	}
-
 	if settings.Repeat == config.RepeatOne {
-		path := s.lib.CurrentTrack()
-		if path == "" {
-			return trackRef{}, false
-		}
-		return trackRef{path: path, album: s.lib.CurrentAlbum().Name}, true
+		return s.repeatOne()
 	}
 
 	if settings.ShuffleMode != config.ShuffleOff {
-		if s.shuffleNeedsRegeneration(settings) {
-			s.regenerateShuffleOrder(settings)
-		}
-		if s.shuffle.idx >= len(s.shuffle.order) {
-			return trackRef{}, false
-		}
-		track := s.shuffle.order[s.shuffle.idx]
-		s.shuffle.idx++
-		s.lib.SelectAlbum(track.albumIdx)
-		s.lib.SelectTrack(track.trackIdx)
-		return track, true
+		return s.advanceShuffled(settings)
 	}
 
+	return s.advanceSequential(settings)
+}
+
+// repeatOne returns the current track regardless of context.
+func (s *playbackState) repeatOne() (trackRef, bool) {
+	if len(s.playlist) > 0 {
+		if s.playlistIdx >= 0 && s.playlistIdx < len(s.playlist) {
+			return trackRef{path: s.playlist[s.playlistIdx], album: s.playlistAlbum}, true
+		}
+		return trackRef{}, false
+	}
+	path := s.lib.CurrentTrack()
+	if path == "" {
+		return trackRef{}, false
+	}
+	return trackRef{path: path, album: s.lib.CurrentAlbum().Name}, true
+}
+
+// advanceShuffled picks the next track from the shuffled order, rebuilding
+// when the source or mode changes. When a playlist is active, it is the
+// shuffle pool (user's explicit context). Otherwise the pool is derived from
+// the library according to ShuffleMode.
+func (s *playbackState) advanceShuffled(settings config.PlaybackSettings) (trackRef, bool) {
+	pool, key := s.shufflePool(settings)
+	if s.shuffle.needsRebuild(key, settings.Repeat) {
+		filtered := excludeCurrentTrack(pool, s.pl.TrackPath())
+		s.shuffle.build(filtered, key)
+	}
+	t, ok := s.shuffle.next()
+	if !ok {
+		return trackRef{}, false
+	}
+	return t, true
+}
+
+// shufflePool returns the track pool and identity key for shuffling.
+func (s *playbackState) shufflePool(settings config.PlaybackSettings) ([]trackRef, string) {
+	if len(s.playlist) > 0 {
+		return s.playlistTracks(), s.playlistKey()
+	}
+	switch settings.ShuffleMode {
+	case config.ShuffleAlbum:
+		return s.currentAlbumTracks(), s.albumKey()
+	case config.ShuffleLocal:
+		return s.localTracks(), s.libraryKey("local")
+	case config.ShuffleAll:
+		return s.allTracks(), s.libraryKey("all")
+	default:
+		return nil, ""
+	}
+}
+
+// playlistTracks builds trackRefs from the active playlist.
+func (s *playbackState) playlistTracks() []trackRef {
+	tracks := make([]trackRef, len(s.playlist))
+	for i, path := range s.playlist {
+		tracks[i] = trackRef{path: path, album: s.playlistAlbum}
+	}
+	return tracks
+}
+
+// playlistKey returns a stable identity for the current playlist content.
+// Uses FNV-1a hash over all track paths to distinguish playlists that differ
+// in content even when they share the same album name and length.
+func (s *playbackState) playlistKey() string {
+	h := fnv.New32a()
+	for _, p := range s.playlist {
+		h.Write([]byte(p))
+		h.Write([]byte{0}) // separator
+	}
+	return fmt.Sprintf("pl:%s:%x", s.playlistAlbum, h.Sum32())
+}
+
+// albumKey returns a stable identity for the current library album.
+// Includes track count to detect additions/deletions within the album.
+func (s *playbackState) albumKey() string {
+	idx := s.lib.CurrentAlbumIndex()
+	if idx < 0 || idx >= len(s.lib.Albums) {
+		return fmt.Sprintf("album:%d", idx)
+	}
+	return fmt.Sprintf("album:%d:%d", idx, len(s.lib.Albums[idx].Tracks))
+}
+
+// libraryKey returns a key that changes when the library content changes.
+// The key embeds the total track count so that a rescan (add/delete)
+// invalidates any cached shuffle order.
+func (s *playbackState) libraryKey(scope string) string {
+	total := 0
+	for _, album := range s.lib.Albums {
+		total += len(album.Tracks)
+	}
+	return fmt.Sprintf("%s:%d", scope, total)
+}
+
+// advanceSequential advances through playlist or library in order.
+func (s *playbackState) advanceSequential(settings config.PlaybackSettings) (trackRef, bool) {
+	if len(s.playlist) > 0 {
+		return s.advancePlaylistSequential(settings)
+	}
+	return s.advanceLibrarySequential(settings)
+}
+
+func (s *playbackState) advancePlaylistSequential(settings config.PlaybackSettings) (trackRef, bool) {
+	next := s.playlistIdx + 1
+	if next < len(s.playlist) {
+		s.playlistIdx = next
+		return trackRef{path: s.playlist[next], album: s.playlistAlbum}, true
+	}
+	if settings.Repeat == config.RepeatAll {
+		s.playlistIdx = 0
+		return trackRef{path: s.playlist[0], album: s.playlistAlbum}, true
+	}
+	return trackRef{}, false
+}
+
+func (s *playbackState) advanceLibrarySequential(settings config.PlaybackSettings) (trackRef, bool) {
 	album := s.lib.CurrentAlbum()
 	if s.lib.CurrentTrackIndex() < len(album.Tracks)-1 {
 		path := s.lib.TrackNext()
@@ -235,77 +403,7 @@ func (s *playbackState) advance(settings config.PlaybackSettings) (trackRef, boo
 	return trackRef{}, false
 }
 
-func (s *playbackState) shuffleNeedsRegeneration(settings config.PlaybackSettings) bool {
-	if len(s.shuffle.order) == 0 {
-		return true
-	}
-	if settings.ShuffleMode == config.ShuffleAlbum && s.shuffle.albumIdx != s.lib.CurrentAlbumIndex() {
-		return true
-	}
-	return s.shuffle.idx >= len(s.shuffle.order) && settings.Repeat == config.RepeatAll
-}
-
-func (s *playbackState) regenerateShuffleOrder(settings config.PlaybackSettings) {
-	if s.lib == nil {
-		s.shuffle = shuffleState{}
-		return
-	}
-
-	var pool []trackRef
-	switch settings.ShuffleMode {
-	case config.ShuffleAlbum:
-		pool = s.currentAlbumTracks()
-		s.shuffle.albumIdx = s.lib.CurrentAlbumIndex()
-	case config.ShuffleLocal:
-		pool = s.localTracks()
-	case config.ShuffleAll:
-		pool = s.allTracks()
-	default:
-		s.shuffle = shuffleState{}
-		return
-	}
-
-	cur := ""
-	if s.pl != nil {
-		cur = s.pl.TrackPath()
-	}
-	if cur != "" && len(pool) > 1 {
-		filtered := pool[:0]
-		for _, track := range pool {
-			if track.path != cur {
-				filtered = append(filtered, track)
-			}
-		}
-		pool = filtered
-	}
-
-	rand.Shuffle(len(pool), func(i, j int) { pool[i], pool[j] = pool[j], pool[i] })
-	s.shuffle.order = pool
-	s.shuffle.idx = 0
-}
-
-func (s *playbackState) allTracks() []trackRef {
-	var all []trackRef
-	for albumIdx, album := range s.lib.Albums {
-		for trackIdx, path := range album.Tracks {
-			all = append(all, trackRef{path: path, album: album.Name, albumIdx: albumIdx, trackIdx: trackIdx})
-		}
-	}
-	return all
-}
-
-func (s *playbackState) localTracks() []trackRef {
-	var all []trackRef
-	for albumIdx, album := range s.lib.Albums {
-		if player.IsModland(album.Path) || player.IsModArchive(album.Path) {
-			continue
-		}
-		for trackIdx, path := range album.Tracks {
-			all = append(all, trackRef{path: path, album: album.Name, albumIdx: albumIdx, trackIdx: trackIdx})
-		}
-	}
-	return all
-}
+// --- Pool builders (used by shufflePool) ---
 
 func (s *playbackState) currentAlbumTracks() []trackRef {
 	albumIdx := s.lib.CurrentAlbumIndex()
@@ -314,10 +412,33 @@ func (s *playbackState) currentAlbumTracks() []trackRef {
 	}
 	album := s.lib.Albums[albumIdx]
 	tracks := make([]trackRef, len(album.Tracks))
-	for trackIdx, path := range album.Tracks {
-		tracks[trackIdx] = trackRef{path: path, album: album.Name, albumIdx: albumIdx, trackIdx: trackIdx}
+	for i, path := range album.Tracks {
+		tracks[i] = trackRef{path: path, album: album.Name}
 	}
 	return tracks
+}
+
+func (s *playbackState) localTracks() []trackRef {
+	var all []trackRef
+	for _, album := range s.lib.Albums {
+		if player.IsModland(album.Path) || player.IsModArchive(album.Path) {
+			continue
+		}
+		for _, path := range album.Tracks {
+			all = append(all, trackRef{path: path, album: album.Name})
+		}
+	}
+	return all
+}
+
+func (s *playbackState) allTracks() []trackRef {
+	var all []trackRef
+	for _, album := range s.lib.Albums {
+		for _, path := range album.Tracks {
+			all = append(all, trackRef{path: path, album: album.Name})
+		}
+	}
+	return all
 }
 
 // prunePlaylist removes entries inside deletedPath and clamps the cursor.

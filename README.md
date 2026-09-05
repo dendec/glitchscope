@@ -65,8 +65,8 @@ Settings are automatically saved to `config.json` next to the binary:
     "beat_sensitivity": 1
   },
   "playback": {
-    "shuffle_mode": 0,
-    "repeat": 0,
+    "shuffle_mode": "off",
+    "repeat": "off",
     "last_position": {
       "path": "/path/to/track.ogg",
       "seconds": 42.5
