@@ -85,20 +85,21 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 }
 
 // buildResolutionValues produces the resolution option list and selected index.
-// This one can't use optionPair because "Auto" is a virtual option prepended
-// when adaptive mode is on.
+// "Auto" is always included as the first option so the user can switch back
+// from a fixed resolution to adaptive mode.
 func buildResolutionValues(s config.Settings, resolutions []config.RenderResolution) ([]string, int) {
+	values := append([]string{"Auto"}, renderResolutionStrings(resolutions)...)
+	if len(resolutions) == 0 {
+		values = append(values, "N/A")
+	}
 	if s.Graphics.Adaptive {
-		values := append([]string{"Auto"}, renderResolutionStrings(resolutions)...)
-		if len(resolutions) == 0 {
-			values = append(values, "N/A")
-		}
 		return values, 0
 	}
-	values := renderResolutionStrings(resolutions)
+	// Find the currently selected fixed resolution (index offset by 1
+	// because "Auto" is always at position 0).
 	for i, r := range resolutions {
 		if r.Width == s.Graphics.RenderWidth && r.Height == s.Graphics.RenderHeight {
-			return values, i
+			return values, i + 1
 		}
 	}
 	return values, 0
