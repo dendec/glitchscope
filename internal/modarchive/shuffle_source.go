@@ -12,6 +12,99 @@ import (
 	"github.com/dendec/glitchscope/internal/catalog"
 )
 
+// maxRecordCacheCap is the maximum number of directory records kept
+// in the ShuffleSource runtime cache. For low-RAM devices (512 MB),
+// 128 cached records with ~30 K tracks each is ~40 MiB worst case;
+// typical records are much smaller (~200 bytes/track).
+const maxRecordCacheCap = 128
+
+// recordCache is a bounded LRU cache for ShuffleDirRecord.
+// Lookup is O(1) via the map; eviction is O(n) over the slice but
+// n ≤ 128 so it's negligible per operation.
+type recordCache struct {
+	entries  map[string]*cacheSlot
+	order    []string // access-ordered, oldest first
+	capacity int
+	// accessCounter is monotonically increasing per entry. It is
+	// normalized (halved all counters) when it exceeds 1<<48 to
+	// prevent effective counter convergence over long runtimes.
+	accessCounter uint64
+}
+
+type cacheSlot struct {
+	record *ShuffleDirRecord
+	access uint64
+}
+
+func newRecordCache(cap int) *recordCache {
+	return &recordCache{
+		entries:  make(map[string]*cacheSlot, cap),
+		order:    make([]string, 0, cap),
+		capacity: cap,
+	}
+}
+
+func (c *recordCache) get(key string) (*ShuffleDirRecord, bool) {
+	slot, ok := c.entries[key]
+	if !ok {
+		return nil, false
+	}
+	c.accessCounter++
+	slot.access = c.accessCounter
+	if c.accessCounter > 1<<48 {
+		c.normalize()
+	}
+	// Move to end of order (most recently used).
+	for i, k := range c.order {
+		if k == key {
+			c.order = append(c.order[:i], c.order[i+1:]...)
+			c.order = append(c.order, key)
+			break
+		}
+	}
+	return slot.record, true
+}
+
+func (c *recordCache) put(key string, record *ShuffleDirRecord) {
+	if _, ok := c.entries[key]; ok {
+		c.entries[key].record = record
+		c.accessCounter++
+		c.entries[key].access = c.accessCounter
+		if c.accessCounter > 1<<48 {
+			c.normalize()
+		}
+		// Move to end of order (most recently used).
+		for i, k := range c.order {
+			if k == key {
+				c.order = append(c.order[:i], c.order[i+1:]...)
+				c.order = append(c.order, key)
+				break
+			}
+		}
+		return
+	}
+	// Evict oldest if at capacity.
+	for len(c.order) >= c.capacity {
+		oldest := c.order[0]
+		c.order = c.order[1:]
+		delete(c.entries, oldest)
+	}
+	c.accessCounter++
+	c.entries[key] = &cacheSlot{record: record, access: c.accessCounter}
+	c.order = append(c.order, key)
+	if c.accessCounter > 1<<48 {
+		c.normalize()
+	}
+}
+
+// normalize halves all access counters to prevent convergence.
+func (c *recordCache) normalize() {
+	for _, slot := range c.entries {
+		slot.access /= 2
+	}
+	c.accessCounter /= 2
+}
+
 // ShuffleSource implements catalog.SourceIndex for ModArchive.
 // It reads modarchive.idx (a GSA file) at construction time and
 // provides lazy random selection by reading only the selected
@@ -25,7 +118,7 @@ type ShuffleSource struct {
 	meta           *ShuffleIndexMeta
 	locatorToEntry map[string]string // canonical URL → GSA entry name (from manifest)
 	gsa            *archive.Archive  // .idx GSA (has cached dir records)
-	records        map[string]*ShuffleDirRecord
+	records        *recordCache
 	mu             sync.Mutex
 }
 
@@ -34,7 +127,7 @@ type ShuffleSource struct {
 // Returns nil if the index does not exist or is invalid.
 func OpenShuffleSource(baseDir string) *ShuffleSource {
 	idxPath := shuffleIndexPath(baseDir)
-	gsa, err := archive.Open(idxPath, _shuffleMaxBuckets)
+	gsa, err := archive.Open(idxPath, _idxMaxEntries)
 	if err != nil {
 		return nil
 	}
@@ -55,6 +148,12 @@ func OpenShuffleSource(baseDir string) *ShuffleSource {
 		return nil
 	}
 
+	// Validate that cached directory records actually exist in the GSA.
+	if err := ValidateCachedRecordPresence(&meta, gsa); err != nil {
+		_ = gsa.Close()
+		return nil
+	}
+
 	// Build reverse map from manifest — no record reads needed.
 	locatorToEntry := make(map[string]string, len(meta.Entries))
 	for _, entry := range meta.Entries {
@@ -66,7 +165,7 @@ func OpenShuffleSource(baseDir string) *ShuffleSource {
 		meta:           &meta,
 		locatorToEntry: locatorToEntry,
 		gsa:            gsa,
-		records:        make(map[string]*ShuffleDirRecord),
+		records:        newRecordCache(maxRecordCacheCap),
 	}
 }
 
@@ -219,26 +318,22 @@ func (s *ShuffleSource) loadRecord(locator string) (*ShuffleDirRecord, error) {
 		entryName = en
 	}
 
-	if r, ok := s.records[entryName]; ok {
+	if r, ok := s.records.get(entryName); ok {
 		return r, nil
 	}
 
 	// Determine the source: cached dir (in .idx) vs snapshot/addendum.
 	isSnapAdd := isSnapshotOrAddendumLocator(entryName)
 	if !isSnapAdd {
-		// Also check the locator itself — caller may pass entry name.
 		isSnapAdd = isSnapshotOrAddendumLocator(locator)
 	}
 
 	var record *ShuffleDirRecord
 	if isSnapAdd {
-		// Resolve the canonical URL and bucket entry name.
 		canonicalURL := locator
 		if isSnapshotOrAddendumLocator(locator) {
 			canonicalURL = locator
 		} else {
-			// entryName is a GSA record name, need canonical URL.
-			// Look it up from the manifest.
 			for _, e := range s.meta.Entries {
 				if e.Name == entryName {
 					canonicalURL = e.Locator
@@ -252,7 +347,6 @@ func (s *ShuffleSource) loadRecord(locator string) (*ShuffleDirRecord, error) {
 			return nil, err
 		}
 	} else {
-		// Cached directory: read from .idx GSA.
 		if s.gsa == nil {
 			return nil, fmt.Errorf("modarchive: index not open")
 		}
@@ -266,7 +360,7 @@ func (s *ShuffleSource) loadRecord(locator string) (*ShuffleDirRecord, error) {
 		}
 	}
 
-	s.records[entryName] = record
+	s.records.put(entryName, record)
 	return record, nil
 }
 
@@ -274,7 +368,7 @@ func (s *ShuffleSource) loadRecord(locator string) (*ShuffleDirRecord, error) {
 // or addendum source GSA. The locator must be a canonical URL.
 func (s *ShuffleSource) loadSnapshotRecord(locator string) (*ShuffleDirRecord, error) {
 	gsaPath := sourceGSAPath(s.baseDir, locator)
-	gsa, err := openGSA(gsaPath, _shuffleMaxBuckets)
+	gsa, err := openGSA(gsaPath, _snapshotMaxEntries)
 	if err != nil {
 		return nil, fmt.Errorf("modarchive: open source GSA: %w", err)
 	}
