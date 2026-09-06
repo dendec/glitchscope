@@ -37,6 +37,14 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		return
 	}
 
+	// Draw preview background full-screen before any overlay elements.
+	// This is the thumbnail texture stretched to fill the window on the
+	// presets page.
+	if o.previewBgTex != 0 {
+		glDrawOverlayImage(o.programImage, o.previewBgTex, 1,
+			0, 0, float32(winW), float32(winH), winW, winH, viewW, viewH)
+	}
+
 	// Rebuild header/footer text textures up front so they're ready before layout/draw below.
 	if o.presetNameDirty {
 		o.rebuildPresetNameTex()

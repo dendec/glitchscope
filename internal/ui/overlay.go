@@ -184,6 +184,7 @@ type Overlay struct {
 	presetDetailKey  string
 	presetsColL      listTex
 	presetsColR      listTex
+	previewBgTex     uint32 // thumbnail texture drawn full-screen as presets page background
 
 	scrollUp    scrollHold
 	scrollDown  scrollHold
@@ -332,6 +333,12 @@ func (o *Overlay) Close() {
 }
 
 // Draw renders either the UI overlay or the notification.
+// SetPreviewBackground stores the preview thumbnail texture to be drawn
+// full-screen as background on the presets page. Pass 0 to clear.
+func (o *Overlay) SetPreviewBackground(tex uint32) {
+	o.previewBgTex = tex
+}
+
 func (o *Overlay) Draw(width, height int) {
 	if o.uiVisible {
 		o.renderUI(width, height, width, height)

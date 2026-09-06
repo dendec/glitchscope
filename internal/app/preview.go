@@ -103,16 +103,6 @@ func (r *previewRenderer) RenderFPS() float64 {
 	return r.meter.Average()
 }
 
-// SetWindowSize updates the preview projectM render dimensions without
-// touching the thumbnail capture texture. Use before RenderFrame() when
-// the preview renders at full window size (presets page background).
-func (r *previewRenderer) SetWindowSize(w, h int) {
-	if !r.isReady() || w <= 0 || h <= 0 {
-		return
-	}
-	r.pm.SetWindowSize(w, h)
-}
-
 // Resize recreates the capture texture at the given dimensions.
 // No-op if dimensions haven't changed.
 func (r *previewRenderer) Resize(w, h int) {
@@ -205,30 +195,12 @@ func (r *previewRenderer) ProcessNext() bool {
 	return true
 }
 
-// RenderFrame renders one preview frame at the current window size into
-// framebuffer 0. The result stays on screen as background.
-// Unlike ProcessNext, this always renders when called — no frame throttling.
-func (r *previewRenderer) RenderFrame() bool {
-	if !r.isReady() {
-		return false
-	}
-
+// ActiveKey returns the key of the currently active preview job.
+func (r *previewRenderer) ActiveKey() string {
 	if r.active == nil {
-		if len(r.queue) == 0 {
-			return false
-		}
-		r.active = &r.queue[0]
-		r.queue = r.queue[1:]
-		r.meter.Reset()
-		slog.Debug("preview job started", "key", r.active.key)
-		r.pm.LoadPresetData(r.active.data, false)
+		return ""
 	}
-
-	started := time.Now()
-	r.pm.RenderFrame()
-	r.meter.AddDuration(time.Since(started))
-
-	return true
+	return r.active.key
 }
 
 func previewFrameDue(now, nextFrame time.Time) bool {
