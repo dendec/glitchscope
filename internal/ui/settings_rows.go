@@ -125,3 +125,49 @@ func boolIndex(v bool) int {
 	}
 	return 0
 }
+
+// settingDescription explains the selected value without exposing implementation details.
+func settingDescription(setting, value int) string {
+	switch setting {
+	case SettingPerformanceMode:
+		switch value {
+		case 0:
+			return "Highest visual quality. Targets 30 FPS."
+		case 1:
+			return "Balances detail and power use. Targets 24 FPS."
+		case 2:
+			return "Prioritizes battery life with a lower resolution ceiling."
+		}
+	case SettingSeekMemory:
+		switch value {
+		case 0:
+			return "Prepares tracker audio for accurate seeking. Uses more memory."
+		case 1:
+			return "Uses less memory. Long tracks stream; seeking depends on the decoder."
+		case 2:
+			return "Skips full-track preparation. Backward seeking may be limited."
+		}
+	case SettingVisualizer:
+		if value == 0 {
+			return "Music keeps playing without the main visualization."
+		}
+		return "Show the animated visualization while listening."
+	case SettingResolution:
+		if value == 0 {
+			return "Adjusts resolution automatically for the current preset."
+		}
+		return "Fixed resolution. Automatic adjustment is disabled."
+	case SettingShuffle:
+		switch value {
+		case 0:
+			return "Play tracks in order."
+		case 1:
+			return "Shuffle the current folder or playlist."
+		case 2:
+			return "Shuffle within the current music source."
+		case 3:
+			return "Shuffle all sources. Offline, only local music is selected."
+		}
+	}
+	return ""
+}

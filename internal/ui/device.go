@@ -19,6 +19,7 @@ import "C"
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -28,6 +29,12 @@ import (
 
 // DeviceInfo holds hardware and software details for the Device help page.
 type DeviceInfo struct {
+	DeviceName string // handheld model, e.g. "TrimUI Smart Pro"
+	CFWName    string // custom firmware, e.g. "muOS"
+	CFWVersion string
+	PMVersion  string
+	SoC        string // chipset name supplied by PortMaster or device tree
+
 	OSName    string // e.g. "Ubuntu 24.04.1 LTS"
 	Platform  string // SDL platform: "Linux", "Windows", "macOS"
 	GoVersion string // e.g. "go1.25.0"
@@ -68,6 +75,7 @@ func CollectDeviceInfo(win *sdl.Window) *DeviceInfo {
 		Arch:            runtime.GOARCH,
 		ProjectMVersion: C.GoString(C.projectMVersion()),
 	}
+	d.fillHandheldInfo(os.Getenv, os.ReadFile)
 	d.OSName = readOSName()
 	d.CPUName = readCPUName()
 	d.TotalRAM = readTotalRAM()
@@ -89,6 +97,88 @@ func CollectDeviceInfo(win *sdl.Window) *DeviceInfo {
 	fillDisplayInfo(d)
 	fillGLInfo(d)
 	return d
+}
+
+type readFileFunc func(string) ([]byte, error)
+
+func (d *DeviceInfo) fillHandheldInfo(getenv func(string) string, readFile readFileFunc) {
+	d.DeviceName = cleanDeviceValue(getenv("DEVICE_NAME"))
+	d.SoC = cleanDeviceValue(getenv("DEVICE_CPU"))
+	d.CFWName = cleanDeviceValue(getenv("CFW_NAME"))
+	d.CFWVersion = cleanDeviceValue(getenv("CFW_VERSION"))
+	d.PMVersion = cleanDeviceValue(getenv("PM_VERSION"))
+
+	osRelease := readKeyValues(readFile, "/etc/os-release")
+	if d.CFWName == "" {
+		d.CFWName = osRelease["OS_NAME"]
+	}
+	if d.CFWVersion == "" {
+		d.CFWVersion = osRelease["OS_VERSION"]
+	}
+	if d.DeviceName == "" {
+		paths := []string{
+			"/opt/muos/device/config/board/name",
+			"/opt/muos/config/device.txt",
+			"/boot/boot/knulli.board",
+			"/boot/boot/batocera.board",
+			"/boot/boot/system.board",
+			"/sys/firmware/devicetree/base/model",
+		}
+		if home := cleanDeviceValue(getenv("HOME")); home != "" {
+			paths = append([]string{
+				filepath.Join(home, ".config", ".CUSTOM_DEVICE"),
+				filepath.Join(home, ".config", ".DEVICE"),
+				filepath.Join(home, ".config", ".OS_ARCH"),
+			}, paths...)
+		}
+		d.DeviceName = firstReadableLine(readFile, paths...)
+	}
+	if d.DeviceName == "" && strings.EqualFold(d.CFWName, "TrimUI") {
+		d.DeviceName = "TrimUI Smart Pro"
+	}
+	if d.SoC == "" {
+		d.SoC = firstReadableLine(readFile,
+			"/sys/devices/soc0/soc_id",
+			"/sys/devices/soc0/machine",
+		)
+	}
+	if d.PMVersion == "" {
+		d.PMVersion = firstReadableLine(readFile,
+			"/roms/ports/PortMaster/version",
+			"/opt/system/Tools/PortMaster/version",
+		)
+	}
+}
+
+func readKeyValues(readFile readFileFunc, path string) map[string]string {
+	values := make(map[string]string)
+	data, err := readFile(path)
+	if err != nil {
+		return values
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		key, value, ok := strings.Cut(line, "=")
+		if ok {
+			values[key] = cleanDeviceValue(value)
+		}
+	}
+	return values
+}
+
+func firstReadableLine(readFile readFileFunc, paths ...string) string {
+	for _, path := range paths {
+		data, err := readFile(path)
+		if err == nil {
+			if value := cleanDeviceValue(string(data)); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func cleanDeviceValue(value string) string {
+	return strings.Trim(value, "\" \t\r\n\x00")
 }
 
 func readOSName() string {
@@ -114,6 +204,9 @@ func readCPUName() string {
 			return strings.TrimSpace(strings.SplitN(line, ":", 2)[1])
 		}
 		if strings.HasPrefix(line, "Processor") {
+			return strings.TrimSpace(strings.SplitN(line, ":", 2)[1])
+		}
+		if strings.HasPrefix(line, "Hardware") {
 			return strings.TrimSpace(strings.SplitN(line, ":", 2)[1])
 		}
 	}
@@ -194,17 +287,29 @@ func (d *DeviceInfo) DeviceInfoLines() []string {
 		return []string{"Device information unavailable."}
 	}
 	lines := []string{
-		"**System:**",
+		"**Device:**",
+	}
+	if d.DeviceName != "" {
+		lines = append(lines, "**"+d.DeviceName+"**")
+	}
+	if d.CFWName != "" {
+		lines = append(lines, keyVal("Firmware", strings.TrimSpace(d.CFWName+" "+d.CFWVersion)))
+	}
+	if d.SoC != "" {
+		lines = append(lines, keyVal("SoC", d.SoC))
+	}
+	lines = append(lines,
 		keyVal("OS", d.OSName),
 		keyVal("CPU", d.CPUName),
 		keyVal("RAM", d.TotalRAM),
 		"",
-		"**Platform:**",
+		"**Software:**",
 		keyVal("Runtime", d.GoVersion+" "+d.Arch),
-		keyVal("SDL", d.Platform),
-		"",
-		"**Display:**",
+	)
+	if d.PMVersion != "" {
+		lines = append(lines, keyVal("PortMaster", d.PMVersion))
 	}
+	lines = append(lines, "", "**Display:**")
 	if d.DisplayName != "" {
 		lines = append(lines, keyVal("Monitor", d.DisplayName))
 	}

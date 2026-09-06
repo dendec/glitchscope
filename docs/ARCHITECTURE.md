@@ -149,3 +149,21 @@ survive a process restart, so device/driver updates cannot reuse old measurement
 
 UI shader attribute/uniform locations are queried at link time and released with
 their program. GL calls remain in the binding/rendering modules.
+
+
+Первое открытие меню сохраняется в `internal/config` как `ui.menu_opened`.
+App фиксирует это после действия открытия меню и сохраняет настройки; UI владеет
+только таймером и отдельной экранной текстурой стартовой подсказки. Истечение
+таймера не меняет сохранённую отметку. Help и footer разрешают названия кнопок
+через общий UI controlLabel; исходное отображение SDL actions не изменяется.
+
+Сведения об устройстве принадлежат UI и собираются лениво при первом открытии
+темы Device. Сначала используются экспортированные PortMaster-переменные, затем
+read-only fallback по известным CFW-файлам, device tree, `/proc`, SDL и OpenGL.
+Результат кешируется до завершения процесса; shell-команды и периодический опрос
+не используются. App добавляет к снимку сведения активного аудиобэкенда.
+
+Числа треков и директорий на странице Catalogs являются только UI-проекцией
+immutable metadata provider-specific shuffle indexes. Открытие темы лениво
+запускает обычную сборку индекса, если shuffle был выключен при старте; Help не
+обходит каталоги и не владеет их данными.

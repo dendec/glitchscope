@@ -103,3 +103,12 @@ new CSV path for the new schema; older reports are not overwritten or mixed.
 The benchmark uses a synthetic audio signal and does not measure audio dropouts
 or UI rendering. Repeat the same run after warming the device to compare sustained
 performance. `-v` logs audio decoding time and process peak RSS.
+
+
+## Finding your way around
+
+On first use, **START — Open menu** (or **TAB** with a keyboard) appears for ten
+seconds. Opening the menu dismisses it permanently; missing the hint lets it
+reappear next time. Help begins with Quick Start, Controls, Playback, Quality and
+Battery, and Troubleshooting. Button names match the context hints at the bottom
+of the menu. Settings includes short explanations of the selected options.

@@ -3,6 +3,7 @@ package ui
 import (
 	"embed"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -38,6 +39,16 @@ func loadLicenseTexts() map[string][]string {
 }
 
 var helpTopics = loadHelpTopics()
+
+// CatalogInfo is the small runtime projection shown by Help. Counts come from
+// persistent shuffle-index metadata; no catalog records are loaded for Help.
+type CatalogInfo struct {
+	ModlandTracks         uint64
+	ModlandDirectories    uint64
+	ModArchiveTracks      uint64
+	ModArchiveDirectories uint64
+	IndexLoading          bool
+}
 
 func loadHelpTopics() []HelpTopic {
 	var topics []HelpTopic
@@ -144,14 +155,41 @@ func (o *Overlay) helpLines(topic HelpTopic) []string {
 		if inWrongSection {
 			continue
 		}
-		lines = append(lines, line)
+		lines = append(lines, readableHelpLines(o.expandHelpControls(line))...)
+	}
+	return lines
+}
+
+func readableHelpLines(line string) []string {
+	if len(line) <= 240 || strings.HasPrefix(strings.TrimSpace(line), "**") {
+		return []string{line}
+	}
+	parts := strings.Split(line, ". ")
+	if len(parts) < 3 {
+		return []string{line}
+	}
+	lines := make([]string, 0, len(parts)+len(parts)/2)
+	for i := 0; i < len(parts); i += 2 {
+		end := min(i+2, len(parts))
+		paragraph := strings.Join(parts[i:end], ". ")
+		if end < len(parts) && !strings.HasSuffix(paragraph, ".") {
+			paragraph += "."
+		}
+		lines = append(lines, paragraph)
+		if end < len(parts) {
+			lines = append(lines, "")
+		}
 	}
 	return lines
 }
 
 func (o *Overlay) deviceInfoLines() []string {
+	if o.deviceInfo == nil && o.deviceInfoProvider != nil {
+		o.deviceInfo = o.deviceInfoProvider()
+		o.deviceInfoProvider = nil
+	}
 	if o.deviceInfo == nil {
-		return []string{"Collecting device information..."}
+		return []string{"Device information unavailable."}
 	}
 	return o.deviceInfo.DeviceInfoLines()
 }
@@ -263,4 +301,37 @@ func (o *Overlay) helpMaxContentTop(topic HelpTopic) int {
 		return 0
 	}
 	return maxTop
+}
+
+// Help and context hints share physical button labels (Nintendo layout on handhelds).
+func (o *Overlay) expandHelpControls(line string) string {
+	for _, action := range []string{hintMenu, hintSelect, hintBack, hintPlay, hintPages, hintMove, hintFocus, hintSeek, hintPresets, hintRandom, hintTracks, hintOverlay, hintFavorite} {
+		line = strings.ReplaceAll(line, "{"+action+"}", o.controlLabel(action))
+	}
+	info := o.catalogInfo
+	replacements := map[string]string{
+		"{modland_tracks}":         formatCatalogCount(info.ModlandTracks, info.IndexLoading),
+		"{modland_directories}":    formatCatalogCount(info.ModlandDirectories, info.IndexLoading),
+		"{modarchive_tracks}":      formatCatalogCount(info.ModArchiveTracks, info.IndexLoading),
+		"{modarchive_directories}": formatCatalogCount(info.ModArchiveDirectories, info.IndexLoading),
+		"{network_status}":         map[bool]string{true: "online", false: "offline"}[o.online],
+	}
+	for placeholder, value := range replacements {
+		line = strings.ReplaceAll(line, placeholder, value)
+	}
+	return line
+}
+
+func formatCatalogCount(count uint64, loading bool) string {
+	if count == 0 {
+		if loading {
+			return "loading..."
+		}
+		return "unavailable"
+	}
+	text := fmt.Sprintf("%d", count)
+	for i := len(text) - 3; i > 0; i -= 3 {
+		text = text[:i] + "," + text[i:]
+	}
+	return text
 }

@@ -1,9 +1,17 @@
 package ui
 
+import "strings"
+
 // renderHelpPanels draws a topic or child-entry list on the left and its text on the right.
 func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	maxTextW := o.availableRowTextWidth(panelW)
 	topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+	if topic.ID == HelpCatalogs && o.catalogInfoProvider != nil {
+		if info := o.catalogInfoProvider(); info != o.catalogInfo {
+			o.catalogInfo = info
+			o.helpDirty = true
+		}
+	}
 	maxRows := panelH / lh
 	if maxRows < 1 {
 		maxRows = 1
@@ -56,9 +64,7 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 					entry := cat.Children[o.helpView.GrandChildCursor]
 					rightRows[0] = listRow{text: entry.Title, bold: true}
 					rightRows = append(rightRows, listRow{text: ""})
-					for _, line := range wrapHelpLines(o.helpLines(HelpTopic{Lines: entry.Lines}), o.face, maxTextW) {
-						rightRows = append(rightRows, listRow{text: line})
-					}
+					rightRows = o.appendHelpRows(rightRows, o.helpLines(HelpTopic{Lines: entry.Lines}), maxTextW)
 				}
 			}
 		} else if o.helpView.InChildren && len(topic.Children) > 0 {
@@ -72,14 +78,10 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 			} else {
 				rightRows[0] = listRow{text: entry.Title, bold: true}
 				rightRows = append(rightRows, listRow{text: ""})
-				for _, line := range wrapHelpLines(o.helpLines(HelpTopic{Lines: entry.Lines}), o.face, maxTextW) {
-					rightRows = append(rightRows, listRow{text: line})
-				}
+				rightRows = o.appendHelpRows(rightRows, o.helpLines(HelpTopic{Lines: entry.Lines}), maxTextW)
 			}
 		} else {
-			for _, line := range wrapHelpLines(o.helpLines(topic), o.face, maxTextW) {
-				rightRows = append(rightRows, listRow{text: line})
-			}
+			rightRows = o.appendHelpRows(rightRows, o.helpLines(topic), maxTextW)
 		}
 		maxTop := len(rightRows) - maxRows
 		if maxTop < 0 {
@@ -122,4 +124,15 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 	}
 	drawScrollbar(o, lx+pw-sbW, py, ph, leftTotal, maxRows, leftScroll, winW, winH, viewW, viewH)
 	drawScrollbar(o, rx+pw-sbW, py, ph, o.helpContentRowCount(topic), maxRows, o.helpView.ContentTop, winW, winH, viewW, viewH)
+}
+
+func (o *Overlay) appendHelpRows(rows []listRow, lines []string, maxTextW int) []listRow {
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		bold := len(trimmed) >= 4 && strings.HasPrefix(trimmed, "**") && strings.HasSuffix(trimmed, "**")
+		for _, wrapped := range wrapHelpLines([]string{line}, o.face, maxTextW) {
+			rows = append(rows, listRow{text: wrapped, bold: bold})
+		}
+	}
+	return rows
 }

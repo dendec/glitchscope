@@ -92,6 +92,7 @@ func (o *Overlay) ToggleUI() {
 	}
 	o.uiVisible = !o.uiVisible
 	if o.uiVisible {
+		o.menuHint.enabled = false
 		o.panelEntered = true
 		o.focusPanel = 0
 		o.uiPage = PageLibrary

@@ -1,35 +1,40 @@
 package ui
 
-import "testing"
+import (
+	"slices"
+	"strings"
+	"testing"
+)
 
 func TestHelpTopicsLoadFromAsset(t *testing.T) {
-	if len(helpTopics) != 6 {
-		t.Fatalf("loaded %d Help topics, want 6", len(helpTopics))
+	if len(helpTopics) != 10 {
+		t.Fatalf("loaded %d Help topics, want 10", len(helpTopics))
 	}
-	if helpTopics[HelpQuickStart].Title != "Quick Start" || len(helpTopics[HelpQuickStart].Lines) == 0 {
-		t.Fatalf("Quick Start topic was not loaded from asset: %+v", helpTopics[HelpQuickStart])
+	if helpTopics[HelpQuickStart].Title != "Getting Started" || len(helpTopics[HelpQuickStart].Lines) == 0 {
+		t.Fatalf("Getting Started topic was not loaded from asset: %+v", helpTopics[HelpQuickStart])
 	}
 	if len(helpTopics[HelpFormats].Children) != 3 || len(helpTopics[HelpCatalogs].Children) != 2 {
 		t.Fatalf("hierarchical Help entries were not loaded: formats=%d catalogs=%d", len(helpTopics[HelpFormats].Children), len(helpTopics[HelpCatalogs].Children))
 	}
-	if len(helpTopics[HelpLicenses].Children) != 14 {
-		t.Fatalf(" Licenses children = %d, want 14", len(helpTopics[HelpLicenses].Children))
+	if len(helpTopics[HelpLicenses].Children) != 23 {
+		t.Fatalf(" Licenses children = %d, want 23", len(helpTopics[HelpLicenses].Children))
 	}
 }
 
-func TestHelpLinesUseKeyboardMappingByDefault(t *testing.T) {
-	o := &Overlay{}
-	lines := o.helpLines(helpTopic(HelpQuickStart))
-	if lines[3] != "Enter confirms or plays the focused item." || lines[5] != "Arrows move between panels or scroll." {
-		t.Fatalf("keyboard Help mapping = %v", lines)
-	}
-}
-
-func TestHelpLinesUseGamepadMappingWhenConnected(t *testing.T) {
-	o := &Overlay{controllerConnected: true}
-	lines := o.helpLines(helpTopic(HelpQuickStart))
-	if lines[3] != "B confirms. A returns." || lines[5] != "Right stick seeks. L1 and R1 switch presets. X picks a random preset." {
-		t.Fatalf("gamepad Help mapping = %v", lines)
+func TestHelpUsesSharedControlLabels(t *testing.T) {
+	for _, gamepad := range []bool{false, true} {
+		o := &Overlay{controllerConnected: gamepad}
+		lines := o.helpLines(helpTopic(HelpQuickStart))
+		joined := strings.Join(lines, "\n")
+		if !strings.Contains(joined, o.controlLabel(hintMenu)) {
+			t.Fatalf("missing menu control in %s", joined)
+		}
+		if strings.Contains(joined, "{") {
+			t.Fatalf("unexpanded controls: %s", joined)
+		}
+		if len(lines) > 10 {
+			t.Fatal("Getting Started is too long")
+		}
 	}
 }
 
@@ -53,8 +58,8 @@ func TestPageCycleIncludesHelp(t *testing.T) {
 func TestHelpTopicChangeResetsContentPosition(t *testing.T) {
 	o := &Overlay{helpView: HelpViewState{TopicCursor: int(HelpQuickStart), ContentTop: 4}}
 	o.helpMoveTopic(1)
-	if o.helpView.TopicCursor != int(HelpFormats) || o.helpView.ContentTop != 0 {
-		t.Fatalf("help state = %+v, want topic %d at top", o.helpView, HelpFormats)
+	if o.helpView.TopicCursor != int(HelpControls) || o.helpView.ContentTop != 0 {
+		t.Fatalf("help state = %+v, want topic %d at top", o.helpView, HelpControls)
 	}
 }
 
@@ -78,13 +83,13 @@ func TestHelpContentScrollStopsAtLastVisiblePage(t *testing.T) {
 		panelEntered:    true,
 		helpView: HelpViewState{
 			TopicCursor: int(HelpQuickStart),
-			ContentTop:  12,
+			ContentTop:  5,
 		},
 		uiPage: PageHelp,
 	}
 	o.CursorDown()
-	if o.helpView.ContentTop != 12 {
-		t.Fatalf("ContentTop = %d, want 12", o.helpView.ContentTop)
+	if o.helpView.ContentTop != 6 {
+		t.Fatalf("ContentTop = %d, want 6", o.helpView.ContentTop)
 	}
 	for range 12 {
 		o.CursorUp()
@@ -99,5 +104,26 @@ func TestHelpBackReturnsToLibrary(t *testing.T) {
 	o.Back()
 	if o.uiPage != PageLibrary || o.panelEntered || o.focusPanel != 0 {
 		t.Fatalf("Back() state = page %d, entered %t, focus %d", o.uiPage, o.panelEntered, o.focusPanel)
+	}
+}
+
+func TestCatalogHelpUsesRuntimeCounts(t *testing.T) {
+	o := &Overlay{catalogInfo: CatalogInfo{
+		ModlandTracks:         123456,
+		ModlandDirectories:    789,
+		ModArchiveTracks:      4567,
+		ModArchiveDirectories: 89,
+	}}
+	text := strings.Join(o.helpLines(HelpTopic{Lines: helpTopic(HelpCatalogs).Children[0].Lines}), "\n")
+	if !strings.Contains(text, "123,456") || !strings.Contains(text, "789") {
+		t.Fatalf("runtime catalog counts missing from %q", text)
+	}
+}
+
+func TestLongHelpTextGetsParagraphBreaks(t *testing.T) {
+	line := strings.Repeat("First sentence has useful details. Second sentence adds context. ", 5)
+	lines := readableHelpLines(line)
+	if len(lines) < 3 || !slices.Contains(lines, "") {
+		t.Fatalf("long help line was not split into paragraphs: %#v", lines)
 	}
 }

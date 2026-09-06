@@ -38,6 +38,9 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 		if a.overlay != nil {
 			wasVisible := a.overlay.UIVisible()
 			a.overlay.ToggleUI()
+			if !wasVisible {
+				a.rememberMenuOpened()
+			}
 			// When opening the UI, navigate to the currently playing track.
 			if !wasVisible && a.pl != nil {
 				path := a.pl.TrackPath()
@@ -781,5 +784,15 @@ func (a *App) handleFavoriteRemove() {
 	slog.Info("favorites: track removed", "path", path)
 	if a.overlay != nil {
 		a.overlay.RefreshFavorites()
+	}
+}
+
+func (a *App) rememberMenuOpened() {
+	if a.settings == nil || a.settings.UI.MenuOpened {
+		return
+	}
+	a.settings.UI.MenuOpened = true
+	if err := config.SaveSettings(a.settingsPath, *a.settings); err != nil {
+		slog.Warn("save menu acknowledgement", "error", err)
 	}
 }

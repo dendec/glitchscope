@@ -684,6 +684,7 @@ func (t Transparency) Validate() error {
 
 // UISettings holds theme and transparency.
 type UISettings struct {
+	MenuOpened   bool         `json:"menu_opened"`
 	Theme        Theme        `json:"theme"`
 	Transparency Transparency `json:"transparency"`
 	ShowStats    bool         `json:"show_stats"`

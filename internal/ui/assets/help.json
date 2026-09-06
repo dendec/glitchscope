@@ -1,31 +1,209 @@
 [
   {
-    "id": 0,
-    "title": "Quick Start",
-    "lines": [
-      "GlitchScope is a music visualizer and tracker module player.",
-      "",
-      "**Keyboard:**",
-      "Enter confirms or plays the focused item.",
-      "Backspace returns or cancels.",
-      "Arrows move between panels or scroll.",
-      "Left/Right switch between panels.",
-      "P cycles through screens.",
-      "Space plays or pauses.",
-      "Comma and period seek backward and forward.",
-      "N and P switch presets. R picks a random preset.",
-      "B shows or hides the overlay. Tab shows or hides the UI.",
-      "Esc or Q quits.",
-      "",
-      "**Gamepad:**",
-      "B confirms. A returns.",
-      "Y plays or pauses.",
-      "Right stick seeks. L1 and R1 switch presets. X picks a random preset.",
-      "Start shows or hides the UI. Back shows or hides the overlay."
+  "title": "Getting Started",
+  "lines": [
+    "**Play your music**",
+    "Press {menu} to open the menu.",
+    "Choose Music, open a folder, then select a track.",
+    "",
+    "**Enjoy the visualizer**",
+    "Close the menu after playback starts.",
+    "Use Presets to choose a visual style and Settings to balance quality, speed and battery life.",
+    "",
+    "The footer always shows the actions available for the current selection."
+  ],
+  "id": 0
+},
+  {
+  "title": "Controls",
+  "children": [
+    {
+      "title": "In the menu",
+      "lines": [
+        "**Navigation**",
+        "{move} moves the selection. Hold to scroll faster.",
+        "{focus} switches panels.",
+        "{select} opens the selected item or applies a value.",
+        "{back} goes back or cancels editing.",
+        "{pages} switches pages.",
+        "",
+        "**Menu**",
+        "{menu} opens or closes the menu.",
+        "The footer shows actions for the current selection."
+      ]
+    },
+    {
+      "title": "While listening",
+      "lines": [
+        "**With the menu closed**",
+        "{tracks} selects the previous / next track.",
+        "Next respects the selected shuffle mode.",
+        "{play} plays or pauses.",
+        "{seek} seeks backward or forward.",
+        "{presets} changes the visualizer preset.",
+        "{random} chooses a random preset.",
+        "{overlay} shows or hides track notifications."
+      ]
+    },
+    {
+      "title": "Help navigation",
+      "lines": [
+        "Choose a topic on the left.",
+        "{select} opens a topic with subtopics.",
+        "{focus} moves to the text panel.",
+        "{move} scrolls the text.",
+        "{back} returns to the previous level.",
+        "{pages} returns to another application page."
+      ]
+    }
+  ],
+  "id": 1
+},
+  {
+  "title": "Playback",
+  "children": [
+    {
+      "title": "Shuffle and repeat",
+      "lines": [
+        "Off: tracks play in order.",
+        "Album: shuffle the current folder or playlist.",
+        "Source: shuffle within Music, Modland or ModArchive.",
+        "All: shuffle across available sources. Offline, All uses only local music.",
+        "Source and All can repeat tracks, including the current track.",
+        "Repeat One repeats the current track when it ends. Manual Next still moves on.",
+        "A failed load is skipped. Repeated failures stop automatic recovery."
+      ]
+    },
+    {
+      "title": "Seeking and memory",
+      "lines": [
+        "{seek} moves through the current track.",
+        "Exact prepares tracker audio in memory for accurate seeking.",
+        "Low memory uses a smaller buffer budget. Long tracks stream instead.",
+        "Streaming starts without preparing the full track. Backward seeking depends on the decoder.",
+        "Changing Tracker seeking affects the next loaded track."
+      ]
+    },
+    {
+      "title": "Favorites",
+      "lines": [
+        "Select a track outside Favorites playlists and follow the Favorite hint in the footer.",
+        "A short press cycles Star / Heart / Note / None.",
+        "**Gamepad:**",
+        "Hold {favourite} to remove the selected track from favorites.",
+        "Outside track browsing, {play} is Play / Pause.",
+        "**Keyboard:**",
+        "F cycles the favorite; Delete removes it.",
+        ""
+      ]
+    }
+  ],
+  "id": 2
+},
+  {
+  "title": "Quality and Battery",
+  "children": [
+    {
+      "title": "Performance modes",
+      "lines": [
+        "Performance prioritizes visualizer quality and targets 30 FPS.",
+        "Balanced targets 24 FPS with a lower resolution ceiling.",
+        "Eco prioritizes battery life with a lower resolution ceiling and slower upscaling.",
+        "Auto resolution adjusts to the current preset. A fixed resolution disables this adjustment.",
+        "A heavy preset can be skipped if the lowest resolution is still too slow."
+      ]
+    },
+    {
+      "title": "Music without visualization",
+      "lines": [
+        "Set Visualizer to Off in Settings.",
+        "Music and menu navigation keep working against a plain background.",
+        "Opening Presets still enables its live preview.",
+        "Turn Visualizer back On to resume the animation."
+      ]
+    },
+    {
+      "title": "Preset selection",
+      "lines": [
+        "Open Presets and browse the list.",
+        "Pause on a preset to see its preview.",
+        "{select} selects it; it is applied when you leave the page.",
+        "Preset auto-switch controls automatic changes.",
+        "Successful resolutions are remembered during the current run."
+      ]
+    }
+  ],
+  "id": 3
+},
+  {
+  "title": "Troubleshooting",
+  "children": [
+    {
+      "title": "No music listed",
+      "lines": [
+        "Open Music and choose a folder containing supported audio files.",
+        "An empty folder and a failed scan are different states; check any error shown.",
+        "Downloaded catalog indexes list music, but do not contain the audio itself."
+      ]
+    },
+    {
+      "title": "Offline catalogs",
+      "lines": [
+        "Saved catalog indexes remain browsable without internet.",
+        "A track must already be downloaded to play offline.",
+        "Shuffle All uses local music while offline. Network availability is checked periodically."
+      ]
+    },
+    {
+      "title": "Loading or skipped tracks",
+      "lines": [
+        "Downloading fetches a remote file. Preparing audio decodes a tracker for seeking.",
+        "You can select another track while loading.",
+        "Unsupported, damaged or unavailable tracks are skipped automatically.",
+        "If repeated failures stop playback, choose another track or source."
+      ]
+    },
+    {
+      "title": "Limited seeking",
+      "lines": [
+        "Some native tracker decoders cannot seek backward reliably.",
+        "Choose Exact under Tracker seeking and load the track again.",
+        "Very long tracks still stream when they exceed the preparation budget."
+      ]
+    }
+  ],
+  "id": 4
+},
+  {
+    "id": 5,
+    "title": "Catalogs",
+    "children": [
+      {"title": "Modland", "lines": [
+        "**Catalog on this device**",
+        "Playable tracks: {modland_tracks}",
+        "Folders: {modland_directories}",
+        "Network: {network_status}",
+        "",
+        "**About Modland**",
+        "A large preservation archive of tracker, chiptune and game music organized by format and author.",
+        "GlitchScope keeps a compact index locally and downloads a selected track to its cache before playback.",
+        "The saved index remains browsable offline; tracks require a connection unless already cached."
+      ]},
+      {"title": "ModArchive", "lines": [
+        "**Catalog on this device**",
+        "Playable tracks: {modarchive_tracks}",
+        "Folders: {modarchive_directories}",
+        "Network: {network_status}",
+        "",
+        "**About The Mod Archive**",
+        "A community archive dedicated to playable music modules, with artists, ratings, reviews and historical collections.",
+        "GlitchScope ships compact indexes for the historical snapshot and addendum, then downloads only the selected module data.",
+        "Saved indexes remain browsable offline; tracks require a connection unless already cached."
+      ]}
     ]
   },
   {
-    "id": 1,
+    "id": 6,
     "title": "Formats",
     "children": [
       {"title": "Audio", "children": [
@@ -143,27 +321,29 @@
     ]
   },
   {
-    "id": 2,
-    "title": "Catalogs",
-    "children": [
-      {"title": "Modland", "lines": ["Online tracker music catalog with format and author folders.", "Tracks are downloaded to the local cache before playback."]},
-      {"title": "ModArchive", "lines": ["Online module archive exposed as browsable directories.", "Catalog contents may be unavailable while the network or cache is unavailable."]}
-    ]
-  },
-  {
-    "id": 3,
+    "id": 7,
     "title": "Device",
     "lines": []
   },
   {
-    "id": 4,
+    "id": 8,
     "title": "About",
     "lines": [
-      "GlitchScope is a music visualizer and player."
+      "**GlitchScope**",
+      "A music player and real-time MilkDrop visualizer built for Linux handhelds and desktop computers.",
+      "",
+      "Play local audio, tracker modules and classic game-music formats, or explore the Modland and ModArchive catalogs.",
+      "Visuals are rendered by projectM. Audio is decoded by specialized open-source engines selected for each format.",
+      "",
+      "Performance, Balanced and Eco modes adapt visual quality to the device. The visualizer can also be disabled for music-only playback.",
+      "",
+      "**Project**",
+      "https://github.com/dendec/glitchscope",
+      "Licensed under GPL-2.0-or-later."
     ]
   },
   {
-    "id": 5,
+    "id": 9,
     "title": "Licenses",
     "children": [
       {"title": "projectM", "lines": ["LGPL-2.1", "https://github.com/projectM-visualizer/projectm", "Copyright (C) 2003-2009 projectM Team"]},
@@ -177,9 +357,18 @@
       {"title": "libstsound", "lines": ["BSD-2-Clause", "https://github.com/cpcsdk/libstsound", "Copyright holders: Leonard/Oxygene et al."]},
       {"title": "Hively", "lines": ["MIT", "https://github.com/tildearrow/foo-input-hvl", "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"]},
       {"title": "cRSID", "lines": ["WTFPL", "https://www.rockbox.org/", "Copyright (c) Hermit (Mihaly Horvath)"]},
-      {"title": "klauspost/compress", "lines": ["BSD-3-Clause", "https://github.com/klauspost/compress", "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"]},
+      {"title": "klauspost/compress (Zstandard)", "lines": ["BSD-3-Clause", "https://github.com/klauspost/compress", "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"]},
       {"title": "go-sdl2", "lines": ["BSD-3-Clause", "https://github.com/veandco/go-sdl2", "Copyright (c) 2013 Go-SDL2 Authors"]},
-      {"title": "x/image", "lines": ["BSD-3-Clause", "https://pkg.go.dev/golang.org/x/image", "Copyright (c) 2009 The Go Authors"]}
+      {"title": "SDL2", "lines": ["zlib", "https://libsdl.org/", "Copyright (C) 1997-2026 Sam Lantinga"]},
+      {"title": "x/image", "lines": ["BSD-3-Clause", "https://pkg.go.dev/golang.org/x/image", "Copyright (c) 2009 The Go Authors"]},
+      {"title": "x/text", "lines": ["BSD-3-Clause", "https://pkg.go.dev/golang.org/x/text", "Copyright (c) 2009 The Go Authors"]},
+      {"title": "libogg", "lines": ["BSD-3-Clause", "https://xiph.org/ogg/", "Copyright (c) Xiph.Org Foundation"]},
+      {"title": "libvorbis", "lines": ["BSD-3-Clause", "https://xiph.org/vorbis/", "Copyright (c) Xiph.Org Foundation"]},
+      {"title": "libFLAC", "lines": ["BSD-3-Clause", "https://xiph.org/flac/", "Copyright (c) Xiph.Org Foundation"]},
+      {"title": "mpg123", "lines": ["LGPL-2.1", "https://www.mpg123.de/", "Copyright (c) mpg123 contributors"]},
+      {"title": "zlib", "lines": ["zlib", "https://zlib.net/", "Copyright (c) Jean-loup Gailly and Mark Adler"]},
+      {"title": "GNU Unifont", "lines": ["GPL-2.0+ with font embedding exception", "https://unifoundry.com/unifont/", "Copyright (c) GNU Unifont contributors"]},
+      {"title": "PortsMaster Device-Info", "lines": ["MIT", "https://github.com/PortsMaster/Device-Info", "Copyright (c) PortsMaster contributors"]}
     ]
   }
 ]

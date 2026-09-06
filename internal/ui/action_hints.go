@@ -27,6 +27,12 @@ const (
 	hintPages    = "pages"
 	hintPlay     = "play"
 	hintFavorite = "favourite"
+	hintMenu     = "menu"
+	hintSeek     = "seek"
+	hintPresets  = "presets"
+	hintRandom   = "random"
+	hintTracks   = "tracks"
+	hintOverlay  = "overlay"
 )
 
 // controlLabel returns the concrete control label for an abstract action under
@@ -36,6 +42,18 @@ const (
 func (o *Overlay) controlLabel(action string) string {
 	if o.controllerConnected {
 		switch action {
+		case hintMenu:
+			return "START"
+		case hintSeek:
+			return "Right stick"
+		case hintPresets:
+			return "L1/R1"
+		case hintRandom:
+			return "Y"
+		case hintTracks:
+			return "D-pad Left/Right"
+		case hintOverlay:
+			return "SELECT"
 		case hintSelect:
 			return "A" // Nintendo A (right) = confirm/open
 		case hintBack:
@@ -52,6 +70,18 @@ func (o *Overlay) controlLabel(action string) string {
 		return "?"
 	}
 	switch action {
+	case hintMenu:
+		return "TAB"
+	case hintSeek:
+		return ", / ."
+	case hintPresets:
+		return "P/N"
+	case hintRandom:
+		return "R"
+	case hintTracks:
+		return "Left/Right"
+	case hintOverlay:
+		return "B"
 	case hintSelect:
 		return "Enter"
 	case hintBack:
@@ -61,7 +91,7 @@ func (o *Overlay) controlLabel(action string) string {
 	case hintMove:
 		return "Up/Down"
 	case hintPages:
-		return "P"
+		return "P/N"
 	case hintPlay:
 		return "Space"
 	case hintFavorite:

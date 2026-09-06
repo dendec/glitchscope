@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dendec/glitchscope/internal/archive"
+	"github.com/dendec/glitchscope/internal/catalog"
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
 	"github.com/dendec/glitchscope/internal/input"
@@ -364,19 +365,47 @@ func (a *App) initAudio() {
 	a.presenter = newOverlayPresenter(a.overlay)
 	a.overlay.SetBaseDir(baseDir())
 	a.overlay.SetShowFPS(a.settings.UI.ShowStats)
+	a.overlay.SetMenuHintEnabled(!a.settings.UI.MenuOpened)
 	a.overlay.SetMicDevices(mic.InputDevices())
 	w, h := a.window.GLGetDrawableSize()
 	a.overlay.SetScreenSize(int(w), int(h))
-	info := ui.CollectDeviceInfo(a.window)
-	if a.pl != nil {
-		backend, sr, ch, buf, ver := a.pl.BackendInfo()
-		info.AudioBackend = backend
-		info.AudioSamplerate = sr
-		info.AudioChannels = ch
-		info.AudioBuffer = buf
-		info.SoloudVersion = ver
-	}
-	a.overlay.SetDeviceInfo(info)
+	a.overlay.SetDeviceInfoProvider(func() *ui.DeviceInfo {
+		info := ui.CollectDeviceInfo(a.window)
+		if a.pl != nil {
+			backend, sr, ch, buf, ver := a.pl.BackendInfo()
+			info.AudioBackend = backend
+			info.AudioSamplerate = sr
+			info.AudioChannels = ch
+			info.AudioBuffer = buf
+			info.SoloudVersion = ver
+		}
+		return info
+	})
+	var catalogInfoOnce sync.Once
+	a.overlay.SetCatalogInfoProvider(func() ui.CatalogInfo {
+		catalogInfoOnce.Do(func() {
+			// With shuffle enabled, initLibrary already owns the background
+			// build. Avoid starting a duplicate while that build is in flight.
+			if a.settings.Playback.ShuffleMode == config.ShuffleOff {
+				a.ensureShuffleCatalog()
+			}
+		})
+		info := ui.CatalogInfo{}
+		cat := a.shuffleCatalog.Load()
+		if cat == nil {
+			info.IndexLoading = true
+			return info
+		}
+		if src := cat.SourceIndex(catalog.SourceModland); src != nil {
+			info.ModlandTracks = src.TrackCount()
+			info.ModlandDirectories = src.DirectoryCount()
+		}
+		if src := cat.SourceIndex(catalog.SourceModArchive); src != nil {
+			info.ModArchiveTracks = src.TrackCount()
+			info.ModArchiveDirectories = src.DirectoryCount()
+		}
+		return info
+	})
 	slog.Info("audio init", "ms", time.Since(t).Milliseconds())
 }
 

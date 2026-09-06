@@ -42,8 +42,12 @@ type HelpTopicID int
 
 const (
 	HelpQuickStart HelpTopicID = iota
-	HelpFormats
+	HelpControls
+	HelpPlayback
+	HelpQuality
+	HelpTroubleshooting
 	HelpCatalogs
+	HelpFormats
 	HelpDevice
 	HelpAbout
 	HelpLicenses
@@ -113,6 +117,7 @@ const (
 
 // Overlay manages UI and notification rendering.
 type Overlay struct {
+	menuHint            menuHint
 	controllerConnected bool
 	programText         uint32
 	programImage        uint32
@@ -274,6 +279,9 @@ type Overlay struct {
 	modArchiveItems     map[string][]modarchive.DirItem
 	favoritesView       FavoritesView
 	deviceInfo          *DeviceInfo
+	deviceInfoProvider  func() *DeviceInfo
+	catalogInfoProvider func() CatalogInfo
+	catalogInfo         CatalogInfo
 }
 
 // New creates an Overlay. The stack always has a virtual source root.
@@ -291,6 +299,7 @@ func New() *Overlay {
 }
 
 func (o *Overlay) Close() {
+	o.deleteTex(&o.menuHint.texture.tex)
 	o.notif.Hide()
 	o.deleteTex(&o.albumsTex)
 	o.deleteTex(&o.tracksTex)
@@ -340,6 +349,7 @@ func (o *Overlay) SetPreviewBackground(tex uint32) {
 }
 
 func (o *Overlay) Draw(width, height int) {
+	defer o.drawMenuHint(width, height)
 	if o.uiVisible {
 		o.renderUI(width, height, width, height)
 		if o.notif.Visible() && o.notif.Tex() != 0 && !o.notif.Hidden() {
@@ -483,6 +493,7 @@ func (o *Overlay) RefreshFavorites() {
 func (o *Overlay) IsSettingsEditing() bool { return o.settingsEditing }
 
 func (o *Overlay) markAllDirty() {
+	o.menuHint.text = ""
 	o.albumsDirty = true
 	o.albumsContentDirty = true
 	o.tracksDirty = true
@@ -530,6 +541,20 @@ func (o *Overlay) SetScreenSize(w, h int) {
 // SetDeviceInfo stores device info for the Device help page.
 func (o *Overlay) SetDeviceInfo(info *DeviceInfo) {
 	o.deviceInfo = info
+	o.helpDirty = true
+}
+
+// SetDeviceInfoProvider installs a lazy collector for the Device help topic.
+// It is called at most once, on the render/input thread, and its result is cached.
+func (o *Overlay) SetDeviceInfoProvider(provider func() *DeviceInfo) {
+	o.deviceInfoProvider = provider
+	o.deviceInfo = nil
+	o.helpDirty = true
+}
+
+// SetCatalogInfoProvider installs a cheap snapshot provider for Help.
+func (o *Overlay) SetCatalogInfoProvider(provider func() CatalogInfo) {
+	o.catalogInfoProvider = provider
 	o.helpDirty = true
 }
 

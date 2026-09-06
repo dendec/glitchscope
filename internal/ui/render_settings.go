@@ -72,6 +72,20 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 			rightRows = append(rightRows, listRow{text: line, active: isCursor})
 		}
 	}
+	if o.settingsCursor >= 0 && o.settingsCursor < len(o.settingsRows) {
+		value := o.settingsRows[o.settingsCursor].Index
+		if o.settingsEditing {
+			value = o.settingsValueCursor
+		}
+		description := settingDescription(o.settingsCursor, value)
+		if description != "" && maxRows-len(rightRows) >= 2 {
+			rightRows = append(rightRows, listRow{})
+			lines := wrapHelpLines([]string{description}, o.face, maxTextPx)
+			for _, line := range lines[:min(len(lines), maxRows-len(rightRows))] {
+				rightRows = append(rightRows, listRow{text: line})
+			}
+		}
+	}
 	o.rebuildListRows(&o.settingsColR, rightRows, maxTextPx, panelW)
 
 	// Rebuild marquee for focused setting value.

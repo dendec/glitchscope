@@ -59,6 +59,7 @@ func LoadSettings(path string) (Settings, error) {
 		UI             *struct {
 			Theme        *Theme        `json:"theme"`
 			Transparency *Transparency `json:"transparency"`
+			MenuOpened   *bool         `json:"menu_opened"`
 			ShowStats    *bool         `json:"show_stats"`
 		} `json:"ui"`
 	}
@@ -115,6 +116,9 @@ func LoadSettings(path string) (Settings, error) {
 		s.PresetInterval = *raw.PresetInterval
 	}
 	if raw.UI != nil {
+		if raw.UI.MenuOpened != nil {
+			s.UI.MenuOpened = *raw.UI.MenuOpened
+		}
 		if raw.UI.Theme != nil {
 			s.UI.Theme = *raw.UI.Theme
 		}
