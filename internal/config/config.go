@@ -90,6 +90,10 @@ type ModeParams struct {
 	AdaptiveLowSec     float64
 	AdaptiveHighSec    float64
 	LowFPSThresh       float64
+	// AdaptiveMaxIndex is the highest resolution index the adaptive algorithm
+	// may scale up to. 0 = no limit (may reach native resolution). Higher
+	// indices are lower resolutions, so this caps the "quality ceiling".
+	AdaptiveMaxIndex int
 }
 
 // Params returns the tuning parameters for mode m.
@@ -106,6 +110,7 @@ func (m PerformanceMode) Params() ModeParams {
 			AdaptiveLowSec:     2.0,
 			AdaptiveHighSec:    4.0,
 			LowFPSThresh:       12.0,
+			AdaptiveMaxIndex:   1, // cap at 0.75× (960×540)
 		}
 	case PerfModeEco:
 		return ModeParams{
@@ -118,6 +123,7 @@ func (m PerformanceMode) Params() ModeParams {
 			AdaptiveLowSec:     3.0,
 			AdaptiveHighSec:    6.0,
 			LowFPSThresh:       7.5,
+			AdaptiveMaxIndex:   3, // cap at 0.5× (640×360)
 		}
 	default: // PerfModePerformance
 		return ModeParams{
@@ -130,6 +136,7 @@ func (m PerformanceMode) Params() ModeParams {
 			AdaptiveLowSec:     2.0,
 			AdaptiveHighSec:    4.0,
 			LowFPSThresh:       15.0,
+			AdaptiveMaxIndex:   0, // no cap — may reach native
 		}
 	}
 }

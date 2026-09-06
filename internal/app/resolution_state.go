@@ -26,7 +26,8 @@ func (s *resolutionState) Configure(winW, winH int, current config.RenderResolut
 	return true
 }
 
-// Reset snaps to the highest resolution and resets adaptive state.
+// Reset snaps to the mode's starting resolution and resets adaptive state.
+// The starting resolution is AdaptiveMaxIndex (0 = native, 1 = 0.75×, etc.).
 func (s *resolutionState) Reset(winW, winH int, params config.ModeParams) bool {
 	s.resolutions = config.ComputeResolutions(winW, winH)
 	s.policy.params = params
@@ -35,7 +36,10 @@ func (s *resolutionState) Reset(winW, winH int, params config.ModeParams) bool {
 		s.restartPolicy()
 		return false
 	}
-	s.index = 0
+	s.index = params.AdaptiveMaxIndex
+	if s.index >= len(s.resolutions) {
+		s.index = len(s.resolutions) - 1
+	}
 	s.restartPolicy()
 	return true
 }
@@ -54,6 +58,13 @@ func (s *resolutionState) Decide(fps float64) (config.RenderResolution, int, boo
 	next, changed, minReached := s.policy.Decide(fps, s.index, len(s.resolutions))
 	if !changed {
 		return config.RenderResolution{}, 0, false, minReached
+	}
+	// Enforce quality ceiling: don't scale up past AdaptiveMaxIndex.
+	if next < s.policy.params.AdaptiveMaxIndex {
+		next = s.policy.params.AdaptiveMaxIndex
+		if next == s.index {
+			return config.RenderResolution{}, 0, false, false
+		}
 	}
 	direction := next - s.index
 	if direction < 0 && next < s.upscaleFloor {
