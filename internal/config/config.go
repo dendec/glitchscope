@@ -114,7 +114,7 @@ func (m PerformanceMode) Params() ModeParams {
 		}
 	case PerfModeEco:
 		return ModeParams{
-			VisualizerFPS:      15,
+			VisualizerFPS:      24,
 			AdaptiveThreshLow:  11.0,
 			AdaptiveThreshHigh: 14.0,
 			AdaptiveLowFrames:  6,
