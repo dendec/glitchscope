@@ -700,7 +700,7 @@ func (a *App) initPreset() {
 			if !ok {
 				return 0, 0, 0, false
 			}
-			return tex, a.preview.thumbW, a.preview.thumbH, true
+			return tex, a.preview.w, a.preview.h, true
 		})
 		a.overlay.SetPresetPreviewFPS(func() float64 {
 			if a.preview == nil {

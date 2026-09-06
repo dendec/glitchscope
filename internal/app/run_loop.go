@@ -302,8 +302,9 @@ func (a *App) updateFramePlayback(now time.Time) {
 
 func (a *App) renderFrame(now time.Time, w, h int) {
 	if a.onPresetsPage {
-		// Presets page: preview renders at full window size as background.
-		// The same frame is captured into a thumbnail texture for the panel.
+		// Presets page: render preview twice — once at thumbnail size for the
+		// panel, once at full window size for the background. The thumbnail
+		// render is cheap and ensures the panel shows a properly scaled view.
 		if wave := a.readAudio(); len(wave) > 0 {
 			a.previewFeedPCM(wave)
 		} else if a.preview != nil && a.preview.isReady() {
@@ -311,13 +312,14 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 		}
 
 		if a.preview != nil && a.preview.isReady() {
-			// Set preview pm to full window size (doesn't touch thumb texture).
-			a.preview.SetWindowSize(w, h)
-			// Render one frame at full window size (stays on screen).
-			a.preview.RenderFrame()
-			// Capture the top-left corner into the thumbnail texture.
+			// 1. Render at thumbnail size → captured into thumb texture for panel.
 			tW, tH := ui.PresetPreviewSize(w, h)
-			a.preview.CaptureThumb(tW, tH)
+			a.preview.Resize(tW, tH)
+			a.preview.ProcessNext()
+
+			// 2. Render at full window size → stays on screen as background.
+			a.preview.SetWindowSize(w, h)
+			a.preview.RenderFrame()
 		}
 	} else {
 		// Normal mode: restore preview to thumbnail size for future use.

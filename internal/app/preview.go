@@ -62,7 +62,6 @@ type previewRenderer struct {
 	pm        *projectm.Handle
 	tex       C.GLuint // thumbnail capture texture
 	w, h      int      // current thumbnail render dimensions
-	thumbW, thumbH int  // actual thumb texture dimensions (may differ from w,h)
 	queue     []previewJob
 	active    *previewJob
 	nextFrame time.Time
@@ -234,28 +233,6 @@ func (r *previewRenderer) RenderFrame() bool {
 
 func previewFrameDue(now, nextFrame time.Time) bool {
 	return nextFrame.IsZero() || !now.Before(nextFrame)
-}
-
-// CaptureThumb copies the top-left corner of framebuffer 0 into the
-// thumbnail texture at the given dimensions. Called after RenderFrame()
-// so the panel can display a mini version of the background.
-func (r *previewRenderer) CaptureThumb(tW, tH int) {
-	if !r.isReady() || tW <= 0 || tH <= 0 {
-		return
-	}
-	// Recreate thumb texture if dimensions changed.
-	if tW != r.thumbW || tH != r.thumbH {
-		if r.tex != 0 {
-			C.glDeleteTextures(1, &r.tex)
-			r.tex = 0
-		}
-		C.prCreateThumbTexture(&r.tex, C.GLsizei(tW), C.GLsizei(tH))
-		r.thumbW, r.thumbH = tW, tH
-	}
-	C.prCaptureThumb(r.tex, C.GLsizei(r.thumbW), C.GLsizei(r.thumbH))
-	if r.active != nil {
-		r.setResult(r.active.key, uint32(r.tex))
-	}
 }
 
 // Flush cancels all pending jobs and clears the result.
