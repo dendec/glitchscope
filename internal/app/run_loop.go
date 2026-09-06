@@ -314,8 +314,7 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 			tW, tH := ui.PresetPreviewSize(w, h)
 			a.preview.Resize(tW, tH)
 			a.preview.ProcessNext()
-			// Tell overlay to draw the thumb texture as full-screen background.
-			if tex, ok := a.preview.HasResult(a.preview.ActiveKey()); ok {
+			if tex, _ := a.preview.Result(); tex != 0 {
 				a.overlay.SetPreviewBackground(tex)
 			}
 		}

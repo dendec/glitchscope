@@ -38,16 +38,6 @@ const (
 	previewFramePeriod = time.Second / previewTargetFPS
 )
 
-// ClearFB clears the current framebuffer to black at the window viewport.
-func ClearFB(w, h int) {
-	C.glBindFramebuffer(C.GL_FRAMEBUFFER, 0)
-	C.glViewport(0, 0, C.GLsizei(w), C.GLsizei(h))
-	C.glDisable(C.GL_SCISSOR_TEST)
-	C.glColorMask(C.GL_TRUE, C.GL_TRUE, C.GL_TRUE, C.GL_TRUE)
-	C.glClearColor(0, 0, 0, 1)
-	C.glClear(C.GL_COLOR_BUFFER_BIT)
-}
-
 // previewJob is a pending thumbnail render request.
 type previewJob struct {
 	key  string // preset key (for cache lookup)
@@ -55,23 +45,28 @@ type previewJob struct {
 }
 
 // previewRenderer manages a dedicated projectM instance for preset preview.
-// On the presets page the preview renders into the full window (as background)
-// and simultaneously captures a corner into a thumbnail texture for the
-// right-panel preview. All methods must be called on the main GL thread.
+// On the presets page ProcessNext() renders at thumbnail size into a GL
+// texture. The overlay then stretches that texture full-screen as the page
+// background while displaying a properly scaled copy in the right panel.
+// All methods must be called on the main GL thread.
 type previewRenderer struct {
-	pm        *projectm.Handle
-	tex       C.GLuint // thumbnail capture texture
-	w, h      int      // current thumbnail render dimensions
-	queue     []previewJob
-	active    *previewJob
+	pm    *projectm.Handle
+	tex   C.GLuint // thumbnail capture texture
+	w, h int      // current thumbnail render dimensions
+
+	queue  []previewJob
+	active *previewJob
+
+	// Frame throttling: ProcessNext renders at most once per previewFramePeriod.
 	nextFrame time.Time
 
-	// FPS measurement.
+	// FPS measurement (render time only, not display cadence).
 	meter fpsMeter
 
-	// Result of the last completed render.
+	// resultKey stores the key of the last successfully rendered preset.
+	// resultTex is the GL texture ID containing that render.
 	resultKey atomic.Value // string
-	resultTex uint32       // GL texture ID
+	resultTex uint32
 
 	ready bool // false if GL init failed
 }
@@ -98,12 +93,13 @@ func (r *previewRenderer) isReady() bool {
 	return r.ready && r.pm != nil
 }
 
-// RenderFPS returns the measured render FPS of the preview instance.
+// RenderFPS returns the measured render time FPS of the preview instance.
+// This is throughput (how fast a single frame renders), not display cadence.
 func (r *previewRenderer) RenderFPS() float64 {
 	return r.meter.Average()
 }
 
-// Resize recreates the capture texture at the given dimensions.
+// Resize recreates the capture texture and updates the projectM window size.
 // No-op if dimensions haven't changed.
 func (r *previewRenderer) Resize(w, h int) {
 	if !r.isReady() || w <= 0 || h <= 0 {
@@ -112,16 +108,14 @@ func (r *previewRenderer) Resize(w, h int) {
 	if w == r.w && h == r.h {
 		return
 	}
-	// Destroy old resources.
 	if r.tex != 0 {
 		C.glDeleteTextures(1, &r.tex)
 		r.tex = 0
 	}
-	// Create new.
 	r.pm.SetWindowSize(w, h)
 	C.prCreateThumbTexture(&r.tex, C.GLsizei(w), C.GLsizei(h))
 	r.w, r.h = w, h
-	r.Flush() // discard stale results
+	r.Flush()
 	slog.Debug("preview resized", "w", w, "h", h)
 }
 
@@ -142,21 +136,31 @@ func (r *previewRenderer) Enqueue(key, data string) {
 	slog.Debug("preview enqueued", "key", key, "queueLen", len(r.queue))
 }
 
-// HasResult returns the GL texture ID for the given key, if available.
-func (r *previewRenderer) HasResult(key string) (uint32, bool) {
-	if k, ok := r.resultKey.Load().(string); ok && k == key && r.resultTex != 0 {
-		return r.resultTex, true
+// Result returns the GL texture ID and key of the last successfully
+// rendered preset, or (0, "") if none is available.
+func (r *previewRenderer) Result() (tex uint32, key string) {
+	if k, ok := r.resultKey.Load().(string); ok && k != "" && r.resultTex != 0 {
+		return r.resultTex, k
 	}
-	return 0, false
+	return 0, ""
 }
 
 func (r *previewRenderer) setResult(key string, tex uint32) {
 	r.resultKey.Store(key)
 	r.resultTex = tex
-	slog.Debug("preview result stored", "key", key, "tex", tex)
 }
 
-// ProcessNext runs one preview step. Returns true if work was done.
+// HasResult reports whether the given key matches the last rendered preset
+// and returns its GL texture ID.
+func (r *previewRenderer) HasResult(key string) (uint32, bool) {
+	tex, k := r.Result()
+	if k == key && tex != 0 {
+		return tex, true
+	}
+	return 0, false
+}
+
+// ProcessNext runs one preview step. Returns true if a new frame was rendered.
 //
 // The job stays active during animation so the thumbnail keeps playing.
 // A new Enqueue replaces the current job.
@@ -165,7 +169,6 @@ func (r *previewRenderer) ProcessNext() bool {
 		return false
 	}
 
-	// Start next job if none active.
 	if r.active == nil {
 		if len(r.queue) == 0 {
 			return false
@@ -179,12 +182,11 @@ func (r *previewRenderer) ProcessNext() bool {
 	}
 
 	now := time.Now()
-	if !previewFrameDue(now, r.nextFrame) {
+	if !r.nextFrame.IsZero() && now.Before(r.nextFrame) {
 		return false
 	}
 	r.nextFrame = now.Add(previewFramePeriod)
 
-	// Render at thumbnail size and capture into the thumb texture.
 	C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
 	started := time.Now()
 	r.pm.RenderFrame()
@@ -193,18 +195,6 @@ func (r *previewRenderer) ProcessNext() bool {
 	r.setResult(r.active.key, uint32(r.tex))
 
 	return true
-}
-
-// ActiveKey returns the key of the currently active preview job.
-func (r *previewRenderer) ActiveKey() string {
-	if r.active == nil {
-		return ""
-	}
-	return r.active.key
-}
-
-func previewFrameDue(now, nextFrame time.Time) bool {
-	return nextFrame.IsZero() || !now.Before(nextFrame)
 }
 
 // Flush cancels all pending jobs and clears the result.
