@@ -102,8 +102,8 @@ func (m PerformanceMode) Params() ModeParams {
 	case PerfModeBalanced:
 		return ModeParams{
 			VisualizerFPS:      24,
-			AdaptiveThreshLow:  17.0,
-			AdaptiveThreshHigh: 20.0,
+			AdaptiveThreshLow:  18.0,
+			AdaptiveThreshHigh: 21.0,
 			AdaptiveLowFrames:  8,
 			AdaptiveHighFrames: 10,
 			AdaptiveCooldown:   12,
@@ -115,21 +115,21 @@ func (m PerformanceMode) Params() ModeParams {
 	case PerfModeEco:
 		return ModeParams{
 			VisualizerFPS:      24,
-			AdaptiveThreshLow:  11.0,
-			AdaptiveThreshHigh: 14.0,
+			AdaptiveThreshLow:  16.0,
+			AdaptiveThreshHigh: 19.0,
 			AdaptiveLowFrames:  6,
 			AdaptiveHighFrames: 8,
 			AdaptiveCooldown:   15,
 			AdaptiveLowSec:     3.0,
 			AdaptiveHighSec:    6.0,
-			LowFPSThresh:       7.5,
+			LowFPSThresh:       10.0,
 			AdaptiveMaxIndex:   3, // cap at 0.5× (640×360)
 		}
 	default: // PerfModePerformance
 		return ModeParams{
 			VisualizerFPS:      30,
-			AdaptiveThreshLow:  20.0,
-			AdaptiveThreshHigh: 24.0,
+			AdaptiveThreshLow:  23.0,
+			AdaptiveThreshHigh: 27.0,
 			AdaptiveLowFrames:  10,
 			AdaptiveHighFrames: 10,
 			AdaptiveCooldown:   10,
