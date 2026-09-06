@@ -371,6 +371,11 @@ func (a *App) enterPresetsPage() {
 	if a.pm != nil {
 		a.pm.SetHardCutEnabled(false)
 	}
+	// Force an immediate preview render on the next frame so the
+	// background appears without a black flash.
+	if a.preview != nil {
+		a.preview.SkipThrottle()
+	}
 	slog.Info("presets page: main viz and preset timers stopped")
 }
 

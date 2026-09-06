@@ -197,6 +197,13 @@ func (r *previewRenderer) ProcessNext() bool {
 	return true
 }
 
+// SkipThrottle forces the next ProcessNext call to render immediately by
+// resetting the frame throttle timer. Call when entering the presets page
+// to avoid a black flash on the first frame.
+func (r *previewRenderer) SkipThrottle() {
+	r.nextFrame = time.Time{}
+}
+
 // Flush cancels all pending jobs and clears the result.
 func (r *previewRenderer) Flush() {
 	r.queue = r.queue[:0]
