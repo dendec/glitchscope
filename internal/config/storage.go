@@ -38,6 +38,7 @@ func LoadSettings(path string) (Settings, error) {
 
 	var raw struct {
 		Graphics *struct {
+			VisualizerOff   *bool            `json:"visualizer_off"`
 			RenderWidth     *int             `json:"render_width"`
 			RenderHeight    *int             `json:"render_height"`
 			UpscaleFilter   *UpscaleFilter   `json:"upscale_filter"`
@@ -46,6 +47,7 @@ func LoadSettings(path string) (Settings, error) {
 			PerformanceMode *PerformanceMode `json:"performance_mode"`
 		} `json:"graphics"`
 		Playback *struct {
+			SeekMemory   *SeekMemory  `json:"seek_memory"`
 			ShuffleMode  *ShuffleMode `json:"shuffle_mode"`
 			Repeat       *RepeatMode  `json:"repeat"`
 			LastPosition *struct {
@@ -68,6 +70,9 @@ func LoadSettings(path string) (Settings, error) {
 	s := DefaultSettings()
 
 	if raw.Graphics != nil {
+		if raw.Graphics.VisualizerOff != nil {
+			s.Graphics.VisualizerOff = *raw.Graphics.VisualizerOff
+		}
 		if raw.Graphics.RenderWidth != nil {
 			s.Graphics.RenderWidth = *raw.Graphics.RenderWidth
 		}
@@ -88,6 +93,9 @@ func LoadSettings(path string) (Settings, error) {
 		}
 	}
 	if raw.Playback != nil {
+		if raw.Playback.SeekMemory != nil {
+			s.Playback.SeekMemory = *raw.Playback.SeekMemory
+		}
 		if raw.Playback.ShuffleMode != nil {
 			s.Playback.ShuffleMode = *raw.Playback.ShuffleMode
 		}

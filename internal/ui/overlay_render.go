@@ -20,7 +20,7 @@ import (
 // render_presets.go. GL/cgo calls are in gl.go.
 
 const (
-	panelWidthPct = 45 // each panel occupies this % of screen width
+	panelWidthPct = 50 // each panel occupies this % of screen width
 
 	headerMarginAt480      = 5
 	headerExtraHeightAt480 = 2

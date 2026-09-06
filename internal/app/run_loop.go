@@ -7,6 +7,7 @@ import (
 
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/input"
+	"github.com/dendec/glitchscope/internal/presets"
 	"github.com/dendec/glitchscope/internal/projectm"
 	"github.com/dendec/glitchscope/internal/ui"
 	"github.com/veandco/go-sdl2/sdl"
@@ -123,6 +124,9 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 		state.lowFPSPreset = "" // reset so next drop on same preset logs again
 	}
 	winChanged := w != state.prevW || h != state.prevH
+	if winChanged {
+		a.presentRequested = true
+	}
 
 	if winChanged && state.prevW > 0 && state.prevH > 0 {
 		if a.settings.Graphics.Adaptive {
@@ -147,8 +151,19 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 	}
 	state.prevW, state.prevH = w, h
 
-	if a.settings.Graphics.Adaptive && !a.onPresetsPage &&
+	if a.settings.Graphics.Adaptive && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage &&
 		a.vizClock.meter.Full() && newVisualizerFrame && !a.adaptiveSuspended(now) {
+		// Reconfigure the active profile after mode/window changes without
+		// reusing an incompatible measurement.
+		key := presetProfileKey{name: a.currentPresetName(), mode: a.settings.Graphics.PerformanceMode, width: w, height: h}
+		if key != a.presetTuning.active {
+			if data, err := presets.Read(key.name); err == nil {
+				a.presetTuning.activate(key, data)
+			} else {
+				slog.Debug("preset profile read", "error", err)
+			}
+		}
+		a.presetTuning.observe(a.adaptive.index, a.adaptive.upscaleFloor, fpsAvg >= a.settings.Graphics.PerformanceMode.Params().AdaptiveThreshLow)
 		if resolution, direction, changed, minReached := a.adaptive.Decide(fpsAvg); changed {
 			a.applyRenderResolution(resolution)
 			if direction > 0 {
@@ -161,6 +176,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 			if presetName != "" && presetName != state.lastSkippedPreset {
 				slog.Warn("preset too heavy", "fps", fpsAvg, "preset", presetName, "action", "skipping")
 				state.lastSkippedPreset = presetName
+				a.presetTuning.markHeavy()
 				a.loadPreset(a.presetIdx + 1)
 			}
 		}
@@ -168,6 +184,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 
 	if a.overlay != nil {
 		a.overlay.SetScreenSize(w, h)
+		a.overlay.SetOnline(a.online.Load())
 	}
 	if a.overlay != nil {
 		selectedAlbum := a.presenter.selectedAlbumIndex()
@@ -192,6 +209,9 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 	favoriteMode := a.favoriteMode()
 	for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 		act := a.inp.ProcessEvent(e, favoriteMode, now)
+		if act != input.ActionNone {
+			a.presentRequested = true
+		}
 		if act == input.ActionQuit {
 			return false
 		}
@@ -247,12 +267,12 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 }
 
 func (a *App) updateFramePlayback(now time.Time) {
-	if !a.onPresetsPage && a.pending.name != "" && now.After(a.pending.at) {
+	if !a.settings.Graphics.VisualizerOff && !a.onPresetsPage && a.pending.name != "" && now.After(a.pending.at) {
 		a.transitionPreset(a.pending.name)
 		a.pending = pendingPreset{}
 	}
 
-	if a.presetTicker != nil && !a.onPresetsPage {
+	if a.presetTicker != nil && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage {
 		select {
 		case <-a.presetTicker.C:
 			a.randPreset()
@@ -260,11 +280,12 @@ func (a *App) updateFramePlayback(now time.Time) {
 		}
 	}
 
-	if !a.onPresetsPage && a.settings.PresetInterval == config.PresetAuto && a.presetSwitch.Swap(false) {
+	if !a.settings.Graphics.VisualizerOff && !a.onPresetsPage && a.settings.PresetInterval == config.PresetAuto && a.presetSwitch.Swap(false) {
 		a.randPreset()
 	}
 
 	if a.pl != nil {
+		loadingPath := a.pl.TrackPath()
 		started, failed := a.pl.CheckPending()
 		if failed {
 			if a.overlay != nil {
@@ -272,12 +293,21 @@ func (a *App) updateFramePlayback(now time.Time) {
 			}
 			a.resumePath = ""
 			a.resumeSeconds = 0
+			if track, ok := a.nextAfterFailure(loadingPath, a.settings.Playback); ok {
+				a.startTrack(track.path, track.album)
+			} else {
+				slog.Warn("playback recovery stopped", "reason", "no next candidate or failure limit reached")
+				if a.overlay != nil {
+					a.overlay.ShowTrack("no playable track; select another track")
+				}
+			}
 		} else {
 			// A load completed successfully. For catalog tracks the file
 			// may now be cached on disk, so the right panel must re-read
 			// its metadata (Cached, duration, comment) — even if the load
 			// finished before the presenter ever observed loading=true.
 			if started {
+				a.failedTracks = nil
 				a.presenter.invalidateTrackInfos()
 			}
 			if a.resumeAttempted && a.resumePath != "" && a.pl.TrackPath() == a.resumePath && a.pl.IsValidVoice() {
@@ -301,6 +331,11 @@ func (a *App) updateFramePlayback(now time.Time) {
 }
 
 func (a *App) renderFrame(now time.Time, w, h int) {
+	if a.overlay != nil {
+		a.overlay.SetControllerConnected(a.inp.HasController())
+		a.overlay.Update(a.inp.DPadUpHeld(), a.inp.DPadDownHeld())
+	}
+	rendered := false
 	if a.onPresetsPage {
 		// Presets page: one preview render at thumbnail size. The thumb
 		// texture is stretched full-screen as background by the overlay.
@@ -313,7 +348,7 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 		if a.preview != nil && a.preview.isReady() {
 			tW, tH := ui.PresetPreviewSize(w, h)
 			a.preview.Resize(tW, tH)
-			a.preview.ProcessNext()
+			rendered = a.preview.ProcessNext()
 			if tex, _ := a.preview.Result(); tex != 0 {
 				a.overlay.SetPreviewBackground(tex)
 			}
@@ -331,7 +366,7 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 		// Schedule projectM independently from the 60 Hz input/UI loop. GL
 		// work remains on this thread; between visualizer frames, keep
 		// presenting the last captured texture.
-		if a.vizClock.Due(now) {
+		if !a.settings.Graphics.VisualizerOff && a.vizClock.Due(now) {
 			fps := int32(time.Second / a.vizClock.framePeriod)
 			a.pm.SetFPS(fps)
 			a.pm.RenderFrame()
@@ -343,18 +378,36 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 			}
 
 			a.vizClock.Complete(time.Now())
+			rendered = true
 		}
 
+	}
+	uiVisible := a.overlay != nil && a.overlay.UIVisible()
+	audioOnly := a.settings.Graphics.VisualizerOff && !a.onPresetsPage
+	due := presentationDue(a.settings.Graphics.PerformanceMode, now, a.nextPresent, rendered, a.presentRequested, uiVisible)
+	if audioOnly {
+		due = a.presentRequested || !now.Before(a.nextPresent)
+	}
+	if !due {
+		return
+	}
+	a.presentRequested = false
+	a.nextPresent = now.Add(time.Second / time.Duration(a.settings.Graphics.PerformanceMode.Params().VisualizerFPS))
+	if audioOnly {
+		ui.ClearBackground(w, h)
+		if !uiVisible {
+			a.nextPresent = now.Add(250 * time.Millisecond)
+		}
+	} else if !a.onPresetsPage {
 		a.rt.BlitToScreen(w, h)
 	}
-
 	if a.overlay != nil {
 		rw, rh := a.rt.Size()
-		a.overlay.SetControllerConnected(a.inp.HasController())
-		a.overlay.Update(a.inp.DPadUpHeld(), a.inp.DPadDownHeld())
 		a.overlay.Draw(w, h)
-		a.pm.BindFeedbackFramebuffer()
-		a.overlay.Inject(rw, rh)
+		if !audioOnly {
+			a.pm.BindFeedbackFramebuffer()
+			a.overlay.Inject(rw, rh)
+		}
 	}
 
 	a.window.GLSwap()
@@ -382,7 +435,7 @@ func (a *App) enterPresetsPage() {
 func (a *App) leavePresetsPage() {
 	a.onPresetsPage = false
 	if a.pm != nil {
-		a.pm.SetHardCutEnabled(a.settings.PresetInterval == config.PresetAuto)
+		a.pm.SetHardCutEnabled(!a.settings.Graphics.VisualizerOff && a.settings.PresetInterval == config.PresetAuto)
 	}
 	a.presetSwitch.Store(false)
 	a.startPresetTicker()
@@ -456,5 +509,11 @@ func (a *App) resetAdaptiveState(winW, winH int) {
 		slog.Warn("adaptive: empty resolution list", "window", fmt.Sprintf("%dx%d", winW, winH))
 		return
 	}
-	a.applyRenderResolution(a.adaptive.resolutions[0])
+	a.applyRenderResolution(a.adaptive.resolutions[a.adaptive.index])
+}
+
+// Input stays at 60 Hz. Energy-saving modes avoid swapping duplicate backgrounds;
+// UI animation has its own deadline and input can request immediate presentation.
+func presentationDue(mode config.PerformanceMode, now, deadline time.Time, rendered, requested, uiVisible bool) bool {
+	return mode == config.PerfModePerformance || rendered || requested || (uiVisible && !now.Before(deadline))
 }

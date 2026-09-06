@@ -1,3 +1,5 @@
+#include <stdint.h>
+extern "C" int glitchscopeRenderCancelled(uintptr_t handle);
 #include "ym_source.h"
 
 #include <algorithm>
@@ -142,8 +144,8 @@ unsigned int Ym_getSampleRate(void *) { return 44100; }
 // both directions. Stops at end-of-song or when maxFrames is reached.
 // Returns the number of frames actually rendered.
 unsigned int Ym_render(const unsigned char *data, unsigned int length,
-                       float *outL, float *outR, unsigned int maxFrames) {
-    if (!data || !length || !outL || !outR || maxFrames == 0) return 0;
+                       float *out, unsigned int maxFrames, uintptr_t cancelHandle) {
+    if (!data || !length || !out || maxFrames == 0) return 0;
     YMMUSIC *m = ymMusicCreate();
     if (!m || !ymMusicLoadMemory(m, const_cast<unsigned char *>(data), length)) {
         if (m) ymMusicDestroy(m);
@@ -155,19 +157,20 @@ unsigned int Ym_render(const unsigned char *data, unsigned int length,
     std::vector<ymsample> tmp(8192 * (mono ? 1 : 2));
     unsigned int rendered = 0;
     while (rendered < maxFrames && !ymMusicIsOver(m)) {
+        if (glitchscopeRenderCancelled(cancelHandle)) break;
         unsigned int n = maxFrames - rendered;
         if (n > 8192) n = 8192;
         if (!ymMusicCompute(m, tmp.data(), static_cast<ymint>(n))) break;
         if (mono) {
             for (unsigned int i = 0; i < n; ++i) {
                 const float v = static_cast<float>(tmp[i]) / 32768.0f;
-                outL[rendered + i] = v;
-                outR[rendered + i] = v;
+                out[(rendered + i) * 2] = v;
+                out[(rendered + i) * 2 + 1] = v;
             }
         } else {
             for (unsigned int i = 0; i < n; ++i) {
-                outL[rendered + i] = static_cast<float>(tmp[i * 2]) / 32768.0f;
-                outR[rendered + i] = static_cast<float>(tmp[i * 2 + 1]) / 32768.0f;
+                out[(rendered + i) * 2] = static_cast<float>(tmp[i * 2]) / 32768.0f;
+                out[(rendered + i) * 2 + 1] = static_cast<float>(tmp[i * 2 + 1]) / 32768.0f;
             }
         }
         rendered += n;

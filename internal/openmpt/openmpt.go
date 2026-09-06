@@ -19,6 +19,7 @@ const char * openmpt_module_get_metadata(void * mod, const char * key);
 import "C"
 
 import (
+	"context"
 	"fmt"
 	"unsafe"
 )
@@ -117,6 +118,14 @@ func GetMessage(data []byte) string {
 // exactly in both directions. Rendering stops at end-of-song or when maxFrames
 // is reached, whichever comes first. Returns (interleaved, channels, frames, err).
 func Render(data []byte, samplerate, maxFrames int) ([]float32, int, int, error) {
+	return RenderContext(context.Background(), data, samplerate, maxFrames)
+}
+
+// RenderContext checks cancellation between small decoder blocks.
+func RenderContext(renderCtx context.Context, data []byte, samplerate, maxFrames int) ([]float32, int, int, error) {
+	if err := renderCtx.Err(); err != nil {
+		return nil, 0, 0, err
+	}
 	if len(data) == 0 {
 		return nil, 0, 0, fmt.Errorf("openmpt: empty data")
 	}
@@ -136,30 +145,25 @@ func Render(data []byte, samplerate, maxFrames int) ([]float32, int, int, error)
 	// source) so rendering is bounded for looping songs.
 	C.openmpt_module_set_repeat_count(mod, 0)
 
-	left := make([]float32, maxFrames)
-	right := make([]float32, maxFrames)
+	left := make([]float32, 4096)
+	right := make([]float32, 4096)
+	interleaved := make([]float32, maxFrames*2)
 	frames := 0
 	for frames < maxFrames {
-		n := maxFrames - frames
-		read := int(C.openmpt_module_read_float_stereo(
-			mod,
-			C.int(samplerate),
-			C.size_t(n),
-			(*C.float)(unsafe.Pointer(&left[frames])),
-			(*C.float)(unsafe.Pointer(&right[frames])),
-		))
-		if read <= 0 {
-			break
+		if err := renderCtx.Err(); err != nil {
+			return nil, 0, 0, err
+		}
+		n := min(maxFrames-frames, len(left))
+		read := int(C.openmpt_module_read_float_stereo(mod, C.int(samplerate), C.size_t(n), (*C.float)(unsafe.Pointer(&left[0])), (*C.float)(unsafe.Pointer(&right[0]))))
+		for i := 0; i < read; i++ {
+			interleaved[(frames+i)*2] = left[i]
+			interleaved[(frames+i)*2+1] = right[i]
 		}
 		frames += read
 		if read < n {
 			break
 		}
 	}
-	interleaved := make([]float32, frames*2)
-	for i := 0; i < frames; i++ {
-		interleaved[i*2] = left[i]
-		interleaved[i*2+1] = right[i]
-	}
+	interleaved = interleaved[:frames*2]
 	return interleaved, 2, frames, nil
 }

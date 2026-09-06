@@ -753,3 +753,42 @@ func TestAlbumKeyIncludesTrackCount(t *testing.T) {
 		t.Fatal("album key should change after track addition")
 	}
 }
+
+func TestOfflineShuffleAllExcludesMaterializedCatalogs(t *testing.T) {
+	state := playbackState{pl: &player.Player{}, lib: &player.Library{Albums: []player.Album{
+		{Name: "local", Path: "/music", Tracks: []string{"a"}},
+		{Name: "remote", Path: "modland:test", Tracks: []string{"modland:test/a"}},
+	}}}
+	state.offline.Store(true)
+	for range 10 {
+		track, ok := state.advance(config.PlaybackSettings{ShuffleMode: config.ShuffleAll, Repeat: config.RepeatAll})
+		if !ok || track.path != "a" {
+			t.Fatalf("offline selection = %+v, %v", track, ok)
+		}
+	}
+}
+
+func TestFailureRecoverySkipsRepeatOneAndStopsAtBrokenPool(t *testing.T) {
+	state := playbackState{pl: &player.Player{}, lib: &player.Library{}, playlist: []string{"bad", "good"}, playlistIdx: 0}
+	settings := config.PlaybackSettings{Repeat: config.RepeatOne}
+	track, ok := state.nextAfterFailure("bad", settings)
+	if !ok || track.path != "good" {
+		t.Fatalf("recovery = %+v, %v", track, ok)
+	}
+	if _, ok := state.nextAfterFailure("good", settings); ok {
+		t.Fatal("retrying a pool with no playable tracks")
+	}
+}
+
+func TestFailureRecoveryHasFiniteBudget(t *testing.T) {
+	state := playbackState{pl: &player.Player{}, lib: &player.Library{}}
+	for i := range maxPlaybackFailures + 2 {
+		state.playlist = append(state.playlist, string(rune('a'+i)))
+	}
+	for i := range maxPlaybackFailures {
+		_, ok := state.nextAfterFailure(state.playlist[i], config.PlaybackSettings{})
+		if ok != (i < maxPlaybackFailures-1) {
+			t.Fatalf("failure %d: next = %v", i, ok)
+		}
+	}
+}

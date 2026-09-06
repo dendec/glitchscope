@@ -193,16 +193,16 @@ func TestAdaptiveUnstableFPSBlocksTrigger(t *testing.T) {
 	params := config.PerfModePerformance.Params()
 	var p adaptivePolicy
 	p.params = params
-	// Alternate between 19 and 21 — oscillating around threshold.
+	// Alternate around the configured lower threshold.
 	for i := 0; i < 20; i++ {
-		fps := 19.0
+		fps := params.AdaptiveThreshLow - 1
 		if i%2 == 0 {
-			fps = 21.0
+			fps = params.AdaptiveThreshLow + 1
 		}
 		p.Decide(fps, 0, 3)
 	}
-	// Should NOT trigger — fpsRing has samples > 20 (unstable).
-	if next, changed, _ := p.Decide(19, 0, 3); changed || next != 0 {
+	// Should NOT trigger while samples straddle the threshold.
+	if next, changed, _ := p.Decide(params.AdaptiveThreshLow-1, 0, 3); changed || next != 0 {
 		t.Fatalf("unstable should not trigger: next=%d changed=%v", next, changed)
 	}
 }
@@ -214,8 +214,8 @@ func TestAdaptiveDeadZoneResetsCounters(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		p.Decide(15, 0, 3)
 	}
-	// Dead zone (22) resets everything.
-	p.Decide(22, 0, 3)
+	// A sample inside the configured dead zone resets the counters.
+	p.Decide((params.AdaptiveThreshLow+params.AdaptiveThreshHigh)/2, 0, 3)
 	// 2 low frames — should NOT trigger.
 	if next, changed, _ := p.Decide(15, 0, 3); changed || next != 0 {
 		t.Fatalf("after dead zone: next=%d changed=%v", next, changed)
@@ -330,5 +330,18 @@ func TestFpsRingMinMax(t *testing.T) {
 	}
 	if r.max() != 30 {
 		t.Fatalf("max = %v, want 30", r.max())
+	}
+}
+
+func TestResolutionModeCeilingOnResetAndConfigure(t *testing.T) {
+	for _, mode := range config.AllPerformanceModes() {
+		var state resolutionState
+		params := mode.Params()
+		if !state.Reset(1280, 720, params) || state.index != params.AdaptiveMaxIndex {
+			t.Fatalf("%v reset index = %d", mode, state.index)
+		}
+		if !state.Configure(1280, 720, config.RenderResolution{Width: 1280, Height: 720}, params) || state.index != params.AdaptiveMaxIndex {
+			t.Fatalf("%v configure index = %d", mode, state.index)
+		}
 	}
 }

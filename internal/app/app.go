@@ -58,7 +58,8 @@ type App struct {
 	settings          *config.Settings
 	settingsPath      string
 	textureDir        string
-	texturesOnce      sync.Once     // ensures textures are extracted at most once
+	texturesOnce      sync.Once // ensures textures are extracted at most once
+	connectivityWg    sync.WaitGroup
 	shuffleWg         sync.WaitGroup // tracks background shuffle build goroutine
 	presetNames       []string
 	presetIdx         int
@@ -67,8 +68,11 @@ type App struct {
 
 	startupFile string
 
-	adaptive resolutionState
-	vizClock visualizerClock // visualizer frame clock, promoted from runState
+	adaptive         resolutionState
+	presetTuning     presetTuning
+	presentRequested bool
+	nextPresent      time.Time
+	vizClock         visualizerClock // visualizer frame clock, promoted from runState
 
 	// appCtx/appCancel govern background work tied to the app lifetime.
 	// Cancelled in Close() so in-flight goroutines (e.g. connectivity check)
@@ -153,8 +157,6 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	a.pm.SetSoftCutDuration(softCutDuration.Seconds())
 	slog.Info("projectM init", "ms", time.Since(t0).Milliseconds())
 
-	a.preview = newPreviewRenderer()
-
 	// Texture extraction is deferred to the first render frame (ensureTextures)
 	// to avoid blocking startup. projectM uses built-in textures until then.
 
@@ -171,7 +173,7 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	switch {
 	case gs.Graphics.Adaptive && len(resolutions) > 0:
 		a.adaptive.Reset(int(w), int(h), gs.Graphics.PerformanceMode.Params())
-		renderW, renderH = a.adaptive.resolutions[0].Width, a.adaptive.resolutions[0].Height
+		renderW, renderH = a.adaptive.resolutions[a.adaptive.index].Width, a.adaptive.resolutions[a.adaptive.index].Height
 	case gs.Graphics.Adaptive:
 		slog.Warn("adaptive: empty resolution list at startup, using saved size",
 			"window", fmt.Sprintf("%dx%d", int(w), int(h)))
@@ -191,7 +193,7 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	a.rt = rt
 	a.settings = &gs
 	a.pm.SetBeatSensitivity(gs.Graphics.BeatSensitivity)
-	a.pm.SetHardCutEnabled(gs.PresetInterval == config.PresetAuto)
+	a.pm.SetHardCutEnabled(!gs.Graphics.VisualizerOff && gs.PresetInterval == config.PresetAuto)
 	a.pm.SetPresetSwitchRequestedHandler(func(bool) {
 		if a.settings.PresetInterval == config.PresetAuto {
 			a.presetSwitch.Store(true)
@@ -218,6 +220,7 @@ func (a *App) Close() {
 	if a.appCancel != nil {
 		a.appCancel()
 	}
+	a.connectivityWg.Wait()
 	modarchive.CloseSnapshotCatalog()
 	if a.modlandShuffleSrc != nil {
 		_ = a.modlandShuffleSrc.Close()
@@ -342,6 +345,7 @@ func (a *App) initAudio() {
 		return
 	}
 	a.pl = pl
+	a.pl.SetRenderBudget(a.settings.Playback.SeekMemory.BudgetBytes())
 	a.pl.Downloader = func(ctx context.Context, path string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
 		if player.IsModland(path) {
 			remotePath := player.RemotePath(path)
@@ -415,7 +419,7 @@ func (a *App) initLibrary() {
 	slog.Debug("initLibrary: catalogs loaded", "hasModland", hasModland, "hasModArchive", hasModArchive,
 		"libAlbums", a.lib.AlbumCount(), "ms", time.Since(t).Milliseconds())
 	if hasModland || hasModArchive {
-		slog.Debug("initLibrary: cached catalogs found, setting online")
+		slog.Debug("initLibrary: cached catalogs available for navigation")
 		a.online.Store(true)
 		if a.overlay != nil {
 			a.overlay.SetOnline(true)
@@ -459,19 +463,35 @@ func (a *App) initLibrary() {
 // The probe is tied to the app context so it is aborted promptly on Close
 // and never writes to the overlay after it has been torn down.
 func (a *App) checkConnectivity() {
+	a.offline.Store(true)
+	a.connectivityWg.Add(1)
 	go func() {
-		ctx, cancel := context.WithTimeout(a.appCtx, 5*time.Second)
-		defer cancel()
-		resp, err := util.Get(ctx, "https://modland.antarctica.no/", nil)
-		if err != nil {
-			slog.Info("connectivity check: offline", "error", err)
-			return
-		}
-		resp.Body.Close()
-		slog.Info("connectivity check: online", "status", resp.StatusCode)
-		a.online.Store(true)
-		if a.overlay != nil && ctx.Err() == nil {
-			a.overlay.SetOnline(true)
+		defer a.connectivityWg.Done()
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			ctx, cancel := context.WithTimeout(a.appCtx, 5*time.Second)
+			resp, err := util.Get(ctx, "https://modland.antarctica.no/", nil)
+			if err != nil {
+				slog.Debug("connectivity probe failed", "error", err)
+			}
+			reachable := err == nil
+			if resp != nil {
+				reachable = reachable && resp.StatusCode >= 200 && resp.StatusCode < 400
+				if closeErr := resp.Body.Close(); closeErr != nil {
+					slog.Debug("connectivity response close", "error", closeErr)
+				}
+			}
+			cancel()
+			a.offline.Store(!reachable)
+			if reachable {
+				a.online.Store(true)
+			}
+			select {
+			case <-a.appCtx.Done():
+				return
+			case <-ticker.C:
+			}
 		}
 	}()
 }
@@ -668,6 +688,7 @@ func (a *App) initPreset() {
 		return
 	}
 	a.pm.LoadPresetData(string(d), false)
+	a.activatePresetProfile(a.presetNames[a.presetIdx], d)
 	if a.overlay != nil {
 		a.overlay.SetPresetName(a.presetNames[a.presetIdx])
 	}
@@ -681,8 +702,8 @@ func (a *App) initPreset() {
 		a.overlay.SetPresetMetaProvider(presets.ReadMeta)
 		a.overlay.SetPresetPreviewRequest(func(key string) {
 			if a.preview == nil {
-				slog.Debug("preview: no renderer")
-				return
+				a.preview = newPreviewRenderer()
+				a.preview.SetFPS(a.settings.Graphics.PerformanceMode.Params().VisualizerFPS)
 			}
 			data, err := presets.Read(key)
 			if err != nil {

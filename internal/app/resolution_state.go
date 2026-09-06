@@ -20,7 +20,7 @@ func (s *resolutionState) Configure(winW, winH int, current config.RenderResolut
 		s.restartPolicy()
 		return false
 	}
-	s.index = config.ClosestResolutionIndex(s.resolutions, current)
+	s.index = max(config.ClosestResolutionIndex(s.resolutions, current), min(params.AdaptiveMaxIndex, len(s.resolutions)-1))
 	s.policy.params = params
 	s.restartPolicy()
 	return true

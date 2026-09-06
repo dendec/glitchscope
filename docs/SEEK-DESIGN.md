@@ -91,7 +91,7 @@ MOD/IT/YM/SID (and any other tracker) get identical, precise scrubbing.
 | `maxRenderFrames`, `interleavedToPlanar`, `renderToSeekable` | `internal/player/player.go` |
 
 **Cap and fallback.** A track is only pre-rendered if its duration is within
-`maxRenderSeconds` (`360s`, ~124 MB of float32 stereo at 44.1 kHz). Longer tracks
+`maxRenderSeconds` (`360s`, ~121 MiB of float32 stereo at 44.1 kHz). Longer tracks
 keep native streaming to bound RAM on low-power handhelds (backward seek then
 restarts). The cap is set above typical chip-track lengths (e.g. a common YM
 tune is ~186s) so they pre-render and seek exactly rather than silently falling
@@ -173,3 +173,34 @@ if heldMax && holdTime > 0.4s:                        // extreme deflection held
 go-build cache is fragile). Unit tests cover the position clock, the
 velocity/acceleration math, the pre-render cap decision and the
 interleave→planar conversion; the SDL/GL path is not unit-tested.
+
+
+## Handheld memory and cancellation
+
+`playback.seek_memory` selects `exact` (default, 256 MiB working PCM budget),
+`low_memory` (128 MiB) or `streaming` (no pre-render). The Settings row is
+**Tracker seeking**. Changes affect subsequent loads and are independent of the
+graphics performance mode. The existing 360-second guard remains in place.
+The budget reserves space for both the interleaved decoded buffer and the final
+SoLoud planar buffer, plus 1 MiB for small blocks. It is not a process RSS limit:
+module data, native decoder state, the Go heap and graphics resources are extra.
+A known track that exceeds either limit streams natively. For unknown duration,
+reaching the buffer limit falls back to native playback instead of truncating
+the song. Streaming retains each backend's seek limitations.
+
+Openmpt uses 4096-frame temporary channel blocks; YM writes interleaved samples
+directly. Neither retains two full channel arrays before interleaving anymore.
+A 360-second stereo track needs about 121 MiB for the decoded PCM and another
+121 MiB for SoLoud conversion, rather than additional full-track channel copies.
+
+All asynchronous native loads share one decoding lock. Queued requests check
+cancellation after acquiring it, so only the newest pending request decodes.
+Openmpt/Xmp check the context between decoding blocks. YM/SID check via a
+synchronous cgo.Handle callback between native blocks; the handle is deleted
+only after the native call returns. Cancellation does not interrupt library
+initialization or a single native block. Stale results are still discarded
+through requestID, and Close cancels and waits for all workers.
+
+Verbose logging reports decode time and the kernel's process peak RSS (including
+native allocations). Peak RSS is a process-lifetime high-water mark, not memory
+attributed exclusively to the most recent track.

@@ -128,3 +128,36 @@ func TestAdvanceShuffleLazyUnknownSourceFallsBack(t *testing.T) {
 		t.Fatal("expected false when the current source has no index")
 	}
 }
+
+func TestOfflineLazyShuffleSelectsOnlyLocalSource(t *testing.T) {
+	local := &fakeSourceIndex{source: catalog.SourceLocal, tracks: []catalog.ShuffleTrack{{Source: catalog.SourceLocal, Path: "/music/a.mod"}}}
+	remote := &fakeSourceIndex{source: catalog.SourceModland, tracks: []catalog.ShuffleTrack{fakeModlandTrack()}}
+	state := playbackState{pl: &player.Player{}, lib: &player.Library{}}
+	state.shuffle.rng = rand.New(rand.NewSource(1))
+	state.shuffleCatalog.Store(catalog.NewShuffleCatalog(local, remote))
+	state.offline.Store(true)
+	for range 100 {
+		track, ok := state.advanceShuffleLazy(config.PlaybackSettings{ShuffleMode: config.ShuffleAll})
+		if !ok || track.path != "/music/a.mod" {
+			t.Fatalf("offline pick = %+v, %v", track, ok)
+		}
+	}
+	state.shuffleCatalog.Store(catalog.NewShuffleCatalog(remote))
+	if _, ok := state.advanceShuffleLazy(config.PlaybackSettings{ShuffleMode: config.ShuffleAll}); ok {
+		t.Fatal("offline remote source selected")
+	}
+}
+
+// Only the shuffle coordinator can select this track outside the playlist.
+func TestManualNextHonorsShuffleAll(t *testing.T) {
+	state := playbackState{pl: &player.Player{}, lib: &player.Library{Albums: []player.Album{
+		{Name: "local", Tracks: []string{"a", "b"}},
+	}}, playlist: []string{"a", "b"}, playlistIdx: 0}
+	state.shuffle.rng = rand.New(rand.NewSource(7))
+	source := &fakeSourceIndex{source: catalog.SourceLocal, tracks: []catalog.ShuffleTrack{{Source: catalog.SourceLocal, Path: "indexed"}}}
+	state.shuffleCatalog.Store(catalog.NewShuffleCatalog(source))
+	path, _, ok := state.manualNext(config.PlaybackSettings{ShuffleMode: config.ShuffleAll, Repeat: config.RepeatOne})
+	if !ok || path != "indexed" {
+		t.Fatalf("manual shuffle next = %q, %v", path, ok)
+	}
+}

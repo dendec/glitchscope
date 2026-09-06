@@ -77,7 +77,7 @@ NC сохраняет статус listing для явного отображе�
 ошибка rescan явно показывается как частично неизвестное состояние.
 
 Основной цикл обрабатывает ввод и UI с частотой до 60 Гц, а главный projectM
-планируется независимо с потолком 30 FPS. GL-операции остаются на закреплённом
+планируется независимо с частотой выбранного performance mode. GL-операции остаются на закреплённом
 main thread; между кадрами визуализации выводится последняя захваченная текстура.
 Показатель `FPS` и adaptive resolution используют частоту завершённых кадров
 визуализации, а не частоту итераций UI.
@@ -103,3 +103,49 @@ make dist
 `make test` и `make lint` запускаются внутри builder image, чтобы результаты
 не зависели от локальных cgo-зависимостей. `make dist` дополнительно проверяет
 полный amd64 packaging path.
+
+## Переключение и восстановление воспроизведения
+
+Ручной Next учитывает shuffle и игнорирует Repeat One; без shuffle сохраняет
+циклическую навигацию. Shuffle All без подтверждённого подключения выбирает
+только локальный источник, включая fallback до готовности индексов. Наличие
+кэшированных каталогов разрешает offline-навигацию, но не подтверждает сеть.
+Подключение проверяется при запуске и каждые 30 секунд (timeout 5 секунд).
+
+Ошибка загрузки пропускает трек, в том числе при Repeat One. Серия восстановления
+хранит не более 10 неудачных путей и ограничивает поиск кандидата 10 попытками;
+при исчерпании выбора показывает уведомление и прекращает автоматический перебор.
+Успешный запуск или новый ручной выбор очищает серию ошибок.
+
+Adaptive resolution применяет потолок режима при сбросе, resize и повышении:
+Performance — native, Balanced — индекс 1 (0.75×), Eco — индекс 3 (0.5×).
+Частота Performance — 30 FPS, Balanced и Eco — 24 FPS; cooldown измеряется
+завершёнными кадрами визуализации, поэтому при просадках длится дольше.
+
+
+## Handheld rendering and memory budgets
+
+Settings owns `playback.seek_memory` and `graphics.visualizer_off`; app translates
+settings into player budgets and rendering policy. The player serializes native
+loads and owns the PCM budget calculation, described in SEEK-DESIGN.md.
+
+Performance retains 60 Hz presentation. Balanced/Eco process input at 60 Hz but
+skip duplicate blits and swaps between visualizer frames; visible UI animation
+has a mode-rate deadline and actions request immediate presentation. Visualizer
+Off stops the main projectM and preset timers, presents a solid background, and
+updates hidden-UI output at 4 Hz. The presets page can still render previews.
+
+Preview creates its projectM instance lazily, throttles to the smaller of 25 FPS
+and the selected mode's FPS, and reuses the UI-owned 120 ms selection delay before loading
+its shader. Resize preserves pending selections. The instance remains allocated
+until shutdown to avoid repeated driver initialization when reopening the page.
+
+App owns a bounded, session-only cache of 256 preset profiles, separated by name,
+mode and drawable size, and validated against the loaded preset's SHA-256 digest.
+Thirty consecutive stable visualization frames establish a reusable resolution.
+Soft-cut frames do not count. Known-heavy presets are omitted from random rotation
+when alternatives exist; manual selection remains available. Profiles never
+survive a process restart, so device/driver updates cannot reuse old measurements.
+
+UI shader attribute/uniform locations are queried at link time and released with
+their program. GL calls remain in the binding/rendering modules.

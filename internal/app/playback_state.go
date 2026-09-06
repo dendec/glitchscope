@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"hash/fnv"
+	"log/slog"
 	"math/rand"
 	"path/filepath"
 	"slices"
@@ -133,6 +134,8 @@ type playbackState struct {
 	playlist      []string
 	playlistIdx   int
 	playlistAlbum string
+	offline       atomic.Bool // connectivity, independent of cached catalog visibility
+	failedTracks  map[string]bool
 
 	// shuffleCatalog is the runtime coordinator over the three provider
 	// shuffle indexes, built at startup or lazily in the background (see
@@ -266,8 +269,47 @@ func (s *playbackState) nextTrack() (string, string, bool) {
 	return path, s.lib.CurrentAlbum().Name, true
 }
 
+// manualNext honors shuffle while overriding Repeat One and exhausted album orders.
+func (s *playbackState) manualNext(settings config.PlaybackSettings) (string, string, bool) {
+	if settings.ShuffleMode == config.ShuffleOff {
+		return s.nextTrack()
+	}
+	settings.Repeat = config.RepeatAll
+	t, ok := s.advance(settings)
+	return t.path, t.album, ok
+}
+
+const maxPlaybackFailures = 10
+
+// nextAfterFailure bounds recovery without maintaining a global shuffle visited set.
+func (s *playbackState) nextAfterFailure(path string, settings config.PlaybackSettings) (trackRef, bool) {
+	if s.failedTracks == nil {
+		s.failedTracks = make(map[string]bool)
+	}
+	s.failedTracks[path] = true
+	if len(s.failedTracks) >= maxPlaybackFailures {
+		return trackRef{}, false
+	}
+	// A broken Repeat One track must not be retried forever.
+	if settings.Repeat == config.RepeatOne {
+		settings.Repeat = config.RepeatAll
+	}
+	for range maxPlaybackFailures {
+		t, ok := s.advance(settings)
+		if !ok {
+			return trackRef{}, false
+		}
+		if !s.failedTracks[t.path] {
+			return t, true
+		}
+		// Sequential selection needs its cursor advanced even for a rejected candidate.
+		s.selectPlaybackContext(t.path)
+	}
+	return trackRef{}, false
+}
+
 // advance picks the next track according to shuffle/repeat settings.
-// Single entry point for auto-advance; manual navigation uses nextTrack/previousTrack.
+// Shared by automatic advancement, shuffled manual Next, and error recovery.
 func (s *playbackState) advance(settings config.PlaybackSettings) (trackRef, bool) {
 	if s.lib == nil || s.pl == nil {
 		return trackRef{}, false
@@ -348,11 +390,16 @@ func (s *playbackState) advanceShuffleLazy(settings config.PlaybackSettings) (tr
 		}
 		t, err = cat.RandomTrackFromSource(kind, s.shuffle.rng)
 	case config.ShuffleAll:
-		t, err = cat.RandomTrackAll(s.shuffle.rng)
+		if s.offline.Load() {
+			t, err = cat.RandomTrackFromSource(catalog.SourceLocal, s.shuffle.rng)
+		} else {
+			t, err = cat.RandomTrackAll(s.shuffle.rng)
+		}
 	default:
 		return trackRef{}, false
 	}
 	if err != nil {
+		slog.Warn("shuffle selection failed", "error", err)
 		return trackRef{}, false
 	}
 
@@ -452,6 +499,9 @@ func (s *playbackState) shufflePool(settings config.PlaybackSettings) ([]trackRe
 		source := s.currentSource()
 		return s.sourceTracks(source), s.libraryKey("source:" + source)
 	case config.ShuffleAll:
+		if s.offline.Load() {
+			return s.sourceTracks("local"), s.libraryKey("all:offline")
+		}
 		return s.allTracks(), s.libraryKey("all")
 	default:
 		return nil, ""

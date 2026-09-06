@@ -222,7 +222,7 @@ func (a *App) handleNormalAction(act input.Action) {
 		}
 
 	case input.ActionFocusRight, input.ActionNextTrack:
-		if path, album, ok := a.nextTrack(); ok {
+		if path, album, ok := a.manualNext(a.settings.Playback); ok {
 			a.playTrack(path, album)
 		}
 
@@ -265,9 +265,11 @@ func (a *App) randPreset() {
 	}
 
 	// Build pool of normal (non-"!") presets.
+	key := a.presetProfileKey("")
 	var normals []string
 	for _, n := range a.presetNames {
-		if n[0] != '!' {
+		key.name = n
+		if n[0] != '!' && !a.presetTuning.profiles[key].heavy {
 			normals = append(normals, n)
 		}
 	}
@@ -297,6 +299,7 @@ func (a *App) transitionPreset(name string) {
 	a.pm.LoadPresetData(string(d), true)
 	a.suspendAdaptiveForPresetTransition(time.Now())
 	a.applyPresetName(name)
+	a.activatePresetProfile(name, d)
 }
 
 // applyPresetName updates the preset index and overlay after a load.
@@ -316,7 +319,7 @@ func (a *App) applyPresetName(name string) {
 // applySettings reads confirmed settings rows and applies changes.
 func (a *App) applySettings(winW, winH int) {
 	rows := a.overlay.SettingsRows()
-	if len(rows) <= ui.SettingShowStats {
+	if len(rows) <= ui.SettingVisualizer {
 		return
 	}
 
@@ -349,7 +352,25 @@ func (a *App) applySettings(winW, winH int) {
 			a.settings.Graphics.PerformanceMode = newMode
 			params := newMode.Params()
 			a.vizClock.framePeriod = time.Second / time.Duration(params.VisualizerFPS)
+			if a.preview != nil {
+				a.preview.SetFPS(params.VisualizerFPS)
+			}
 			a.resetAdaptiveState(winW, winH)
+		}
+	}
+
+	visualizerOff := rows[ui.SettingVisualizer].Index == 0
+	if visualizerOff != a.settings.Graphics.VisualizerOff {
+		a.settings.Graphics.VisualizerOff = visualizerOff
+		a.vizClock.Reset()
+		a.resetAdaptiveCounters()
+		a.presentRequested = true
+	}
+	seekModes := config.AllSeekMemoryModes()
+	if idx := rows[ui.SettingSeekMemory].Index; idx >= 0 && idx < len(seekModes) {
+		a.settings.Playback.SeekMemory = seekModes[idx]
+		if a.pl != nil {
+			a.pl.SetRenderBudget(seekModes[idx].BudgetBytes())
 		}
 	}
 
@@ -374,7 +395,7 @@ func (a *App) applySettings(winW, winH int) {
 	presetIntervals := config.AllPresetIntervals()
 	if rows[ui.SettingPresetTimer].Index >= 0 && rows[ui.SettingPresetTimer].Index < len(presetIntervals) {
 		a.settings.PresetInterval = presetIntervals[rows[ui.SettingPresetTimer].Index]
-		a.pm.SetHardCutEnabled(a.settings.PresetInterval == config.PresetAuto)
+		a.pm.SetHardCutEnabled(!a.settings.Graphics.VisualizerOff && a.settings.PresetInterval == config.PresetAuto)
 		if a.settings.PresetInterval != config.PresetAuto {
 			a.presetSwitch.Store(false)
 		}
@@ -417,6 +438,12 @@ func (a *App) applySettings(winW, winH int) {
 
 // playTrack starts playback of a track and shows the notification.
 func (a *App) playTrack(path, album string) {
+	a.failedTracks = nil
+	a.startTrack(path, album)
+}
+
+// startTrack preserves the failure budget while recovering from a load error.
+func (a *App) startTrack(path, album string) {
 	a.stopMicCapture() // any playback wins over microphone input
 
 	if a.overlay != nil {

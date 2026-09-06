@@ -19,6 +19,8 @@ const (
 	SettingTheme           = 10
 	SettingTransparency    = 11
 	SettingShowStats       = 12
+	SettingSeekMemory      = 14
+	SettingVisualizer      = 15
 )
 
 // settingOpt is a setting whose String() produces a display label.
@@ -43,6 +45,7 @@ func optionPair[T settingOpt](all []T, current T) (values []string, index int) {
 
 // BuildSettingsRows creates SettingRow entries from the current config.
 func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
+	seekValues, seekIndex := optionPair(config.AllSeekMemoryModes(), s.Playback.SeekMemory)
 	resolutions := config.ComputeResolutions(winW, winH)
 	resValues, resIndex := buildResolutionValues(s, resolutions)
 
@@ -81,6 +84,9 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 		{Label: "Theme", Values: themeValues, Index: themeIndex},
 		{Label: "Transparency", Values: transValues, Index: transIndex},
 		{Label: "Show stats", Values: []string{"Off", "On"}, Index: boolIndex(s.UI.ShowStats)},
+		{Header: true, Label: "── Audio memory ───"},
+		{Label: "Tracker seeking", Values: seekValues, Index: seekIndex},
+		{Label: "Visualizer", Values: []string{"Off", "On"}, Index: boolIndex(!s.Graphics.VisualizerOff)},
 	}
 }
 

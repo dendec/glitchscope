@@ -1,3 +1,5 @@
+#include <stdint.h>
+extern "C" int glitchscopeRenderCancelled(uintptr_t handle);
 #include "sid_source.h"
 
 #include <cstring>
@@ -115,7 +117,7 @@ unsigned int SidSource_getSampleRate(void *source) { return 44100; }
 // Stops at end-of-stream or when maxFrames is reached.
 // Returns the number of frames actually rendered.
 unsigned int Sid_render(const unsigned char *data, unsigned int length,
-                        float *out, unsigned int maxFrames) {
+                        float *out, unsigned int maxFrames, uintptr_t cancelHandle) {
     if (!data || !length || !out || maxFrames == 0) return 0;
     SidCodec *codec = Sid_create();
     if (!codec || Sid_loadMem(codec, data, length)) {
@@ -125,6 +127,7 @@ unsigned int Sid_render(const unsigned char *data, unsigned int length,
     std::vector<short> tmp(8192);
     unsigned int rendered = 0;
     while (rendered < maxFrames) {
+        if (glitchscopeRenderCancelled(cancelHandle)) break;
         unsigned int n = maxFrames - rendered;
         if (n > 8192) n = 8192;
         const int got = Sid_read(codec, (int)n, tmp.data());

@@ -6,6 +6,7 @@ package soloud
 #cgo CXXFLAGS: -std=c++11 -DWITH_SDL2_STATIC -I ../../lib/soloud/include -I ../../lib/game-music-emu/gme
 #include "bridge_sid.h"
 #include <stdlib.h>
+#include <stdint.h>
 #include "soloud_c.h"
 void *Ffmpeg_create(void);
 void Ffmpeg_destroy(void *source);
@@ -37,7 +38,7 @@ int SidSource_loadMem(void *source, const unsigned char *data, unsigned int leng
 unsigned int SidSource_getLengthMs(void *source);
 unsigned int SidSource_getTrackCount(void *source);
 unsigned int SidSource_getSampleRate(void *source);
-unsigned int Sid_render(const unsigned char *data, unsigned int length, float *out, unsigned int maxFrames);
+unsigned int Sid_render(const unsigned char *data, unsigned int length, float *out, unsigned int maxFrames, uintptr_t cancelHandle);
 void *Ayumi_create(void);
 void Ayumi_destroy(void *source);
 int Ayumi_loadMem(void *source, const unsigned char *data, unsigned int length);
@@ -53,13 +54,15 @@ void Ym_destroy(void *source);
 int Ym_loadMem(void *source, const unsigned char *data, unsigned int length);
 unsigned int Ym_getLengthMs(void *source);
 unsigned int Ym_getSampleRate(void *source);
-unsigned int Ym_render(const unsigned char *data, unsigned int length, float *outL, float *outR, unsigned int maxFrames);
+unsigned int Ym_render(const unsigned char *data, unsigned int length, float *out, unsigned int maxFrames, uintptr_t cancelHandle);
 int Wav_loadInterleaved(void *source, const float *samples, unsigned int length, float sampleRate, unsigned int channels);
 */
 import "C"
 
 import (
+	"context"
 	"fmt"
+	"runtime/cgo"
 	"strings"
 	"unsafe"
 )
@@ -555,28 +558,34 @@ func (s *Soloud) PlayFfmpeg(f *Ffmpeg) uint {
 // float32 stereo. Returns (interleaved, channels, frames, err). Used to build a
 // seekable pre-rendered Wav because libstsound's native YM seek is unreliable.
 func RenderYm(data []byte, maxFrames int) ([]float32, int, int, error) {
+	return RenderYmContext(context.Background(), data, maxFrames)
+}
+
+// RenderYmContext cancels native decoding between PCM blocks.
+func RenderYmContext(ctx context.Context, data []byte, maxFrames int) ([]float32, int, int, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, 0, 0, err
+	}
+	handle := cgo.NewHandle(ctx)
+	defer handle.Delete()
 	if len(data) == 0 || maxFrames <= 0 {
 		return nil, 0, 0, nil
 	}
-	left := make([]float32, maxFrames)
-	right := make([]float32, maxFrames)
+	interleaved := make([]float32, maxFrames*2)
 	frames := int(C.Ym_render(
 		(*C.uchar)(unsafe.Pointer(&data[0])),
 		C.uint(len(data)),
-		(*C.float)(unsafe.Pointer(&left[0])),
-		(*C.float)(unsafe.Pointer(&right[0])),
+		(*C.float)(unsafe.Pointer(&interleaved[0])),
 		C.uint(maxFrames),
+		C.uintptr_t(handle),
 	))
+	if err := ctx.Err(); err != nil {
+		return nil, 0, 0, err
+	}
 	if frames <= 0 {
 		return nil, 0, 0, fmt.Errorf("ym render: no frames decoded")
 	}
-	left = left[:frames]
-	right = right[:frames]
-	interleaved := make([]float32, frames*2)
-	for i := 0; i < frames; i++ {
-		interleaved[i*2] = left[i]
-		interleaved[i*2+1] = right[i]
-	}
+	interleaved = interleaved[:frames*2]
 	return interleaved, 2, frames, nil
 }
 
@@ -584,6 +593,16 @@ func RenderYm(data []byte, maxFrames int) ([]float32, int, int, error) {
 // samples. Returns (mono, channels, frames, err). SID has no native seek at
 // all, so the pre-rendered buffer is what makes seeking possible.
 func RenderSid(data []byte, maxFrames int) ([]float32, int, int, error) {
+	return RenderSidContext(context.Background(), data, maxFrames)
+}
+
+// RenderSidContext cancels native decoding between PCM blocks.
+func RenderSidContext(ctx context.Context, data []byte, maxFrames int) ([]float32, int, int, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, 0, 0, err
+	}
+	handle := cgo.NewHandle(ctx)
+	defer handle.Delete()
 	if len(data) == 0 || maxFrames <= 0 {
 		return nil, 0, 0, nil
 	}
@@ -593,7 +612,11 @@ func RenderSid(data []byte, maxFrames int) ([]float32, int, int, error) {
 		C.uint(len(data)),
 		(*C.float)(unsafe.Pointer(&mono[0])),
 		C.uint(maxFrames),
+		C.uintptr_t(handle),
 	))
+	if err := ctx.Err(); err != nil {
+		return nil, 0, 0, err
+	}
 	if frames <= 0 {
 		return nil, 0, 0, fmt.Errorf("sid render: no frames decoded")
 	}

@@ -98,10 +98,8 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 
 	lx, rx := float32(0), float32(winW-panelW)
 	py, ph, pw := float32(panelY), float32(panelH), float32(panelW)
-	drawPanelBg(o, lx, py, pw, ph, winW, winH, viewW, viewH)
-	drawPanelBg(o, rx, py, pw, ph, winW, winH, viewW, viewH)
-	drawPanelBorder(o, lx, py, pw, ph, winW, winH, viewW, viewH)
-	drawPanelBorder(o, rx, py, pw, ph, winW, winH, viewW, viewH)
+	// drawListColumn renders each panel background. Drawing it here as well
+	// compounds the alpha and makes Help less transparent than other pages.
 	leftCursor := o.helpView.TopicCursor
 	leftScroll := o.helpView.EntryTop
 	if o.helpView.InGrandChildren {

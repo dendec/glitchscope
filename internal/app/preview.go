@@ -50,15 +50,16 @@ type previewJob struct {
 // background while displaying a properly scaled copy in the right panel.
 // All methods must be called on the main GL thread.
 type previewRenderer struct {
-	pm    *projectm.Handle
-	tex   C.GLuint // thumbnail capture texture
+	pm   *projectm.Handle
+	tex  C.GLuint // thumbnail capture texture
 	w, h int      // current thumbnail render dimensions
 
 	queue  []previewJob
 	active *previewJob
 
 	// Frame throttling: ProcessNext renders at most once per previewFramePeriod.
-	nextFrame time.Time
+	nextFrame   time.Time
+	framePeriod time.Duration
 
 	// FPS measurement (render time only, not display cadence).
 	meter fpsMeter
@@ -74,7 +75,7 @@ type previewRenderer struct {
 // newPreviewRenderer creates a second projectM instance for thumbnails.
 // Call Resize() before the first ProcessNext() to set initial dimensions.
 func newPreviewRenderer() *previewRenderer {
-	r := &previewRenderer{}
+	r := &previewRenderer{framePeriod: previewFramePeriod}
 
 	pm, err := projectm.Create()
 	if err != nil {
@@ -115,7 +116,10 @@ func (r *previewRenderer) Resize(w, h int) {
 	r.pm.SetWindowSize(w, h)
 	C.prCreateThumbTexture(&r.tex, C.GLsizei(w), C.GLsizei(h))
 	r.w, r.h = w, h
-	r.Flush()
+	r.nextFrame = time.Time{}
+	r.meter.Reset()
+	r.resultKey.Store("")
+	r.resultTex = 0
 	slog.Debug("preview resized", "w", w, "h", h)
 }
 
@@ -182,10 +186,17 @@ func (r *previewRenderer) ProcessNext() bool {
 	}
 
 	now := time.Now()
-	if !r.nextFrame.IsZero() && now.Before(r.nextFrame) {
+	if !previewFrameDue(now, r.nextFrame) {
 		return false
 	}
-	r.nextFrame = now.Add(previewFramePeriod)
+	if r.nextFrame.IsZero() {
+		r.nextFrame = now.Add(r.framePeriod)
+	} else {
+		r.nextFrame = r.nextFrame.Add(r.framePeriod)
+		if now.After(r.nextFrame) {
+			r.nextFrame = now
+		}
+	}
 
 	C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
 	started := time.Now()
@@ -225,4 +236,17 @@ func (r *previewRenderer) Destroy() {
 		r.pm = nil
 	}
 	r.ready = false
+}
+
+func previewFrameDue(now, nextFrame time.Time) bool {
+	return nextFrame.IsZero() || !now.Before(nextFrame)
+}
+
+// SetFPS keeps preview within the selected mode's visualizer budget.
+func (r *previewRenderer) SetFPS(fps int32) {
+	fps = min(previewTargetFPS, max(1, fps))
+	r.framePeriod = time.Second / time.Duration(fps)
+	if r.pm != nil {
+		r.pm.SetFPS(fps)
+	}
 }

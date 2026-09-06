@@ -9,14 +9,18 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dendec/glitchscope/internal/presets"
+	"github.com/dendec/glitchscope/internal/prof"
 	"github.com/dendec/glitchscope/internal/projectm"
 	"github.com/veandco/go-sdl2/sdl"
 )
+
+var benchmarkHeader = []string{"preset", "status", "startup_ms", "steady_ms_per_frame", "steady_fps", "total_ms", "load_ms", "p95_ms", "p99_ms", "max_ms", "process_peak_rss_kib"}
 
 // RunBenchmarkSupervisor benchmarks every preset in an isolated subprocess.
 func RunBenchmarkSupervisor(frames int, outPath string) {
@@ -36,6 +40,17 @@ func RunBenchmarkSupervisor(frames int, outPath string) {
 
 	needHeader := true
 	if fi, err := os.Stat(outPath); err == nil && fi.Size() > 0 {
+		existing, openErr := os.Open(outPath)
+		if openErr != nil {
+			slog.Error("benchmark report open", "error", openErr)
+			return
+		}
+		header, readErr := csv.NewReader(existing).Read()
+		_ = existing.Close()
+		if readErr != nil || !slices.Equal(header, benchmarkHeader) {
+			slog.Error("benchmark report schema differs; select a new -benchmark-out path", "path", outPath)
+			return
+		}
 		needHeader = false
 	}
 
@@ -52,7 +67,7 @@ func RunBenchmarkSupervisor(frames int, outPath string) {
 
 	cw := csv.NewWriter(f)
 	if needHeader {
-		_ = cw.Write([]string{"preset", "status", "compile_ms", "steady_ms_per_frame", "steady_fps", "total_ms"})
+		_ = cw.Write(benchmarkHeader)
 		cw.Flush()
 	}
 
@@ -101,6 +116,11 @@ func RunBenchmarkSupervisor(frames int, outPath string) {
 			fmt.Sprintf("%.2f", steadyMs),
 			fmt.Sprintf("%.2f", steadyFPS),
 			fmt.Sprintf("%.2f", totalMs),
+			fmt.Sprintf("%.2f", result.loadMs),
+			fmt.Sprintf("%.2f", result.p95Ms),
+			fmt.Sprintf("%.2f", result.p99Ms),
+			fmt.Sprintf("%.2f", result.maxMs),
+			fmt.Sprintf("%.0f", result.peakRSS),
 		})
 
 		tested++
@@ -127,6 +147,7 @@ func (a *App) RunBenchmarkWorker(frames int) {
 // ---------------------------------------------------------------------------
 
 type benchResult struct {
+	loadMs, p95Ms, p99Ms, maxMs, peakRSS    float64
 	compileMs, steadyMs, steadyFPS, totalMs float64
 	errText                                 string
 }
@@ -191,6 +212,8 @@ func runBenchmarkWorker(pm *projectm.Handle, rt *projectm.RenderTarget, window *
 
 		start := time.Now()
 		pm.LoadPresetData(string(data), false)
+		loadMs := float64(time.Since(start)) / float64(time.Millisecond)
+		samples := make([]float64, 0, frames-1)
 
 		var compileMs float64
 		var steadyTotal time.Duration
@@ -204,9 +227,10 @@ func runBenchmarkWorker(pm *projectm.Handle, rt *projectm.RenderTarget, window *
 			window.GLSwap()
 			elapsed := time.Since(t0)
 			if frame == 0 {
-				compileMs = elapsed.Seconds() * 1000
+				compileMs = loadMs + elapsed.Seconds()*1000
 			} else {
 				steadyTotal += elapsed
+				samples = append(samples, elapsed.Seconds()*1000)
 			}
 		}
 
@@ -220,7 +244,13 @@ func runBenchmarkWorker(pm *projectm.Handle, rt *projectm.RenderTarget, window *
 			}
 		}
 
-		if _, err := fmt.Fprintf(out, "OK %.2f %.2f %.2f %.2f\n", compileMs, steadyMs, steadyFPS, totalMs); err != nil {
+		p95, p99, maxFrame := frameQuantiles(samples)
+		peakRSS, memErr := prof.PeakMemoryKB()
+		if memErr != nil {
+			slog.Debug("benchmark peak RSS unavailable", "error", memErr)
+			peakRSS = -1
+		}
+		if _, err := fmt.Fprintf(out, "OK %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %d\n", compileMs, steadyMs, steadyFPS, totalMs, loadMs, p95, p99, maxFrame, peakRSS); err != nil {
 			return
 		}
 		if err := out.Flush(); err != nil {
@@ -236,14 +266,18 @@ func parseBenchLine(line string) (benchResult, error) {
 	}
 	switch fields[0] {
 	case "OK":
-		if len(fields) != 5 {
+		if len(fields) != 10 {
 			return benchResult{}, fmt.Errorf("malformed OK line: %q", line)
 		}
-		compileMs, _ := strconv.ParseFloat(fields[1], 64)
-		steadyMs, _ := strconv.ParseFloat(fields[2], 64)
-		steadyFPS, _ := strconv.ParseFloat(fields[3], 64)
-		totalMs, _ := strconv.ParseFloat(fields[4], 64)
-		return benchResult{compileMs: compileMs, steadyMs: steadyMs, steadyFPS: steadyFPS, totalMs: totalMs}, nil
+		values := make([]float64, 9)
+		for i := range values {
+			v, err := strconv.ParseFloat(fields[i+1], 64)
+			if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+				return benchResult{}, fmt.Errorf("invalid benchmark value %q", fields[i+1])
+			}
+			values[i] = v
+		}
+		return benchResult{compileMs: values[0], steadyMs: values[1], steadyFPS: values[2], totalMs: values[3], loadMs: values[4], p95Ms: values[5], p99Ms: values[6], maxMs: values[7], peakRSS: values[8]}, nil
 	case "ERR":
 		return benchResult{errText: strings.Join(fields[1:], " ")}, nil
 	default:
@@ -353,4 +387,13 @@ func readBenchmarkedPresets(outPath string) map[string]bool {
 		}
 	}
 	return done
+}
+
+// Nearest-rank percentiles, excluding the preset's first frame. Sort in place.
+func frameQuantiles(samples []float64) (p95, p99, maximum float64) {
+	if len(samples) == 0 {
+		return 0, 0, 0
+	}
+	slices.Sort(samples)
+	return samples[int(math.Ceil(float64(len(samples))*0.95))-1], samples[int(math.Ceil(float64(len(samples))*0.99))-1], samples[len(samples)-1]
 }

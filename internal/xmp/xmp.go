@@ -9,6 +9,7 @@ package xmp
 import "C"
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"unsafe"
@@ -107,6 +108,15 @@ func TryLoad(data []byte) error {
 // directions. Rendering stops at end-of-song or when maxFrames is reached,
 // whichever comes first. Returns (interleaved, channels, frames, err).
 func Render(data []byte, samplerate, maxFrames int) ([]float32, int, int, error) {
+	return RenderContext(context.Background(), data, samplerate, maxFrames)
+}
+
+// RenderContext checks cancellation between small decoder blocks.
+func RenderContext(renderCtx context.Context, data []byte, samplerate, maxFrames int) ([]float32, int, int, error) {
+	cancelErr := renderCtx.Err()
+	if cancelErr != nil {
+		return nil, 0, 0, cancelErr
+	}
 	if len(data) == 0 {
 		return nil, 0, 0, fmt.Errorf("xmp: empty data")
 	}
@@ -132,6 +142,9 @@ func Render(data []byte, samplerate, maxFrames int) ([]float32, int, int, error)
 	out := make([]float32, 0, maxFrames*2)
 	frames := 0
 	for frames < maxFrames {
+		if err := renderCtx.Err(); err != nil {
+			return nil, 0, 0, err
+		}
 		if C.xmp_play_frame(ctx) < 0 {
 			break // genuine end of song
 		}

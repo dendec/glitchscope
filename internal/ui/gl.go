@@ -5,6 +5,7 @@ package ui
 #cgo LDFLAGS: -lGLESv2
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+#include <stdlib.h>
 
 static unsigned int createTextProgram();
 static unsigned int createImageProgram();
@@ -13,6 +14,34 @@ static void drawOverlayImageClipped(unsigned int program, unsigned int image, fl
 	float x, float y, float imageWidth, float imageHeight,
 	float clipX, float clipY, float clipW, float clipH,
 	int winW, int winH, int viewW, int viewH);
+
+// Context-thread-only locations, released together with each program.
+typedef struct UIProgramLocations {
+ GLuint program;
+ GLint text, opacity, color, pos, tc;
+ struct UIProgramLocations *next;
+} UIProgramLocations;
+static UIProgramLocations *uiPrograms = NULL;
+
+static UIProgramLocations *uiLocations(GLuint program) {
+ for (UIProgramLocations *p = uiPrograms; p; p = p->next) {
+  if (p->program == program) return p;
+ }
+ return NULL;
+}
+static void uiDeleteProgram(GLuint program) {
+ UIProgramLocations **link = &uiPrograms;
+ while (*link) {
+  if ((*link)->program == program) {
+   UIProgramLocations *old = *link;
+   *link = old->next;
+   free(old);
+   break;
+  }
+  link = &(*link)->next;
+ }
+ glDeleteProgram(program);
+}
 
 static unsigned int compileShader(unsigned int type, const char *source) {
 	GLuint shader = glCreateShader(type);
@@ -41,7 +70,17 @@ static unsigned int createProgram(const char *vs, const char *fs) {
 	GLint ok = 0;
 	glGetProgramiv(program, GL_LINK_STATUS, &ok);
 	if (!ok) { glDeleteProgram(program); return 0; }
-	return program;
+ UIProgramLocations *loc = (UIProgramLocations *)malloc(sizeof(UIProgramLocations));
+ if (!loc) { glDeleteProgram(program); return 0; }
+ loc->program = program;
+ loc->text = glGetUniformLocation(program, "text");
+ loc->opacity = glGetUniformLocation(program, "opacity");
+ loc->color = glGetUniformLocation(program, "uColor");
+ loc->pos = glGetAttribLocation(program, "pos");
+ loc->tc = glGetAttribLocation(program, "tc");
+ loc->next = uiPrograms;
+ uiPrograms = loc;
+ return program;
 }
 
 static void beginDraw(int w, int h) {
@@ -58,12 +97,14 @@ static void endDraw() {
 
 static void drawText(unsigned int program, unsigned int text, float opacity,
 	float x, float y, float textWidth, float textHeight, int winW, int winH, int viewW, int viewH) {
+UIProgramLocations *loc = uiLocations(program);
+ if (!loc) return;
 	beginDraw(viewW, viewH);
 	glUseProgram(program);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, text);
-	glUniform1i(glGetUniformLocation(program, "text"), 0);
-	glUniform1f(glGetUniformLocation(program, "opacity"), opacity);
+	glUniform1i(loc->text, 0);
+	glUniform1f(loc->opacity, opacity);
 	float left = x / (float)winW * 2.0f - 1.0f;
 	float right = (x + textWidth) / (float)winW * 2.0f - 1.0f;
 	// Go layout coordinates use a top-left origin; OpenGL uses bottom-left.
@@ -71,10 +112,10 @@ static void drawText(unsigned int program, unsigned int text, float opacity,
 	float top = ((float)winH - y) / (float)winH * 2.0f - 1.0f;
 	float verts[] = { left,bottom, right,bottom, left,top, right,top };
 	float uvs[]   = { 0,1, 1,1, 0,0, 1,0 };
-	GLuint pos = (GLuint)glGetAttribLocation(program, "pos");
+	GLuint pos = (GLuint)loc->pos;
 	glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 0, verts);
 	glEnableVertexAttribArray(pos);
-	GLuint tc = (GLuint)glGetAttribLocation(program, "tc");
+	GLuint tc = (GLuint)loc->tc;
 	if (tc != (GLuint)-1) {
 		glVertexAttribPointer(tc, 2, GL_FLOAT, GL_FALSE, 0, uvs);
 		glEnableVertexAttribArray(tc);
@@ -115,6 +156,8 @@ static void drawOverlayImageClipped(unsigned int program, unsigned int image, fl
 static void drawFilledRect(unsigned int program,
 	float x, float y, float w, float h, float r, float g, float b, float a,
 	int winW, int winH, int viewW, int viewH) {
+UIProgramLocations *loc = uiLocations(program);
+ if (!loc) return;
 	beginDraw(viewW, viewH);
 	glUseProgram(program);
 	float left = x / (float)winW * 2.0f - 1.0f;
@@ -122,8 +165,8 @@ static void drawFilledRect(unsigned int program,
 	float bottom = ((float)winH - y - h) / (float)winH * 2.0f - 1.0f;
 	float top = ((float)winH - y) / (float)winH * 2.0f - 1.0f;
 	float verts[] = { left,bottom, right,bottom, left,top, right,top };
-	glUniform4f(glGetUniformLocation(program, "uColor"), r, g, b, a);
-	GLuint pos = (GLuint)glGetAttribLocation(program, "pos");
+	glUniform4f(loc->color, r, g, b, a);
+	GLuint pos = (GLuint)loc->pos;
 	glVertexAttribPointer(pos, 2, GL_FLOAT, GL_FALSE, 0, verts);
 	glEnableVertexAttribArray(pos);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -225,7 +268,7 @@ func glCreateRectProgram() uint32 {
 
 func glDeleteProgram(program uint32) {
 	if program != 0 {
-		C.glDeleteProgram(C.uint(program))
+		C.uiDeleteProgram(C.uint(program))
 	}
 }
 
@@ -280,4 +323,13 @@ func glUploadTexture(rgba *image.RGBA) uint32 {
 	}
 	pix := (*C.uchar)(unsafe.Pointer(&rgba.Pix[0]))
 	return uint32(C.texUpload(pix, C.int(rgba.Rect.Dx()), C.int(rgba.Rect.Dy())))
+}
+
+// ClearBackground presents a quiet player screen without running projectM.
+func ClearBackground(width, height int) {
+	C.glBindFramebuffer(C.GL_FRAMEBUFFER, 0)
+	C.glViewport(0, 0, C.GLsizei(width), C.GLsizei(height))
+	C.glDisable(C.GL_SCISSOR_TEST)
+	C.glClearColor(0.02, 0.02, 0.025, 1)
+	C.glClear(C.GL_COLOR_BUFFER_BIT)
 }

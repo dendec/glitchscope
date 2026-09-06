@@ -303,3 +303,13 @@ Presets-страница: справа скриншот пресета + инф�
 11. Кнопки Play/Delete + confirm в UI
 12. Help
 13. Presets info — экспериментально
+
+
+## Handheld power options (ПРИНЯТО)
+
+Settings exposes **Tracker seeking**: Exact (256 MiB), Low memory (128 MiB),
+Streaming; and **Visualizer**: Off/On. Seeking budget changes apply on the next
+track load. Over-budget tracks keep playing through their native decoder, with
+that decoder's seek limitations. Visualizer Off keeps playback and navigation
+working against a solid background. Opening Presets still enables live preview.
+Performance-mode thresholds and quality ceilings are unchanged.

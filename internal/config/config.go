@@ -76,7 +76,7 @@ type PerformanceMode int
 const (
 	PerfModePerformance PerformanceMode = iota // 30 FPS visualizer, default
 	PerfModeBalanced                           // 24 FPS, moderate savings
-	PerfModeEco                                // 15 FPS, maximum battery life
+	PerfModeEco                                // 24 FPS, lower resolution for battery life
 )
 
 // ModeParams holds the tuning knobs for one performance mode.
@@ -192,6 +192,7 @@ func AllPerformanceModes() []PerformanceMode {
 
 // GraphicsSettings is the persisted user-tunable graphics parameters.
 type GraphicsSettings struct {
+	VisualizerOff   bool            `json:"visualizer_off"`
 	RenderWidth     int             `json:"render_width"`
 	RenderHeight    int             `json:"render_height"`
 	UpscaleFilter   UpscaleFilter   `json:"upscale_filter"`
@@ -385,6 +386,7 @@ func AllShuffleModes() []ShuffleMode {
 
 // PlaybackSettings holds shuffle/repeat configuration.
 type PlaybackSettings struct {
+	SeekMemory   SeekMemory       `json:"seek_memory"`
 	ShuffleMode  ShuffleMode      `json:"shuffle_mode"`
 	Repeat       RepeatMode       `json:"repeat"`
 	LastPosition PlaybackPosition `json:"last_position"`
@@ -410,10 +412,13 @@ func (p PlaybackPosition) Validate() error {
 }
 
 func DefaultPlayback() PlaybackSettings {
-	return PlaybackSettings{ShuffleMode: ShuffleOff, Repeat: RepeatOff}
+	return PlaybackSettings{ShuffleMode: ShuffleOff, Repeat: RepeatOff, SeekMemory: SeekMemoryFull}
 }
 
 func (p PlaybackSettings) Validate() error {
+	if err := p.SeekMemory.Validate(); err != nil {
+		return err
+	}
 	if p.ShuffleMode < ShuffleOff || p.ShuffleMode > ShuffleAll {
 		return fmt.Errorf("invalid shuffle mode %d", p.ShuffleMode)
 	}

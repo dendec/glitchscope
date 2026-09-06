@@ -16,7 +16,7 @@ var (
 	flagWidth       = flag.Int("w", 1280, "window width")
 	flagHeight      = flag.Int("h", 720, "window height")
 	flagBenchmark   = flag.Bool("benchmark", false, "benchmark every preset and write CSV, then exit")
-	flagBenchFrames = flag.Int("benchmark-frames", 10, "frames per preset in benchmark mode")
+	flagBenchFrames = flag.Int("benchmark-frames", 120, "frames per preset in benchmark mode")
 	flagBenchOut    = flag.String("benchmark-out", "benchmark.csv", "output path for benchmark CSV")
 	flagBenchWorker = flag.Bool("benchmark-worker", false, "internal: run as benchmark worker subprocess")
 	flagFile        = flag.String("file", "", "audio file to play on startup")

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dendec/glitchscope/internal/openmpt"
+	"github.com/dendec/glitchscope/internal/prof"
 	"github.com/dendec/glitchscope/internal/soloud"
 	"github.com/dendec/glitchscope/internal/xmp"
 )
@@ -29,8 +30,9 @@ const (
 	// tracks fall back to native streaming (backward seek restarts) rather
 	// than consuming an unbounded amount of RAM on low-power handhelds.
 	// 360s covers essentially all chip tracks (YM/SID etc.) at a worst case of
-	// ~124 MiB for stereo float32 PCM (~0.17 MiB/s per channel-pair).
-	maxRenderSeconds = 360.0
+	// ~121 MiB for the final stereo float32 PCM buffer.
+	maxRenderSeconds          = 360.0
+	defaultRenderBudget int64 = 256 << 20
 )
 
 // loadResult holds the outcome of loading a single audio source.
@@ -69,16 +71,18 @@ type Player struct {
 
 	// Downloader optionally fetches a remote file to a local path (e.g. for modland).
 	// The context is cancelled when a new track is requested or playback is stopped.
-	Downloader  func(ctx context.Context, path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
-	loadFunc    func(localPath string) loadResult // test seam: override loadSource
-	loadCancel  context.CancelFunc                // cancels the current in-flight load
-	pendingCh   chan loadResult                   // background load results
-	pendingMu   sync.Mutex
-	requestID   atomic.Uint64
-	loading     atomic.Bool
-	loadPercent atomic.Int64 // download progress percent [0..100], -1 if unknown
-	loadWG      sync.WaitGroup
-	closed      bool
+	Downloader   func(ctx context.Context, path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
+	loadFunc     func(localPath string) loadResult // test seam: override native loading
+	loadCancel   context.CancelFunc                // cancels the current in-flight load
+	pendingCh    chan loadResult                   // background load results
+	renderBudget atomic.Int64                      // zero means the default; negative disables pre-render
+	decodeMu     sync.Mutex                        // only one native load/pre-render at a time
+	pendingMu    sync.Mutex
+	requestID    atomic.Uint64
+	loading      atomic.Bool
+	loadPercent  atomic.Int64 // download progress percent [0..100], -1 if unknown
+	loadWG       sync.WaitGroup
+	closed       bool
 }
 
 // New creates and initializes a Player.
@@ -132,8 +136,11 @@ func isFfmpegExt(ext string) bool {
 	}
 }
 
-// loadSource loads an audio source from a local path and returns a loadResult.
-func loadSource(localPath string) loadResult {
+// loadSourceContext loads a local source with cancellable pre-rendering.
+func loadSourceContext(ctx context.Context, localPath string, budget int64) loadResult {
+	if err := ctx.Err(); err != nil {
+		return loadResult{err: err}
+	}
 	ext := strings.ToLower(filepath.Ext(localPath))
 
 	if isHvlExt(ext) {
@@ -142,7 +149,7 @@ func loadSource(localPath string) loadResult {
 		}, true, 2)
 	}
 	if isTrackerExt(ext) {
-		return loadTracker(localPath, ext)
+		return loadTracker(ctx, localPath, ext, budget)
 	}
 	if isGmeExt(ext) {
 		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
@@ -150,7 +157,7 @@ func loadSource(localPath string) loadResult {
 		}, true, 2)
 	}
 	if isSidExt(ext) {
-		return loadChip(localPath, ext, 1, func(data []byte) (soloud.AudioSource, error) {
+		return loadChip(ctx, budget, localPath, ext, 1, func(data []byte) (soloud.AudioSource, error) {
 			return soloud.NewSid(data)
 		})
 	}
@@ -165,7 +172,7 @@ func loadSource(localPath string) loadResult {
 		}, true, 2)
 	}
 	if isYmExt(ext) {
-		return loadChip(localPath, ext, 2, func(data []byte) (soloud.AudioSource, error) {
+		return loadChip(ctx, budget, localPath, ext, 2, func(data []byte) (soloud.AudioSource, error) {
 			return soloud.NewYm(data)
 		})
 	}
@@ -231,7 +238,7 @@ func loadFromBytes(path, ext string, factory func([]byte) (soloud.AudioSource, e
 // reliable bidirectional seek: it renders the track into a seekable Wav when it
 // fits within the pre-render cap, else keeps native streaming. defChannels is
 // the native output channel count used when the source reports none.
-func loadChip(path, ext string, defChannels int, factory func([]byte) (soloud.AudioSource, error)) loadResult {
+func loadChip(ctx context.Context, budget int64, path, ext string, defChannels int, factory func([]byte) (soloud.AudioSource, error)) loadResult {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return loadResult{path: path, err: fmt.Errorf("%s read %s: %w", ext, path, err)}
@@ -249,7 +256,7 @@ func loadChip(path, ext string, defChannels int, factory func([]byte) (soloud.Au
 	if ch, ok := src.(interface{ GetChannels() int }); ok {
 		channels = ch.GetChannels()
 	}
-	repl, newDur, newCh, replaced := renderToSeekable(src, data, dur, channels)
+	repl, newDur, newCh, replaced := renderToSeekableContext(ctx, budget, src, data, dur, channels)
 	if replaced {
 		src.Destroy()
 		src = repl
@@ -268,7 +275,7 @@ func loadChip(path, ext string, defChannels int, factory func([]byte) (soloud.Au
 }
 
 // loadTracker loads a tracker file, trying openmpt first, then xmp.
-func loadTracker(path, ext string) loadResult {
+func loadTracker(ctx context.Context, path, ext string, budget int64) loadResult {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return loadResult{path: path, err: fmt.Errorf("tracker read %s: %w", path, err)}
@@ -279,7 +286,7 @@ func loadTracker(path, ext string) loadResult {
 		ompt, err := soloud.NewOpenmpt(data)
 		if err == nil {
 			bpm, ch, dur, _ := openmpt.GetTrackerMeta(data)
-			return finishTrackerLoad(ompt, data, path, bpm, ch, dur)
+			return finishTrackerLoad(ctx, budget, ompt, data, path, bpm, ch, dur)
 		}
 		slog.Debug("openmpt fallback to xmp", "ext", ext, "err", err)
 	}
@@ -292,13 +299,13 @@ func loadTracker(path, ext string) loadResult {
 	if err != nil {
 		slog.Warn("tracker meta", "path", path, "err", err)
 	}
-	return finishTrackerLoad(mod, data, path, bpm, ch, dur)
+	return finishTrackerLoad(ctx, budget, mod, data, path, bpm, ch, dur)
 }
 
 // finishTrackerLoad renders a tracker source into a seekable Wav when possible,
 // else keeps native streaming, and assembles the loadResult.
-func finishTrackerLoad(src soloud.AudioSource, data []byte, path string, bpm float64, channels int, duration float64) loadResult {
-	repl, newDur, newCh, replaced := renderToSeekable(src, data, duration, channels)
+func finishTrackerLoad(ctx context.Context, budget int64, src soloud.AudioSource, data []byte, path string, bpm float64, channels int, duration float64) loadResult {
+	repl, newDur, newCh, replaced := renderToSeekableContext(ctx, budget, src, data, duration, channels)
 	if replaced {
 		src.Destroy()
 		src = repl
@@ -310,7 +317,9 @@ func finishTrackerLoad(src soloud.AudioSource, data []byte, path string, bpm flo
 
 // PlayFile loads and plays an audio file. Only one file at a time.
 func (p *Player) PlayFile(path string) error {
-	r := loadSource(path)
+	p.decodeMu.Lock()
+	r := loadSourceContext(context.Background(), path, p.renderBudgetBytes())
+	p.decodeMu.Unlock()
 	if r.err != nil {
 		return r.err
 	}
@@ -400,11 +409,29 @@ func (p *Player) PlayFileAsync(path string) {
 			return
 		}
 		p.loadPercent.Store(-1) // decode phase: unknown progress
-		loader := loadSource
-		if p.loadFunc != nil {
-			loader = p.loadFunc
+		p.decodeMu.Lock()
+		decodeStart := time.Now()
+		var r loadResult
+		if ctx.Err() == nil {
+			if p.loadFunc != nil {
+				r = p.loadFunc(localPath)
+			} else {
+				r = loadSourceContext(ctx, localPath, p.renderBudgetBytes())
+			}
 		}
-		r := loader(localPath)
+		if ctx.Err() != nil && r.src != nil {
+			r.src.Destroy()
+			r.src = nil
+		}
+		p.decodeMu.Unlock()
+		if ctx.Err() == nil {
+			peak, err := prof.PeakMemoryKB()
+			if err != nil {
+				slog.Debug("audio peak memory unavailable", "error", err)
+				peak = -1
+			}
+			slog.Debug("audio decode complete", "path", localPath, "ms", time.Since(decodeStart).Milliseconds(), "process_peak_rss_kib", peak)
+		}
 		r.path = path
 		r.localPath = localPath
 		r.requestID = requestID
@@ -575,23 +602,23 @@ type renderer func(maxFrames int) (samples []float32, channels, frames int, err 
 
 // rendererFor returns a renderer for the given source type, or nil if the
 // source already seeks natively in both directions and needs no pre-render.
-func rendererFor(src soloud.AudioSource, data []byte) renderer {
+func rendererFor(ctx context.Context, src soloud.AudioSource, data []byte) renderer {
 	switch src.(type) {
 	case *soloud.Openmpt:
 		return func(mf int) ([]float32, int, int, error) {
-			return openmpt.Render(data, renderSampleRate, mf)
+			return openmpt.RenderContext(ctx, data, renderSampleRate, mf)
 		}
 	case *soloud.Xmp:
 		return func(mf int) ([]float32, int, int, error) {
-			return xmp.Render(data, renderSampleRate, mf)
+			return xmp.RenderContext(ctx, data, renderSampleRate, mf)
 		}
 	case *soloud.Ym:
 		return func(mf int) ([]float32, int, int, error) {
-			return soloud.RenderYm(data, mf)
+			return soloud.RenderYmContext(ctx, data, mf)
 		}
 	case *soloud.Sid:
 		return func(mf int) ([]float32, int, int, error) {
-			return soloud.RenderSid(data, mf)
+			return soloud.RenderSidContext(ctx, data, mf)
 		}
 	default:
 		return nil
@@ -604,18 +631,36 @@ func rendererFor(src soloud.AudioSource, data []byte) renderer {
 // maxRenderSeconds, it returns src unchanged. On success the returned Wav
 // replaces src and the caller must destroy the original src.
 func renderToSeekable(src soloud.AudioSource, data []byte, duration float64, channels int) (replacement soloud.AudioSource, newDuration float64, newChannels int, replaced bool) {
-	render := rendererFor(src, data)
+	return renderToSeekableContext(context.Background(), defaultRenderBudget, src, data, duration, channels)
+}
+
+func renderToSeekableContext(ctx context.Context, budget int64, src soloud.AudioSource, data []byte, duration float64, channels int) (replacement soloud.AudioSource, newDuration float64, newChannels int, replaced bool) {
+	render := rendererFor(ctx, src, data)
 	if render == nil {
 		return src, duration, channels, false
 	}
-	mf := maxRenderFrames(duration)
+	pcmChannels := 2
+	if _, mono := src.(*soloud.Sid); mono {
+		pcmChannels = 1
+	}
+	mf := budgetRenderFrames(duration, pcmChannels, budget)
 	if mf <= 0 {
 		// Over the cap: keep native streaming (backward seek restarts).
 		return src, duration, channels, false
 	}
+	if ctx.Err() != nil {
+		return src, duration, channels, false
+	}
 	samples, rendCh, frames, err := render(mf)
+	if ctx.Err() != nil {
+		return src, duration, channels, false
+	}
 	if err != nil || frames <= 0 {
 		slog.Warn("render-to-buffer failed, using native playback", "err", err, "frames", frames)
+		return src, duration, channels, false
+	}
+	if duration <= 0 && frames >= mf {
+		slog.Info("unknown-length pre-render reached budget; using native playback", "frames", frames)
 		return src, duration, channels, false
 	}
 	if rendCh < 1 {
@@ -876,4 +921,35 @@ func fileBitrate(path string, duration float64) float64 {
 		return 0
 	}
 	return float64(info.Size()) * 8 / duration / 1000
+}
+
+// SetRenderBudget changes the PCM working budget for subsequent loads.
+// A zero budget selects native streaming; running loads retain their budget.
+func (p *Player) SetRenderBudget(bytes int64) {
+	if bytes <= 0 {
+		bytes = -1
+	}
+	p.renderBudget.Store(bytes)
+}
+
+func (p *Player) renderBudgetBytes() int64 {
+	budget := p.renderBudget.Load()
+	if budget == 0 {
+		return defaultRenderBudget
+	}
+	return max(budget, 0)
+}
+
+// Budget includes the decoded interleaved buffer and the final SoLoud buffer,
+// plus 1 MiB for small conversion blocks. Decoder/module memory is separate.
+func budgetRenderFrames(duration float64, channels int, budget int64) int {
+	if channels < 1 || budget <= 1<<20 {
+		return 0
+	}
+	frames := maxRenderFrames(duration)
+	limit := int((budget - (1 << 20)) / int64(channels*4*2))
+	if duration > 0 && frames > limit {
+		return 0
+	}
+	return min(frames, limit)
 }

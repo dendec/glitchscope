@@ -75,3 +75,23 @@ crash,crashed,0.0,0.0,0.0,0.0
 		t.Fatal("expected 'crash' to be in done set (regression: crashed must be skipped)")
 	}
 }
+
+func TestBenchmarkPercentilesAndProtocol(t *testing.T) {
+	samples := make([]float64, 100)
+	for i := range samples {
+		samples[i] = float64(100 - i)
+	}
+	p95, p99, peak := frameQuantiles(samples)
+	if p95 != 95 || p99 != 99 || peak != 100 {
+		t.Fatalf("quantiles: %g %g %g", p95, p99, peak)
+	}
+	result, err := parseBenchLine("OK 10 20 50 210 3 25 30 35 1024")
+	if err != nil || result.loadMs != 3 || result.p99Ms != 30 || result.peakRSS != 1024 {
+		t.Fatalf("parsed = %+v, %v", result, err)
+	}
+	for _, line := range []string{"OK 1 2", "OK NaN 2 3 4 5 6 7 8 9", "OK 1 2 3 4 5 6 7 8 nope"} {
+		if _, err := parseBenchLine(line); err == nil {
+			t.Fatalf("accepted bad benchmark line %q", line)
+		}
+	}
+}

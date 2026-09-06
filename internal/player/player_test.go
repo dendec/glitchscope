@@ -656,3 +656,62 @@ func TestRenderToSeekableOverCapFallback(t *testing.T) {
 		t.Fatalf("over-cap duration/channels changed: %v/%v", dur, ch)
 	}
 }
+
+func TestPreRenderWorkingBudget(t *testing.T) {
+	if frames := budgetRenderFrames(360, 2, defaultRenderBudget); frames != 360*renderSampleRate {
+		t.Fatalf("default duration compatibility: %d", frames)
+	}
+	if frames := budgetRenderFrames(186, 2, 128<<20); frames != 186*renderSampleRate {
+		t.Fatalf("typical YM does not fit: %d", frames)
+	}
+	if frames := budgetRenderFrames(300, 2, 128<<20); frames != 0 {
+		t.Fatal("over-budget stereo should stream")
+	}
+	if frames := budgetRenderFrames(300, 1, 128<<20); frames != 300*renderSampleRate {
+		t.Fatal("budget did not account for mono")
+	}
+	for _, budget := range []int64{0, 1 << 20, 128 << 20, 256 << 20} {
+		frames := budgetRenderFrames(0, 2, budget)
+		if frames > 0 && int64(frames)*16+(1<<20) > budget {
+			t.Fatal("unknown duration exceeds working budget")
+		}
+	}
+}
+
+func TestQueuedLoadsDecodeOnlyNewestAfterCancellation(t *testing.T) {
+	p := newTestPlayer(t)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var calls []string
+	var active, peak atomic.Int32
+	p.loadFunc = func(path string) loadResult {
+		n := active.Add(1)
+		for old := peak.Load(); n > old && !peak.CompareAndSwap(old, n); old = peak.Load() {
+		}
+		defer active.Add(-1)
+		calls = append(calls, path)
+		if path == "first" {
+			close(entered)
+			<-release
+		}
+		return loadResult{path: path}
+	}
+	p.PlayFileAsync("first")
+	<-entered
+	for range 20 {
+		p.PlayFileAsync("obsolete")
+	}
+	p.PlayFileAsync("last")
+	close(release)
+	p.loadWG.Wait()
+	if peak.Load() != 1 {
+		t.Fatalf("concurrent decodes = %d", peak.Load())
+	}
+	if len(calls) != 2 || calls[0] != "first" || calls[1] != "last" {
+		t.Fatalf("decoded obsolete requests: %v", calls)
+	}
+	started, failed := p.CheckPending()
+	if !started || failed || p.TrackPath() != "last" {
+		t.Fatalf("latest request not published: %v %v %s", started, failed, p.TrackPath())
+	}
+}
