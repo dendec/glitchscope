@@ -315,6 +315,10 @@ limitations. Visualizer Off keeps playback and navigation
 working against a solid background. Opening Presets still enables live preview.
 Performance-mode thresholds and quality ceilings are unchanged.
 
+Настройка интервала смены визуальных пресетов называется **Rotation**: `Off`
+оставляет текущий пресет до ручной смены, `Auto` делегирует момент смены
+визуализатору, значения времени задают фиксированный интервал.
+
 Settings также содержит **Cache**: срок хранения (`Do not keep`, 1/7/30/90
 days, 6 months, `Forever`) и лимит размера (128/256/512 MB, 1/2/4 GB,
 `Unlimited`). Defaults: 30 days и 1 GB. Из правой панели скачанного каталожного

@@ -96,6 +96,21 @@ func TestBuildPresetTreeEmpty(t *testing.T) {
 	}
 }
 
+func TestPresetNodeDisplayLineMarksOnlyDirectories(t *testing.T) {
+	directory := presetNode{name: "Fractal", children: []presetNode{{name: "pulse", isLeaf: true}}}
+	if got := nodeDisplayLine(&directory, ""); got != "Fractal/" {
+		t.Fatalf("directory display = %q, want %q", got, "Fractal/")
+	}
+
+	leaf := presetNode{name: "pulse", key: "Fractal/pulse.milk", isLeaf: true}
+	if got := nodeDisplayLine(&leaf, ""); got != "  pulse" {
+		t.Fatalf("leaf display = %q, want %q", got, "  pulse")
+	}
+	if got := nodeDisplayLine(&leaf, leaf.key); got != "▸ pulse" {
+		t.Fatalf("playing leaf display = %q, want %q", got, "▸ pulse")
+	}
+}
+
 func TestNavigationExpandCollapse(t *testing.T) {
 	keys := []string{
 		"Fractal/Loops/a.milk",

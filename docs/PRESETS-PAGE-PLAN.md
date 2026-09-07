@@ -3,6 +3,9 @@
 ## Goal
 
 Rework the Presets page navigation to mirror the Library/NC pattern:
+
+Категории на любом уровне имеют суффикс `/`, как директории в Library и
+подменю в Help. Конечные `.milk`-пресеты отображаются без `/`.
 - **Left panel**: hierarchical category tree (like NC directory navigation)
 - **Right panel**: stable preset detail view + optional thumbnail preview
 

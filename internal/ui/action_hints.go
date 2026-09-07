@@ -128,8 +128,12 @@ func (o *Overlay) ActionHints() []UIHint {
 
 	// Common low-priority hints shared across pages. Drawn when space allows;
 	// the renderer drops trailing hints first.
-	if o.playingPath != "" || o.loading {
-		hints = append(hints, UIHint{Key: o.controlLabel(hintPlay), Label: "Play/Pause"})
+	if o.playingPath != "" && !o.loading {
+		label := "Pause"
+		if o.paused {
+			label = "Play"
+		}
+		hints = append(hints, UIHint{Key: o.controlLabel(hintPlay), Label: label})
 	}
 	hints = append(hints, UIHint{Key: o.controlLabel(hintPages), Label: "Screens"})
 	return hints
@@ -158,17 +162,33 @@ func (o *Overlay) helpHints() []UIHint {
 			{Key: o.controlLabel(hintMove), Label: "Scroll"},
 		}
 	}
-	// Topic / entry list.
-	hints := []UIHint{
-		{Key: o.controlLabel(hintSelect), Label: "Open"},
-		{Key: o.controlLabel(hintBack), Label: "Back"},
+	// Topic / entry list. Select is meaningful only for a row marked as a
+	// submenu; leaf content is already visible in the right panel.
+	hints := make([]UIHint, 0, 3)
+	if o.helpSelectionHasSubmenu() {
+		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: "Open"})
 	}
+	hints = append(hints, UIHint{Key: o.controlLabel(hintBack), Label: "Back"})
 	if o.helpView.InChildren || o.helpView.InGrandChildren {
 		hints = append(hints, UIHint{Key: o.controlLabel(hintMove), Label: "Entry"})
 	} else {
 		hints = append(hints, UIHint{Key: o.controlLabel(hintMove), Label: "Topic"})
 	}
 	return hints
+}
+
+func (o *Overlay) helpSelectionHasSubmenu() bool {
+	topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+	if o.helpView.InGrandChildren {
+		return false
+	}
+	if !o.helpView.InChildren {
+		return len(topic.Children) > 0
+	}
+	if o.helpView.EntryCursor < 0 || o.helpView.EntryCursor >= len(topic.Children) {
+		return false
+	}
+	return len(topic.Children[o.helpView.EntryCursor].Children) > 0
 }
 
 func (o *Overlay) presetsHints() []UIHint {

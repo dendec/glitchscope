@@ -89,6 +89,13 @@ func helpTopic(id HelpTopicID) HelpTopic {
 
 func helpTopicCount() int { return len(helpTopics) }
 
+func helpMenuTitle(title string, hasSubmenu bool) string {
+	if hasSubmenu {
+		return title + "/"
+	}
+	return title
+}
+
 func wrapHelpLines(lines []string, face font.Face, maxTextW int) []string {
 	if face == nil || maxTextW <= 0 {
 		return append([]string(nil), lines...)

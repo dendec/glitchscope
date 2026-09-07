@@ -427,8 +427,8 @@ func (a *App) applySettings(winW, winH int) {
 	}
 
 	presetIntervals := config.AllPresetIntervals()
-	if rows[ui.SettingPresetTimer].Index >= 0 && rows[ui.SettingPresetTimer].Index < len(presetIntervals) {
-		a.settings.PresetInterval = presetIntervals[rows[ui.SettingPresetTimer].Index]
+	if rows[ui.SettingRotation].Index >= 0 && rows[ui.SettingRotation].Index < len(presetIntervals) {
+		a.settings.PresetInterval = presetIntervals[rows[ui.SettingRotation].Index]
 		a.pm.SetHardCutEnabled(!a.settings.Graphics.VisualizerOff && a.settings.PresetInterval == config.PresetAuto)
 		if a.settings.PresetInterval != config.PresetAuto {
 			a.presetSwitch.Store(false)

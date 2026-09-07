@@ -34,12 +34,12 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 			leftTop = &o.helpView.GrandChildTop
 		} else if o.helpView.InChildren {
 			for _, e := range topic.Children {
-				leftItems = append(leftItems, leftItem{Title: e.Title})
+				leftItems = append(leftItems, leftItem{Title: helpMenuTitle(e.Title, len(e.Children) > 0)})
 			}
 			leftCursor = o.helpView.EntryCursor
 		} else {
 			for _, t := range helpTopics {
-				leftItems = append(leftItems, leftItem{Title: t.Title})
+				leftItems = append(leftItems, leftItem{Title: helpMenuTitle(t.Title, len(t.Children) > 0)})
 			}
 		}
 		leftTotal := len(leftItems)

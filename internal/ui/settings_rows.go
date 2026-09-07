@@ -13,7 +13,7 @@ const (
 	SettingRepeat          = 2
 	SettingPerformanceMode = 4
 	SettingVisualizer      = 5
-	SettingPresetTimer     = 6
+	SettingRotation        = 6
 	SettingResolution      = 7
 	SettingFilter          = 8
 	SettingBeatSensitivity = 9
@@ -78,7 +78,7 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 		{Header: true, Label: "── Visualization ──"},
 		{Label: "Performance", Values: perfValues, Index: perfIndex},
 		{Label: "Visualizer", Values: []string{"Off", "On"}, Index: boolIndex(!s.Graphics.VisualizerOff)},
-		{Label: "Presets", Values: presetValues, Index: presetIndex},
+		{Label: "Rotation", Values: presetValues, Index: presetIndex},
 		{Label: "Resolution", Values: resValues, Index: resIndex},
 		{Label: "Filter", Values: filterValues, Index: filterIndex},
 		{Label: "Sensitivity", Values: beatValues, Index: beatIndex},
@@ -146,6 +146,14 @@ func settingDescription(setting, value int) string {
 			return "Music keeps playing without the main visualization."
 		}
 		return "Show the animated visualization while listening."
+	case SettingRotation:
+		if value == 0 {
+			return "Keep the current visual preset until it is changed manually."
+		}
+		if value == 1 {
+			return "Let the visualizer decide when to switch presets."
+		}
+		return "Switch visual presets at the selected interval."
 	case SettingResolution:
 		if value == 0 {
 			return "Adjusts resolution automatically for the current preset."

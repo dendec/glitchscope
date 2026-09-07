@@ -21,6 +21,15 @@ func TestHelpTopicsLoadFromAsset(t *testing.T) {
 	}
 }
 
+func TestHelpMenuTitleMarksOnlySubmenus(t *testing.T) {
+	if got := helpMenuTitle("Formats", true); got != "Formats/" {
+		t.Fatalf("submenu title = %q", got)
+	}
+	if got := helpMenuTitle("Quick start", false); got != "Quick start" {
+		t.Fatalf("leaf title = %q", got)
+	}
+}
+
 func TestHelpUsesSharedControlLabels(t *testing.T) {
 	for _, gamepad := range []bool{false, true} {
 		o := &Overlay{controllerConnected: gamepad}

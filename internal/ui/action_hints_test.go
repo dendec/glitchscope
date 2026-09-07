@@ -183,6 +183,7 @@ func TestActionHintsHelpTopics(t *testing.T) {
 	o := srcRoot()
 	o.uiPage = PageHelp
 	o.focusPanel = 0
+	o.helpView.TopicCursor = int(HelpPlayback)
 	got := hints(o)
 	want := []UIHint{
 		{Key: "Enter", Label: "Open"},
@@ -192,6 +193,22 @@ func TestActionHintsHelpTopics(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(help topics) = %v, want %v", got, want)
+	}
+}
+
+func TestActionHintsHelpLeafHasNoOpen(t *testing.T) {
+	o := srcRoot()
+	o.uiPage = PageHelp
+	o.focusPanel = 0
+	o.helpView.TopicCursor = int(HelpQuickStart)
+	got := hints(o)
+	want := []UIHint{
+		{Key: "Backspace", Label: "Back"},
+		{Key: "Up/Down", Label: "Topic"},
+		{Key: "P/N", Label: "Screens"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ActionHints(help leaf) = %v, want %v", got, want)
 	}
 }
 
@@ -221,22 +238,33 @@ func TestActionHintsGamepadMapping(t *testing.T) {
 	}
 }
 
-func TestActionHintsPlayPauseShown(t *testing.T) {
-	o := srcRoot()
-	o.uiPage = PageLibrary
-	o.playingPath = "/music/track.it"
-	got := hints(o)
-	found := false
-	for _, h := range got {
-		if h.Label == "Play/Pause" {
-			found = true
-			if h.Key != "Space" {
-				t.Fatalf("Play/Pause key = %q, want Space", h.Key)
+func TestActionHintsPlaybackActionMatchesState(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		paused  bool
+		loading bool
+		want    string
+	}{
+		{name: "playing", want: "Pause"},
+		{name: "paused", paused: true, want: "Play"},
+		{name: "loading", loading: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			o := srcRoot()
+			o.uiPage = PageLibrary
+			o.playingPath = "/music/track.it"
+			o.paused = test.paused
+			o.loading = test.loading
+			var got string
+			for _, hint := range hints(o) {
+				if hint.Key == "Space" {
+					got = hint.Label
+				}
 			}
-		}
-	}
-	if !found {
-		t.Fatalf("expected a Play/Pause hint when playing, got %v", got)
+			if got != test.want {
+				t.Fatalf("playback hint = %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 
