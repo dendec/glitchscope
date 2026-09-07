@@ -483,14 +483,14 @@ func TestMicrophoneSourceHiddenWithoutDevices(t *testing.T) {
 	o := &Overlay{navStack: []navLevel{{ctx: ctxSourceRoot}}}
 	o.SetMicDevices(nil)
 
-	if len(o.albumEntries) != 1 || o.albumEntries[0].source != sourceMusic {
-		t.Fatalf("source entries without devices = %#v, want music only", o.albumEntries)
+	if len(o.albumEntries) != 3 || o.albumEntries[0].source != sourceMusic || o.albumEntries[1].source != sourceModland || o.albumEntries[2].source != sourceModArchive {
+		t.Fatalf("source entries without devices = %#v, want music and remote catalogs", o.albumEntries)
 	}
 
 	o.micActive = true
 	o.SetMicDevices(nil)
-	if len(o.albumEntries) != 2 || o.albumEntries[1].source != sourceMicrophone {
-		t.Fatalf("source entries during capture = %#v, want music and microphone", o.albumEntries)
+	if len(o.albumEntries) != 4 || o.albumEntries[1].source != sourceMicrophone {
+		t.Fatalf("source entries during capture = %#v, want music, microphone, and remote catalogs", o.albumEntries)
 	}
 }
 
@@ -501,8 +501,8 @@ func TestMicrophoneSourceHiddenWhenCaptureStopsAfterDeviceRemoval(t *testing.T) 
 	o.SetMicDevices(nil)
 	o.SetMicActive(false)
 
-	if len(o.albumEntries) != 1 || o.albumEntries[0].source != sourceMusic {
-		t.Fatalf("source entries after capture stops = %#v, want music only", o.albumEntries)
+	if len(o.albumEntries) != 3 || o.albumEntries[0].source != sourceMusic || o.albumEntries[1].source != sourceModland || o.albumEntries[2].source != sourceModArchive {
+		t.Fatalf("source entries after capture stops = %#v, want music and remote catalogs", o.albumEntries)
 	}
 }
 
@@ -760,6 +760,29 @@ func TestNCOnlineAddsProviderEntries(t *testing.T) {
 		if entry.kind == entrySource || entry.kind == entryParent && entry.label != ".." {
 			t.Fatalf("invalid NC root entry: %#v", o.albumEntries)
 		}
+	}
+}
+
+func TestOfflineSourceRootKeepsProvidersAndFiltersModland(t *testing.T) {
+	o := &Overlay{
+		cachedAlbums: []player.Album{
+			{Name: "Modland: MOD/Cached", Path: player.ModlandPrefix + "MOD/Cached", Tracks: []string{player.ModlandPrefix + "MOD/Cached/a.mod"}},
+			{Name: "Modland: XM/Remote", Path: player.ModlandPrefix + "XM/Remote", Tracks: []string{player.ModlandPrefix + "XM/Remote/b.xm"}},
+		},
+	}
+	o.isTrackCached = func(path string) bool { return strings.Contains(path, "/Cached/") }
+	o.hasCachedUnder = func(path string) bool { return strings.Contains(path, "/Cached") }
+	entries := o.buildSourceEntries()
+	if len(entries) != 3 || entries[1].source != sourceModland || entries[2].source != sourceModArchive {
+		t.Fatalf("offline source entries = %#v", entries)
+	}
+	formats := o.buildFormatEntries()
+	if len(formats) != 1 || formats[0].format != "MOD" {
+		t.Fatalf("offline formats = %#v", formats)
+	}
+	tracks := o.buildCatalogTrackEntries(1)
+	if len(tracks) != 0 {
+		t.Fatalf("uncached tracks visible offline: %#v", tracks)
 	}
 }
 

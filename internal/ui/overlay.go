@@ -140,7 +140,9 @@ type Overlay struct {
 
 	libAlbums       func() []player.Album  // reads lib.Albums — snapshot cached once per frame
 	addCatalogAlbum func(player.Album) int // adds on-the-fly catalog album to lib, returns stable index
-	cachedAlbums    []player.Album         // one-frame snapshot of libAlbums(); never mutated by the overlay
+	isTrackCached   func(string) bool
+	hasCachedUnder  func(string) bool
+	cachedAlbums    []player.Album // one-frame snapshot of libAlbums(); never mutated by the overlay
 	navStack        []navLevel
 	albumEntries    []navEntry
 	albums          []string
@@ -715,7 +717,27 @@ func (o *Overlay) SetOnline(v bool) {
 	}
 	o.online = v
 	slog.Info("overlay connectivity changed", "online", v, "nc_dir", o.ncDir(), "base_dir", o.baseDir)
+	if o.source == sourceModland || o.source == sourceModArchive {
+		o.switchToProvider(o.source)
+		return
+	}
 	o.refreshSourceRoot()
+}
+
+// SetTrackCacheLookup supplies the read-only cache projection used by offline navigation.
+func (o *Overlay) SetTrackCacheLookup(isCached, hasDescendant func(string) bool) {
+	o.isTrackCached = isCached
+	o.hasCachedUnder = hasDescendant
+	o.refreshSourceRoot()
+}
+
+// RefreshTrackCache redraws cache-dependent actions and rebuilds an offline
+// provider tree so newly empty folders disappear immediately.
+func (o *Overlay) RefreshTrackCache() {
+	if !o.online && (o.source == sourceModland || o.source == sourceModArchive) {
+		o.switchToProvider(o.source)
+	}
+	o.markAllDirty()
 }
 
 // SetLibAlbums registers a callback that returns the current lib.Albums list.

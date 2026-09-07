@@ -27,7 +27,6 @@ import (
 	"github.com/dendec/glitchscope/internal/prof"
 	"github.com/dendec/glitchscope/internal/projectm"
 	"github.com/dendec/glitchscope/internal/ui"
-	"github.com/dendec/glitchscope/internal/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -61,6 +60,9 @@ type App struct {
 	textureDir        string
 	texturesOnce      sync.Once // ensures textures are extracted at most once
 	connectivityWg    sync.WaitGroup
+	connectivity      *connectivityCache
+	trackCacheWg      sync.WaitGroup
+	trackCacheOnce    sync.Once
 	shuffleWg         sync.WaitGroup // tracks background shuffle build goroutine
 	presetNames       []string
 	presetIdx         int
@@ -90,17 +92,21 @@ type App struct {
 	online           atomic.Bool
 	quit             atomic.Bool
 	presetSwitch     atomic.Bool
+	trackCacheReady  atomic.Bool
 
-	deleteSvc *deleteService
+	deleteSvc  *deleteService
+	trackCache *player.TrackCache
 
 	favorites     *player.Favorites
 	favoritesPath string
 
-	seek           seekControl // continuous-seek drivetrain state
-	onPresetsPage  bool        // true when UI is on Presets page (main viz stopped)
-	selectedPreset string      // confirmed on Presets page, loaded when the page closes
-	testSignalFreq float64     // phase accumulator for synthetic test signal
-	testSignalBuf  []float32   // reusable buffer for test signal (avoids alloc per frame)
+	seek             seekControl // continuous-seek drivetrain state
+	onPresetsPage    bool        // true when UI is on Presets page (main viz stopped)
+	selectedPreset   string      // confirmed on Presets page, loaded when the page closes
+	testSignalFreq   float64     // phase accumulator for synthetic test signal
+	testSignalBuf    []float32   // reusable buffer for test signal (avoids alloc per frame)
+	trackerBudget    int64
+	trackerBudgetSet bool
 }
 
 // New creates an App with display initialised. Player/overlay/input/library
@@ -112,8 +118,10 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		startupFile:  startupFile,
 		modlandSizes: make(map[string]int64),
 		presenter:    newOverlayPresenter(nil),
+		connectivity: newConnectivityCache(),
 	}
 	a.playbackState.shuffle.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	a.offline.Store(true)
 	a.appCtx, a.appCancel = context.WithCancel(context.Background())
 
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK | sdl.INIT_AUDIO); err != nil {
@@ -222,6 +230,7 @@ func (a *App) Close() {
 		a.appCancel()
 	}
 	a.connectivityWg.Wait()
+	a.trackCacheWg.Wait()
 	modarchive.CloseSnapshotCatalog()
 	if a.modlandShuffleSrc != nil {
 		_ = a.modlandShuffleSrc.Close()
@@ -247,6 +256,7 @@ func (a *App) Close() {
 	}
 	if a.pl != nil {
 		a.pl.Close()
+		a.pruneTrackCache()
 	}
 	if a.mic != nil {
 		a.mic.Close()
@@ -319,10 +329,13 @@ func (a *App) Init() {
 	a.initLibrary()
 	a.initFavorites()
 	a.deleteSvc = newDeleteService(baseDir())
+	a.trackCache = player.NewTrackCache(baseDir())
+	if a.overlay != nil {
+		a.overlay.SetTrackCacheLookup(a.trackCache.IsCached, a.trackCache.HasDescendant)
+	}
 	if a.deleteSvc.baseErr != nil {
 		slog.Error("delete service unavailable", "error", a.deleteSvc.baseErr)
 	}
-	a.checkConnectivity()
 	a.initInput()
 	a.initPreset()
 	if a.startupFile != "" && a.pl != nil {
@@ -330,7 +343,12 @@ func (a *App) Init() {
 	} else if a.startupFile != "" {
 		slog.Warn("startup file skipped, audio unavailable", "path", a.startupFile)
 	} else {
-		a.restoreSavedPosition(false)
+		position := a.settings.Playback.LastPosition.Path
+		cachedRemote := a.trackCache != nil && a.trackCache.IsCached(position)
+		if (player.IsModland(position) || player.IsModArchive(position)) && !cachedRemote {
+			a.requestConnectivity()
+		}
+		a.restoreSavedPosition(cachedRemote)
 	}
 	a.startPresetTicker()
 	if a.overlay != nil {
@@ -346,18 +364,43 @@ func (a *App) initAudio() {
 		return
 	}
 	a.pl = pl
-	a.pl.SetRenderBudget(a.settings.Playback.SeekMemory.BudgetBytes())
+	a.configureTrackerRenderBudget()
 	a.pl.Downloader = func(ctx context.Context, path string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
+		if (player.IsModland(path) || player.IsModArchive(path)) && a.trackCache != nil && a.trackCache.IsCached(path) {
+			if err := a.trackCache.Touch(path); err != nil {
+				slog.Debug("track cache touch", "path", path, "error", err)
+			}
+			return a.trackCache.LocalPath(path), nil
+		}
+		if player.IsModland(path) || player.IsModArchive(path) {
+			if err := requireOnline(a.connectivity, ctx); err != nil {
+				a.setOnline(false)
+				return "", err
+			}
+			a.setOnline(true)
+		}
+		var localPath string
+		var err error
 		if player.IsModland(path) {
 			remotePath := player.RemotePath(path)
 			if expectedSize == 0 {
 				expectedSize = a.modlandSizes[remotePath]
 			}
-			return modland.DownloadFile(ctx, baseDir(), remotePath, expectedSize, onProgress)
+			localPath, err = modland.DownloadFile(ctx, baseDir(), remotePath, expectedSize, onProgress)
 		}
 		if player.IsModArchive(path) {
 			remoteURL := player.RemotePath(path)
-			return modarchive.DownloadAndExtract(ctx, baseDir(), remoteURL, onProgress)
+			localPath, err = modarchive.DownloadAndExtract(ctx, baseDir(), remoteURL, onProgress)
+		}
+		if err != nil {
+			return "", err
+		}
+		if localPath != "" {
+			if a.trackCache != nil {
+				_ = a.trackCache.Touch(path)
+				a.pruneTrackCache()
+			}
+			return localPath, nil
 		}
 		return path, nil
 	}
@@ -409,6 +452,25 @@ func (a *App) initAudio() {
 	slog.Info("audio init", "ms", time.Since(t).Milliseconds())
 }
 
+func (a *App) configureTrackerRenderBudget() {
+	if a.pl == nil {
+		return
+	}
+	availableKB, err := prof.AvailableMemoryKB()
+	if err != nil {
+		slog.Debug("available memory unavailable, tracker pre-render disabled", "error", err)
+		availableKB = 0
+	}
+	budget := player.AutomaticRenderBudget(availableKB << 10)
+	if a.trackerBudgetSet && budget == a.trackerBudget {
+		return
+	}
+	a.pl.SetRenderBudget(budget)
+	a.trackerBudget = budget
+	a.trackerBudgetSet = true
+	slog.Info("tracker render budget", "available_mib", availableKB>>10, "budget_mib", budget>>20)
+}
+
 func (a *App) initLibrary() {
 	musicDir := a.findMusicDir()
 	// Ensure the music directory exists so the scanner always has a root.
@@ -449,10 +511,6 @@ func (a *App) initLibrary() {
 		"libAlbums", a.lib.AlbumCount(), "ms", time.Since(t).Milliseconds())
 	if hasModland || hasModArchive {
 		slog.Debug("initLibrary: cached catalogs available for navigation")
-		a.online.Store(true)
-		if a.overlay != nil {
-			a.overlay.SetOnline(true)
-		}
 	}
 
 	a.updateLocalShuffleSource(albums, scanStatus)
@@ -487,41 +545,41 @@ func (a *App) initLibrary() {
 	}
 }
 
-// checkConnectivity probes the network in the background. On success it
-// enables the remote catalogs (Modland/ModArchive) in the navigation tree.
-// The probe is tied to the app context so it is aborted promptly on Close
-// and never writes to the overlay after it has been torn down.
-func (a *App) checkConnectivity() {
-	a.offline.Store(true)
+// requestConnectivity probes on demand; connectivityCache coalesces requests
+// and reuses both successful and failed results for one minute.
+func (a *App) requestConnectivity() {
 	a.connectivityWg.Add(1)
 	go func() {
 		defer a.connectivityWg.Done()
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			ctx, cancel := context.WithTimeout(a.appCtx, 5*time.Second)
-			resp, err := util.Get(ctx, "https://modland.antarctica.no/", nil)
-			if err != nil {
-				slog.Debug("connectivity probe failed", "error", err)
-			}
-			reachable := err == nil
-			if resp != nil {
-				reachable = reachable && resp.StatusCode >= 200 && resp.StatusCode < 400
-				if closeErr := resp.Body.Close(); closeErr != nil {
-					slog.Debug("connectivity response close", "error", closeErr)
-				}
-			}
-			cancel()
-			a.offline.Store(!reachable)
-			if reachable {
-				a.online.Store(true)
-			}
-			select {
-			case <-a.appCtx.Done():
-				return
-			case <-ticker.C:
-			}
-		}
+		a.setOnline(a.connectivity.Check(a.appCtx))
+	}()
+}
+
+func (a *App) setOnline(online bool) {
+	a.online.Store(online)
+	a.offline.Store(!online)
+}
+
+func (a *App) pruneTrackCache() {
+	if a.trackCache == nil || a.settings == nil {
+		return
+	}
+	policy := a.settings.TrackCache
+	protected := ""
+	if a.pl != nil {
+		protected = a.pl.TrackPath()
+	}
+	if err := a.trackCache.Prune(policy.Retention.Duration(), policy.Retention == config.CacheForever, int64(policy.MaxBytes), protected); err != nil {
+		slog.Warn("track cache cleanup", "error", err)
+	}
+}
+
+func (a *App) startTrackCacheCleanup() {
+	a.trackCacheWg.Add(1)
+	go func() {
+		defer a.trackCacheWg.Done()
+		a.pruneTrackCache()
+		a.trackCacheReady.Store(true)
 	}()
 }
 

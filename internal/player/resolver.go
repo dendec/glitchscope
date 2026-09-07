@@ -30,6 +30,23 @@ func (r *Resolver) IsCached(virtualPath string) bool {
 	return r.ResolveLocalPath(virtualPath) != ""
 }
 
+// CacheCandidatePath maps a virtual track or catalog directory to its cache
+// location without requiring it to exist.
+func (r *Resolver) CacheCandidatePath(virtualPath string) string {
+	if r.baseDir == "" {
+		return ""
+	}
+	remote := RemotePath(virtualPath)
+	if IsModland(virtualPath) {
+		filesDir := filepath.Join(r.baseDir, ".cache", "modland", "files")
+		return safeCacheJoin(filesDir, remote)
+	}
+	if IsModArchive(virtualPath) {
+		return ModArchiveCachePath(r.baseDir, remote)
+	}
+	return ""
+}
+
 // ResolveLocalPath returns the local cache path for a virtual track path
 // (modland:…, modarchive:…) if it exists on disk, or the original path for
 // local files. Returns "" when the virtual path has no cached file.
@@ -43,7 +60,10 @@ func (r *Resolver) ResolveLocalPath(virtualPath string) string {
 	}
 	if IsModland(virtualPath) {
 		filesDir := filepath.Join(r.baseDir, ".cache", "modland", "files")
-		local := filepath.Join(filesDir, filepath.FromSlash(remote))
+		local := safeCacheJoin(filesDir, remote)
+		if local == "" {
+			return ""
+		}
 		if fileExists(local) {
 			return local
 		}
@@ -71,7 +91,10 @@ func ModArchiveCachePath(baseDir, remote string) string {
 	}
 	filesDir := filepath.Join(baseDir, ".cache", "modarchive", "files")
 	if parsed.Fragment == "" {
-		local := filepath.Join(filesDir, filepath.FromSlash(urlPath))
+		local := safeCacheJoin(filesDir, urlPath)
+		if local == "" {
+			return ""
+		}
 		if strings.EqualFold(filepath.Ext(local), ".zip") {
 			local = strings.TrimSuffix(local, filepath.Ext(local))
 		}
@@ -83,9 +106,28 @@ func ModArchiveCachePath(baseDir, remote string) string {
 		return ""
 	}
 	archivePath := strings.TrimSuffix(urlPath, path.Ext(urlPath))
-	local := filepath.Join(filesDir, filepath.FromSlash(archivePath), filepath.FromSlash(entryPath))
+	local := safeCacheJoin(filesDir, path.Join(archivePath, entryPath))
+	if local == "" {
+		return ""
+	}
 	if strings.EqualFold(filepath.Ext(local), ".zip") {
 		local = strings.TrimSuffix(local, filepath.Ext(local))
+	}
+	return local
+}
+
+func safeCacheJoin(root, slashPath string) string {
+	if slashPath == "" || path.IsAbs(slashPath) || strings.Contains(slashPath, "\\") || strings.Contains(slashPath, "\x00") {
+		return ""
+	}
+	cleaned := path.Clean(slashPath)
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return ""
+	}
+	local := filepath.Join(root, filepath.FromSlash(cleaned))
+	rel, err := filepath.Rel(root, local)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return ""
 	}
 	return local
 }

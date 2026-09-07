@@ -75,10 +75,7 @@ func TestQuickStartPhysicalButtons(t *testing.T) {
 	}
 }
 
-func TestSeekingDescriptionsExplainTradeoff(t *testing.T) {
-	if !strings.Contains(settingDescription(SettingSeekMemory, 2), "Backward seeking") {
-		t.Fatal("streaming seek limitation missing")
-	}
+func TestShuffleDescriptionExplainsOfflineBehavior(t *testing.T) {
 	if !strings.Contains(settingDescription(SettingShuffle, 3), "Offline") {
 		t.Fatal("offline shuffle behavior missing")
 	}

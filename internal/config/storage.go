@@ -47,7 +47,6 @@ func LoadSettings(path string) (Settings, error) {
 			PerformanceMode *PerformanceMode `json:"performance_mode"`
 		} `json:"graphics"`
 		Playback *struct {
-			SeekMemory   *SeekMemory  `json:"seek_memory"`
 			ShuffleMode  *ShuffleMode `json:"shuffle_mode"`
 			Repeat       *RepeatMode  `json:"repeat"`
 			LastPosition *struct {
@@ -55,6 +54,10 @@ func LoadSettings(path string) (Settings, error) {
 				Seconds *float64 `json:"seconds"`
 			} `json:"last_position"`
 		} `json:"playback"`
+		TrackCache *struct {
+			Retention *CacheRetention `json:"retention"`
+			MaxBytes  *CacheSizeLimit `json:"max_bytes"`
+		} `json:"track_cache"`
 		PresetInterval *PresetInterval `json:"preset_interval"`
 		UI             *struct {
 			Theme        *Theme        `json:"theme"`
@@ -94,9 +97,6 @@ func LoadSettings(path string) (Settings, error) {
 		}
 	}
 	if raw.Playback != nil {
-		if raw.Playback.SeekMemory != nil {
-			s.Playback.SeekMemory = *raw.Playback.SeekMemory
-		}
 		if raw.Playback.ShuffleMode != nil {
 			s.Playback.ShuffleMode = *raw.Playback.ShuffleMode
 		}
@@ -110,6 +110,14 @@ func LoadSettings(path string) (Settings, error) {
 			if raw.Playback.LastPosition.Seconds != nil {
 				s.Playback.LastPosition.Seconds = *raw.Playback.LastPosition.Seconds
 			}
+		}
+	}
+	if raw.TrackCache != nil {
+		if raw.TrackCache.Retention != nil {
+			s.TrackCache.Retention = *raw.TrackCache.Retention
+		}
+		if raw.TrackCache.MaxBytes != nil {
+			s.TrackCache.MaxBytes = *raw.TrackCache.MaxBytes
 		}
 	}
 	if raw.PresetInterval != nil {

@@ -177,10 +177,10 @@ interleave→planar conversion; the SDL/GL path is not unit-tested.
 
 ## Handheld memory and cancellation
 
-`playback.seek_memory` selects `exact` (default, 256 MiB working PCM budget),
-`low_memory` (128 MiB) or `streaming` (no pre-render). The Settings row is
-**Tracker seeking**. Changes affect subsequent loads and are independent of the
-graphics performance mode. The existing 360-second guard remains in place.
+At audio startup, `internal/prof` reads `MemAvailable` and the player selects a
+working PCM budget: 256 MiB when at least 512 MiB is free, 128 MiB when at least
+256 MiB is free, otherwise native streaming. This keeps the budget at or below
+half of currently available memory. The existing 360-second guard remains in place.
 The budget reserves space for both the interleaved decoded buffer and the final
 SoLoud planar buffer, plus 1 MiB for small blocks. It is not a process RSS limit:
 module data, native decoder state, the Go heap and graphics resources are extra.

@@ -153,12 +153,10 @@ func (o *Overlay) buildSourceEntries() []navEntry {
 		entries = append(entries, navEntry{label: o.micLabel(), kind: entrySource, source: sourceMicrophone, albumIdx: -1})
 	}
 	slog.Debug("buildSourceEntries", "online", o.online)
-	if o.online {
-		entries = append(entries,
-			navEntry{label: "modland/", kind: entrySource, source: sourceModland, albumIdx: -1},
-			navEntry{label: "modarchive/", kind: entrySource, source: sourceModArchive, albumIdx: -1},
-		)
-	}
+	entries = append(entries,
+		navEntry{label: "modland/", kind: entrySource, source: sourceModland, albumIdx: -1},
+		navEntry{label: "modarchive/", kind: entrySource, source: sourceModArchive, albumIdx: -1},
+	)
 	return entries
 }
 
@@ -259,6 +257,9 @@ func (o *Overlay) buildFormatEntries() []navEntry {
 		if !strings.HasPrefix(a.Path, player.ModlandPrefix) {
 			continue
 		}
+		if !o.online && o.hasCachedUnder != nil && !o.hasCachedUnder(a.Path) {
+			continue
+		}
 		format, _ := splitModlandName(a.Name)
 		if !seen[format] {
 			seen[format] = true
@@ -279,6 +280,9 @@ func (o *Overlay) buildAlbumsInFormatEntries(format string) []navEntry {
 	var entries []navEntry
 	for i, a := range o.currentAlbums() {
 		if !strings.HasPrefix(a.Path, player.ModlandPrefix) {
+			continue
+		}
+		if !o.online && o.hasCachedUnder != nil && !o.hasCachedUnder(a.Path) {
 			continue
 		}
 		f, author := splitModlandName(a.Name)
@@ -302,6 +306,9 @@ func (o *Overlay) buildCatalogTrackEntries(albumIdx int) []navEntry {
 	tracks := all[albumIdx].Tracks
 	entries := make([]navEntry, 0, len(tracks))
 	for i, track := range tracks {
+		if !o.online && o.isTrackCached != nil && !o.isTrackCached(track) {
+			continue
+		}
 		label := player.TrackTitle(track)
 		entries = append(entries, navEntry{
 			label:    label,
@@ -321,6 +328,9 @@ func (o *Overlay) buildModArchiveEntries(targetURL string) []navEntry {
 	if !ok {
 		items, ok = modarchive.FetchDirectoryCached(o.baseDir, targetURL)
 		if !ok {
+			if !o.online {
+				return nil
+			}
 			var err error
 			items, err = modarchive.FetchDirectory(o.baseDir, targetURL)
 			if err != nil {
@@ -351,6 +361,9 @@ func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []moda
 		var entries []navEntry
 		for _, item := range items {
 			if item.Kind == modarchive.KindDir || item.Kind == modarchive.KindArchive {
+				if !o.online && o.hasCachedUnder != nil && !o.hasCachedUnder(player.ModArchivePrefix+item.URL) {
+					continue
+				}
 				entries = append(entries, navEntry{
 					label:    item.CleanName + "/",
 					kind:     entryModArchiveDir,

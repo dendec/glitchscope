@@ -393,6 +393,10 @@ func (o *Overlay) FocusLeft() {
 		if o.infoPanelFocused() && o.scrollInfoHorizontal(-1) {
 			return
 		}
+		if o.ncConfirm {
+			o.ncConfirm = false
+			o.tracksContentDirty = true
+		}
 		o.focusPanelBy(-1, func() { o.albumsDirty = true; o.tracksDirty = true })
 	}
 }
@@ -635,6 +639,17 @@ func (o *Overlay) Select() bool {
 		}
 		return false
 	}
+	if e := o.currentEntry(); e != nil && e.IsCatalogTrack() && o.isTrackCached != nil && o.isTrackCached(e.filePath) {
+		if o.ncConfirm {
+			o.ncConfirm = false
+			o.ncDeleteConfirmed = true
+		} else {
+			o.ncConfirm = true
+		}
+		o.tracksDirty = true
+		o.tracksContentDirty = true
+		return false
+	}
 	return true // track panel — play the track
 }
 
@@ -710,7 +725,7 @@ func (o *Overlay) Back() {
 	}
 
 	// NC: cancel delete confirm dialog — focus stays on Delete button.
-	if o.isNC() && o.ncConfirm {
+	if o.ncConfirm {
 		o.ncConfirm = false
 		o.tracksDirty = true
 		o.tracksContentDirty = true
@@ -825,4 +840,17 @@ func (o *Overlay) NCDeletePath() string {
 		return e.dirPath
 	}
 	return ""
+}
+
+// CatalogConsumeDeleteConfirmed returns a confirmed cached catalog track deletion.
+func (o *Overlay) CatalogConsumeDeleteConfirmed() string {
+	if !o.ncDeleteConfirmed || !o.isCatalog() {
+		return ""
+	}
+	o.ncDeleteConfirmed = false
+	e := o.currentEntry()
+	if e == nil || !e.IsCatalogTrack() {
+		return ""
+	}
+	return e.filePath
 }

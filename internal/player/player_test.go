@@ -678,6 +678,23 @@ func TestPreRenderWorkingBudget(t *testing.T) {
 	}
 }
 
+func TestAutomaticRenderBudget(t *testing.T) {
+	tests := []struct {
+		available int64
+		want      int64
+	}{
+		{available: 255 << 20, want: 0},
+		{available: 256 << 20, want: 128 << 20},
+		{available: 511 << 20, want: 128 << 20},
+		{available: 512 << 20, want: 256 << 20},
+	}
+	for _, test := range tests {
+		if got := AutomaticRenderBudget(test.available); got != test.want {
+			t.Errorf("AutomaticRenderBudget(%d) = %d, want %d", test.available, got, test.want)
+		}
+	}
+}
+
 func TestQueuedLoadsDecodeOnlyNewestAfterCancellation(t *testing.T) {
 	p := newTestPlayer(t)
 	entered := make(chan struct{})

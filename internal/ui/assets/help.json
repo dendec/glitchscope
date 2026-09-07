@@ -75,13 +75,13 @@
       ]
     },
     {
-      "title": "Seeking and memory",
+      "title": "Seeking",
       "lines": [
         "{seek} moves through the current track.",
-        "Exact prepares tracker audio in memory for accurate seeking.",
-        "Low memory uses a smaller buffer budget. Long tracks stream instead.",
-        "Streaming starts without preparing the full track. Backward seeking depends on the decoder.",
-        "Changing Tracker seeking affects the next loaded track."
+        "Tracker audio is prepared for accurate seeking when enough memory is available.",
+        "The preparation budget is selected automatically from currently available memory.",
+        "Long tracks or low-memory conditions use native streaming instead.",
+        "Backward seeking then depends on the decoder."
       ]
     },
     {
@@ -104,7 +104,7 @@
   "title": "Quality and Battery",
   "children": [
     {
-      "title": "Performance modes",
+      "title": "Performance",
       "lines": [
         "Performance prioritizes visualizer quality and targets 30 FPS.",
         "Balanced targets 24 FPS with a lower resolution ceiling.",
@@ -167,8 +167,8 @@
       "title": "Limited seeking",
       "lines": [
         "Some native tracker decoders cannot seek backward reliably.",
-        "Choose Exact under Tracker seeking and load the track again.",
-        "Very long tracks still stream when they exceed the preparation budget."
+        "Tracker seeking is prepared automatically when enough memory is available.",
+        "Very long tracks and low-memory conditions use native streaming."
       ]
     }
   ],

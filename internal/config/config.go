@@ -386,7 +386,6 @@ func AllShuffleModes() []ShuffleMode {
 
 // PlaybackSettings holds shuffle/repeat configuration.
 type PlaybackSettings struct {
-	SeekMemory   SeekMemory       `json:"seek_memory"`
 	ShuffleMode  ShuffleMode      `json:"shuffle_mode"`
 	Repeat       RepeatMode       `json:"repeat"`
 	LastPosition PlaybackPosition `json:"last_position"`
@@ -412,13 +411,10 @@ func (p PlaybackPosition) Validate() error {
 }
 
 func DefaultPlayback() PlaybackSettings {
-	return PlaybackSettings{ShuffleMode: ShuffleOff, Repeat: RepeatOff, SeekMemory: SeekMemoryFull}
+	return PlaybackSettings{ShuffleMode: ShuffleOff, Repeat: RepeatOff}
 }
 
 func (p PlaybackSettings) Validate() error {
-	if err := p.SeekMemory.Validate(); err != nil {
-		return err
-	}
 	if p.ShuffleMode < ShuffleOff || p.ShuffleMode > ShuffleAll {
 		return fmt.Errorf("invalid shuffle mode %d", p.ShuffleMode)
 	}
@@ -696,16 +692,18 @@ func DefaultUI() UISettings {
 
 // Settings is the full persisted settings envelope.
 type Settings struct {
-	Graphics       GraphicsSettings `json:"graphics"`
-	Playback       PlaybackSettings `json:"playback"`
-	PresetInterval PresetInterval   `json:"preset_interval"`
-	UI             UISettings       `json:"ui"`
+	Graphics       GraphicsSettings   `json:"graphics"`
+	Playback       PlaybackSettings   `json:"playback"`
+	TrackCache     TrackCacheSettings `json:"track_cache"`
+	PresetInterval PresetInterval     `json:"preset_interval"`
+	UI             UISettings         `json:"ui"`
 }
 
 func DefaultSettings() Settings {
 	return Settings{
 		Graphics:       DefaultGraphics(),
 		Playback:       DefaultPlayback(),
+		TrackCache:     DefaultTrackCache(),
 		PresetInterval: PresetAuto,
 		UI:             DefaultUI(),
 	}
@@ -717,6 +715,9 @@ func (s Settings) Validate() error {
 	}
 	if err := s.Playback.Validate(); err != nil {
 		return fmt.Errorf("playback: %w", err)
+	}
+	if err := s.TrackCache.Validate(); err != nil {
+		return fmt.Errorf("track cache: %w", err)
 	}
 	if err := s.PresetInterval.Validate(); err != nil {
 		return fmt.Errorf("preset interval: %w", err)

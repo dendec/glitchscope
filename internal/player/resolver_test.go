@@ -90,6 +90,20 @@ func TestModArchiveCachePathRejectsTraversal(t *testing.T) {
 	}
 }
 
+func TestResolverRejectsModlandTraversal(t *testing.T) {
+	r := NewResolver()
+	r.SetBaseDir(t.TempDir())
+	if got := r.CacheCandidatePath(ModlandPrefix + "../../outside.mod"); got != "" {
+		t.Fatalf("traversal cache path = %q", got)
+	}
+}
+
+func TestModArchiveCachePathRejectsURLPathTraversal(t *testing.T) {
+	if got := ModArchiveCachePath(t.TempDir(), "https://example.test/../../outside.mod"); got != "" {
+		t.Fatalf("URL traversal cache path = %q", got)
+	}
+}
+
 func TestResolveLocalPathLocalFile(t *testing.T) {
 	r := NewResolver()
 	r.SetBaseDir(t.TempDir())

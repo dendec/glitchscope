@@ -12,15 +12,16 @@ const (
 	SettingShuffle         = 1
 	SettingRepeat          = 2
 	SettingPerformanceMode = 4
-	SettingPresetTimer     = 5
-	SettingResolution      = 6
-	SettingFilter          = 7
-	SettingBeatSensitivity = 8
-	SettingTheme           = 10
-	SettingTransparency    = 11
-	SettingShowStats       = 12
-	SettingSeekMemory      = 14
-	SettingVisualizer      = 15
+	SettingVisualizer      = 5
+	SettingPresetTimer     = 6
+	SettingResolution      = 7
+	SettingFilter          = 8
+	SettingBeatSensitivity = 9
+	SettingTheme           = 11
+	SettingTransparency    = 12
+	SettingShowStats       = 13
+	SettingCacheSize       = 15
+	SettingCacheRetention  = 16
 )
 
 // settingOpt is a setting whose String() produces a display label.
@@ -45,7 +46,6 @@ func optionPair[T settingOpt](all []T, current T) (values []string, index int) {
 
 // BuildSettingsRows creates SettingRow entries from the current config.
 func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
-	seekValues, seekIndex := optionPair(config.AllSeekMemoryModes(), s.Playback.SeekMemory)
 	resolutions := config.ComputeResolutions(winW, winH)
 	resValues, resIndex := buildResolutionValues(s, resolutions)
 
@@ -56,6 +56,8 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 	themeValues, themeIndex := optionPair(config.AllThemes(), s.UI.Theme)
 	transValues, transIndex := optionPair(config.AllTransparencies(), s.UI.Transparency)
 	perfValues, perfIndex := optionPair(config.AllPerformanceModes(), s.Graphics.PerformanceMode)
+	cacheRetentionValues, cacheRetentionIndex := optionPair(config.AllCacheRetentions(), s.TrackCache.Retention)
+	cacheSizeValues, cacheSizeIndex := optionPair(config.AllCacheSizeLimits(), s.TrackCache.MaxBytes)
 
 	beatSensitivities := config.AllBeatSensitivities()
 	beatValues := make([]string, len(beatSensitivities))
@@ -74,19 +76,20 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 		{Label: "Repeat", Values: repeatValues, Index: repeatIndex},
 		// Visualization
 		{Header: true, Label: "── Visualization ──"},
-		{Label: "Performance mode", Values: perfValues, Index: perfIndex},
-		{Label: "Preset auto-switch", Values: presetValues, Index: presetIndex},
-		{Label: "Render resolution", Values: resValues, Index: resIndex},
-		{Label: "Upscale filter", Values: filterValues, Index: filterIndex},
-		{Label: "Beat sensitivity", Values: beatValues, Index: beatIndex},
+		{Label: "Performance", Values: perfValues, Index: perfIndex},
+		{Label: "Visualizer", Values: []string{"Off", "On"}, Index: boolIndex(!s.Graphics.VisualizerOff)},
+		{Label: "Presets", Values: presetValues, Index: presetIndex},
+		{Label: "Resolution", Values: resValues, Index: resIndex},
+		{Label: "Filter", Values: filterValues, Index: filterIndex},
+		{Label: "Sensitivity", Values: beatValues, Index: beatIndex},
 		// Appearance
 		{Header: true, Label: "── Appearance ───"},
 		{Label: "Theme", Values: themeValues, Index: themeIndex},
 		{Label: "Transparency", Values: transValues, Index: transIndex},
-		{Label: "Show stats", Values: []string{"Off", "On"}, Index: boolIndex(s.UI.ShowStats)},
-		{Header: true, Label: "── Audio memory ───"},
-		{Label: "Tracker seeking", Values: seekValues, Index: seekIndex},
-		{Label: "Visualizer", Values: []string{"Off", "On"}, Index: boolIndex(!s.Graphics.VisualizerOff)},
+		{Label: "Stats", Values: []string{"Off", "On"}, Index: boolIndex(s.UI.ShowStats)},
+		{Header: true, Label: "── Cache ───────"},
+		{Label: "Size", Values: cacheSizeValues, Index: cacheSizeIndex},
+		{Label: "Lifetime", Values: cacheRetentionValues, Index: cacheRetentionIndex},
 	}
 }
 
@@ -138,15 +141,6 @@ func settingDescription(setting, value int) string {
 		case 2:
 			return "Prioritizes battery life with a lower resolution ceiling."
 		}
-	case SettingSeekMemory:
-		switch value {
-		case 0:
-			return "Prepares tracker audio for accurate seeking. Uses more memory."
-		case 1:
-			return "Uses less memory. Long tracks stream; seeking depends on the decoder."
-		case 2:
-			return "Skips full-track preparation. Backward seeking may be limited."
-		}
 	case SettingVisualizer:
 		if value == 0 {
 			return "Music keeps playing without the main visualization."
@@ -168,6 +162,13 @@ func settingDescription(setting, value int) string {
 		case 3:
 			return "Shuffle all sources. Offline, only local music is selected."
 		}
+	case SettingCacheRetention:
+		if value == 0 {
+			return "Downloaded tracks are removed after they stop playing."
+		}
+		return "Tracks unused for this long are removed automatically."
+	case SettingCacheSize:
+		return "Least recently played downloads are removed when the limit is exceeded."
 	}
 	return ""
 }

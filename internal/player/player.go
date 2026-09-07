@@ -932,6 +932,19 @@ func (p *Player) SetRenderBudget(bytes int64) {
 	p.renderBudget.Store(bytes)
 }
 
+// AutomaticRenderBudget reserves at most half of currently available memory
+// for tracker pre-rendering, using the two supported bounded budgets.
+func AutomaticRenderBudget(availableBytes int64) int64 {
+	switch {
+	case availableBytes >= 512<<20:
+		return 256 << 20
+	case availableBytes >= 256<<20:
+		return 128 << 20
+	default:
+		return 0
+	}
+}
+
 func (p *Player) renderBudgetBytes() int64 {
 	budget := p.renderBudget.Load()
 	if budget == 0 {

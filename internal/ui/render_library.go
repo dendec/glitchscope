@@ -77,7 +77,8 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		// the complete panel so neither can escape or overlap outside it.
 		actionH := float32(0)
 		metadataH := float32(panelH)
-		if isNCInfo {
+		catalogDelete := isCatalogInfo && o.isTrackCached != nil && o.isTrackCached(o.currentEntry().filePath)
+		if isNCInfo || catalogDelete {
 			actionH = float32(o.actionBarHeight(lh))
 			metadataH -= actionH
 			if metadataH < float32(lh) {
@@ -131,7 +132,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		if o.focusPanel == 1 {
 			drawPanelBorder(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		}
-		if isNCInfo && o.ncActionsTex != 0 {
+		if (isNCInfo || catalogDelete) && o.ncActionsTex != 0 {
 			actionY := ty + metadataH
 			glDrawOverlayTextClipped(o.programText, o.ncActionsTex, 1,
 				tx, actionY, float32(o.ncActionsTexW), float32(o.ncActionsTexH),
@@ -170,6 +171,17 @@ func (o *Overlay) rebuildNCActionsTex() {
 		}
 	}
 	o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH = o.renderTextToTex(play+delete, o.textColor())
+}
+
+func (o *Overlay) rebuildCatalogActionsTex() {
+	o.deleteTex(&o.ncActionsTex)
+	label := "  [Delete cached file]"
+	if o.ncConfirm {
+		label = " >[Delete cached file?]"
+	} else if o.focusPanel == 1 {
+		label = " >[Delete cached file]"
+	}
+	o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH = o.renderTextToTex(label, o.textColor())
 }
 
 func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
@@ -699,6 +711,7 @@ func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 	if len(lines) == 0 {
 		return
 	}
+	o.rebuildCatalogActionsTex()
 
 	maxTextPx := o.availableRowTextWidth(maxW)
 	infoTextW := maxTextPx

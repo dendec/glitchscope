@@ -87,9 +87,9 @@ GPL-2.0+ (See [portmaster/licenses/THIRD_PARTY_LICENSES.md](portmaster/licenses/
 
 ## Low-power handheld tuning
 
-- **Tracker seeking** in Settings selects Exact (256 MiB working PCM budget),
-  Low memory (128 MiB), or Streaming. Exact remains the default. Tracks that do
-  not fit stream natively; backward seeking then depends on the decoder.
+- **Tracker seeking** selects its working PCM budget automatically from free
+  device memory. Tracks that do not fit stream natively; backward seeking then
+  depends on the decoder.
 - **Visualizer → Off** plays music without running the main visualizer. The
   presets page still provides previews when opened.
 - Balanced/Eco avoid presenting duplicate visualization frames. Input continues

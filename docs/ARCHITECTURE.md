@@ -16,6 +16,7 @@
 | Favorites | `internal/player` (`favorites.go`) | overlay navigation, input actions, JSON storage |
 | Remote catalogs | `internal/modland`, `internal/modarchive` | provider navigation and downloads |
 | Provider-neutral directory cache | `internal/catalog` | provider loaders, shuffle selection, UI listings |
+| Downloaded track cache policy | `internal/player.TrackCache` | `internal/config`, downloader wiring, catalog UI |
 
 **Каталоговые альбомы** (modland/modarchive) хранятся в `lib.Albums` через
 `Library.AddCatalogAlbum`. Overlay создаёт альбомы on-the-fly во время навигации
@@ -31,6 +32,16 @@
 сам Library отвечает только за индекс альбомов. Извлечение метаданных из
 локального файла — чистая функция `extractMetaFromFile` (`meta.go`), без
 side effects, переиспользуется при on-demand заполнении и refresh комментария.
+
+`internal/player.TrackCache` управляет только скачанными треками внутри этих
+двух `files`-директорий. Индексы каталогов и bundled ModArchive GSA не входят в
+лимит и никогда не удаляются cache policy. Время модификации файла является
+восстанавливаемой отметкой последнего воспроизведения. Очистка сначала удаляет
+файлы старше `settings.track_cache.retention`, затем применяет LRU до
+`settings.track_cache.max_bytes`; активный трек защищён до остановки.
+Первый startup-prune запускается в фоне после входа в render loop, поэтому
+сканирование большого кэша не блокирует инициализацию приложения. UI применяет
+готовую офлайн-проекцию на основном потоке после завершения задачи.
 
 **ModArchive snapshot 1987-2007** представлен как дерево виртуальных папок:
 буква → bucket ZIP → треки. Официальный addendum 2007 представлен соседним
@@ -110,7 +121,12 @@ make dist
 циклическую навигацию. Shuffle All без подтверждённого подключения выбирает
 только локальный источник, включая fallback до готовности индексов. Наличие
 кэшированных каталогов разрешает offline-навигацию, но не подтверждает сеть.
-Подключение проверяется при запуске и каждые 30 секунд (timeout 5 секунд).
+Подключение проверяется только при открытии Library или перед сетевой операцией.
+Положительный и отрицательный результат хранятся одну минуту; одновременные
+запросы объединяются в одну проверку с timeout 5 секунд. Корневые папки
+Modland/ModArchive видимы всегда. Пока сеть неизвестна или недоступна, внутри
+них отображаются только скачанные треки и родительские папки, ведущие к ним;
+проигрывание скачанного трека не запускает сетевую проверку.
 
 Ошибка загрузки пропускает трек, в том числе при Repeat One. Серия восстановления
 хранит не более 10 неудачных путей и ограничивает поиск кандидата 10 попытками;
@@ -125,9 +141,11 @@ Performance — native, Balanced — индекс 1 (0.75×), Eco — индек
 
 ## Handheld rendering and memory budgets
 
-Settings owns `playback.seek_memory` and `graphics.visualizer_off`; app translates
-settings into player budgets and rendering policy. The player serializes native
-loads and owns the PCM budget calculation, described in SEEK-DESIGN.md.
+`internal/prof` reads available device memory, `internal/player` selects a
+bounded tracker pre-render budget, and app wires the result at audio startup.
+Settings owns only the `graphics.visualizer_off` rendering policy. The player
+serializes native loads and owns the PCM budget calculation described in
+SEEK-DESIGN.md.
 
 Performance retains 60 Hz presentation. Balanced/Eco process input at 60 Hz but
 skip duplicate blits and swaps between visualizer frames; visible UI animation

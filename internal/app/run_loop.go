@@ -288,6 +288,7 @@ func (a *App) updateFramePlayback(now time.Time) {
 		loadingPath := a.pl.TrackPath()
 		started, failed := a.pl.CheckPending()
 		if failed {
+			a.pruneTrackCache()
 			if a.overlay != nil {
 				a.overlay.ShowTrack(" playback error")
 			}
@@ -309,6 +310,7 @@ func (a *App) updateFramePlayback(now time.Time) {
 			if started {
 				a.failedTracks = nil
 				a.presenter.invalidateTrackInfos()
+				a.pruneTrackCache()
 			}
 			if a.resumeAttempted && a.resumePath != "" && a.pl.TrackPath() == a.resumePath && a.pl.IsValidVoice() {
 				resumePath := a.resumePath
@@ -331,7 +333,11 @@ func (a *App) updateFramePlayback(now time.Time) {
 }
 
 func (a *App) renderFrame(now time.Time, w, h int) {
+	a.trackCacheOnce.Do(a.startTrackCacheCleanup)
 	if a.overlay != nil {
+		if a.trackCacheReady.Swap(false) {
+			a.overlay.RefreshTrackCache()
+		}
 		a.overlay.SetControllerConnected(a.inp.HasController())
 		a.overlay.Update(a.inp.DPadUpHeld(), a.inp.DPadDownHeld())
 	}

@@ -126,9 +126,10 @@ const (
 ```
 чтобы источник не смешивался с `focusPanel`, физическим путём или provider
 навигацией.
-- `sourceRoot` показывает строки источников: `music/`, `modland/`,
-  `modarchive/`; недоступный remote source отображается disabled или скрывается
-  по существующему правилу connectivity.
+- `sourceRoot` всегда показывает строки источников: `music/`, `modland/`,
+  `modarchive/`. При неизвестной или недоступной сети remote source содержит
+  только скачанные треки и минимальное дерево родительских папок. Открытие
+  Library запускает ленивую проверку сети, результат которой действует минуту.
 - `sourceMusic` использует NC-стек путей и `os.ReadDir`; `player.Library` не
   участвует в навигации — только в плейбэке и playing state.
 - `sourceModland` и `sourceModArchive` используют текущую album/provider-модель
@@ -307,9 +308,15 @@ Presets-страница: справа скриншот пресета + инф�
 
 ## Handheld power options (ПРИНЯТО)
 
-Settings exposes **Tracker seeking**: Exact (256 MiB), Low memory (128 MiB),
-Streaming; and **Visualizer**: Off/On. Seeking budget changes apply on the next
-track load. Over-budget tracks keep playing through their native decoder, with
-that decoder's seek limitations. Visualizer Off keeps playback and navigation
+Settings exposes **Visualizer** next to **Performance**. The tracker seeking
+budget is selected automatically from available device memory. Over-budget
+tracks keep playing through their native decoder, with that decoder's seek
+limitations. Visualizer Off keeps playback and navigation
 working against a solid background. Opening Presets still enables live preview.
 Performance-mode thresholds and quality ceilings are unchanged.
+
+Settings также содержит **Cache**: срок хранения (`Do not keep`, 1/7/30/90
+days, 6 months, `Forever`) и лимит размера (128/256/512 MB, 1/2/4 GB,
+`Unlimited`). Defaults: 30 days и 1 GB. Из правой панели скачанного каталожного
+трека файл можно удалить после подтверждения; активное воспроизведение сначала
+останавливается.

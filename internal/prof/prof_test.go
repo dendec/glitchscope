@@ -2,9 +2,20 @@ package prof
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestParseMemoryKB(t *testing.T) {
+	got, err := parseMemoryKB([]byte("MemTotal: 1024 kB\nMemAvailable: 768 kB\n"), "MemAvailable:")
+	if err != nil || got != 768 {
+		t.Fatalf("parseMemoryKB = %d, %v", got, err)
+	}
+	if _, err := parseMemoryKB([]byte("MemTotal: 1024 kB\n"), "MemAvailable:"); err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("missing field error = %v", err)
+	}
+}
 
 func TestProcStatus(t *testing.T) {
 	if runtime.GOOS != "linux" {

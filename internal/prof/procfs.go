@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	procStatus = "/proc/self/status"
-	procStat   = "/proc/self/stat"
+	procStatus  = "/proc/self/status"
+	procStat    = "/proc/self/stat"
+	procMeminfo = "/proc/meminfo"
 )
 
 func readProcStatus() (vmRSS int64, err error) {
@@ -20,11 +21,24 @@ func readProcStatus() (vmRSS int64, err error) {
 // PeakMemoryKB reads the kernel process high-water RSS, including native allocations.
 func PeakMemoryKB() (int64, error) { return readProcMemory("VmHWM:") }
 
+// AvailableMemoryKB reads memory immediately available to applications.
+func AvailableMemoryKB() (int64, error) {
+	data, err := os.ReadFile(procMeminfo)
+	if err != nil {
+		return 0, err
+	}
+	return parseMemoryKB(data, "MemAvailable:")
+}
+
 func readProcMemory(field string) (int64, error) {
 	data, err := os.ReadFile(procStatus)
 	if err != nil {
 		return 0, err
 	}
+	return parseMemoryKB(data, field)
+}
+
+func parseMemoryKB(data []byte, field string) (int64, error) {
 	for _, line := range bytes.Split(data, []byte("\n")) {
 		if !bytes.HasPrefix(line, []byte(field)) {
 			continue

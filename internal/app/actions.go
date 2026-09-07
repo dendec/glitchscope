@@ -40,6 +40,7 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 			a.overlay.ToggleUI()
 			if !wasVisible {
 				a.rememberMenuOpened()
+				a.requestConnectivity()
 			}
 			// When opening the UI, navigate to the currently playing track.
 			if !wasVisible && a.pl != nil {
@@ -129,6 +130,10 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 			}
 		} else {
 			selected := a.overlay.Select()
+			if path := a.overlay.CatalogConsumeDeleteConfirmed(); path != "" {
+				a.deleteCachedTrack(path)
+				return
+			}
 			if a.overlay.ConsumeMicMenuRequest() {
 				devices := mic.InputDevices()
 				a.overlay.SetMicDevices(devices)
@@ -179,6 +184,26 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 	}
 }
 
+func (a *App) deleteCachedTrack(path string) {
+	if a.trackCache == nil || !a.trackCache.IsCached(path) {
+		return
+	}
+	if a.pl != nil && a.pl.TrackPath() == path {
+		a.pl.Stop()
+	}
+	if err := a.trackCache.Delete(path); err != nil {
+		slog.Warn("delete cached track", "path", path, "error", err)
+		if a.overlay != nil {
+			a.overlay.ShowTrack("cache delete failed")
+		}
+		return
+	}
+	if a.overlay != nil {
+		a.overlay.ShowTrack("removed from cache")
+		a.overlay.RefreshTrackCache()
+	}
+}
+
 // switchScreen moves the overlay to the next/previous page and rebuilds
 // settings rows when landing on the settings page.
 func (a *App) switchScreen(winW, winH int, forward bool) {
@@ -190,6 +215,10 @@ func (a *App) switchScreen(winW, winH int, forward bool) {
 	if a.overlay.IsSettingsPage() {
 		rows := ui.BuildSettingsRows(*a.settings, winW, winH)
 		a.overlay.SetSettingsRows(rows, 0)
+	}
+	if a.overlay.IsLibraryPage() {
+		a.overlay.RefreshTrackCache()
+		a.requestConnectivity()
 	}
 }
 
@@ -322,7 +351,7 @@ func (a *App) applyPresetName(name string) {
 // applySettings reads confirmed settings rows and applies changes.
 func (a *App) applySettings(winW, winH int) {
 	rows := a.overlay.SettingsRows()
-	if len(rows) <= ui.SettingVisualizer {
+	if len(rows) <= ui.SettingCacheRetention {
 		return
 	}
 
@@ -369,13 +398,15 @@ func (a *App) applySettings(winW, winH int) {
 		a.resetAdaptiveCounters()
 		a.presentRequested = true
 	}
-	seekModes := config.AllSeekMemoryModes()
-	if idx := rows[ui.SettingSeekMemory].Index; idx >= 0 && idx < len(seekModes) {
-		a.settings.Playback.SeekMemory = seekModes[idx]
-		if a.pl != nil {
-			a.pl.SetRenderBudget(seekModes[idx].BudgetBytes())
-		}
+	cacheRetentions := config.AllCacheRetentions()
+	if idx := rows[ui.SettingCacheRetention].Index; idx >= 0 && idx < len(cacheRetentions) {
+		a.settings.TrackCache.Retention = cacheRetentions[idx]
 	}
+	cacheSizes := config.AllCacheSizeLimits()
+	if idx := rows[ui.SettingCacheSize].Index; idx >= 0 && idx < len(cacheSizes) {
+		a.settings.TrackCache.MaxBytes = cacheSizes[idx]
+	}
+	a.pruneTrackCache()
 
 	shuffleModes := config.AllShuffleModes()
 	if rows[ui.SettingShuffle].Index >= 0 && rows[ui.SettingShuffle].Index < len(shuffleModes) {
@@ -448,6 +479,7 @@ func (a *App) playTrack(path, album string) {
 // startTrack preserves the failure budget while recovering from a load error.
 func (a *App) startTrack(path, album string) {
 	a.stopMicCapture() // any playback wins over microphone input
+	a.configureTrackerRenderBudget()
 
 	if a.overlay != nil {
 		label := player.TrackTitle(path)
@@ -479,6 +511,7 @@ func (a *App) startMicCapture(device string) {
 	a.stopMicCapture()
 	if a.pl != nil {
 		a.pl.Stop()
+		a.pruneTrackCache()
 	}
 	c, err := mic.OpenDevice(device)
 	if err != nil {

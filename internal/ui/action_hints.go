@@ -107,7 +107,7 @@ func (o *Overlay) controlLabel(action string) string {
 // entries and always shown.
 func (o *Overlay) ActionHints() []UIHint {
 	// Delete confirmation is an exclusive state: only Confirm + Cancel.
-	if o.uiPage == PageLibrary && o.isNC() && o.ncConfirm {
+	if o.uiPage == PageLibrary && o.ncConfirm {
 		return []UIHint{
 			{Key: o.controlLabel(hintSelect), Label: "Confirm"},
 			{Key: o.controlLabel(hintBack), Label: "Cancel"},
@@ -212,6 +212,12 @@ func (o *Overlay) libraryHints() []UIHint {
 
 	// Non-NC right panel (track / catalog track list).
 	if o.focusPanel == 1 {
+		if e := o.currentEntry(); e != nil && e.IsCatalogTrack() && o.isTrackCached != nil && o.isTrackCached(e.filePath) {
+			return []UIHint{
+				{Key: o.controlLabel(hintSelect), Label: "Delete cache"},
+				{Key: o.controlLabel(hintBack), Label: "Left"},
+			}
+		}
 		return []UIHint{
 			{Key: o.controlLabel(hintSelect), Label: "Play"},
 			{Key: o.controlLabel(hintBack), Label: "Left"},
