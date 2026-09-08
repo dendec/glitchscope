@@ -4,7 +4,7 @@
     "lines": [
       "**Ihre Musik abspielen**",
       "Drücken Sie {menu} zur Öffnung des Menüs.",
-      "Wählen Sie „Musik“ aus, öffnen Sie ein Verzeichnis und wählen Sie anschließend ein Lied aus.",
+      "Öffnen Sie die Bibliothek, wählen Sie „Lokale Musik“, öffnen Sie einen Ordner und wählen Sie einen Titel.",
       "",
       "**Genießen Sie den Visualizer**",
       "Schließen Sie das Menü, nachdem die Wiedergabe begonnen hat.",
@@ -40,7 +40,7 @@
           "Nächster Titel berücksichtigt den ausgewählten Shuffle-Modus.",
           "{play} spielt oder pausiert.",
           "{seek} springt rückwärts oder vorwärts.",
-          "{presets} ändert die Einstellung des Visualizers.",
+          "{presets} wechselt das Preset des Visualizers.",
           "{random} wählt eine zufällige Einstellung aus.",
           "{overlay} zeigt oder versteckt Benachrichtigungen zum aktuellen Titel."
         ]
@@ -67,7 +67,7 @@
         "lines": [
           "Aus: Die Titel werden in der Reihenfolge abgespielt.",
           "Album: Die aktuelle Ordnerstruktur oder Wiedergabeliste wird zufällig geordnet.",
-          "Quelle: Zufallsabspielung innerhalb von Music, Modland oder ModArchive.",
+          "Quelle: Zufallswiedergabe innerhalb von „Lokale Musik“, Modland oder ModArchive.",
           "Alle: Zufällige Wiedergabe über alle verfügbaren Quellen. Im Offline-Modus verwendet „Alle“ nur lokale Musik.",
           "Quelle und Alle können Titel wiederholen, einschließlich des aktuellen Titels.",
           "„Wiederholen 1“ wiederholt die aktuelle Titel, sobald diese zu Ende ist. „Manuell Weiter“ geht dennoch zum nächsten Titel über.",
@@ -141,7 +141,7 @@
       {
         "title": "Keine Musik gelistet",
         "lines": [
-          "Öffnen Sie Musik und wählen Sie einen Ordner mit unterstützten Audiodateien aus.",
+          "Öffnen Sie die Bibliothek, wählen Sie „Lokale Musik“ und dann einen Ordner mit unterstützten Audiodateien.",
           "Ein leerer Ordner und ein fehlgeschlagener Scan sind unterschiedliche Zustände; überprüfen Sie eventuelle angezeigte Fehler.",
           "Die heruntergeladenen Katalogindizes listen die Musik auf, enthalten aber nicht die Audiodateien selbst."
         ]
@@ -151,7 +151,7 @@
         "lines": [
           "Die gespeicherten Katalogindizes können auch ohne Internet angezeigt werden.",
           "Ein Track muss bereits heruntergeladen sein, um offline abgespielt zu werden.",
-          "„Shuffle All“ verwendet die lokalen Musikdateien im Offline-Modus. Die Netzwerkbereitstellung wird regelmäßig überprüft."
+          "„Shuffle All“ verwendet im Offline-Modus nur lokale Musik. Die Netzwerkverfügbarkeit wird regelmäßig geprüft."
         ]
       },
       {

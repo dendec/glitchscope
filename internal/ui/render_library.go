@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/player"
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
@@ -156,18 +157,18 @@ func (o *Overlay) hasNCSelection() bool {
 func (o *Overlay) rebuildNCActionsTex() {
 	o.deleteTex(&o.ncActionsTex)
 	deleteAvailable := o.ncInfoFile != "" || (o.ncInfoIsDir && o.ncInfoDir != o.baseDir)
-	play := "  [Play]"
+	play := "  [" + o.catalog.Text(i18n.ActionPlay) + "]"
 	if o.ncRight == ncRightPlay {
-		play = " >[Play]"
+		play = " >[" + o.catalog.Text(i18n.ActionPlay) + "]"
 	}
 	delete := ""
 	if deleteAvailable {
-		delete = "    [Delete]"
+		delete = "    [" + o.catalog.Text(i18n.ActionDelete) + "]"
 		if o.ncConfirm {
-			delete = "    [Delete?]"
+			delete = "    [" + o.catalog.Text(i18n.ActionDelete) + "?]"
 		}
 		if o.ncRight == ncRightDelete {
-			delete = "   >[Delete]"
+			delete = "   >[" + o.catalog.Text(i18n.ActionDelete) + "]"
 		}
 	}
 	o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH = o.renderTextToTex(play+delete, o.textColor())
@@ -175,11 +176,11 @@ func (o *Overlay) rebuildNCActionsTex() {
 
 func (o *Overlay) rebuildCatalogActionsTex() {
 	o.deleteTex(&o.ncActionsTex)
-	label := "  [Delete cached file]"
+	label := "  [" + o.catalog.Text(i18n.ActionDeleteCache) + "]"
 	if o.ncConfirm {
-		label = " >[Delete cached file?]"
+		label = " >[" + o.catalog.Text(i18n.ActionDeleteCache) + "?]"
 	} else if o.focusPanel == 1 {
-		label = " >[Delete cached file]"
+		label = " >[" + o.catalog.Text(i18n.ActionDeleteCache) + "]"
 	}
 	o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH = o.renderTextToTex(label, o.textColor())
 }
@@ -319,7 +320,7 @@ func (o *Overlay) rebuildLocalTrackInfoTex(maxW, maxH int) {
 	ti := &o.trackInfos[o.trackCursor]
 	// Load cover art for the selected track.
 	o.loadCoverArt(ti.Path, o.availableRowTextWidth(maxW))
-	lines := trackInfoLines(player.TrackTitle(ti.Path), ti)
+	lines := trackInfoLines(o.catalog, player.TrackTitle(ti.Path), ti)
 	if len(lines) == 0 {
 		return
 	}
@@ -426,9 +427,9 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 	var lines []string
 	if status := o.NCListingStatus(); status != filesystem.StatusOK {
 		if status == filesystem.StatusPartial {
-			lines = append(lines, "! Part of catalog unavailable", "")
+			lines = append(lines, "! "+o.catalog.Text(i18n.InfoCatalogPartial), "")
 		} else {
-			lines = append(lines, "! Catalog unavailable", "")
+			lines = append(lines, "! "+o.catalog.Text(i18n.InfoCatalogUnavailable), "")
 		}
 	}
 
@@ -436,12 +437,12 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		// Directory info.
 		baseName := filepath.Base(o.ncInfoDir)
 		if o.ncInfoDir == o.baseDir {
-			baseName = "Music"
+			baseName = o.catalog.Text(i18n.InfoMusic)
 		}
 		files, dirs := o.ncDirectoryCounts(o.ncInfoDir)
 		lines = append(lines, baseName, "",
-			fmt.Sprintf("  Folders: %d", dirs),
-			fmt.Sprintf("  Playable files: %d", files))
+			"  "+o.catalog.Format(i18n.InfoFolders, dirs),
+			"  "+o.catalog.Format(i18n.InfoPlayableFiles, files))
 	} else if o.ncInfoFile != "" {
 		// Load cover art first (before text) so the texture is ready for rendering.
 		o.loadCoverArt(o.ncInfoFile, o.availableRowTextWidth(maxW))
@@ -452,43 +453,43 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		// Read audio metadata for the file.
 		meta := player.ReadFileMeta(o.ncInfoFile)
 		if meta.Title != "" {
-			lines = append(lines, "", fmt.Sprintf("  Title: %s", meta.Title))
+			lines = append(lines, "", "  "+o.catalog.Format(i18n.InfoTitle, meta.Title))
 		}
 		if meta.Artist != "" {
-			lines = append(lines, fmt.Sprintf("  Artist: %s", meta.Artist))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoArtist, meta.Artist))
 		}
 		if meta.Album != "" {
-			lines = append(lines, fmt.Sprintf("  Album: %s", meta.Album))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoAlbum, meta.Album))
 		}
 		if meta.AlbumArtist != "" {
-			lines = append(lines, fmt.Sprintf("  Album Artist: %s", meta.AlbumArtist))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoAlbumArtist, meta.AlbumArtist))
 		}
 		if meta.Genre != "" {
-			lines = append(lines, fmt.Sprintf("  Genre: %s", meta.Genre))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoGenre, meta.Genre))
 		}
 		if meta.Date != "" {
-			lines = append(lines, fmt.Sprintf("  Date: %s", meta.Date))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoDate, meta.Date))
 		}
 		if meta.Track != "" {
-			lines = append(lines, fmt.Sprintf("  Track: %s", meta.Track))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoTrack, meta.Track))
 		}
 		if meta.Composer != "" {
-			lines = append(lines, fmt.Sprintf("  Composer: %s", meta.Composer))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoComposer, meta.Composer))
 		}
 		if meta.Disc != "" {
-			lines = append(lines, fmt.Sprintf("  Disc: %s", meta.Disc))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoDisc, meta.Disc))
 		}
 		if meta.Duration > 0 {
-			lines = append(lines, fmt.Sprintf("  Length: %s", formatDuration(meta.Duration)))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoLength, formatDuration(meta.Duration)))
 		}
 		if meta.Channels > 0 {
-			lines = append(lines, fmt.Sprintf("  Channels: %d", meta.Channels))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoChannels, meta.Channels))
 		}
 		if meta.BPM > 0 {
-			lines = append(lines, fmt.Sprintf("  BPM: %.0f", meta.BPM))
+			lines = append(lines, "  "+o.catalog.Format(i18n.InfoBPM, meta.BPM))
 		}
 		if meta.Comment != "" {
-			lines = append(lines, "  Comment:")
+			lines = append(lines, "  "+o.catalog.Text(i18n.InfoComment))
 			for _, c := range strings.Split(meta.Comment, "\n") {
 				lines = append(lines, "  "+c)
 			}
@@ -562,37 +563,37 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 }
 
 // trackInfoLines builds right-panel info lines for a track. Pure logic, no GL.
-func trackInfoLines(title string, ti *player.TrackInfo) []string {
+func trackInfoLines(catalog i18n.Catalog, title string, ti *player.TrackInfo) []string {
 	var lines []string
 	lines = append(lines, title, "")
 
 	// Audio tags
 	if ti.Title != "" {
-		lines = append(lines, fmt.Sprintf("Title: %s", ti.Title))
+		lines = append(lines, catalog.Format(i18n.InfoTitle, ti.Title))
 	}
 	if ti.Artist != "" {
-		lines = append(lines, fmt.Sprintf("Artist: %s", ti.Artist))
+		lines = append(lines, catalog.Format(i18n.InfoArtist, ti.Artist))
 	}
 	if ti.Album != "" {
-		lines = append(lines, fmt.Sprintf("Album: %s", ti.Album))
+		lines = append(lines, catalog.Format(i18n.InfoAlbum, ti.Album))
 	}
 	if ti.AlbumArtist != "" {
-		lines = append(lines, fmt.Sprintf("Album Artist: %s", ti.AlbumArtist))
+		lines = append(lines, catalog.Format(i18n.InfoAlbumArtist, ti.AlbumArtist))
 	}
 	if ti.Genre != "" {
-		lines = append(lines, fmt.Sprintf("Genre: %s", ti.Genre))
+		lines = append(lines, catalog.Format(i18n.InfoGenre, ti.Genre))
 	}
 	if ti.Date != "" {
-		lines = append(lines, fmt.Sprintf("Date: %s", ti.Date))
+		lines = append(lines, catalog.Format(i18n.InfoDate, ti.Date))
 	}
 	if ti.Track != "" {
-		lines = append(lines, fmt.Sprintf("Track: %s", ti.Track))
+		lines = append(lines, catalog.Format(i18n.InfoTrack, ti.Track))
 	}
 	if ti.Composer != "" {
-		lines = append(lines, fmt.Sprintf("Composer: %s", ti.Composer))
+		lines = append(lines, catalog.Format(i18n.InfoComposer, ti.Composer))
 	}
 	if ti.Disc != "" {
-		lines = append(lines, fmt.Sprintf("Disc: %s", ti.Disc))
+		lines = append(lines, catalog.Format(i18n.InfoDisc, ti.Disc))
 	}
 	for key, value := range ti.Extra {
 		if shouldHideExtraTag(key, value) {
@@ -616,32 +617,32 @@ func trackInfoLines(title string, ti *player.TrackInfo) []string {
 	// Technical info
 	var header string
 	if ti.Duration > 0 {
-		header = fmt.Sprintf("Length: %-5s", formatDuration(ti.Duration))
+		header = catalog.Format(i18n.InfoLength, formatDuration(ti.Duration))
 	}
 	if ti.Size > 0 {
 		if header != "" {
 			header += " "
 		}
-		header += fmt.Sprintf("Size: %s", formatSize(ti.Size))
+		header += catalog.Format(i18n.InfoSize, formatSize(ti.Size))
 	}
 	if header != "" {
 		lines = append(lines, header)
 	}
 	var specs string
 	if ti.Channels > 0 {
-		specs = fmt.Sprintf("Channels: %-3d", ti.Channels)
+		specs = catalog.Format(i18n.InfoChannels, ti.Channels)
 	}
 	if ti.BPM > 0 {
 		if specs != "" {
 			specs += " "
 		}
-		specs += fmt.Sprintf("BPM: %-3.0f", ti.BPM)
+		specs += catalog.Format(i18n.InfoBPM, ti.BPM)
 	}
 	if specs != "" {
 		lines = append(lines, specs)
 	}
 	if ti.Comment != "" {
-		lines = append(lines, "Comment:")
+		lines = append(lines, catalog.Text(i18n.InfoComment))
 		lines = append(lines, strings.Split(ti.Comment, "\n")...)
 	}
 	return lines
@@ -672,7 +673,7 @@ func normalizeMetadataLines(value string) string {
 // track. Returns nil when the track is not cached or metadata is not yet
 // available — the caller hides the right panel in that case.
 // Pure logic, no GL — unit-testable.
-func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []player.TrackInfo) []string {
+func catalogTrackInfoLines(catalog i18n.Catalog, e *navEntry, albums []player.Album, trackInfos []player.TrackInfo) []string {
 	if e.albumIdx < 0 || e.trackIdx < 0 {
 		return nil
 	}
@@ -694,7 +695,7 @@ func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []play
 		if !ti.Cached {
 			return nil
 		}
-		return trackInfoLines(player.TrackTitle(e.label), ti)
+		return trackInfoLines(catalog, player.TrackTitle(e.label), ti)
 	}
 
 	// Track info not yet available (metadata still loading).
@@ -707,7 +708,7 @@ func catalogTrackInfoLines(e *navEntry, albums []player.Album, trackInfos []play
 func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 	o.tracksContentDirty = false
 
-	lines := catalogTrackInfoLines(e, o.currentAlbums(), o.trackInfos)
+	lines := catalogTrackInfoLines(o.catalog, e, o.currentAlbums(), o.trackInfos)
 	if len(lines) == 0 {
 		return
 	}

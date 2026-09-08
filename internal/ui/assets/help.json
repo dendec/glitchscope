@@ -4,7 +4,7 @@
     "lines": [
       "**Play your music**",
       "Press {menu} to open the menu.",
-      "Choose Music, open a folder, then select a track.",
+      "Open Library, choose Local Music, open a folder, then select a track.",
       "",
       "**Enjoy the visualizer**",
       "Close the menu after playback starts.",
@@ -67,7 +67,7 @@
         "lines": [
           "Off: tracks play in order.",
           "Album: shuffle the current folder or playlist.",
-          "Source: shuffle within Music, Modland or ModArchive.",
+          "Source: shuffle within Local Music, Modland or ModArchive.",
           "All: shuffle across available sources. Offline, All uses only local music.",
           "Source and All can repeat tracks, including the current track.",
           "Repeat One repeats the current track when it ends. Manual Next still moves on.",
@@ -141,7 +141,7 @@
       {
         "title": "No music listed",
         "lines": [
-          "Open Music and choose a folder containing supported audio files.",
+          "Open Library, choose Local Music, then select a folder containing supported audio files.",
           "An empty folder and a failed scan are different states; check any error shown.",
           "Downloaded catalog indexes list music, but do not contain the audio itself."
         ]

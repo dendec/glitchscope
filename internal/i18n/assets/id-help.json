@@ -4,7 +4,7 @@
     "lines": [
       "**Putar musik Anda**",
       "Tekan {menu} untuk membuka menu.",
-      "Pilih Musik, buka sebuah folder, lalu pilih lagu yang diinginkan.",
+      "Buka Pustaka, pilih Musik Lokal, lalu buka folder dan pilih lagu.",
       "",
       "**Nikmati visualisernya**",
       "Tutup menu setelah pemutaran dimulai.",
@@ -40,7 +40,7 @@
           "Trek berikutnya mengikuti mode shuffle yang dipilih.",
           "{play} memutar atau menunda.",
           "{seek} mencari ke belakang atau ke depan.",
-          "{presets} mengubah pengaturan visualizer.",
+          "{presets} mengganti preset visualizer.",
           "{random} memilih pengaturan acak.",
           "{overlay} menampilkan atau menyembunyikan notifikasi trek."
         ]
@@ -67,7 +67,7 @@
         "lines": [
           "Off: lagu diputar secara berurutan.",
           "Album: mengacak folder atau playlist saat ini.",
-          "Source: mengacak konten di Music, Modland, atau ModArchive.",
+          "Sumber: acak dalam Musik Lokal, Modland, atau ModArchive.",
           "All: mengacak semua sumber yang tersedia. Di mode Offline, All hanya menggunakan musik lokal.",
           "Source dan All dapat memutar ulang lagu, termasuk lagu yang sedang diputar.",
           "Repeat One akan memutar ulang lagu saat ini setelah selesai. Manual Next tetap akan melanjutkan ke lagu berikutnya.",
@@ -109,7 +109,7 @@
           "Mode Kinerja menekankan kualitas visualizer dengan target 30 FPS.",
           "Mode Seimbang menargetkan 24 FPS dengan batas resolusi yang lebih rendah.",
           "Mode Eco memprioritaskan daya baterai dengan batas resolusi yang lebih rendah dan proses upscaling yang lebih lambat.",
-          "Resolusi Otomatis akan disesuaikan dengan pengaturan preset saat ini. Resolusi tetap akan menonaktifkan penyesuaian ini.",
+          "Resolusi Otomatis menyesuaikan diri dengan preset saat ini. Resolusi tetap menonaktifkan penyesuaian ini.",
           "Preset yang berat dapat diabaikan jika resolusi terendah tetap terlalu lambat."
         ]
       },
@@ -126,7 +126,7 @@
         "title": "Pemilihan preset",
         "lines": [
           "Buka menu Preset dan jelajahi daftarnya.",
-          "Tetapkan penanda pada suatu preset untuk melihat pratinjauannya.",
+          "Diamkan pilihan pada suatu preset untuk melihat pratinjauannya.",
           "{select} akan memilihnya; preset tersebut akan diterapkan saat Anda meninggalkan halaman.",
           "Pengaturan otomatis preset mengontrol perubahan secara otomatis.",
           "Resolusi yang berhasil diatur akan diingat selama sesi pemutaran berlangsung."
@@ -141,7 +141,7 @@
       {
         "title": "Tidak ada musik yang terdaftar",
         "lines": [
-          "Buka Music dan pilih folder yang berisi file audio yang didukung.",
+          "Buka Pustaka, pilih Musik Lokal, lalu pilih folder berisi file audio yang didukung.",
           "Folder kosong dan hasil pemindaian yang gagal merupakan kondisi yang berbeda; periksa pesan kesalahan yang ditampilkan.",
           "Indeks katalog yang diunduh memuat daftar musik, tetapi tidak berisi file audio itu sendiri."
         ]
@@ -166,8 +166,8 @@
       {
         "title": "Pencarian terbatas",
         "lines": [
-          "Beberapa dekoder tracker bawaan tidak dapat melakukan pencarian ke belakang dengan andal.",
-          "Fungsi pencarian tracker akan diaktifkan secara otomatis bila memori yang tersedia cukup.",
+          "Beberapa dekoder modul bawaan tidak dapat memundurkan posisi dengan andal.",
+          "Pencarian posisi yang akurat disiapkan otomatis bila memori yang tersedia cukup.",
           "Track yang sangat panjang dan kondisi memori rendah akan menggunakan streaming bawaan."
         ]
       }

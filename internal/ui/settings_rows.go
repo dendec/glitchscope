@@ -176,53 +176,53 @@ func boolIndex(v bool) int {
 }
 
 // settingDescription explains the selected value without exposing implementation details.
-func settingDescription(setting, value int) string {
+func settingDescription(catalog i18n.Catalog, setting, value int) string {
 	switch setting {
 	case SettingPerformanceMode:
 		switch value {
 		case 0:
-			return "Highest visual quality. Targets 30 FPS."
+			return catalog.Text(i18n.DescriptionPerformance)
 		case 1:
-			return "Balances detail and power use. Targets 24 FPS."
+			return catalog.Text(i18n.DescriptionBalanced)
 		case 2:
-			return "Prioritizes battery life with a lower resolution ceiling."
+			return catalog.Text(i18n.DescriptionEco)
 		}
 	case SettingVisualizer:
 		if value == 0 {
-			return "Music keeps playing without the main visualization."
+			return catalog.Text(i18n.DescriptionVisualizerOff)
 		}
-		return "Show the animated visualization while listening."
+		return catalog.Text(i18n.DescriptionVisualizerOn)
 	case SettingRotation:
 		if value == 0 {
-			return "Keep the current visual preset until it is changed manually."
+			return catalog.Text(i18n.DescriptionRotationOff)
 		}
 		if value == 1 {
-			return "Let the visualizer decide when to switch presets."
+			return catalog.Text(i18n.DescriptionRotationAuto)
 		}
-		return "Switch visual presets at the selected interval."
+		return catalog.Text(i18n.DescriptionRotationInterval)
 	case SettingResolution:
 		if value == 0 {
-			return "Adjusts resolution automatically for the current preset."
+			return catalog.Text(i18n.DescriptionResolutionAuto)
 		}
-		return "Fixed resolution. Automatic adjustment is disabled."
+		return catalog.Text(i18n.DescriptionResolutionFixed)
 	case SettingShuffle:
 		switch value {
 		case 0:
-			return "Play tracks in order."
+			return catalog.Text(i18n.DescriptionShuffleOff)
 		case 1:
-			return "Shuffle the current folder or playlist."
+			return catalog.Text(i18n.DescriptionShuffleAlbum)
 		case 2:
-			return "Shuffle within the current music source."
+			return catalog.Text(i18n.DescriptionShuffleSource)
 		case 3:
-			return "Shuffle all sources. Offline, only local music is selected."
+			return catalog.Text(i18n.DescriptionShuffleAll)
 		}
 	case SettingCacheRetention:
 		if value == 0 {
-			return "Downloaded tracks are removed after they stop playing."
+			return catalog.Text(i18n.DescriptionCacheSession)
 		}
-		return "Tracks unused for this long are removed automatically."
+		return catalog.Text(i18n.DescriptionCacheRetention)
 	case SettingCacheSize:
-		return "Least recently played downloads are removed when the limit is exceeded."
+		return catalog.Text(i18n.DescriptionCacheSize)
 	}
 	return ""
 }

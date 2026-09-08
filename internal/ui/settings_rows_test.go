@@ -41,7 +41,7 @@ func TestSettingsRowsUseLocalizedLabelsWithoutChangingSelection(t *testing.T) {
 
 func TestRotationDescriptionsExplainBehavior(t *testing.T) {
 	for value, want := range []string{"manually", "visualizer decide", "selected interval"} {
-		if got := settingDescription(SettingRotation, value); !strings.Contains(got, want) {
+		if got := settingDescription(i18n.MustLoad(i18n.English), SettingRotation, value); !strings.Contains(got, want) {
 			t.Errorf("Rotation description %d = %q, want %q", value, got, want)
 		}
 	}

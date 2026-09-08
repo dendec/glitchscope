@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/modarchive"
 	"github.com/dendec/glitchscope/internal/player"
 )
@@ -55,6 +56,18 @@ func TestDisplayTrackPath(t *testing.T) {
 				t.Fatalf("displayTrackPath(%q) = %q, want %q", test.path, got, test.want)
 			}
 		})
+	}
+}
+
+func TestSourceEntriesUseLocalizedDisplayNames(t *testing.T) {
+	o := &Overlay{
+		catalog:    i18n.MustLoad(i18n.Russian),
+		micDevices: []string{"test microphone"},
+	}
+	entries := o.buildSourceEntries()
+	want := []string{"Локальная музыка/", "Микрофон/", "Modland/", "ModArchive/"}
+	if got := labelsOf(entries); !reflect.DeepEqual(got, want) {
+		t.Fatalf("source labels = %#v, want %#v", got, want)
 	}
 }
 
@@ -206,7 +219,7 @@ func TestTrackTitleKeepsExtension(t *testing.T) {
 }
 
 func TestTrackInfoLinesFiltersAndExpandsExtraTags(t *testing.T) {
-	lines := trackInfoLines("song.m4a", &player.TrackInfo{
+	lines := trackInfoLines(i18n.MustLoad(i18n.English), "song.m4a", &player.TrackInfo{
 		Extra: map[string]string{
 			"language":     " und ",
 			"handler_name": "AudioHandler",
@@ -374,7 +387,7 @@ func TestNavigateToModlandTrack(t *testing.T) {
 			playingPath,
 		},
 	}}
-	o := &Overlay{libAlbums: func() []player.Album { return albums }}
+	o := &Overlay{libAlbums: func() []player.Album { return albums }, albumCursor: 35, albumsScroll: 24}
 	o.refreshAlbumsCache()
 
 	o.NavigateToTrack(playingPath)
@@ -388,6 +401,16 @@ func TestNavigateToModlandTrack(t *testing.T) {
 	selected := o.currentEntry()
 	if selected == nil || !selected.IsCatalogTrack() || selected.trackIdx != 1 {
 		t.Fatalf("selected entry = %#v, want second Modland track", selected)
+	}
+
+	for _, label := range []string{"Curt Cool", "Protracker/", "Modland/"} {
+		o.Back()
+		if e := o.currentEntry(); e == nil || e.label != label {
+			t.Fatalf("after Back: selected = %#v, want %q", e, label)
+		}
+		if o.albumsScroll > o.albumCursor {
+			t.Fatalf("scroll %d exceeds cursor %d", o.albumsScroll, o.albumCursor)
+		}
 	}
 }
 
@@ -997,18 +1020,18 @@ func TestBreadcrumbText(t *testing.T) {
 	o := &Overlay{baseDir: "/app"}
 
 	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/app/music"}}
-	if got := o.breadcrumbText(); got != "/music" {
-		t.Fatalf("NC root: got %q, want %q", got, "/music")
+	if got := o.breadcrumbText(); got != "/Local Music" {
+		t.Fatalf("NC root: got %q, want %q", got, "/Local Music")
 	}
 
 	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/app/music"}, {ctx: ctxNC, dirPath: "/app/music/a/b"}}
-	if got := o.breadcrumbText(); got != "/music/a/b" {
+	if got := o.breadcrumbText(); got != "/Local Music/a/b" {
 		t.Fatalf("NC subdir: got %q", got)
 	}
 
 	// Deep-link collapses the stack to one NC level; crumbs derive from dir.
 	o.navStack = []navLevel{{ctx: ctxNC, dirPath: "/app/music/a/b"}}
-	if got := o.breadcrumbText(); got != "/music/a/b" {
+	if got := o.breadcrumbText(); got != "/Local Music/a/b" {
 		t.Fatalf("NC deep-link: got %q", got)
 	}
 
@@ -1016,7 +1039,7 @@ func TestBreadcrumbText(t *testing.T) {
 		{ctx: ctxNC, dirPath: "/app/music"},
 		{ctx: ctxCatalog, label: "Modland"},
 	}
-	if got := o.breadcrumbText(); got != "/music/Modland" {
+	if got := o.breadcrumbText(); got != "/Local Music/Modland" {
 		t.Fatalf("catalog stack: got %q", got)
 	}
 
@@ -1024,7 +1047,7 @@ func TestBreadcrumbText(t *testing.T) {
 	o.albumEntries = []navEntry{{label: "Author", kind: entryModlandAlbum, albumIdx: 0}}
 	o.albumCursor = 0
 	o.focusPanel = 1
-	if got := o.breadcrumbText(); got != "/music/Modland/Author" {
+	if got := o.breadcrumbText(); got != "/Local Music/Modland/Author" {
 		t.Fatalf("leaf entered: got %q", got)
 	}
 
@@ -1034,7 +1057,7 @@ func TestBreadcrumbText(t *testing.T) {
 		navLevel{ctx: ctxCatalog, label: "Protracker"},
 		navLevel{ctx: ctxCatalog, label: "Nested"},
 	)
-	if got := o.breadcrumbText(); got != "/music/Modland/Protracker/Nested/Author" {
+	if got := o.breadcrumbText(); got != "/Local Music/Modland/Protracker/Nested/Author" {
 		t.Fatalf("elision: got %q", got)
 	}
 }
@@ -1083,39 +1106,28 @@ func TestNavigateToRestoredModArchiveSnapshotTrackBreadcrumb(t *testing.T) {
 	}}
 	o := &Overlay{
 		modArchiveItems: map[string][]modarchive.DirItem{
-			modarchive.BaseURL: {{Name: modarchive.SnapshotDir, URL: modarchive.BaseURL + modarchive.SnapshotDir + "/", Kind: modarchive.KindDir}},
-			modarchive.BaseURL + modarchive.SnapshotDir + "/":   {{Name: "B", URL: modarchive.BaseURL + modarchive.SnapshotDir + "/B/", Kind: modarchive.KindDir}},
+			modarchive.BaseURL: {{Name: modarchive.SnapshotDir, CleanName: modarchive.SnapshotDir, URL: modarchive.BaseURL + modarchive.SnapshotDir + "/", Kind: modarchive.KindDir}},
+			modarchive.BaseURL + modarchive.SnapshotDir + "/":   {{Name: "B", CleanName: "B", URL: modarchive.BaseURL + modarchive.SnapshotDir + "/B/", Kind: modarchive.KindDir}},
 			modarchive.BaseURL + modarchive.SnapshotDir + "/B/": {{Name: "B0.zip", URL: bucketURL, Kind: modarchive.KindArchive, CleanName: "B0"}},
 			bucketURL: {{Name: "boom-crash-m00.mod", URL: trackURL, Kind: modarchive.KindFile}},
 		},
-		libAlbums: func() []player.Album { return albums },
+		libAlbums:    func() []player.Album { return albums },
+		albumCursor:  35,
+		albumsScroll: 24,
 	}
 	o.refreshAlbumsCache()
 
 	o.NavigateToTrack(player.ModArchivePrefix + trackURL)
 
-	if got := o.breadcrumbText(); got != "/modarchive/1987-2007/B/B0" {
-		t.Fatalf("restored snapshot breadcrumb = %q, want %q", got, "/modarchive/1987-2007/B/B0")
+	if got := o.breadcrumbText(); got != "/ModArchive/1987-2007/B/B0" {
+		t.Fatalf("restored snapshot breadcrumb = %q, want %q", got, "/ModArchive/1987-2007/B/B0")
 	}
 
-	o.albumCursor = 0
-	if o.Select() {
-		t.Fatal("selecting restored snapshot parent unexpectedly started playback")
-	}
-	if got := o.breadcrumbText(); got != "/modarchive/1987-2007/B" {
-		t.Fatalf("breadcrumb after parent = %q, want %q", got, "/modarchive/1987-2007/B")
-	}
-
-	o.albumCursor = 0
-	o.Select()
-	if got := o.breadcrumbText(); got != "/modarchive/1987-2007" {
-		t.Fatalf("breadcrumb after second parent = %q, want %q", got, "/modarchive/1987-2007")
-	}
-
-	o.albumCursor = 0
-	o.Select()
-	if got := o.breadcrumbText(); got != "/modarchive" {
-		t.Fatalf("breadcrumb after third parent = %q, want %q", got, "/modarchive")
+	for _, label := range []string{"B0/", "B/", modarchive.SnapshotDir + "/", "ModArchive/"} {
+		o.Back()
+		if e := o.currentEntry(); e == nil || e.label != label {
+			t.Fatalf("after Back: selected = %#v, want %q", e, label)
+		}
 	}
 }
 
@@ -1142,16 +1154,16 @@ func TestNavigateToRestoredModArchiveAdditionTrackBreadcrumb(t *testing.T) {
 
 	o.NavigateToTrack(player.ModArchivePrefix + trackURL)
 
-	if got := o.breadcrumbText(); got != "/modarchive/2009/AHX/M" {
-		t.Fatalf("restored addition breadcrumb = %q, want %q", got, "/modarchive/2009/AHX/M")
+	if got := o.breadcrumbText(); got != "/ModArchive/2009/AHX/M" {
+		t.Fatalf("restored addition breadcrumb = %q, want %q", got, "/ModArchive/2009/AHX/M")
 	}
 
 	o.albumCursor = 0
 	if o.Select() {
 		t.Fatal("selecting restored addition parent unexpectedly started playback")
 	}
-	if got := o.breadcrumbText(); got != "/modarchive/2009/AHX" {
-		t.Fatalf("breadcrumb after parent = %q, want %q", got, "/modarchive/2009/AHX")
+	if got := o.breadcrumbText(); got != "/ModArchive/2009/AHX" {
+		t.Fatalf("breadcrumb after parent = %q, want %q", got, "/ModArchive/2009/AHX")
 	}
 }
 
@@ -1170,7 +1182,7 @@ func catalogTrackInfoTestAlbums() []player.Album {
 
 func TestCatalogTrackInfoCachedWithEmptyMetadata(t *testing.T) {
 	e := &navEntry{label: "a.mod", kind: entryCatalogTrack, albumIdx: 0, trackIdx: 0}
-	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
+	lines := catalogTrackInfoLines(i18n.MustLoad(i18n.English), e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
 		{Path: player.ModArchivePrefix + "http://example.com/test/a.mod", Cached: true},
 		{Path: player.ModArchivePrefix + "http://example.com/test/b.mod"},
 	})
@@ -1185,7 +1197,7 @@ func TestCatalogTrackInfoCachedWithEmptyMetadata(t *testing.T) {
 
 func TestCatalogTrackInfoNotCached(t *testing.T) {
 	e := &navEntry{label: "a.mod", kind: entryCatalogTrack, albumIdx: 0, trackIdx: 0}
-	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
+	lines := catalogTrackInfoLines(i18n.MustLoad(i18n.English), e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
 		{Path: player.ModArchivePrefix + "http://example.com/test/a.mod", Cached: false},
 	})
 	// Uncached track: no right panel.
@@ -1197,7 +1209,7 @@ func TestCatalogTrackInfoNotCached(t *testing.T) {
 func TestCatalogTrackInfoSelectsRightTrack(t *testing.T) {
 	// Second track of the album selected; first is cached, second is not.
 	e := &navEntry{label: "b.mod", kind: entryCatalogTrack, albumIdx: 0, trackIdx: 1}
-	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
+	lines := catalogTrackInfoLines(i18n.MustLoad(i18n.English), e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
 		{Path: player.ModArchivePrefix + "http://example.com/test/a.mod", Cached: true},
 		{Path: player.ModArchivePrefix + "http://example.com/test/b.mod", Cached: false},
 	})
@@ -1210,7 +1222,7 @@ func TestCatalogTrackInfoSelectsRightTrack(t *testing.T) {
 func TestCatalogTrackInfoLongComment(t *testing.T) {
 	e := &navEntry{label: "a.mod", kind: entryCatalogTrack, albumIdx: 0, trackIdx: 0}
 	comment := "line one\nline two\nline three\nline four"
-	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
+	lines := catalogTrackInfoLines(i18n.MustLoad(i18n.English), e, catalogTrackInfoTestAlbums(), []player.TrackInfo{
 		{Path: player.ModArchivePrefix + "http://example.com/test/a.mod", Cached: true, Duration: 120, Comment: comment},
 	})
 	// title, "", "Comment:", 4 comment lines = 7
@@ -1231,8 +1243,23 @@ func TestCatalogTrackInfoLongComment(t *testing.T) {
 
 func TestCatalogTrackInfoInvalidIndexReturnsNil(t *testing.T) {
 	e := &navEntry{label: "a.mod", kind: entryCatalogTrack, albumIdx: 5, trackIdx: 0}
-	lines := catalogTrackInfoLines(e, catalogTrackInfoTestAlbums(), nil)
+	lines := catalogTrackInfoLines(i18n.MustLoad(i18n.English), e, catalogTrackInfoTestAlbums(), nil)
 	if lines != nil {
 		t.Fatalf("invalid album index must return nil, got %q", lines)
+	}
+}
+
+func TestPopLevelClampsStaleSelection(t *testing.T) {
+	o := &Overlay{
+		navStack: []navLevel{
+			{ctx: ctxSourceRoot, entries: []navEntry{{label: "Modland/", kind: entrySource, source: sourceModland}}, cursor: 11, scroll: 8},
+			{ctx: ctxCatalog},
+		},
+	}
+	if !o.popLevel() {
+		t.Fatal("expected return to source root")
+	}
+	if o.albumCursor != 0 || o.albumsScroll != 0 || o.currentEntry() == nil {
+		t.Fatalf("invalid restored selection: cursor=%d scroll=%d", o.albumCursor, o.albumsScroll)
 	}
 }

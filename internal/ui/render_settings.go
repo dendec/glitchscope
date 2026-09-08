@@ -42,7 +42,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 	if o.panelEntered && !o.settingsEditing && o.settingsCursor >= o.albumsScroll && o.settingsCursor < leftEnd {
 		row := o.settingsRows[o.settingsCursor]
 		if !row.Header {
-			o.rebuildMarqueeLine(&o.marqueeL, row.Label, maxTextPx, true)
+			o.rebuildMarqueeLine(&o.marqueeL, row.Label, maxTextPx, false)
 		}
 	}
 
@@ -77,7 +77,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 		if o.settingsEditing {
 			value = o.settingsValueCursor
 		}
-		description := settingDescription(o.settingsCursor, value)
+		description := settingDescription(o.catalog, o.settingsCursor, value)
 		if description != "" && maxRows-len(rightRows) >= 2 {
 			rightRows = append(rightRows, listRow{})
 			lines := wrapHelpLines([]string{description}, o.face, maxTextPx)
@@ -96,7 +96,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 			selIdx := o.settingsValueCursor
 			if selIdx >= o.tracksScroll && selIdx < rightEnd {
 				mark := "▸ "
-				o.rebuildMarqueeLine(&o.marqueeR, mark+row.Values[selIdx], maxTextPx, true)
+				o.rebuildMarqueeLine(&o.marqueeR, mark+row.Values[selIdx], maxTextPx, false)
 			}
 		}
 	}

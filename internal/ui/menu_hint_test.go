@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dendec/glitchscope/internal/i18n"
 )
 
 func TestMenuHintStartsAtFirstDrawAndExpires(t *testing.T) {
@@ -76,7 +78,7 @@ func TestQuickStartPhysicalButtons(t *testing.T) {
 }
 
 func TestShuffleDescriptionExplainsOfflineBehavior(t *testing.T) {
-	if !strings.Contains(settingDescription(SettingShuffle, 3), "Offline") {
+	if !strings.Contains(settingDescription(i18n.MustLoad(i18n.English), SettingShuffle, 3), "Offline") {
 		t.Fatal("offline shuffle behavior missing")
 	}
 }

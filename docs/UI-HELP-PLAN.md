@@ -70,7 +70,7 @@
 Интерфейс всегда показывает:
 
 - страницу: `Library`, `Settings`, `Presets`, `Help`;
-- источник: `Music`, `Modland`, `ModArchive`, `Microphone`;
+- источник: `Local Music`, `Favorites`, `Microphone`, `Modland`, `ModArchive`;
 - breadcrumb текущего пути;
 - активную панель;
 - активную строку или значение;
@@ -381,7 +381,7 @@ Library <- Settings <- Presets <- Help <- Library
 функций:
 
 ```text
-1. Choose Music in Library.
+1. Open Library and choose Local Music.
 2. Select a folder or file.
 3. Press Enter to open or play.
 4. Use Left/Right to move between panels.
@@ -414,7 +414,7 @@ type HelpTopic struct {
 - не использовать Unicode-символы, которых нет в Unifont;
 - не полагаться только на цвет или жирность;
 - не показывать технические внутренние имена вроде `focusPanel`;
-- использовать пользовательские термины `Library`, `Music`, `Play`, `Back`.
+- использовать пользовательские термины `Library`, `Local Music`, `Play`, `Back`.
 
 ### 7.5. Контекстный вход в Help
 

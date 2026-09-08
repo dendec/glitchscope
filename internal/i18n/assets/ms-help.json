@@ -4,7 +4,7 @@
     "lines": [
       "**Mainkan muzik anda**",
       "Tekan {menu} untuk membuka menu.",
-      "Pilih Music, buka sebuah folder, kemudian pilih lagu yang diinginkan.",
+      "Buka Pustaka, pilih Muzik Tempatan, kemudian buka folder dan pilih trek.",
       "",
       "**Nikmati visualizer**",
       "Tutup menu setelah pemutaran bermula.",
@@ -40,7 +40,7 @@
           "Butang Seterusnya mengikut mod shuffle yang dipilih.",
           "{play} memainkan atau menangguhkan mainan.",
           "{seek} bergerak ke belakang atau ke depan.",
-          "{presets} mengubah tetapan visualizer.",
+          "{presets} menukar praset visualizer.",
           "{random} memilih tetapan rawak.",
           "{overlay} menunjukkan atau menyembunyikan notifikasi trek."
         ]
@@ -67,7 +67,7 @@
         "lines": [
           "Mati: trek dimainkan mengikut urutan.",
           "Album: shuffle folder atau senarai main semasa.",
-          "Sumber: shuffle dalam Music, Modland atau ModArchive.",
+          "Sumber: kocok dalam Muzik Tempatan, Modland atau ModArchive.",
           "Semua: shuffle merentasi semua sumber yang tersedia. Dalam mod offline, “Semua” hanya menggunakan muzik tempatan.",
           "Pilihan “Sumber” dan “Semua” boleh mengulang trek, termasuk trek semasa.",
           "“Ulang Satu” akan mengulang trek semasa setelah ia tamat. Pilihan “Seterusnya” secara manual tetap akan memindahkan ke trek seterusnya.",
@@ -141,7 +141,7 @@
       {
         "title": "Tiada muzik yang disenaraikan",
         "lines": [
-          "Buka Bahagian Muzik dan pilih folder yang mengandungi fail audio yang disokong.",
+          "Buka Pustaka, pilih Muzik Tempatan, kemudian pilih folder yang mengandungi fail audio yang disokong.",
           "Folder kosong dan imbasan yang gagal merupakan keadaan yang berbeza; semak sebarang ralat yang dipaparkan.",
           "Indeks katalog yang dimuat turun menyenaraikan muzik, tetapi tidak mengandungi fail audio itu sendiri."
         ]
@@ -166,8 +166,8 @@
       {
         "title": "Carian terhad",
         "lines": [
-          "Beberapa pengekod tracker asli tidak dapat melakukan carian ke belakang dengan tepat.",
-          "Carian tracker akan diaktifkan secara automatik apabila memori yang mencukupi tersedia.",
+          "Sesetengah penyahkod modul asli tidak dapat mengundur kedudukan dengan tepat.",
+          "Pencarian kedudukan yang tepat disediakan secara automatik apabila memori mencukupi.",
           "Lagu yang sangat panjang dan keadaan memori yang rendah akan menggunakan aliran data asli."
         ]
       }

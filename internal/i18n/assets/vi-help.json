@@ -4,7 +4,7 @@
     "lines": [
       "**Phát nhạc của bạn**",
       "Nhấn {menu} để mở menu.",
-      "Chọn mục Nhạc, mở một thư mục, sau đó chọn bài hát.",
+      "Mở Thư viện, chọn Nhạc cục bộ, rồi mở thư mục và chọn bài hát.",
       "",
       "**Thưởng thức hiển thị hình ảnh**",
       "Đóng menu sau khi việc phát nhạc bắt đầu.",
@@ -40,7 +40,7 @@
           "Chức năng Tiếp theo sẽ tuân theo chế độ xáo trộn đã chọn.",
           "{play} phát hoặc tạm dừng.",
           "{seek} cuộn ngược hoặc cuộn tiến.",
-          "{presets} thay đổi thiết lập trực quan hóa.",
+          "{presets} đổi preset của trình trực quan hóa.",
           "{random} chọn một thiết lập ngẫu nhiên.",
           "{overlay} hiển thị hoặc ẩn thông báo bài hát."
         ]
@@ -67,7 +67,7 @@
         "lines": [
           "Tắt: các bài hát được phát theo thứ tự.",
           "Album: đảo bài trong thư mục hoặc danh sách phát hiện tại.",
-          "Nguồn: đảo bài trong Music, Modland hoặc ModArchive.",
+          "Nguồn: phát ngẫu nhiên trong Nhạc cục bộ, Modland hoặc ModArchive.",
           "Tất cả: đảo bài giữa các nguồn có sẵn. Khi ở chế độ ngoại tuyến, tùy chọn Tất cả chỉ sử dụng nhạc cục bộ.",
           "Các tùy chọn Nguồn và Tất cả đều có thể lặp lại các bài hát, kể cả bài hát đang phát.",
           "Lặp một lần sẽ lặp lại bài hát đang phát khi nó kết thúc. Tùy chọn Tiếp theo thủ công vẫn sẽ chuyển sang bài hát tiếp theo.",
@@ -141,7 +141,7 @@
       {
         "title": "Không có nhạc nào được liệt kê",
         "lines": [
-          "Mở mục Nhạc và chọn thư mục chứa các tệp âm thanh được hỗ trợ.",
+          "Mở Thư viện, chọn Nhạc cục bộ, rồi chọn thư mục chứa tệp âm thanh được hỗ trợ.",
           "Thư mục trống và trạng thái quét thất bại là hai trạng thái khác nhau; hãy kiểm tra bất kỳ lỗi nào được hiển thị.",
           "Các chỉ mục danh mục đã tải về liệt kê danh sách nhạc, nhưng không chứa chính tệp âm thanh đó."
         ]
@@ -166,8 +166,8 @@
       {
         "title": "Tìm kiếm bị hạn chế",
         "lines": [
-          "Một số bộ giải mã tracker gốc không thể tìm kiếm ngược một cách đáng tin cậy.",
-          "Chức năng tìm kiếm trong tracker sẽ được kích hoạt tự động khi có đủ bộ nhớ.",
+          "Một số bộ giải mã mô-đun gốc không thể tua lùi ổn định.",
+          "Khả năng chuyển vị trí chính xác được chuẩn bị tự động khi có đủ bộ nhớ.",
           "Các bản nhạc quá dài và tình trạng bộ nhớ thấp sẽ sử dụng phương thức phát trực tiếp gốc."
         ]
       }

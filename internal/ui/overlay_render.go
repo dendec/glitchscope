@@ -427,7 +427,7 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	if o.loading {
 		text := "⏳ " + title
 		if title == "" {
-			text = "⏳ loading…"
+			text = "⏳ " + o.catalog.Text(i18n.ValueLoading)
 		}
 		if o.loadPercent >= 0 {
 			text += fmt.Sprintf("  %d%%", o.loadPercent)

@@ -4,7 +4,7 @@
     "lines": [
       "**Reproduza sua música**",
       "Aperte {menu} para abrir o menu.",
-      "Escolha Música, abra uma pasta e, em seguida, selecione uma faixa.",
+      "Abra a Biblioteca, escolha Músicas locais, abra uma pasta e selecione uma faixa.",
       "",
       "**Aproveite o visualizador**",
       "Feche o menu após o início da reprodução.",
@@ -67,7 +67,7 @@
         "lines": [
           "Desligado: as faixas são reproduzidas em ordem.",
           "Álbum: embaralha a pasta ou lista de reprodução atual.",
-          "Fonte: aleatório dentro da Música, Modland ou ModArchive.",
+          "Fonte: reprodução aleatória em Músicas locais, Modland ou ModArchive.",
           "Todos: mistura as músicas das fontes disponíveis. Off-line, “Todos” utiliza apenas músicas locais.",
           "Fonte e Todos podem repetir faixas, incluindo a faixa atual.",
           "Repetir Uma repete a faixa atual quando ela termina. Próximo Manual continua avançando.",
@@ -141,7 +141,7 @@
       {
         "title": "Nenhuma música listada",
         "lines": [
-          "Abra o Music e selecione uma pasta que contenha arquivos de áudio compatíveis.",
+          "Abra a Biblioteca, escolha Músicas locais e selecione uma pasta com arquivos de áudio compatíveis.",
           "Uma pasta vazia e uma varredura falha são situações diferentes; verifique quaisquer erros exibidos.",
           "Os índices do catálogo baixados listam as músicas, mas não contêm o áudio em si."
         ]

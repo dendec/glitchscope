@@ -1,12 +1,12 @@
 package ui
 
 import (
-	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/presets"
 )
 
@@ -334,14 +334,14 @@ func (o *Overlay) buildPresetDetailRows() []listRow {
 	m := o.presetMeta(o.presetDetailKey)
 
 	rows := []listRow{
-		{text: fmt.Sprintf("Shapes: %d   Waves: %d", m.Shapes, m.Waves)},
-		{text: fmt.Sprintf("Equations: %d per-frame, %d per-pixel", m.PerFrameEqs, m.PerPixelEqs)},
-		{text: fmt.Sprintf("Textures: %d", m.Textures)},
+		{text: o.catalog.Format(i18n.PresetShapesWaves, m.Shapes, m.Waves)},
+		{text: o.catalog.Format(i18n.PresetEquations, m.PerFrameEqs, m.PerPixelEqs)},
+		{text: o.catalog.Format(i18n.PresetTextures, m.Textures)},
 	}
 
 	// Show preview FPS when available (presets page, preview active).
 	if o.presetPreviewFPSNow > 0 {
-		rows = append(rows, listRow{}, listRow{text: fmt.Sprintf("Preview FPS: %d", o.presetPreviewFPSNow)})
+		rows = append(rows, listRow{}, listRow{text: o.catalog.Format(i18n.PresetPreviewFPS, o.presetPreviewFPSNow)})
 	}
 
 	return rows

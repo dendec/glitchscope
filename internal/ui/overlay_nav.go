@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/modarchive"
 	"github.com/dendec/glitchscope/internal/player"
 )
@@ -139,23 +140,23 @@ func relParts(base, path string) []string {
 // micLabel shows the microphone source entry.
 func (o *Overlay) micLabel() string {
 	if o.micActive {
-		return "microphone [capturing]/"
+		return o.catalog.Text(i18n.SourceMicrophoneCapturing) + "/"
 	}
-	return "microphone/"
+	return o.catalog.Text(i18n.SourceMicrophone) + "/"
 }
 
 func (o *Overlay) buildSourceEntries() []navEntry {
-	entries := []navEntry{{label: "music/", kind: entrySource, source: sourceMusic, albumIdx: -1}}
+	entries := []navEntry{{label: o.catalog.Text(i18n.SourceLocalMusic) + "/", kind: entrySource, source: sourceMusic, albumIdx: -1}}
 	if o.favoritesView != nil && o.favoritesView.TotalCount() > 0 {
-		entries = append(entries, navEntry{label: "favorites/", kind: entrySource, source: sourceFavorites, albumIdx: -1})
+		entries = append(entries, navEntry{label: o.catalog.Text(i18n.SourceFavorites) + "/", kind: entrySource, source: sourceFavorites, albumIdx: -1})
 	}
 	if len(o.micDevices) > 0 || o.micActive {
 		entries = append(entries, navEntry{label: o.micLabel(), kind: entrySource, source: sourceMicrophone, albumIdx: -1})
 	}
 	slog.Debug("buildSourceEntries", "online", o.online)
 	entries = append(entries,
-		navEntry{label: "modland/", kind: entrySource, source: sourceModland, albumIdx: -1},
-		navEntry{label: "modarchive/", kind: entrySource, source: sourceModArchive, albumIdx: -1},
+		navEntry{label: "Modland/", kind: entrySource, source: sourceModland, albumIdx: -1},
+		navEntry{label: "ModArchive/", kind: entrySource, source: sourceModArchive, albumIdx: -1},
 	)
 	return entries
 }
@@ -176,6 +177,31 @@ func (o *Overlay) refreshSourceRoot() {
 		o.albumCursor = root.cursor
 		o.albumsScroll = root.scroll
 		o.syncPanels()
+	}
+}
+
+// relocalizeSourceLabels updates the source root and any open source-level
+// breadcrumb without disturbing navigation or cursor state.
+func (o *Overlay) relocalizeSourceLabels() {
+	if len(o.navStack) == 0 {
+		return
+	}
+	o.refreshSourceRoot()
+	for i := 1; i < len(o.navStack); i++ {
+		switch o.navStack[i].ctx {
+		case ctxFavorites:
+			if i == 1 {
+				o.navStack[i].label = o.catalog.Text(i18n.SourceFavorites)
+			}
+		case ctxMicrophone:
+			o.navStack[i].label = o.catalog.Text(i18n.SourceMicrophone)
+		case ctxCatalog:
+			if i == 1 && o.source == sourceModland {
+				o.navStack[i].label = "Modland"
+			} else if i == 1 && o.source == sourceModArchive {
+				o.navStack[i].label = "ModArchive"
+			}
+		}
 	}
 }
 
@@ -231,13 +257,13 @@ func (o *Overlay) rebuildCurrentFavoritePlaylist() {
 func (o *Overlay) ShowMicrophoneDevices(devices []string) {
 	entries := make([]navEntry, 0, len(devices)+1)
 	if o.micActive {
-		entries = append(entries, navEntry{label: "stop capture", kind: entryMicrophoneStop, albumIdx: -1})
+		entries = append(entries, navEntry{label: o.catalog.Text(i18n.SourceStopCapture), kind: entryMicrophoneStop, albumIdx: -1})
 	}
 	for _, device := range devices {
 		entries = append(entries, navEntry{label: device, kind: entryMicrophoneDevice, device: device, albumIdx: -1})
 	}
 	if len(entries) == 0 {
-		entries = append(entries, navEntry{label: "no input devices", kind: entryInfo, albumIdx: -1})
+		entries = append(entries, navEntry{label: o.catalog.Text(i18n.SourceNoInputDevices), kind: entryInfo, albumIdx: -1})
 	}
 	o.source = sourceMicrophone
 	o.refreshSourceRoot()
@@ -245,7 +271,7 @@ func (o *Overlay) ShowMicrophoneDevices(devices []string) {
 	o.navStack = []navLevel{root}
 	o.albumCursor = root.cursor
 	o.albumsScroll = root.scroll
-	o.pushLevel(navLevel{ctx: ctxMicrophone, label: "microphone", entries: entries})
+	o.pushLevel(navLevel{ctx: ctxMicrophone, label: o.catalog.Text(i18n.SourceMicrophone), entries: entries})
 	o.focusPanel = 0
 }
 
@@ -465,7 +491,8 @@ func (o *Overlay) popLevel() bool {
 	}
 	o.navStack = o.navStack[:len(o.navStack)-1]
 	top := o.navStack[len(o.navStack)-1]
-	o.albumCursor, o.albumsScroll = top.cursor, top.scroll
+	o.albumCursor = clampCursor(top.cursor, len(top.entries))
+	o.albumsScroll = min(max(0, top.scroll), o.albumCursor)
 	o.trackCursor = 0
 	o.marqueeL.invalidate(o)
 	o.syncPanels()
@@ -658,7 +685,7 @@ func (o *Overlay) breadcrumbParts() []string {
 	}
 	parts := []string{"/"}
 	if o.source == sourceMusic {
-		parts = append(parts, "music")
+		parts = append(parts, o.catalog.Text(i18n.SourceLocalMusic))
 	}
 	if o.isNC() {
 		if dir := o.ncDir(); dir != "" {
@@ -765,17 +792,23 @@ func (o *Overlay) switchToSourceRoot() {
 
 func (o *Overlay) switchToProvider(source sourceKind) {
 	slog.Debug("switchToProvider", "source", source, "allAlbums", len(o.currentAlbums()), "online", o.online)
+	o.switchToSourceRoot()
 	o.source = source
-	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
+	for i, e := range o.albumEntries {
+		if e.kind == entrySource && e.source == source {
+			o.albumCursor = i
+			break
+		}
+	}
 	switch source {
 	case sourceFavorites:
 		o.switchToFavoritesRoot()
 	case sourceModland:
 		entries := o.buildFormatEntries()
 		slog.Debug("switchToProvider modland", "formats", len(entries))
-		o.pushLevel(navLevel{ctx: ctxCatalog, label: "modland", entries: entries})
+		o.pushLevel(navLevel{ctx: ctxCatalog, label: "Modland", entries: entries})
 	case sourceModArchive:
-		o.pushLevel(navLevel{ctx: ctxCatalog, label: "modarchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
+		o.pushLevel(navLevel{ctx: ctxCatalog, label: "ModArchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
 	}
 }
 
@@ -797,7 +830,7 @@ func (o *Overlay) switchToFavoritesRoot() {
 			format: string(spec.ID),
 		})
 	}
-	o.pushLevel(navLevel{ctx: ctxFavorites, entries: entries, label: "favorites"})
+	o.pushLevel(navLevel{ctx: ctxFavorites, entries: entries, label: o.catalog.Text(i18n.SourceFavorites)})
 }
 
 // switchToFavoritesPlaylist opens a specific playlist showing its tracks.
@@ -962,19 +995,14 @@ func (o *Overlay) navigateToModlandTrack(path string) {
 		return
 	}
 
-	// Build navigation tree: source root → modland → format → album tracks.
-	// Temporarily enable online so the source root shows the provider entry;
-	// restore the original state afterward so offline users aren't left with
-	// phantom remote entries after closing the UI.
-	savedOnline := o.online
-	o.online = true
-	o.source = sourceModland
-	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
-	o.online = savedOnline
-
-	// Level 1: modland formats.
-	formatEntries := o.buildFormatEntries()
-	o.pushLevel(navLevel{ctx: ctxCatalog, label: "modland", entries: formatEntries})
+	// Build the same parent selections as manual navigation.
+	o.switchToProvider(sourceModland)
+	for i, e := range o.albumEntries {
+		if e.kind == entryFormat && e.format == format {
+			o.albumCursor = i
+			break
+		}
+	}
 
 	// Level 2: albums within format.
 	albumEntries := o.buildAlbumsInFormatEntries(format)
@@ -1052,21 +1080,19 @@ func (o *Overlay) navigateToModArchiveTrack(path string) {
 		return
 	}
 
-	// Build navigation tree: source root → modarchive → directory.
-	// Temporarily enable online so the source root shows the provider entry;
-	// restore the original state afterward.
-	savedOnline := o.online
-	o.online = true
-	o.source = sourceModArchive
-	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
-	o.online = savedOnline
-	o.pushLevel(navLevel{ctx: ctxCatalog, label: "modarchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
+	o.switchToProvider(sourceModArchive)
 
 	// Restore each virtual snapshot directory so parent navigation mirrors the
 	// tree the user would traverse manually.
 	for _, target := range modArchiveNavigationTargets(albumURL) {
 		dirEntries := o.buildModArchiveEntries(target.url)
 		if dirEntries != nil {
+			for i, e := range o.albumEntries {
+				if e.kind == entryModArchiveDir && e.url == target.url {
+					o.albumCursor = i
+					break
+				}
+			}
 			o.pushLevel(navLevel{ctx: ctxCatalog, label: target.label, entries: dirEntries})
 		}
 	}

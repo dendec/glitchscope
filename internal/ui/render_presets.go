@@ -85,7 +85,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 			}
 			name = nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
 		}
-		o.rebuildMarqueeLine(&o.marqueeL, name, maxTextPx, true)
+		o.rebuildMarqueeLine(&o.marqueeL, name, maxTextPx, false)
 	} else {
 		o.marqueeL.invalidate(o)
 	}

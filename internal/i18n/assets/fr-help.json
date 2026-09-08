@@ -4,7 +4,7 @@
     "lines": [
       "**Replayez votre musique**",
       "Appuyez sur {menu} pour ouvrir le menu.",
-      "Choisissez « Musique », ouvrez un dossier, puis sélectionnez une piste.",
+      "Ouvrez la Bibliothèque, choisissez « Musique locale », ouvrez un dossier, puis sélectionnez une piste.",
       "",
       "**Profitez du visualiseur**",
       "Fermez le menu une fois la lecture commencée.",
@@ -40,7 +40,7 @@
           "La piste suivante respecte le mode aléatoire sélectionné.",
           "{play} lance ou met en pause.",
           "{seek} fait défiler vers l’avant ou vers l’arrière.",
-          "{presets} change le préreglage du visualiseur.",
+          "{presets} change le preset du visualiseur.",
           "{random} choisit un préreglage aléatoire.",
           "{overlay} affiche ou cache les notifications de piste."
         ]
@@ -67,7 +67,7 @@
         "lines": [
           "Désactivé : les pistes sont jouées dans l’ordre.",
           "Album : mélange les pistes de la bibliothèque ou de la liste de lecture actuelle.",
-          "Source : mélange les pistes au sein de Music, Modland ou ModArchive.",
+          "Source : lecture aléatoire dans « Musique locale », Modland ou ModArchive.",
           "Tout : mélange les pistes entre toutes les sources disponibles. En mode hors ligne, « Tout » ne prend en compte que la musique locale.",
           "« Source » et « Tout » permettent de répéter les pistes, y compris la piste actuelle.",
           "« Répéter une fois » répète la piste actuelle une fois son écoute terminée. « Suivant manuel » passe néanmoins à la piste suivante.",
@@ -141,7 +141,7 @@
       {
         "title": "Aucune musique listée",
         "lines": [
-          "Ouvrez « Music » et sélectionnez un dossier contenant des fichiers audio pris en charge.",
+          "Ouvrez la Bibliothèque, choisissez « Musique locale », puis un dossier contenant des fichiers audio pris en charge.",
           "Un dossier vide et un balayage échoué correspondent à des états différents ; vérifiez les éventuelles erreurs affichées.",
           "Les index du catalogue téléchargé listent les musiques, mais ne contiennent pas le fichier audio lui-même."
         ]
@@ -166,8 +166,8 @@
       {
         "title": "Recherche limitée",
         "lines": [
-          "Certains décodeurs de tracker natifs ne permettent pas une recherche en arrière fiable.",
-          "La recherche dans les trackers est préparée automatiquement lorsque suffisamment de mémoire est disponible.",
+          "Certains décodeurs natifs de modules ne permettent pas un retour arrière fiable.",
+          "La navigation précise dans les modules est préparée automatiquement lorsque la mémoire disponible le permet.",
           "Les pistes très longues et les conditions de faible mémoire utilisent le streaming natif."
         ]
       }

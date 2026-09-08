@@ -1,6 +1,10 @@
 package ui
 
-import "time"
+import (
+	"time"
+
+	"github.com/dendec/glitchscope/internal/i18n"
+)
 
 const menuHintDuration = 10 * time.Second
 
@@ -31,7 +35,7 @@ func (o *Overlay) drawMenuHint(width, height int) {
 	if o.face == nil || !o.menuHint.visible(time.Now(), o.uiVisible) {
 		return
 	}
-	text := "[" + o.controlLabel(hintMenu) + "] Open menu"
+	text := "[" + o.controlLabel(hintMenu) + "] " + o.catalog.Text(i18n.ActionOpen)
 	if text != o.menuHint.text || o.menuHint.texture.tex == 0 {
 		o.menuHint.text = text
 		o.deleteTex(&o.menuHint.texture.tex)

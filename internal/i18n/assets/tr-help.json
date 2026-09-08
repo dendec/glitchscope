@@ -4,7 +4,7 @@
     "lines": [
       "**Müziğinizi çalın**",
       "Menüyü açmak için {menu} tuşuna basın.",
-      "Müzik seçin, bir klasör açın ve ardından bir parça seçin.",
+      "Kitaplığı açın, Yerel Müzik’i seçin, ardından bir klasör ve parça seçin.",
       "",
       "**Görselleştiriciyi keyfin çıkarın**",
       "Çalma işlemi başladıktan sonra menüyü kapatın.",
@@ -40,7 +40,7 @@
           "Sonraki butonu, seçilen rastgeleleştirme modunu dikkate alır.",
           "{play} çalmayı başlatır veya durdurur.",
           "{seek} geriye veya ileriye sarma yapar.",
-          "{presets} görselleştirici ayarlarını değiştirir.",
+          "{presets} görselleştirici presetini değiştirir.",
           "{random} rastgele bir ayarı seçer.",
           "{overlay} parça bildirimlerini gösterir veya gizler."
         ]
@@ -67,7 +67,7 @@
         "lines": [
           "Kapalı: Şarkılar sırayla çalınır.",
           "Albüm: Mevcut klasörü veya çalma listesini rastgele sıralar.",
-          "Kaynak: Music, Modland veya ModArchive içinde rastgele sıralama.",
+          "Kaynak: Yerel Müzik, Modland veya ModArchive içinde karışık çalma.",
           "Hepsi: Mevcut kaynaklar arasında rastgele sıralama. Çevrimdışı modda “Hepsi”, yalnızca yerel müzikleri kullanır.",
           "Kaynak ve “Hepsi”, mevcut parça da dahil olmak üzere parçaları tekrarlayabilir.",
           "Tekrarla Bir, mevcut parça bittiğinde onu tekrar çalar. Manuel “Sonraki”, yine de parçayı ilerletir.",
@@ -141,7 +141,7 @@
       {
         "title": "Müzik listelenmedi",
         "lines": [
-          "Music uygulamasını açın ve desteklenen ses dosyalarını içeren bir klasör seçin.",
+          "Kitaplığı açın, Yerel Müzik’i seçin ve desteklenen ses dosyalarını içeren bir klasör seçin.",
           "Boş bir klasör ile başarısız bir tarama farklı durumlardır; gösterilen hataları kontrol edin.",
           "İndirilen katalog dizinleri müzikleri listeler, ancak ses dosyalarının kendisini içermez."
         ]
@@ -166,8 +166,8 @@
       {
         "title": "Sınırlı arama",
         "lines": [
-          "Bazı yerel tracker kod çözücüleri güvenilir bir şekilde geriye doğru arama yapamaz.",
-          "Yeterli bellek mevcut olduğunda tracker arama özelliği otomatik olarak hazırlanır.",
+          "Bazı yerel modül kod çözücüleri güvenilir biçimde geriye saramaz.",
+          "Yeterli bellek olduğunda hassas konumlandırma otomatik olarak hazırlanır.",
           "Çok uzun parçalar ve düşük bellek koşulları durumunda yerel akış yöntemi kullanılır."
         ]
       }

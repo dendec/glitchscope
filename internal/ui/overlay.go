@@ -325,6 +325,7 @@ func (o *Overlay) SetLanguage(language config.Language) error {
 	}
 	o.catalog = catalog
 	o.helpTopics = topics
+	o.relocalizeSourceLabels()
 	o.clampHelpView()
 	o.markAllDirty()
 	if o.notif.TextKey() != "" {

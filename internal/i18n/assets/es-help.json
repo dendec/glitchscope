@@ -4,7 +4,7 @@
     "lines": [
       "**Reproduce tu música**",
       "Presione {menu} para abrir el menú.",
-      "Elige Música, abre una carpeta y luego selecciona una pista.",
+      "Abre la Biblioteca, elige Música local, abre una carpeta y selecciona una pista.",
       "",
       "**Disfruta del visualizador**",
       "Cierre el menú una vez que comience la reproducción.",
@@ -40,7 +40,7 @@
           "La siguiente pista respeta el modo de mezcla seleccionado.",
           "{play} reproduce o pone en pausa.",
           "{seek} busca hacia atrás o hacia adelante.",
-          "{presets} cambia la configuración predeterminada del visualizador.",
+          "{presets} cambia el preset del visualizador.",
           "{random} elige una configuración aleatoria.",
           "{overlay} muestra u oculta notificaciones de pista."
         ]
@@ -67,7 +67,7 @@
         "lines": [
           "Apagado: las pistas se reproducen en orden.",
           "Álbum: mezcla la carpeta o lista de reproducción actual.",
-          "Fuente: mezcla dentro de Music, Modland o ModArchive.",
+          "Fuente: mezcla dentro de Música local, Modland o ModArchive.",
           "Todos: mezcla entre todas las fuentes disponibles. En modo sin conexión, \"Todos\" solo utiliza música local.",
           "\"Fuente\" y \"Todos\" pueden repetir pistas, incluida la actual.",
           "\"Repetir una\" repite la pista actual al finalizarla. \"Siguiente manual\" sigue avanzando.",
@@ -126,7 +126,7 @@
         "title": "Selección de preajustes",
         "lines": [
           "Abra Predefiniciones y explore la lista.",
-          "Pausa en un preset para ver su vista previa.",
+          "Detente sobre un preset para ver su vista previa.",
           "{select} lo selecciona; se aplica al salir de la página.",
           "El modo de cambio automático de preajustes controla los cambios automáticos.",
           "Las resoluciones exitosas se recuerdan durante la ejecución actual."
@@ -141,7 +141,7 @@
       {
         "title": "No se muestra música",
         "lines": [
-          "Abra Música y elija una carpeta que contenga archivos de audio compatibles.",
+          "Abre la Biblioteca, elige Música local y selecciona una carpeta con archivos de audio compatibles.",
           "Una carpeta vacía y un escaneo fallido son estados diferentes; revise cualquier error que aparezca.",
           "Los índices del catálogo descargado listan la música, pero no contienen el audio en sí."
         ]
@@ -166,8 +166,8 @@
       {
         "title": "Búsqueda limitada",
         "lines": [
-          "Algunos decodificadores nativos de tracker no pueden realizar búsquedas hacia atrás de manera fiable.",
-          "La búsqueda en tracker se prepara automáticamente cuando hay suficiente memoria disponible.",
+          "Algunos decodificadores nativos de módulos no permiten retroceder de forma fiable.",
+          "La navegación precisa por los módulos se prepara automáticamente cuando hay memoria suficiente.",
           "Las pistas muy largas y las condiciones de poca memoria utilizan la transmisión en tiempo real nativa."
         ]
       }
