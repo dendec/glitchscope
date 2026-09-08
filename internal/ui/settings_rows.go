@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/i18n"
 )
 
 // Settings row indices — shared between BuildSettingsRows and applySettings.
@@ -17,11 +18,12 @@ const (
 	SettingResolution      = 7
 	SettingFilter          = 8
 	SettingBeatSensitivity = 9
-	SettingTheme           = 11
-	SettingTransparency    = 12
-	SettingShowStats       = 13
-	SettingCacheSize       = 15
-	SettingCacheRetention  = 16
+	SettingLanguage        = 11
+	SettingTheme           = 12
+	SettingTransparency    = 13
+	SettingShowStats       = 14
+	SettingCacheSize       = 16
+	SettingCacheRetention  = 17
 )
 
 // settingOpt is a setting whose String() produces a display label.
@@ -46,18 +48,36 @@ func optionPair[T settingOpt](all []T, current T) (values []string, index int) {
 
 // BuildSettingsRows creates SettingRow entries from the current config.
 func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
-	resolutions := config.ComputeResolutions(winW, winH)
-	resValues, resIndex := buildResolutionValues(s, resolutions)
+	return BuildSettingsRowsWithCatalog(s, winW, winH, i18n.MustLoad(i18n.English))
+}
 
-	filterValues, filterIndex := optionPair(config.AllFilters(), s.Graphics.UpscaleFilter)
-	repeatValues, repeatIndex := optionPair(config.AllRepeatModes(), s.Playback.Repeat)
-	presetValues, presetIndex := optionPair(config.AllPresetIntervals(), s.PresetInterval)
-	shuffleValues, shuffleIndex := optionPair(config.AllShuffleModes(), s.Playback.ShuffleMode)
+// BuildSettingsRowsWithCatalog creates localized rows while preserving enum indices.
+func BuildSettingsRowsWithCatalog(s config.Settings, winW, winH int, catalog i18n.Catalog) []SettingRow {
+	resolutions := config.ComputeResolutions(winW, winH)
+	resValues, resIndex := buildResolutionValuesWithLabels(s, resolutions, catalog.Text(i18n.ValueAuto), catalog.Text(i18n.ValueUnavailable))
+
+	filterValues := []string{catalog.Text(i18n.ValueSmooth), catalog.Text(i18n.ValuePixel)}
+	filterIndex := comparableIndex(config.AllFilters(), s.Graphics.UpscaleFilter)
+	repeatValues := []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueRepeatOne), catalog.Text(i18n.ValueRepeatAll)}
+	repeatIndex := comparableIndex(config.AllRepeatModes(), s.Playback.Repeat)
+	presetValues, presetIndex := localizedPresetIntervals(catalog, s.PresetInterval)
+	shuffleValues := []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueShuffleAlbum), catalog.Text(i18n.ValueShuffleSource), catalog.Text(i18n.ValueShuffleAll)}
+	shuffleIndex := comparableIndex(config.AllShuffleModes(), s.Playback.ShuffleMode)
 	themeValues, themeIndex := optionPair(config.AllThemes(), s.UI.Theme)
 	transValues, transIndex := optionPair(config.AllTransparencies(), s.UI.Transparency)
-	perfValues, perfIndex := optionPair(config.AllPerformanceModes(), s.Graphics.PerformanceMode)
+	perfValues := []string{catalog.Text(i18n.ValuePerformance), catalog.Text(i18n.ValueBalanced), catalog.Text(i18n.ValueEco)}
+	perfIndex := comparableIndex(config.AllPerformanceModes(), s.Graphics.PerformanceMode)
 	cacheRetentionValues, cacheRetentionIndex := optionPair(config.AllCacheRetentions(), s.TrackCache.Retention)
 	cacheSizeValues, cacheSizeIndex := optionPair(config.AllCacheSizeLimits(), s.TrackCache.MaxBytes)
+	languages := config.AllLanguages()
+	languageValues := make([]string, len(languages))
+	languageIndex := 0
+	for i, language := range languages {
+		languageValues[i] = language.String()
+		if language == s.UI.Language {
+			languageIndex = i
+		}
+	}
 
 	beatSensitivities := config.AllBeatSensitivities()
 	beatValues := make([]string, len(beatSensitivities))
@@ -71,35 +91,61 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 
 	return []SettingRow{
 		// Playback
-		{Header: true, Label: "── Playback ────"},
-		{Label: "Shuffle", Values: shuffleValues, Index: shuffleIndex},
-		{Label: "Repeat", Values: repeatValues, Index: repeatIndex},
+		{Header: true, Label: "── " + catalog.Text(i18n.SettingsPlayback) + " ────"},
+		{Label: catalog.Text(i18n.SettingsShuffle), Values: shuffleValues, Index: shuffleIndex},
+		{Label: catalog.Text(i18n.SettingsRepeat), Values: repeatValues, Index: repeatIndex},
 		// Visualization
-		{Header: true, Label: "── Visualization ──"},
-		{Label: "Performance", Values: perfValues, Index: perfIndex},
-		{Label: "Visualizer", Values: []string{"Off", "On"}, Index: boolIndex(!s.Graphics.VisualizerOff)},
-		{Label: "Rotation", Values: presetValues, Index: presetIndex},
-		{Label: "Resolution", Values: resValues, Index: resIndex},
-		{Label: "Filter", Values: filterValues, Index: filterIndex},
-		{Label: "Sensitivity", Values: beatValues, Index: beatIndex},
+		{Header: true, Label: "── " + catalog.Text(i18n.SettingsVisualization) + " ──"},
+		{Label: catalog.Text(i18n.SettingsPerformance), Values: perfValues, Index: perfIndex},
+		{Label: catalog.Text(i18n.SettingsVisualizer), Values: []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueOn)}, Index: boolIndex(!s.Graphics.VisualizerOff)},
+		{Label: catalog.Text(i18n.SettingsRotation), Values: presetValues, Index: presetIndex},
+		{Label: catalog.Text(i18n.SettingsResolution), Values: resValues, Index: resIndex},
+		{Label: catalog.Text(i18n.SettingsFilter), Values: filterValues, Index: filterIndex},
+		{Label: catalog.Text(i18n.SettingsSensitivity), Values: beatValues, Index: beatIndex},
 		// Appearance
-		{Header: true, Label: "── Appearance ───"},
-		{Label: "Theme", Values: themeValues, Index: themeIndex},
-		{Label: "Transparency", Values: transValues, Index: transIndex},
-		{Label: "Stats", Values: []string{"Off", "On"}, Index: boolIndex(s.UI.ShowStats)},
-		{Header: true, Label: "── Cache ───────"},
-		{Label: "Size", Values: cacheSizeValues, Index: cacheSizeIndex},
-		{Label: "Lifetime", Values: cacheRetentionValues, Index: cacheRetentionIndex},
+		{Header: true, Label: "── " + catalog.Text(i18n.SettingsAppearance) + " ───"},
+		{Label: catalog.Text(i18n.SettingsLanguage), Values: languageValues, Index: languageIndex},
+		{Label: catalog.Text(i18n.SettingsTheme), Values: themeValues, Index: themeIndex},
+		{Label: catalog.Text(i18n.SettingsTransparency), Values: transValues, Index: transIndex},
+		{Label: catalog.Text(i18n.SettingsStats), Values: []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueOn)}, Index: boolIndex(s.UI.ShowStats)},
+		{Header: true, Label: "── " + catalog.Text(i18n.SettingsCache) + " ───────"},
+		{Label: catalog.Text(i18n.SettingsSize), Values: cacheSizeValues, Index: cacheSizeIndex},
+		{Label: catalog.Text(i18n.SettingsLifetime), Values: cacheRetentionValues, Index: cacheRetentionIndex},
 	}
+}
+
+func comparableIndex[T comparable](all []T, current T) int {
+	for i, value := range all {
+		if value == current {
+			return i
+		}
+	}
+	return 0
+}
+
+func localizedPresetIntervals(catalog i18n.Catalog, current config.PresetInterval) ([]string, int) {
+	all := config.AllPresetIntervals()
+	values := make([]string, len(all))
+	for i, interval := range all {
+		switch interval {
+		case config.PresetOff:
+			values[i] = catalog.Text(i18n.ValueOff)
+		case config.PresetAuto:
+			values[i] = catalog.Text(i18n.ValueAuto)
+		default:
+			values[i] = interval.String()
+		}
+	}
+	return values, comparableIndex(all, current)
 }
 
 // buildResolutionValues produces the resolution option list and selected index.
 // "Auto" is always included as the first option so the user can switch back
 // from a fixed resolution to adaptive mode.
-func buildResolutionValues(s config.Settings, resolutions []config.RenderResolution) ([]string, int) {
-	values := append([]string{"Auto"}, renderResolutionStrings(resolutions)...)
+func buildResolutionValuesWithLabels(s config.Settings, resolutions []config.RenderResolution, auto, unavailable string) ([]string, int) {
+	values := append([]string{auto}, renderResolutionStrings(resolutions)...)
 	if len(resolutions) == 0 {
-		values = append(values, "N/A")
+		values = append(values, unavailable)
 	}
 	if s.Graphics.Adaptive {
 		return values, 0

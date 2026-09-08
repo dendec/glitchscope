@@ -100,7 +100,7 @@ modland-catalog: $(MODLAND_CATALOG)
 modarchive-catalog: $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
 
 # Docker build (amd64)
-dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
+dist: subset-font builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t glitchscope:amd64 -f Dockerfile .
 	@# Backup music directory if it exists before rm -rf.
 	@if [ -d "$(X64_DIST_DIR)/music" ]; then \
@@ -132,7 +132,7 @@ dist: builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_C
 # ARM64 cross-build via Docker
 DOCKER_IMAGE_ARM64 := glitchscope:arm64
 
-dist-arm64: builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
+dist-arm64: subset-font builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)

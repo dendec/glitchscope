@@ -9,6 +9,7 @@
 | Понятие | Единственный владелец | Остальные проекции |
 |---|---|---|
 | Настройки | `internal/config` | JSON storage, Settings UI |
+| UI translations | `internal/i18n` | `internal/config` language choice, UI/help/notifications |
 | Локальный индекс музыки | `internal/player` | NC navigation, playback selection, catalog albums |
 | Навигация и focus | `internal/ui` | rendered lists and breadcrumbs |
 | Playback queue | `internal/app` playback state | player commands, overlay snapshot |

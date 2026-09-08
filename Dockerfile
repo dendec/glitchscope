@@ -13,8 +13,10 @@ COPY lib/ lib/
 COPY test_data/ test_data/
 COPY portmaster/ portmaster/
 
-# Install pre-built font subset
-RUN mkdir -p internal/ui/assets && cp /opt/font/unifont.otf internal/ui/assets/unifont.otf
+# Use the generated font subset copied with the source tree.  Do not replace it
+# with the builder image's cached font: the subset depends on the current locale
+# assets and internal/ui/font_ranges.json.
+RUN test -s internal/ui/assets/unifont.otf
 
 # Build Go app for target architecture
 RUN --mount=type=cache,target=/root/.cache/go-build \

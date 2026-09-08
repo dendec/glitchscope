@@ -9,6 +9,7 @@ import (
 
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/modarchive"
 	"github.com/dendec/glitchscope/internal/player"
 	"golang.org/x/image/font"
@@ -117,6 +118,7 @@ const (
 
 // Overlay manages UI and notification rendering.
 type Overlay struct {
+	catalog             i18n.Catalog
 	menuHint            menuHint
 	controllerConnected bool
 	programText         uint32
@@ -176,6 +178,7 @@ type Overlay struct {
 	settingsColL        listTex
 	settingsColR        listTex
 	helpView            HelpViewState
+	helpTopics          []HelpTopic
 	helpColL            listTex
 	helpColR            listTex
 	helpDirty           bool
@@ -289,6 +292,8 @@ type Overlay struct {
 // New creates an Overlay. The stack always has a virtual source root.
 func New() *Overlay {
 	o := &Overlay{
+		catalog:         i18n.MustLoad(i18n.English),
+		helpTopics:      helpTopics,
 		programText:     glCreateTextProgram(),
 		programImage:    glCreateImageProgram(),
 		programRect:     glCreateRectProgram(),
@@ -299,6 +304,60 @@ func New() *Overlay {
 	o.albums = labelsOf(o.albumEntries)
 	return o
 }
+
+// SetLanguage replaces the immutable catalog and invalidates every text cache.
+func (o *Overlay) SetLanguage(language config.Language) error {
+	i18nLanguage := i18n.Language(language)
+	catalog, err := i18n.Load(i18nLanguage)
+	if err != nil {
+		return err
+	}
+	helpAsset := helpData
+	if i18nLanguage != i18n.English {
+		helpAsset, err = i18n.HelpData(i18nLanguage)
+		if err != nil {
+			return err
+		}
+	}
+	topics, err := parseHelpTopics(helpAsset)
+	if err != nil {
+		return err
+	}
+	o.catalog = catalog
+	o.helpTopics = topics
+	o.clampHelpView()
+	o.markAllDirty()
+	if o.notif.TextKey() != "" {
+		o.notif.Relocalize(catalog, o.fontSize, o.textColor())
+	}
+	return nil
+}
+
+func (o *Overlay) clampHelpView() {
+	if len(o.helpTopics) == 0 {
+		o.helpView = HelpViewState{}
+		return
+	}
+	o.helpView.TopicCursor = min(o.helpView.TopicCursor, len(o.helpTopics)-1)
+	topic := o.helpTopics[o.helpView.TopicCursor]
+	if len(topic.Children) == 0 {
+		o.helpView.InChildren = false
+		o.helpView.InGrandChildren = false
+		o.helpView.EntryCursor = 0
+		return
+	}
+	o.helpView.EntryCursor = min(o.helpView.EntryCursor, len(topic.Children)-1)
+	entry := topic.Children[o.helpView.EntryCursor]
+	if len(entry.Children) == 0 {
+		o.helpView.InGrandChildren = false
+		o.helpView.GrandChildCursor = 0
+		return
+	}
+	o.helpView.GrandChildCursor = min(o.helpView.GrandChildCursor, len(entry.Children)-1)
+}
+
+// Catalog returns the current immutable translation catalog.
+func (o *Overlay) Catalog() i18n.Catalog { return o.catalog }
 
 func (o *Overlay) Close() {
 	o.deleteTex(&o.menuHint.texture.tex)

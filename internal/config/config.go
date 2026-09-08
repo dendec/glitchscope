@@ -681,13 +681,14 @@ func (t Transparency) Validate() error {
 // UISettings holds theme and transparency.
 type UISettings struct {
 	MenuOpened   bool         `json:"menu_opened"`
+	Language     Language     `json:"language"`
 	Theme        Theme        `json:"theme"`
 	Transparency Transparency `json:"transparency"`
 	ShowStats    bool         `json:"show_stats"`
 }
 
 func DefaultUI() UISettings {
-	return UISettings{Theme: ThemeDark, Transparency: 0, ShowStats: false}
+	return UISettings{Language: English, Theme: ThemeDark, Transparency: 0, ShowStats: false}
 }
 
 // Settings is the full persisted settings envelope.
@@ -724,6 +725,9 @@ func (s Settings) Validate() error {
 	}
 	if _, ok := s.UI.Theme.spec(); !ok {
 		return fmt.Errorf("ui theme: invalid theme %d", s.UI.Theme)
+	}
+	if err := s.UI.Language.Validate(); err != nil {
+		return fmt.Errorf("ui language: %w", err)
 	}
 	if err := s.UI.Transparency.Validate(); err != nil {
 		return fmt.Errorf("ui transparency: %w", err)

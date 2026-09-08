@@ -1,0 +1,1110 @@
+[
+  {
+    "title": "はじめに",
+    "lines": [
+      "**音楽を再生しましょう**",
+      "メニューを開くには、{menu}を押してください。",
+      "「音楽」を選択し、フォルダを開いてからトラックを選びます。",
+      "",
+      "**ビジュアライザーをお楽しみください**",
+      "再生が開始したらメニューを閉じてください。",
+      "ビジュアルスタイルを選ぶにはプリセットを、品質、速度、バッテリー寿命のバランスを調整するには設定をご利用ください。",
+      "",
+      "フッターには、常に現在選択されている項目で利用可能なアクションが表示されます。"
+    ],
+    "id": 0
+  },
+  {
+    "title": "コントロール",
+    "children": [
+      {
+        "title": "メニュー内",
+        "lines": [
+          "**Navigation**",
+          "{move} で選択項目が移動します。長押しするとより速くスクロールできます。",
+          "{focus} でパネルが切り替わります。",
+          "{select} で選択されたアイテムが開かれるか、値が適用されます。",
+          "{back} で前に戻るか、編集をキャンセルします。",
+          "{pages} でページが切り替わります。",
+          "",
+          "**Menu**",
+          "{menu} でメニューが開閉されます。",
+          "フッターには現在選択中の項目に関する操作が表示されます。"
+        ]
+      },
+      {
+        "title": "再生中",
+        "lines": [
+          "**メニューが閉じている状態**",
+          "{tracks} で前の/次のトラックが選択されます。",
+          "次に進む際は選択されているシャッフルモードが反映されます。",
+          "{play} で再生/一時停止が切り替わります。",
+          "{seek} で前後にジャンプできます。",
+          "{presets} でビジュアライザーのプリセットが変更されます。",
+          "{random} でランダムなプリセットが選択されます。",
+          "{overlay} でトラックに関する通知の表示/非表示が切り替わります。"
+        ]
+      },
+      {
+        "title": "ヘルプナビゲーション",
+        "lines": [
+          "左側からトピックを選択してください。",
+          "{select} でサブトピックを含むトピックが開きます。",
+          "{focus} でテキストパネルに移動します。",
+          "{move} でテキストがスクロールされます。",
+          "{back} で前のレベルに戻ります。",
+          "{pages} で別のアプリケーションのページに戻ります。"
+        ]
+      }
+    ],
+    "id": 1
+  },
+  {
+    "title": "再生",
+    "children": [
+      {
+        "title": "シャッフル＆リピート",
+        "lines": [
+          "オフ：トラックは順番に再生されます。",
+          "アルバム：現在のフォルダーまたはプレイリストをシャッフルします。",
+          "出典：Music、Modland、ModArchive内でのシャッフル機能。",
+          "全て：利用可能なソース間でシャッフル再生。オフライン時は、「全て」モードではローカルにある音楽のみが使用されます。",
+          "ソースとオールでは、現在のトラックを含むすべてのトラックを繰り返し再生できます。",
+          "「One Repeat」は、現在のトラックが終了するとそれを再再生します。「Manual Next」の場合は引き続き次のトラックに進みます。",
+          "読み込みに失敗した場合はスキップされます。繰り返し失敗すると自動復旧は停止します。"
+        ]
+      },
+      {
+        "title": "ジャンプ再生",
+        "lines": [
+          "{seek}は現在のトラック内を進みます。",
+          "十分なメモリがある場合、正確なジャンプ再生のためにトラッカーオーディオが準備されます。",
+          "プリパレーション予算は、現在利用可能なメモリから自動的に選択されます。",
+          "長尺のトラックやメモリが少ない環境では、ネイティブストリーミングが使用されます。",
+          "逆方向へのシークは、デコーダーに依存します。"
+        ]
+      },
+      {
+        "title": "お気に入り",
+        "lines": [
+          "「お気に入り」プレイリスト外のトラックを選択し、フッターに表示されるヒントに従ってください。",
+          "短く押すと Star / Heart / Note / None が切り替わります。",
+          "{gamepad_heading}",
+          "選択中のトラックをお気に入りから削除するには、{favourite} を押し続けてください。",
+          "トラック検索中以外では、{play} は再生/一時停止の機能です。",
+          "{keyboard_heading}",
+          "F キーでお気に入りの切り替えが行え、Delete キーで削除できます。",
+          ""
+        ]
+      }
+    ],
+    "id": 2
+  },
+  {
+    "title": "品質とバッテリー",
+    "children": [
+      {
+        "title": "パフォーマンス",
+        "lines": [
+          "パフォーマンスモードではビジュアライザーの品質を最優先し、30 FPSを目標とします。",
+          "バランスモードでは解像度の上限を下げて24 FPSを目標とします。",
+          "エコモードではバッテリー寿命を最優先し、解像度の上限を下げてアップスケーリングの速度も遅くします。",
+          "自動解像度モードでは現在のプリセットに応じて調整されます。固定解像度モードではこの調整は行われません。",
+          "最低解像度でもまだ処理速度が遅い場合は、負荷の高いプリセットをスキップできます。"
+        ]
+      },
+      {
+        "title": "ビジュアライゼーションなしの音楽",
+        "lines": [
+          "設定でビジュアライザーを「オフ」にしてください。",
+          "単色の背景でも、音楽の再生やメニューの操作は引き続き可能です。",
+          "「オープニングプリセット」でもライブプレビューは有効です。",
+          "アニメーションを再開するには、ビジュアライザーを再びオンにしてください。"
+        ]
+      },
+      {
+        "title": "プリセットの選択",
+        "lines": [
+          "「プリセット」を開き、一覧を閲覧してください。",
+          "プリセットを一時停止してプレビューを確認できます。",
+          "{select}で選択され、ページを離れると適用されます。",
+          "プリセットの自動切り替えは、自動的な変更を制御します。",
+          "正常に解決された設定は、現在の実行中に記憶されます。"
+        ]
+      }
+    ],
+    "id": 3
+  },
+  {
+    "title": "トラブルシューティング",
+    "children": [
+      {
+        "title": "音楽が表示されません",
+        "lines": [
+          "「Music」を開き、対応するオーディオファイルが含まれているフォルダを選択してください。",
+          "空のフォルダとスキャンに失敗した状態は異なります。表示されるエラーを確認してください。",
+          "ダウンロードされたカタログインデックスには音楽がリストアップされますが、オーディオファイル自体は含まれていません。"
+        ]
+      },
+      {
+        "title": "オフラインカタログ",
+        "lines": [
+          "保存されたカタログのインデックスは、インターネットがなくても閲覧可能です。",
+          "オフラインで再生するには、トラックが事前にダウンロードされている必要があります。",
+          "Shuffle Allはオフライン時にローカルに保存されている音楽を使用します。ネットワークの接続状況は定期的に確認されます。"
+        ]
+      },
+      {
+        "title": "トラックの読み込みまたはスキップに関する問題",
+        "lines": [
+          "ダウンロードはリモートのファイルを取得します。オーディオの準備は、シーク機能のためにトラッカーをデコードします。",
+          "読み込み中に別のトラックを選択できます。",
+          "サポートされていない、破損している、または利用できないトラックは自動的にスキップされます。",
+          "繰り返しエラーが発生して再生できない場合は、別のトラックやソースを選択してください。"
+        ]
+      },
+      {
+        "title": "リミテッドシーク",
+        "lines": [
+          "一部のネイティブトラッカーデコーダーでは、信頼性の高いバックワードシークができません。",
+          "十分なメモリがある場合、トラッカーシーク機能が自動的に有効になります。",
+          "非常に長いトラックやメモリが少ない状況では、ネイティブストリーミングが使用されます。"
+        ]
+      }
+    ],
+    "id": 4
+  },
+  {
+    "id": 5,
+    "title": "カタログ",
+    "children": [
+      {
+        "title": "Modland",
+        "lines": [
+          "**このデバイス上のカタログ**",
+          "再生可能なトラック：{modland_tracks}",
+          "フォルダ：{modland_directories}",
+          "ネットワーク：{network_status}",
+          "",
+          "**Modlandについて**",
+          "フォーマットや制作者別に分類された、トラッカー、チップチューン、ゲーム音楽の大規模な保存アーカイブです。",
+          "GlitchScopeはローカルにコンパクトなインデックスを保持し、再生前に選択したトラックをキャッシュにダウンロードします。",
+          "保存されたインデックスはオフラインでも閲覧可能です。トラックは、既にキャッシュされていない限り接続が必要です。"
+        ]
+      },
+      {
+        "title": "ModArchive",
+        "lines": [
+          "**このデバイス上のカタログ**",
+          "再生可能なトラック：{modarchive_tracks}",
+          "フォルダ：{modarchive_directories}",
+          "ネットワーク：{network_status}",
+          "",
+          "**Mod Archiveについて**",
+          "プレイ可能な音楽モジュールを専門に扱うコミュニティアーカイブで、アーティスト情報、評価、レビュー、過去のコレクションなどが掲載されています。",
+          "GlitchScopeは、歴史的スナップショットと付録用のコンパクトなインデックスを同梱し、選択したモジュールデータのみをダウンロードします。",
+          "保存されたインデックスはオフラインでも閲覧可能です。トラックは、既にキャッシュされていない限り接続が必要です。"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "title": "フォーマット",
+    "children": [
+      {
+        "title": "オーディオ",
+        "children": [
+          {
+            "title": ".aac",
+            "lines": [
+              "AACは損失ありのオーディオ符号化形式で、通常はRaw AACとして、またはMP4ファミリーのコンテナ内に保存されます。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".ac3",
+            "lines": [
+              "AC-3（Dolby Digital）は、モノラルおよびマルチチャンネル音声に使用される損失型のオーディオ符号化形式です。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".eac3",
+            "lines": [
+              "E-AC-3（Dolby Digital Plus）は、より高いビットレートや追加のチャンネル構成によってAC-3を拡張した形式です。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".mp1",
+            "lines": [
+              "MP1とはMPEG Audio Layer Iのことで、MPEG-1オーディオレイヤー3種類の中で最も初期のものです。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".mp2",
+            "lines": [
+              "MP2とはMPEG Audio Layer IIのことで、放送や古いメディアで今なお使用されている損失圧縮形式です。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".mp3",
+            "lines": [
+              "MP3とは、広く利用されている損失音声フォーマットであるMPEG Audio Layer IIIのことです。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".ogg",
+            "lines": [
+              "Oggは、Vorbis、Opus、FLAC、Speexといったオーディオ形式を格納するためによく使われるコンテナ形式です。GlitchScopeではFFmpegを使用してそのオーディオストリームをデコードします。"
+            ]
+          },
+          {
+            "title": ".oga",
+            "lines": [
+              "OGAはOggコンテナ用の音声専用ファイル拡張子です。GlitchScopeではFFmpegを使用してその音声ストリームをデコードします。"
+            ]
+          },
+          {
+            "title": ".opus",
+            "lines": [
+              "Opusは、IETFによって標準化されたオープンな低遅延の損失音声フォーマットです。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".spx",
+            "lines": [
+              "SPXは通常、Oggコンテナ内にSpeex音声を格納した形式です。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".flac",
+            "lines": [
+              "FLACは、元のPCMサンプルを正確に再構築するオープンなロスレスオーディオフォーマットです。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".wav",
+            "lines": [
+              "WAVはRIFFベースのオーディオコンテナで、主にPCMに使用されますが、他のコーデックも扱うことができます。GlitchScopeではFFmpegを使用してデコードします。"
+            ]
+          },
+          {
+            "title": ".rf64",
+            "lines": [
+              "RF64は、従来のRIFF形式の4 GiBというサイズ制限を超えるファイル向けにWAVを拡張した形式です。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".aiff",
+            "lines": [
+              "AIFFはAppleが開発したIFFベースのオーディオコンテナで、非圧縮PCMファイルによく使用されます。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".aif",
+            "lines": [
+              "AIFはAIFFオーディオファイルの別名として使われるファイル拡張子です。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".aifc",
+            "lines": [
+              "AIFCはAIFFコンテナの圧縮音声版です。GlitchScopeではFFmpegを使用してデコードします。"
+            ]
+          },
+          {
+            "title": ".caf",
+            "lines": [
+              "CAFは、オーディオとメタデータを格納するApple製のCore Audioフォーマットコンテナです。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".m4a",
+            "lines": [
+              "M4Aはオーディオ専用のMP4コンテナで、主にAACまたはALAC形式の音声を格納します。GlitchScopeではFFmpegを使用してそのオーディオストリームをデコードします。"
+            ]
+          },
+          {
+            "title": ".m4b",
+            "lines": [
+              "M4Bは、オーディオブックや章のメタデータによく使用されるMP4オーディオコンテナです。GlitchScopeはFFmpegを使用してそのオーディオストリームをデコードします。"
+            ]
+          },
+          {
+            "title": ".mp4",
+            "lines": [
+              "MP4は、オーディオ、ビデオ、メタデータを格納できるISO Base Mediaコンテナです。GlitchScopeはサポートされているオーディオストリームをFFmpegを介して再生します。"
+            ]
+          },
+          {
+            "title": ".mov",
+            "lines": [
+              "MOVは、Appleが開発したオーディオ、ビデオ、メタデータ用のQuickTimeコンテナ形式です。GlitchScopeは対応するオーディオストリームをFFmpegを介して再生します。"
+            ]
+          },
+          {
+            "title": ".mka",
+            "lines": [
+              "MKAはMatroskaコンテナ用の、オーディオに特化したファイル拡張子です。GlitchScopeはFFmpegを使用してそのオーディオストリームをデコードします。"
+            ]
+          },
+          {
+            "title": ".mkv",
+            "lines": [
+              "MKVはMatroska形式のマルチメディアコンテナです。GlitchScopeでは、サポートされているオーディオストリームをFFmpegを通じて再生します。"
+            ]
+          },
+          {
+            "title": ".webm",
+            "lines": [
+              "WebMはMatroskaベースのコンテナ形式で、主にOpusまたはVorbis形式のオーディオを扱います。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".wma",
+            "lines": [
+              "WMAファイルにはWindows Media Audioコーデックが使用されており、通常はASFコンテナ内に格納されています。GlitchScopeではFFmpegを使用してこれらのファイルをデコードします。"
+            ]
+          },
+          {
+            "title": ".asf",
+            "lines": [
+              "ASFはMicrosoftが開発したAdvanced Systems Format形式のコンテナで、多くの場合WMAオーディオが含まれています。GlitchScopeではFFmpegを使用してそのオーディオストリームをデコードします。"
+            ]
+          },
+          {
+            "title": ".amr",
+            "lines": [
+              "AMRは携帯電話で使用される音声符号化フォーマットで、主にAMR-NBやAMR-WBとして利用されます。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".ape",
+            "lines": [
+              "APEはロスレスオーディオフォーマットであるMonkey's Audioです。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".tta",
+            "lines": [
+              "TTAとはロスレスオーディオ形式であるTrue Audioです。GlitchScopeではFFmpegを使用してデコードします。"
+            ]
+          },
+          {
+            "title": ".wv",
+            "lines": [
+              "WVとはロスレスまたはハイブリッド型のオーディオフォーマットであるWavPackです。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".mpc",
+            "lines": [
+              "MPCとは、主に音楽向けに設計された損失圧縮型のオーディオフォーマットであるMusepackです。GlitchScopeではFFmpegを使用してこれをデコードします。"
+            ]
+          },
+          {
+            "title": ".ts",
+            "lines": [
+              "TSは、放送や録画されたメディアで使用されるMPEGトランスポートストリームコンテナです。GlitchScopeはサポートされているオーディオストリームをFFmpegを介して再生します。"
+            ]
+          },
+          {
+            "title": ".m2ts",
+            "lines": [
+              "M2TSはBlu-ray形式のMPEGトランスポートストリームコンテナです。GlitchScopeはサポートされているオーディオストリームをFFmpegを介して再生します。"
+            ]
+          },
+          {
+            "title": ".ra",
+            "lines": [
+              "RAはRealAudioファイルまたはストリームコンテナです。GlitchScopeはFFmpegを使用して対応するRealAudioコーデックをデコードします。"
+            ]
+          },
+          {
+            "title": ".rm",
+            "lines": [
+              "RMはRealAudioを含む可能性のあるRealMediaコンテナです。GlitchScopeはサポートされているオーディオストリームをFFmpegを通じて再生します。"
+            ]
+          }
+        ]
+      },
+      {
+        "title": "トラッカー",
+        "children": [
+          {
+            "title": ".mod",
+            "lines": [
+              "MODファミリーのモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".xm",
+            "lines": [
+              "FastTracker II拡張モジュールです。GlitchScopeはlibxmpを使用してこの拡張形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".it",
+            "lines": [
+              "Impulse Trackerモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".s3m",
+            "lines": [
+              "Scream Tracker 3用モジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".mptm",
+            "lines": [
+              "OpenMPTモジュール。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".stm",
+            "lines": [
+              "Scream Tracker 2用モジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".nst",
+            "lines": [
+              "NoiseTrackerモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".wow",
+            "lines": [
+              "Mod's Graveモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".ult",
+            "lines": [
+              "UltraTrackerモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".669",
+            "lines": [
+              "Composer 669またはUNIS 669モジュール。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".mtm",
+            "lines": [
+              "MultiTrackerモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".med",
+            "lines": [
+              "MEDまたはOctaMEDモジュールです。GlitchScopeはlibxmpを使用してこの拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".far",
+            "lines": [
+              "Farandole Composerモジュール。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".mdl",
+            "lines": [
+              "Digitrakkerモジュールです。GlitchScopeはlibxmpを使用してこの拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".ams",
+            "lines": [
+              "Extreme社のTrackerまたはVelvet Studioモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".dsm",
+            "lines": [
+              "DSIKモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".amf",
+            "lines": [
+              "AsylumまたはDSMIモジュール。GlitchScopeはlibxmpを使用してこの拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".okt",
+            "lines": [
+              "Oktalyzerモジュール。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".dmf",
+            "lines": [
+              "デジタル・トラッカーまたはDefleMaskモジュールです。GlitchScopeはlibopenmptを使用してこのファイル形式をデコードし、必要に応じてlibxmpを補助的に利用します。"
+            ]
+          },
+          {
+            "title": ".ptm",
+            "lines": [
+              "ポリトラッカーモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".psm",
+            "lines": [
+              "ProTracker Studio または Epic モジュール。GlitchScope は libxmp を使用してこの拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".mt2",
+            "lines": [
+              "MadTracker 2用モジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".dbm",
+            "lines": [
+              "DigiBooster Proモジュール。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".abk",
+            "lines": [
+              "AMOS Music Bankモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".digi",
+            "lines": [
+              "DIGI Boosterモジュール。GlitchScopeはlibxmpを使用してこの拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".dtt",
+            "lines": [
+              "デジタル・トラッカー形式。GlitchScopeはlibxmpを使用してこの拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".flx",
+            "lines": [
+              "FlexTraxモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".gtk",
+            "lines": [
+              "Graoumf Trackerモジュール。GlitchScopeはlibxmpを使用してこの拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".imf",
+            "lines": [
+              "Imago Orpheusモジュール。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".liq",
+            "lines": [
+              "Liquid Trackerモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".masi",
+            "lines": [
+              "Epic MegaGames製のMASIモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".mgt",
+            "lines": [
+              "Megatrackerモジュール。GlitchScopeはlibxmpを使用してこの拡張フォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".mmd",
+            "lines": [
+              "MEDまたはOctaMED形式のMMDモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".mmdc",
+            "lines": [
+              "圧縮されたMEDモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".mmcmp",
+            "lines": [
+              "MMCMPで圧縮されたモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".muse",
+            "lines": [
+              "MUSE形式のモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".nt",
+            "lines": [
+              "NoiseTrackerモジュール。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".pmd",
+            "lines": [
+              "ProTracker互換のモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".ppm",
+            "lines": [
+              "ProTracker Packerモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".pru",
+            "lines": [
+              "Prorunnerモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".pt36",
+            "lines": [
+              "ProTracker 3.6用モジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".rh",
+            "lines": [
+              "Rob Hubbard製モジュール。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".rtm",
+            "lines": [
+              "Real Trackerモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".sfx",
+            "lines": [
+              "サウンドFXモジュールです。GlitchScopeはlibxmpを使用してこの拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".sfx2",
+            "lines": [
+              "SoundFX 2モジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".stim",
+            "lines": [
+              "Slamtiltモジュール。GlitchScopeはlibxmpを使用してこの拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".stx",
+            "lines": [
+              "STMIKモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".tcb",
+            "lines": [
+              "TCB Trackerモジュール。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".tdd",
+            "lines": [
+              "The Dark Demonモジュールです。GlitchScopeはlibxmpを使用してこのフォーマットをデコードします。"
+            ]
+          },
+          {
+            "title": ".tp",
+            "lines": [
+              "Tracker Packerモジュールです。GlitchScopeはlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".uni",
+            "lines": [
+              "UNIモジュール。GlitchScopeはlibxmpを使用してこのファイル拡張子をデコードします。"
+            ]
+          },
+          {
+            "title": ".xd",
+            "lines": [
+              "FastTracker II用モジュールのフォーマットです。GlitchScopeではlibxmpを使用してこのファイル形式をデコードします。"
+            ]
+          },
+          {
+            "title": ".mo3",
+            "lines": [
+              "MO3圧縮モジュールです。GlitchScopeはlibopenmptを使用してこのフォーマットをデコードし、必要に応じてlibxmpを使用します。"
+            ]
+          },
+          {
+            "title": ".ktm",
+            "lines": [
+              "Karateモジュールです。GlitchScopeはlibopenmptを使用してこのフォーマットをデコードし、必要に応じてlibxmpを代替として使用します。"
+            ]
+          },
+          {
+            "title": ".ims",
+            "lines": [
+              "Velvet Studio用モジュールです。GlitchScopeはlibopenmptを使用してこのフォーマットをデコードし、必要に応じてlibxmpを補助的に利用します。"
+            ]
+          },
+          {
+            "title": ".mdc",
+            "lines": [
+              "Megadrive用トラッカーモジュールです。GlitchScopeはlibopenmptを使用してこのフォーマットをデコードし、必要に応じてlibxmpを補助的に利用します。"
+            ]
+          },
+          {
+            "title": ".txn",
+            "lines": [
+              "MadTracker 2用モジュールです。GlitchScopeはlibopenmptを使用してこのファイル形式をデコードし、必要に応じてlibxmpを補助的に利用します。"
+            ]
+          }
+        ]
+      },
+      {
+        "title": "チップチューン",
+        "children": [
+          {
+            "title": ".ay",
+            "lines": [
+              "AY形式は、ZX SpectrumやAmstrad CPCの音楽データをAYファミリーのサウンドハードウェア向けのZ80プログラムデータとして保存します。GlitchScopeではGame Music Emuを使用して再生します。"
+            ]
+          },
+          {
+            "title": ".nsf",
+            "lines": [
+              "NSFは、エミュレーション再生用のNintendo NESやFamicomの音楽コードおよびデータを保存します。GlitchScopeではGame Music Emuを使用してこれらを再生します。"
+            ]
+          },
+          {
+            "title": ".nsfe",
+            "lines": [
+              "NSFEは、チャンク化されたメタデータやプレイリスト情報を持つ、拡張可能なNSFの派生形式です。GlitchScopeではGame Music Emuを使用して再生します。"
+            ]
+          },
+          {
+            "title": ".spc",
+            "lines": [
+              "SPCとは、スーパーニンテンドウまたはスーパーファミコンのオーディオサブシステムのスナップショットです。GlitchScopeではGame Music Emuを使用して再生します。"
+            ]
+          },
+          {
+            "title": ".gbs",
+            "lines": [
+              "GBSはエミュレーション再生用に、Nintendo Game Boyの音楽コードとデータを保存します。GlitchScopeはGame Music Emuを使用してこれらを再生します。"
+            ]
+          },
+          {
+            "title": ".hes",
+            "lines": [
+              "HESは、エミュレーション再生用にPC EngineやTurboGrafx-16の音楽コードおよびデータを保存します。GlitchScopeではGame Music Emuを使用してこれらを再生します。"
+            ]
+          },
+          {
+            "title": ".kss",
+            "lines": [
+              "KSSは、PSGまたはSCCオーディオを使用してMSXやその他のZ80ベースのシステム用の音楽を保存します。GlitchScopeではGame Music Emuを使って再生され、このバックエンドではFM音声はサポートされていません。"
+            ]
+          },
+          {
+            "title": ".sap",
+            "lines": [
+              "SAPは、POKEYサウンドチップ用のAtari 8ビット音楽コードとデータを保存します。GlitchScopeはGame Music Emuを使用してこれらを再生します。"
+            ]
+          },
+          {
+            "title": ".vgm",
+            "lines": [
+              "VGMは、コンソール、アーケードマシン、コンピュータ内のサウンドチップに送信されるコマンドを記録したものです。GlitchScopeは、Game Music Emuを使用して対応するVGMチップの音楽を再生します。"
+            ]
+          },
+          {
+            "title": ".vgz",
+            "lines": [
+              "VGZはgzipで圧縮されたVGMファイルです。GlitchScopeはGame Music Emuを使用してこれを解圧し、再生します。"
+            ]
+          },
+          {
+            "title": ".sid",
+            "lines": [
+              "SIDはCommodore 64の音楽コードおよびSIDチップ用のデータを格納します。一般的なバリアントはPSIDです。GlitchScopeではcRSIDを使用してこれらのファイルを再生します。"
+            ]
+          },
+          {
+            "title": ".rsid",
+            "lines": [
+              "RSIDは、より完全なCommodore 64の動作を必要とするチューン向けに作られた、より厳格なSIDの派生形式です。GlitchScopeではcRSIDを使用して再生します。"
+            ]
+          },
+          {
+            "title": ".vtx",
+            "lines": [
+              "VTXは、Vortex Trackerでよく作成される、圧縮されたAY-3-8910またはYM2149のレジスタデータを保存しています。GlitchScopeでは、独自のVTXパーサーおよびayumi機能を用いてこれを再生します。"
+            ]
+          },
+          {
+            "title": ".pt3",
+            "lines": [
+              "PT3とは、AY-3-8910またはYM2149を使用した音楽向けのPro Tracker 3モジュールです。GlitchScopeではpt3playerおよびayumiを使用して再生します。"
+            ]
+          },
+          {
+            "title": ".ym",
+            "lines": [
+              "YMはAtari STスタイルのYM2149レジスタダンプを保存し、複数のフォーマットバージョンが存在します。GlitchScopeではStSoundを使用して再生します。"
+            ]
+          },
+          {
+            "title": ".lh",
+            "lines": [
+              "LHは、LHAで圧縮されたYM音楽用のレガシーな拡張子です。GlitchScopeはStSoundを使用してそれをデコードし、再生します。"
+            ]
+          },
+          {
+            "title": ".lha",
+            "lines": [
+              "LHAアーカイブには圧縮されたYM音楽が含まれている場合があります。GlitchScopeは、対応するYMアーカイブをStSoundを使用して開きます。"
+            ]
+          },
+          {
+            "title": ".ahx",
+            "lines": [
+              "AHXは、サンプル音声ではなく合成音源を中心に設計されたAmigaチップチューンモジュールです。GlitchScopeではHivelyTrackerリプレイヤーを使用して再生します。"
+            ]
+          },
+          {
+            "title": ".hvl",
+            "lines": [
+              "HVLとはHivelyTrackerモジュール形式で、AHXに追加のトラッカー機能を搭載したものです。GlitchScopeではHivelyTrackerリプレイヤーを使用して再生します。"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "デバイス",
+    "lines": []
+  },
+  {
+    "id": 8,
+    "title": "このアプリについて",
+    "lines": [
+      "**GlitchScope**",
+      "Linux搭載のハンドヘルドデバイスやデスクトップコンピュータ向けに開発された、音楽プレーヤー兼リアルタイムMilkDropビジュアライザーです。",
+      "",
+      "ローカルのオーディオファイル、トラッカーモジュール、クラシックなゲーム音楽フォーマットを再生したり、ModlandやModArchiveのカタログを閲覧したりできます。",
+      "ビジュアルはprojectMによってレンダリングされ、オーディオは各フォーマットに最適化された専用のオープンソースエンジンによってデコードされます。",
+      "",
+      "パフォーマンス、バランス、エコモードでは、デバイスの性能に応じてビジュアルの品質が調整されます。また、音楽のみの再生時にはビジュアライザーを無効にすることも可能です。",
+      "",
+      "**Project**",
+      "https://github.com/dendec/glitchscope",
+      "GPL-2.0-or-laterライセンスのもとで提供されています。"
+    ]
+  },
+  {
+    "id": 9,
+    "title": "ライセンス",
+    "children": [
+      {
+        "title": "projectM",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/projectM-visualizer/projectm",
+          "Copyright (C) 2003-2009 projectM Team"
+        ]
+      },
+      {
+        "title": "SoLoud",
+        "lines": [
+          "zlib",
+          "https://github.com/jarikomppa/soloud",
+          "Copyright (c) 2013-2018 Jari Komppa"
+        ]
+      },
+      {
+        "title": "FFmpeg",
+        "lines": [
+          "LGPL-2.1+",
+          "https://ffmpeg.org/",
+          "Copyright (c) FFmpeg developers"
+        ]
+      },
+      {
+        "title": "libxmp",
+        "lines": [
+          "MIT",
+          "https://github.com/libxmp/libxmp",
+          "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"
+        ]
+      },
+      {
+        "title": "libopenmpt",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/OpenMPT/openmpt",
+          "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"
+        ]
+      },
+      {
+        "title": "game-music-emu",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/libgme/game-music-emu",
+          "Copyright (c) Shay Green"
+        ]
+      },
+      {
+        "title": "ayumi",
+        "lines": [
+          "MIT",
+          "https://github.com/true-grue/ayumi",
+          "Copyright (c) Peter Sovietov"
+        ]
+      },
+      {
+        "title": "pt3player",
+        "lines": [
+          "MIT",
+          "https://github.com/Volutar/pt3player",
+          "Copyright (c) 2023 Volutar"
+        ]
+      },
+      {
+        "title": "libstsound",
+        "lines": [
+          "BSD-2-Clause",
+          "https://github.com/cpcsdk/libstsound",
+          "Copyright holders: Leonard/Oxygene et al."
+        ]
+      },
+      {
+        "title": "Hively",
+        "lines": [
+          "MIT",
+          "https://github.com/tildearrow/foo-input-hvl",
+          "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"
+        ]
+      },
+      {
+        "title": "cRSID",
+        "lines": [
+          "WTFPL",
+          "https://www.rockbox.org/",
+          "Copyright (c) Hermit (Mihaly Horvath)"
+        ]
+      },
+      {
+        "title": "klauspost/compress (Zstandard)",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/klauspost/compress",
+          "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"
+        ]
+      },
+      {
+        "title": "go-sdl2",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/veandco/go-sdl2",
+          "Copyright (c) 2013 Go-SDL2 Authors"
+        ]
+      },
+      {
+        "title": "SDL2",
+        "lines": [
+          "zlib",
+          "https://libsdl.org/",
+          "Copyright (C) 1997-2026 Sam Lantinga"
+        ]
+      },
+      {
+        "title": "x/image",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/image",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "x/text",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/text",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "libogg",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/ogg/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libvorbis",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/vorbis/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libFLAC",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/flac/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "mpg123",
+        "lines": [
+          "LGPL-2.1",
+          "https://www.mpg123.de/",
+          "Copyright (c) mpg123 contributors"
+        ]
+      },
+      {
+        "title": "zlib",
+        "lines": [
+          "zlib",
+          "https://zlib.net/",
+          "Copyright (c) Jean-loup Gailly and Mark Adler"
+        ]
+      },
+      {
+        "title": "GNU Unifont",
+        "lines": [
+          "GPL-2.0+ with font embedding exception",
+          "https://unifoundry.com/unifont/",
+          "Copyright (c) GNU Unifont contributors"
+        ]
+      },
+      {
+        "title": "PortsMaster Device-Info",
+        "lines": [
+          "MIT",
+          "https://github.com/PortsMaster/Device-Info",
+          "Copyright (c) PortsMaster contributors"
+        ]
+      }
+    ]
+  }
+]

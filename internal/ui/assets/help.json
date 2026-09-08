@@ -1,323 +1,898 @@
 [
   {
-  "title": "Getting Started",
-  "lines": [
-    "**Play your music**",
-    "Press {menu} to open the menu.",
-    "Choose Music, open a folder, then select a track.",
-    "",
-    "**Enjoy the visualizer**",
-    "Close the menu after playback starts.",
-    "Use Presets to choose a visual style and Settings to balance quality, speed and battery life.",
-    "",
-    "The footer always shows the actions available for the current selection."
-  ],
-  "id": 0
-},
+    "title": "Getting Started",
+    "lines": [
+      "**Play your music**",
+      "Press {menu} to open the menu.",
+      "Choose Music, open a folder, then select a track.",
+      "",
+      "**Enjoy the visualizer**",
+      "Close the menu after playback starts.",
+      "Use Presets to choose a visual style and Settings to balance quality, speed and battery life.",
+      "",
+      "The footer always shows the actions available for the current selection."
+    ],
+    "id": 0
+  },
   {
-  "title": "Controls",
-  "children": [
-    {
-      "title": "In the menu",
-      "lines": [
-        "**Navigation**",
-        "{move} moves the selection. Hold to scroll faster.",
-        "{focus} switches panels.",
-        "{select} opens the selected item or applies a value.",
-        "{back} goes back or cancels editing.",
-        "{pages} switches pages.",
-        "",
-        "**Menu**",
-        "{menu} opens or closes the menu.",
-        "The footer shows actions for the current selection."
-      ]
-    },
-    {
-      "title": "While listening",
-      "lines": [
-        "**With the menu closed**",
-        "{tracks} selects the previous / next track.",
-        "Next respects the selected shuffle mode.",
-        "{play} plays or pauses.",
-        "{seek} seeks backward or forward.",
-        "{presets} changes the visualizer preset.",
-        "{random} chooses a random preset.",
-        "{overlay} shows or hides track notifications."
-      ]
-    },
-    {
-      "title": "Help navigation",
-      "lines": [
-        "Choose a topic on the left.",
-        "{select} opens a topic with subtopics.",
-        "{focus} moves to the text panel.",
-        "{move} scrolls the text.",
-        "{back} returns to the previous level.",
-        "{pages} returns to another application page."
-      ]
-    }
-  ],
-  "id": 1
-},
+    "title": "Controls",
+    "children": [
+      {
+        "title": "In the menu",
+        "lines": [
+          "**Navigation**",
+          "{move} moves the selection. Hold to scroll faster.",
+          "{focus} switches panels.",
+          "{select} opens the selected item or applies a value.",
+          "{back} goes back or cancels editing.",
+          "{pages} switches pages.",
+          "",
+          "**Menu**",
+          "{menu} opens or closes the menu.",
+          "The footer shows actions for the current selection."
+        ]
+      },
+      {
+        "title": "While listening",
+        "lines": [
+          "**With the menu closed**",
+          "{tracks} selects the previous / next track.",
+          "Next respects the selected shuffle mode.",
+          "{play} plays or pauses.",
+          "{seek} seeks backward or forward.",
+          "{presets} changes the visualizer preset.",
+          "{random} chooses a random preset.",
+          "{overlay} shows or hides track notifications."
+        ]
+      },
+      {
+        "title": "Help navigation",
+        "lines": [
+          "Choose a topic on the left.",
+          "{select} opens a topic with subtopics.",
+          "{focus} moves to the text panel.",
+          "{move} scrolls the text.",
+          "{back} returns to the previous level.",
+          "{pages} returns to another application page."
+        ]
+      }
+    ],
+    "id": 1
+  },
   {
-  "title": "Playback",
-  "children": [
-    {
-      "title": "Shuffle and repeat",
-      "lines": [
-        "Off: tracks play in order.",
-        "Album: shuffle the current folder or playlist.",
-        "Source: shuffle within Music, Modland or ModArchive.",
-        "All: shuffle across available sources. Offline, All uses only local music.",
-        "Source and All can repeat tracks, including the current track.",
-        "Repeat One repeats the current track when it ends. Manual Next still moves on.",
-        "A failed load is skipped. Repeated failures stop automatic recovery."
-      ]
-    },
-    {
-      "title": "Seeking",
-      "lines": [
-        "{seek} moves through the current track.",
-        "Tracker audio is prepared for accurate seeking when enough memory is available.",
-        "The preparation budget is selected automatically from currently available memory.",
-        "Long tracks or low-memory conditions use native streaming instead.",
-        "Backward seeking then depends on the decoder."
-      ]
-    },
-    {
-      "title": "Favorites",
-      "lines": [
-        "Select a track outside Favorites playlists and follow the Favorite hint in the footer.",
-        "A short press cycles Star / Heart / Note / None.",
-        "**Gamepad:**",
-        "Hold {favourite} to remove the selected track from favorites.",
-        "Outside track browsing, {play} is Play / Pause.",
-        "**Keyboard:**",
-        "F cycles the favorite; Delete removes it.",
-        ""
-      ]
-    }
-  ],
-  "id": 2
-},
+    "title": "Playback",
+    "children": [
+      {
+        "title": "Shuffle and repeat",
+        "lines": [
+          "Off: tracks play in order.",
+          "Album: shuffle the current folder or playlist.",
+          "Source: shuffle within Music, Modland or ModArchive.",
+          "All: shuffle across available sources. Offline, All uses only local music.",
+          "Source and All can repeat tracks, including the current track.",
+          "Repeat One repeats the current track when it ends. Manual Next still moves on.",
+          "A failed load is skipped. Repeated failures stop automatic recovery."
+        ]
+      },
+      {
+        "title": "Seeking",
+        "lines": [
+          "{seek} moves through the current track.",
+          "Tracker audio is prepared for accurate seeking when enough memory is available.",
+          "The preparation budget is selected automatically from currently available memory.",
+          "Long tracks or low-memory conditions use native streaming instead.",
+          "Backward seeking then depends on the decoder."
+        ]
+      },
+      {
+        "title": "Favorites",
+        "lines": [
+          "Select a track outside Favorites playlists and follow the Favorite hint in the footer.",
+          "A short press cycles Star / Heart / Note / None.",
+            "{gamepad_heading}",
+          "Hold {favourite} to remove the selected track from favorites.",
+          "Outside track browsing, {play} is Play / Pause.",
+            "{keyboard_heading}",
+          "F cycles the favorite; Delete removes it.",
+          ""
+        ]
+      }
+    ],
+    "id": 2
+  },
   {
-  "title": "Quality and Battery",
-  "children": [
-    {
-      "title": "Performance",
-      "lines": [
-        "Performance prioritizes visualizer quality and targets 30 FPS.",
-        "Balanced targets 24 FPS with a lower resolution ceiling.",
-        "Eco prioritizes battery life with a lower resolution ceiling and slower upscaling.",
-        "Auto resolution adjusts to the current preset. A fixed resolution disables this adjustment.",
-        "A heavy preset can be skipped if the lowest resolution is still too slow."
-      ]
-    },
-    {
-      "title": "Music without visualization",
-      "lines": [
-        "Set Visualizer to Off in Settings.",
-        "Music and menu navigation keep working against a plain background.",
-        "Opening Presets still enables its live preview.",
-        "Turn Visualizer back On to resume the animation."
-      ]
-    },
-    {
-      "title": "Preset selection",
-      "lines": [
-        "Open Presets and browse the list.",
-        "Pause on a preset to see its preview.",
-        "{select} selects it; it is applied when you leave the page.",
-        "Preset auto-switch controls automatic changes.",
-        "Successful resolutions are remembered during the current run."
-      ]
-    }
-  ],
-  "id": 3
-},
+    "title": "Quality and Battery",
+    "children": [
+      {
+        "title": "Performance",
+        "lines": [
+          "Performance prioritizes visualizer quality and targets 30 FPS.",
+          "Balanced targets 24 FPS with a lower resolution ceiling.",
+          "Eco prioritizes battery life with a lower resolution ceiling and slower upscaling.",
+          "Auto resolution adjusts to the current preset. A fixed resolution disables this adjustment.",
+          "A heavy preset can be skipped if the lowest resolution is still too slow."
+        ]
+      },
+      {
+        "title": "Music without visualization",
+        "lines": [
+          "Set Visualizer to Off in Settings.",
+          "Music and menu navigation keep working against a plain background.",
+          "Opening Presets still enables its live preview.",
+          "Turn Visualizer back On to resume the animation."
+        ]
+      },
+      {
+        "title": "Preset selection",
+        "lines": [
+          "Open Presets and browse the list.",
+          "Pause on a preset to see its preview.",
+          "{select} selects it; it is applied when you leave the page.",
+          "Preset auto-switch controls automatic changes.",
+          "Successful resolutions are remembered during the current run."
+        ]
+      }
+    ],
+    "id": 3
+  },
   {
-  "title": "Troubleshooting",
-  "children": [
-    {
-      "title": "No music listed",
-      "lines": [
-        "Open Music and choose a folder containing supported audio files.",
-        "An empty folder and a failed scan are different states; check any error shown.",
-        "Downloaded catalog indexes list music, but do not contain the audio itself."
-      ]
-    },
-    {
-      "title": "Offline catalogs",
-      "lines": [
-        "Saved catalog indexes remain browsable without internet.",
-        "A track must already be downloaded to play offline.",
-        "Shuffle All uses local music while offline. Network availability is checked periodically."
-      ]
-    },
-    {
-      "title": "Loading or skipped tracks",
-      "lines": [
-        "Downloading fetches a remote file. Preparing audio decodes a tracker for seeking.",
-        "You can select another track while loading.",
-        "Unsupported, damaged or unavailable tracks are skipped automatically.",
-        "If repeated failures stop playback, choose another track or source."
-      ]
-    },
-    {
-      "title": "Limited seeking",
-      "lines": [
-        "Some native tracker decoders cannot seek backward reliably.",
-        "Tracker seeking is prepared automatically when enough memory is available.",
-        "Very long tracks and low-memory conditions use native streaming."
-      ]
-    }
-  ],
-  "id": 4
-},
+    "title": "Troubleshooting",
+    "children": [
+      {
+        "title": "No music listed",
+        "lines": [
+          "Open Music and choose a folder containing supported audio files.",
+          "An empty folder and a failed scan are different states; check any error shown.",
+          "Downloaded catalog indexes list music, but do not contain the audio itself."
+        ]
+      },
+      {
+        "title": "Offline catalogs",
+        "lines": [
+          "Saved catalog indexes remain browsable without internet.",
+          "A track must already be downloaded to play offline.",
+          "Shuffle All uses local music while offline. Network availability is checked periodically."
+        ]
+      },
+      {
+        "title": "Loading or skipped tracks",
+        "lines": [
+          "Downloading fetches a remote file. Preparing audio decodes a tracker for seeking.",
+          "You can select another track while loading.",
+          "Unsupported, damaged or unavailable tracks are skipped automatically.",
+          "If repeated failures stop playback, choose another track or source."
+        ]
+      },
+      {
+        "title": "Limited seeking",
+        "lines": [
+          "Some native tracker decoders cannot seek backward reliably.",
+          "Tracker seeking is prepared automatically when enough memory is available.",
+          "Very long tracks and low-memory conditions use native streaming."
+        ]
+      }
+    ],
+    "id": 4
+  },
   {
     "id": 5,
     "title": "Catalogs",
     "children": [
-      {"title": "Modland", "lines": [
-        "**Catalog on this device**",
-        "Playable tracks: {modland_tracks}",
-        "Folders: {modland_directories}",
-        "Network: {network_status}",
-        "",
-        "**About Modland**",
-        "A large preservation archive of tracker, chiptune and game music organized by format and author.",
-        "GlitchScope keeps a compact index locally and downloads a selected track to its cache before playback.",
-        "The saved index remains browsable offline; tracks require a connection unless already cached."
-      ]},
-      {"title": "ModArchive", "lines": [
-        "**Catalog on this device**",
-        "Playable tracks: {modarchive_tracks}",
-        "Folders: {modarchive_directories}",
-        "Network: {network_status}",
-        "",
-        "**About The Mod Archive**",
-        "A community archive dedicated to playable music modules, with artists, ratings, reviews and historical collections.",
-        "GlitchScope ships compact indexes for the historical snapshot and addendum, then downloads only the selected module data.",
-        "Saved indexes remain browsable offline; tracks require a connection unless already cached."
-      ]}
+      {
+        "title": "Modland",
+        "lines": [
+          "**Catalog on this device**",
+          "Playable tracks: {modland_tracks}",
+          "Folders: {modland_directories}",
+          "Network: {network_status}",
+          "",
+          "**About Modland**",
+          "A large preservation archive of tracker, chiptune and game music organized by format and author.",
+          "GlitchScope keeps a compact index locally and downloads a selected track to its cache before playback.",
+          "The saved index remains browsable offline; tracks require a connection unless already cached."
+        ]
+      },
+      {
+        "title": "ModArchive",
+        "lines": [
+          "**Catalog on this device**",
+          "Playable tracks: {modarchive_tracks}",
+          "Folders: {modarchive_directories}",
+          "Network: {network_status}",
+          "",
+          "**About The Mod Archive**",
+          "A community archive dedicated to playable music modules, with artists, ratings, reviews and historical collections.",
+          "GlitchScope ships compact indexes for the historical snapshot and addendum, then downloads only the selected module data.",
+          "Saved indexes remain browsable offline; tracks require a connection unless already cached."
+        ]
+      }
     ]
   },
   {
     "id": 6,
     "title": "Formats",
     "children": [
-      {"title": "Audio", "children": [
-        {"title": ".aac", "lines": ["AAC (Advanced Audio Coding) is a lossy audio codec standardized in ISO/IEC 14496-3, developed by Fraunhofer, Dolby, AT&T, and Sony as a successor to MP3. It uses MDCT-based perceptual coding, supports 1-48 channels, sample rates from 8 to 96 kHz, and bitrates up to 512 kbps per channel. AAC-LC is the most widely supported profile, with HE-AAC variants adding spectral band replication for low-bitrate efficiency. AAC is the default audio format for Apple iTunes, YouTube, Spotify, Nintendo consoles, and most streaming services, achieving transparent stereo quality at around 128 kbps VBR."]},
-        {"title": ".ac3", "lines": ["Dolby Digital (AC-3) is a lossy multichannel audio codec developed by Dolby Laboratories, standardized as ATSC A/52. It supports up to 5.1 discrete channels (five full-range speakers plus LFE subwoofer), sample rates up to 48 kHz, and bitrates from 64 to 640 kbps using MDCT-based perceptual coding. AC-3 is the standard audio format for DVD-Video, Blu-ray, digital TV broadcasting, and cinema sound."]},
-        {"title": ".eac3", "lines": ["Dolby Digital Plus (E-AC-3) is a lossy multichannel audio codec, an enhanced successor to AC-3 developed by Dolby Laboratories. It supports up to 7.1 discrete channels, bitrates up to 6.144 Mbps, and improved coding efficiency at low bitrates. E-AC-3 decoders are backward-compatible with AC-3 bitstreams. Used on Blu-ray Disc, streaming services, and HD broadcasting."]},
-        {"title": ".mp1", "lines": ["MPEG-1 Audio Layer I (MP1) is a lossy audio codec defined in ISO/IEC 11172-3, the simplest of the three MPEG-1 audio layers. It uses 32-band subband coding with a psychoacoustic model, supporting sample rates of 32, 44.1, and 48 kHz with bitrates from 32 to 448 kbps. MP1 was used in the Digital Compact Cassette (DCC) format as PASC encoding and is now largely obsolete."]},
-        {"title": ".mp2", "lines": ["MPEG-1 Audio Layer II (MP2) is a lossy audio codec defined in ISO/IEC 11172-3, derived from the MUSICAM algorithm. It uses 32-band subband coding, supporting 32, 44.1, and 48 kHz sample rates and bitrates from 32 to 384 kbps. MP2 is less efficient than MP3 but has lower computational complexity and better error resilience. It remains the audio format for Digital Audio Broadcasting (DAB), Video CD, and professional broadcast distribution."]},
-        {"title": ".mp3", "lines": ["MPEG-1 Audio Layer III (MP3) is a lossy audio codec developed primarily by Fraunhofer IIS, standardized in ISO/IEC 11172-3. It uses MDCT and FFT-based perceptual coding with a hybrid filter bank, supporting sample rates from 8 to 48 kHz and bitrates from 8 to 320 kbps. MP3 is the most widely recognized digital audio format, having driven the explosion of internet music distribution in the late 1990s. It remains a de facto standard despite newer codecs offering better quality per bitrate."]},
-        {"title": ".ogg", "lines": ["Ogg is an open, royalty-free multimedia container format developed by the Xiph.Org Foundation. It commonly encapsulates Vorbis (lossy) or FLAC (lossless) audio streams, and can also contain Opus, Speex, or Theora video. Ogg Vorbis is widely used in gaming (Minecraft, Halo, World of Warcraft), internet radio, and open-source projects. Wikipedia uses Ogg for audio content."]},
-        {"title": ".oga", "lines": ["Ogg Audio (.oga) is a file extension for Ogg containers holding audio-only streams, typically Vorbis or Opus encoded. The .oga extension differentiates audio-only Ogg files from mixed .ogg files. The underlying format is identical to .ogg but signals audio-only content. Used for web audio, game audio, and internet streaming."]},
-        {"title": ".opus", "lines": ["Opus is a free, open-source lossy audio codec standardized as RFC 6716 by the IETF, developed by Xiph.Org Foundation. It combines SILK (speech-oriented LPC) and CELT (MDCT-based) algorithms, supporting bitrates from 6 to 510 kbps, sample rates from 8 to 48 kHz, and up to 255 channels. Default delay is 26.5 ms, reducible to 5 ms. Opus is mandatory for WebRTC and is used by WhatsApp, Discord, YouTube, and Zoom. Listening tests consistently rank it higher quality than MP3, AAC, and Vorbis at equivalent bitrates."]},
-        {"title": ".spx", "lines": ["Speex is a free, open-source lossy audio codec designed for voice communication, developed by Xiph.Org Foundation. It uses CELP speech coding, supporting sample rates from 8 to 32 kHz, optimized for voice at 2-44 kbps with built-in echo cancellation and noise suppression. Speex was widely used for VoIP before being superseded by Opus, which offers better quality for both speech and music."]},
-        {"title": ".flac", "lines": ["FLAC (Free Lossless Audio Codec) is an open, royalty-free lossless audio codec developed by the Xiph.Org Foundation. It typically compresses audio to 50-70% of original size while producing bit-perfect reconstruction. Supports sample rates up to 655.35 kHz, bit depths up to 32 bits, and up to 8 channels. FLAC is the most popular lossless format for music archiving, supported by most operating systems, hi-fi equipment, and streaming services like Tidal and Qobuz."]},
-        {"title": ".wav", "lines": ["WAV (Waveform Audio File Format) is an audio container format developed by IBM and Microsoft, based on RIFF. It typically stores uncompressed LPCM audio at CD quality (44.1 kHz, 16-bit stereo) but can also contain compressed audio. Files are large (about 10 MB per minute for CD quality) but offer zero-loss, zero-latency playback. WAV is the standard for professional audio production, broadcasting, and Windows system audio."]},
-        {"title": ".rf64", "lines": ["RF64 is an extension of the WAV format developed by the European Broadcasting Union (EBU) to overcome the 4 GB file size limitation of standard WAV. It uses a 64-bit file size field while remaining backward-compatible with standard WAV readers. RF64 is used in professional audio production and broadcasting for very long recordings that exceed the WAV 4 GB limit, specified in EBU Tech 3306."]},
-        {"title": ".aiff", "lines": ["AIFF (Audio Interchange File Format) is an audio container format developed by Apple, based on IFF. It typically stores uncompressed LPCM audio, similar to WAV but using big-endian byte order. Supports sample rates up to 48 kHz, bit depths up to 32 bits, and multiple channels. AIFF is commonly used on macOS and in professional audio production. The .aif extension is a shorter alias used interchangeably."]},
-        {"title": ".aif", "lines": ["AIF is an alternative file extension for AIFF (Audio Interchange File Format), functionally identical to .aiff. The .aif extension is a shorter alias used interchangeably by most applications, referring to the same Apple-developed container format for uncompressed audio."]},
-        {"title": ".aifc", "lines": ["AIFF-C (AIFC) is a compressed variant of the AIFF format developed by Apple, supporting various audio compression codecs within the AIFF container. Unlike standard AIFF which is uncompressed, AIFC can store compressed audio using codecs like PCM, ALAC, or other encodings. It retains the AIFF chunk-based structure while adding a compression type identifier. Used in Apple's audio ecosystem for compressed audio interchange."]},
-        {"title": ".caf", "lines": ["Core Audio Format (CAF) is an audio container format developed by Apple, designed to overcome limitations of older formats like WAV and AIFF. It supports virtually any audio codec (PCM, AAC, ALAC, Opus, etc.), sample rates, bit depths, and channel configurations. CAF files can exceed 4 GB and support rich metadata. CAF is used internally by macOS and iOS audio frameworks and is the recommended container for Apple platform audio development."]},
-        {"title": ".m4a", "lines": ["MPEG-4 Audio (.m4a) is a container format based on the ISO base media file format, typically containing AAC or ALAC encoded audio. It uses the MP4 container structure restricted to audio content, commonly holding AAC-LC or HE-AAC lossy audio, or Apple Lossless for lossless content. M4A is Apple's preferred audio container, used extensively in iTunes Store and Apple Music, supported by virtually all modern devices."]},
-        {"title": ".m4b", "lines": ["M4B is a variant of the MPEG-4 container format designed specifically for audiobooks and podcasts. It supports AAC audio encoding along with chapter markers, metadata, bookmarks, and variable playback speed. The format enables navigation between chapters and remembers playback position. M4B is the standard format for audiobooks on Apple platforms, used by Apple Books and various podcast apps."]},
-        {"title": ".mp4", "lines": ["MPEG-4 Part 14 (MP4) is a multimedia container format based on the ISO base media file format. It can contain video, audio, subtitles, and chapter information. For audio, it commonly holds AAC, AC-3, E-AC-3, MP3, FLAC, or Opus streams. MP4 is the most widely used container for digital video distribution, standard for streaming (YouTube, Netflix) and mobile video."]},
-        {"title": ".mov", "lines": ["QuickTime Movie (.mov) is a multimedia container format developed by Apple as part of the QuickTime framework. It can contain video, audio, text, and effects using a track-based structure. Supports virtually any codec including H.264, ProRes, AAC, ALAC, Opus, and PCM. MOV is widely used in professional video production and editing, natively supported on macOS and iOS."]},
-        {"title": ".mka", "lines": ["Matroska Audio (.mka) is an audio-only variant of the Matroska multimedia container format. It can encapsulate virtually any audio codec including FLAC, Opus, Vorbis, AAC, MP3, AC-3, DTS, and PCM. Supports metadata, chapter markers, and attachments. MKA is used for high-fidelity audio storage, popular in home theater and audiophile communities."]},
-        {"title": ".mkv", "lines": ["Matroska (MKV) is an open, royalty-free multimedia container format that can hold video, audio, subtitles, and chapter information. It supports virtually any codec combination. For audio, it commonly contains FLAC, Opus, AAC, AC-3, DTS, or Vorbis streams. MKV is popular for high-quality video storage, archiving, and home media servers (Plex, Kodi)."]},
-        {"title": ".webm", "lines": ["WebM is an open, royalty-free multimedia container format based on Matroska, developed by Google for web use. It typically contains VP8/VP9/AV1 video and Opus or Vorbis audio. Designed for HTML5 video and audio elements with native browser support in Chrome, Firefox, Edge, and Opera. WebM is the standard format for HTML5 video on the web, used extensively by YouTube."]},
-        {"title": ".wma", "lines": ["Windows Media Audio (WMA) is a proprietary lossy audio codec developed by Microsoft. It uses MDCT-based perceptual coding, with variants including WMA Standard (lossy), WMA Pro (multichannel lossy), and WMA Lossless. WMA was Microsoft's answer to MP3 and AAC, widely used in Windows Media Player and Xbox ecosystems. Its use has declined with the rise of AAC and Opus."]},
-        {"title": ".asf", "lines": ["Advanced Systems Format (ASF) is a digital multimedia container format developed by Microsoft, primarily used as a wrapper for Windows Media streams. It can contain audio (WMA, MP3), video (WMV, MPEG-4), and metadata. ASF supports streaming over networks with features like content protection. Used primarily in Windows Media streaming and surveillance systems."]},
-        {"title": ".amr", "lines": ["Adaptive Multi-Rate (AMR) is a lossy audio codec optimized for speech coding, standardized by 3GPP. It uses ACELP speech coding at bitrates from 4.75 to 12.2 kbps with 8 kHz sample rate. AMR-WB extends this to 16 kHz and 6.6-23.85 kbps. AMR is widely used in GSM and 3G mobile networks for voice calls and MMS messages, optimized for speech not music."]},
-        {"title": ".ape", "lines": ["Monkey's Audio (APE) is a lossy audio codec known for its high compression ratios. It typically achieves 55-65% of original PCM size, slightly better compression than FLAC but at the cost of higher CPU usage. Supports sample rates up to 64 kHz, bit depths up to 32 bits, and multi-channel audio. Used primarily in the audiophile community for lossless music archiving."]},
-        {"title": ".tta", "lines": ["True Audio (TTA) is a free, open-source lossless audio codec based on adaptive prognostic filters. It achieves compression ratios comparable to FLAC (50-70% of original size) with fast encoding and decoding. Supports 8, 16, 24, and 32-bit audio at any sample rate. TTA is a lightweight lossless codec used for audio archiving, supported by foobar2000 and specialized players."]},
-        {"title": ".wv", "lines": ["WavPack is a free, open-source lossless audio codec with unique hybrid mode capabilities. In lossless mode, it achieves compression ratios similar to FLAC. Its hybrid mode creates a lossy file plus a correction file, allowing playability on lossy-capable players while retaining lossless restoration. WavPack also supports DSD audio. Used for flexible audio archiving."]},
-        {"title": ".mpc", "lines": ["Musepack (MPC) is a lossy audio codec optimized for high-quality transparent encoding at mid-to-high bitrates. It uses MP2-derived subband coding with improvements, operating at 128-320 kbps with VBR. Designed for transparency at adequate bitrates. Musepack was popular in the audiophile community but has largely been superseded by Opus and AAC."]},
-        {"title": ".ts", "lines": ["MPEG Transport Stream (.ts) is a digital container format for transmission and storage of audio, video, and data. It uses fixed-size 188-byte packets designed for broadcasting over unreliable networks with built-in error correction. Commonly carries MPEG-2 video with MP2, AAC, or AC-3 audio. TS is the standard for digital TV broadcasting (DVB, ATSC, ISDB) and IPTV."]},
-        {"title": ".m2ts", "lines": ["MPEG-2 Transport Stream (.m2ts) is a variant of MPEG-TS used for high-definition video and audio storage on Blu-ray Disc and AVCHD. It carries MPEG-2, H.264/AVC, or VC-1 video with Dolby Digital, DTS, LPCM, or AAC audio. Supports 1080p/1080i video at various frame rates. Used on Blu-ray Disc, AVCHD camcorders, and PlayStation 3."]},
-        {"title": ".ra", "lines": ["RealAudio (RA) is a proprietary lossy audio codec developed by RealNetworks for internet streaming. It supports a range of codecs from low-bitrate speech (8 kbps) to high-quality music encoding. Modern versions use AAC-based encoding. Designed for adaptive streaming over variable-bandwidth connections. RealAudio was widely used for internet radio but has declined with modern codecs."]},
-        {"title": ".rm", "lines": ["RealMedia (.rm) is a proprietary multimedia container format developed by RealNetworks. It typically contains RealAudio or RealVideo streams, designed for streaming over the internet with adaptive bitrate capabilities. RealMedia was dominant for internet streaming in the early 2000s but has been largely replaced by HTML5 video, HLS, DASH, and modern codecs."]}
-      ]},
-      {"title": "Tracker", "children": [
-        {"title": ".mod", "lines": ["MOD is a tracker module format created by Karsten Obarski for Ultimate Soundtracker on the Commodore Amiga in 1987, the first tracker module format ever made. It originally supported 4 channels and 15 8-bit PCM samples, with patterns containing note, instrument, and effect data arranged in a spreadsheet-like grid. Later variants (NoiseTracker, ProTracker) expanded to 32 channels and 31 instruments. MOD remains widely used in the demoscene, chiptune, keygen music, and indie game soundtracks, and is supported by nearly every module player and media library."]},
-        {"title": ".xm", "lines": ["XM (Extended Module) was created by Fredrik Huss (Mr.H) of Triton for FastTracker 2 in 1994. It introduced multisampling-capable instruments with volume and panning envelopes, 16-bit sample support, sample looping, basic pattern compression, and an expanded effect command set. XM is one of the most popular tracker formats, widely used in demoscene music, game soundtracks, and tracker composition, supported by OpenMPT, MilkyTracker, XMPlay, and most module playback libraries."]},
-        {"title": ".it", "lines": ["IT (Impulse Tracker) was created by Jeffrey Lim for Impulse Tracker in 1995. It introduced New Note Actions (NNAs) for managing polyphony beyond the pattern channel count, resonant filters, compressed pattern data (PP20/IT214/IT215), and channel-based panning. IT supports up to 64 channels and 99 instruments. It was used extensively in the demoscene and by notable artists like Deadmau5, C418 (Minecraft), and Sean Tyas, and powers the soundtrack of Unreal Tournament and Deus Ex via UMX containers."]},
-        {"title": ".s3m", "lines": ["S3M (Scream Tracker 3 Module) was created by Sami Tammilehto (Psi) for Scream Tracker 3, released in 1994. It supports up to 32 channels (16 digital + 14 FM synthesis via OPL2), 99 instruments, compressed pattern data, extra-fine pitch slides, and per-instrument sample rate at middle C. S3M is one of the few formats that hybridizes sample playback with real-time FM synthesis. It was widely used in the DOS demoscene and remains playable via OpenMPT, XMPlay, and libopenmpt."]},
-        {"title": ".mptm", "lines": ["MPTM is the native module format of OpenMPT, introduced in 2007. It extends IT/XM capabilities with support for VST plugins, stereo samples, per-channel wet/dry mixing, up to 128 channels, and extended pattern commands not possible in legacy formats. MPTM was created to preserve features that OpenMPT had been adding to IT and XM files but which could break compatibility. It is used by modern tracker musicians working in OpenMPT."]},
-        {"title": ".stm", "lines": ["STM (Scream Tracker Module) is the native format of Scream Tracker versions 1.0 through 2.x, created by Sami Tammilehto of Future Crew in 1990. It is a 4-channel MOD-like format supporting up to 31 samples with basic effects. STM was the precursor to S3M and was widely used in the early DOS demoscene. Today it is supported by OpenMPT, Schism Tracker, and libopenmpt."]},
-        {"title": ".nst", "lines": ["NST (NoiseTracker Module) is the native format of NoiseTracker, created by Pex \"Mahoney\" Tufvesson and Anders \"Kaktus\" Berkeman for the Amiga in 1989. It is an enhanced MOD variant supporting up to 31 instruments and additional effects not available in standard MOD. NoiseTracker was a key stepping stone between Ultimate Soundtracker and ProTracker. Notable users include Axwell of Swedish House Mafia. NST files are playable via OpenMPT and MilkyTracker."]},
-        {"title": ".wow", "lines": ["WOW is the native module format of Grave Composer, a DOS tracker from the early 1990s. It supports up to 32 channels of 8-bit sampled audio with a pattern-based sequencing structure similar to other DOS-era formats. WOW is a relatively obscure format with limited modern support, though OpenMPT can import and play back WOW files."]},
-        {"title": ".ult", "lines": ["ULT (UltraTracker Module) is the native format of UltraTracker, a DOS tracker from the mid-1990s. It supports up to 8 channels and 128 instruments with 8-bit PCM samples, offering a modest step up from the 4-channel MOD standard. ULT was used in the DOS demoscene and is supported by Schism Tracker, MikMod, and OpenMPT."]},
-        {"title": ".669", "lines": ["669 is the native format of the 669 tracker, created by Ashton/4mat for DOS in the early 1990s. It is an 8-channel format using compressed pattern data and 8-bit PCM samples. The format was one of the early efforts to exceed the 4-channel limit of MOD on DOS platforms. 669 files are playable via Schism Tracker, OpenMPT, and libopenmpt."]},
-        {"title": ".mtm", "lines": ["MTM (MultiTracker Module) was created by the American demoscene group Renaissance for MultiTracker on DOS in the early 1990s. It supports up to 32 simultaneous channels with 8-bit samples and up to 100 patterns. MTM was one of the first PC tracker formats to offer a high channel count, though fully utilizing 32 channels was demanding for contemporary hardware. MTM files are supported by OpenMPT and various module players."]},
-        {"title": ".med", "lines": ["MED was created by Teijo Kinnunen for the Amiga in 1989 and later evolved into OctaMED. It achieves 8-channel playback through software mixing on the Amiga's 4-channel hardware, and features native MIDI sequencing via the serial port, arbitrary pattern lengths, and up to 63 instruments. The format evolved through MED2-MED4 and MMD0-MMD3 sub-versions. Notable users include Calvin Harris (I Created Disco), Aphrodite, and Venetian Snares. MED files are playable via OpenMPT and XMPlay."]},
-        {"title": ".far", "lines": ["FAR (Farandole Composer Module) is the native format of Farandole Composer, a DOS tracker from the early 1990s. It supports up to 4 channels with 8-bit PCM samples and a pattern-based sequencing structure. FAR is a relatively simple format that was used in the early DOS demoscene. FAR files are playable via Schism Tracker and libopenmpt-based players."]},
-        {"title": ".mdl", "lines": ["MDL is the native module format of DigiTrakker, a DOS tracker from the mid-1990s. It supports up to 32 channels with both 8-bit and 16-bit PCM samples, compressed pattern data, and instrument volume envelopes. MDL was an ambitious format for its era, offering features competitive with IT and XM. MDL files are playable via OpenMPT and libopenmpt. Note: .mdl is also used by Microsoft Flight Simulator for 3D models, a completely unrelated format."]},
-        {"title": ".ams", "lines": ["AMS (Velvet Studio Module) is the native format of Velvet Studio, a DOS tracker from the mid-1990s. It supports up to 32 channels with samples and effects, offering a pattern-based sequencing environment. AMS is a relatively obscure format with limited modern support, though it can be played via Awave Studio and some module playback libraries."]},
-        {"title": ".dsm", "lines": ["DSM (DSIK Digital Sound Module) is the native format of the DSMI tracker, a DOS tracker from the early 1990s. It is a 4-channel MOD-like format supporting 8-bit PCM samples with basic effects. DSM was used in the early DOS demoscene and is playable via OpenMPT, MODPlug Player, and libopenmpt."]},
-        {"title": ".amf", "lines": ["AMF (ASYLUM Music Format) is the native format of the ASYLUM Music System, a DOS tracker from the early 1990s. It supports up to 8 channels with 8-bit PCM samples and a pattern-based structure. AMF is a relatively obscure format but is playable via Schism Tracker, MikMod, and Open Cubic Player."]},
-        {"title": ".okt", "lines": ["OKT (Oktalyzer Module) is the native format of Oktalyzer, created for the Amiga in 1990. It was an early effort to achieve 8-channel sound on the Amiga's 4-channel hardware through software mixing. OKT uses a MOD-like structure with additional effects and instrument features. OKT files are playable via MilkyTracker, MikMod, and OpenMPT."]},
-        {"title": ".dmf", "lines": ["DMF (D-Lusion Digital Music Format) was created by Thorsten Mutschall (D-Lusion) for X-Tracker, a DOS tracker from around 1994-1995. It features a DDMF magic header, chunk-based file structure (SEQU, PATT, INST, SMPD), and supports up to 32 channels with 8-bit and 16-bit PCM samples at up to 44.1 kHz. DMF never achieved the mainstream reach of IT or XM but is playable via OpenMPT and XMPlay."]},
-        {"title": ".ptm", "lines": ["PTM (PolyTracker Module) was created by Lone Ranger of AcmE for PolyTracker, a DOS tracker from around 1994-1995. Structurally derived from ScreamTracker 3, it supports up to 32 channels with 8-bit and 16-bit PCM samples at 8-44.1 kHz, sharing S3M's pattern layout and effect command syntax. PolyTracker was quickly superseded by Impulse Tracker. PTM files are playable via OpenMPT, XMPlay, and libopenmpt."]},
-        {"title": ".psm", "lines": ["PSM (Protracker Studio Module) was created by Epic MegaGames for the Epic MegaMusic format in the mid-1990s. It supports up to 32 channels and was used in several Epic Games titles including Unreal, Unreal Tournament, and Deus Ex, packaged inside UMX container files. PSM is playable via MODPlug Player and OpenMPT."]},
-        {"title": ".mt2", "lines": ["MT2 is MadTracker 2's native module format, developed by Yannick Delwiche in the late 1990s for Windows. It supports multiple channels, instruments with volume and panning envelopes, and modern tracker effects. MadTracker 2 was popular in the European demoscene and tracker music community for its intuitive interface and VST plugin support. The format is now largely legacy, though modules can still be played with Schism Tracker, Winamp, or Awave Studio."]},
-        {"title": ".dbm", "lines": ["DBM is the DigiBooster Pro module format, created by Tomasz and Waldemar Piasta for the Amiga platform in the mid-1990s. It uses IFF-like chunked structure with INFO, SONG, INST, PATT, SMPL, VENV, and PENV sections, supporting up to 64 channels, 8/16/32-bit samples, and volume/panning envelopes. DigiBooster Pro was notable for bringing professional multitrack capabilities to the Amiga. The format remains supported by libxmp-based players and OpenMPT for archival purposes."]},
-        {"title": ".abk", "lines": ["ABK is the AMOS/STOS Music Bank format, used by the AMOS and STOS BASIC programming languages on the Amiga in the early 1990s. It stores 4-channel modules with Amiga period-based notes, supporting basic tracker effects like portamento, vibrato, and arpeggio. The format was commonly used in Amiga games and demos created with AMOS/STOS. It is now considered a historical format, supported primarily by libxmp-based players for preservation."]},
-        {"title": ".digi", "lines": ["DIGI is the DIGI Booster module format, created by Tomasz 'Tap' Piasta for the Amiga in the early 1990s. It supports variable channel counts, 31 instruments with volume and finetune settings, and ProTracker-compatible effects with some extensions like robot and filter commands. DIGI Booster was one of the early Amiga trackers to support more than 4 channels. The format is now rare, with playback mainly through libxmp-based players."]},
-        {"title": ".dtt", "lines": ["DTT is a rare tracker module format associated with early 1990s Amiga music production. Limited documentation exists, but it appears to be a variant or extension of the MOD format used by specific Amiga tracker software. The format supports basic sample playback and pattern sequencing. Due to its obscurity, very few modules in this format are known to exist, and support is limited to specialized preservation tools."]},
-        {"title": ".flx", "lines": ["FLX is the FlexTune Tracker module format, a relatively obscure tracker format from the early 1990s. It was designed for creating music on personal computers with support for multiple channels and sample-based synthesis. The format includes basic tracker effects and pattern sequencing capabilities. Very few modules in this format survive today, and it remains largely undocumented in modern tracker communities."]},
-        {"title": ".gtk", "lines": ["GTK is a tracker module format associated with the Generic Tracker software, which was available for Amiga and early PC platforms. It supports standard MOD-like features including multiple channels, sample playback, and basic effects. The format was used primarily in the demoscene community during the early 1990s. Today, it is considered a historical format with limited modern support beyond archival players."]},
-        {"title": ".imf", "lines": ["IMF is the Imago Orpheus module format, developed by Lutz Roeder for DOS in the mid-1990s. It supports up to 32 channels, instruments with volume/panning/pitch envelopes, up to 1024 samples, and a comprehensive set of effects including filters and portamento. Imago Orpheus was notable for its professional-quality sound and IT-like features. The format is supported by OpenMPT, libxmp, and several other modern players."]},
-        {"title": ".liq", "lines": ["LIQ is the Liquid Tracker module format, developed by Nir Oren for DOS in the mid-1990s. It supports up to 64 channels, LDSS instrument format with 16-bit stereo samples, volume/panning envelopes, and a comprehensive effect set including S3M-compatible commands. Liquid Tracker was known for its clean interface and professional features. The format is supported by libxmp and some specialized tracker players."]},
-        {"title": ".masi", "lines": ["MASI (PSM) is the Epic MegaGames MASI module format, used in Unreal, Unreal Tournament, and other Epic games from the late 1990s. It uses an IFF-like chunked structure with support for multiple channels, instruments, and patterns. The format has two variants: standard Epic PSM and Sinaria PSM with different note encoding. It is supported by libxmp and is notable for its use in landmark FPS games."]},
-        {"title": ".mgt", "lines": ["MGT is the Megatracker module format, developed for Amiga systems in the early 1990s. It uses MGT/MCS magic bytes and supports variable channel counts, up to 64 instruments, track-based pattern editing, and comprehensive volume column effects. Megatracker was notable for its advanced features compared to standard MOD format. The format is supported by libxmp for preservation purposes."]},
-        {"title": ".mmd", "lines": ["MMD is the MED/OctaMED module format, originally developed by Otso Järvinen for the Amiga in the late 1980s, with OctaMED adding 8-channel support and later evolving into OctaMED Soundstudio. It supports sampled, synthetic, and hybrid instruments, up to 128 channels, and a comprehensive effect set. The format has several versions (MMD0-MMD3) with increasing capabilities. It is widely supported by modern players and is historically significant in the Amiga music scene."]},
-        {"title": ".mmdc", "lines": ["MMDC is a compressed variant of the MMD (MED/OctaMED) module format. It typically uses standard compression algorithms to reduce file sizes while maintaining the same musical content and features as regular MMD files. The compressed format was used for distribution where file size was a concern. Playback is handled by the same players that support standard MMD modules, with decompression performed transparently during loading."]},
-        {"title": ".mmcmp", "lines": ["MMCMP is the MMComp compressed module format, designed to compress tracker modules while preserving their playback quality. It typically uses lossless compression algorithms to reduce file sizes, particularly effective for modules with repetitive pattern data. The format was used for distributing compact tracker music files. Decompression is handled transparently by supporting players during playback."]},
-        {"title": ".muse", "lines": ["MUSE is a container format used to package compressed GAL4/GAL5 (Galaxy Sound System) modules. It uses 'MUSE' magic bytes with 0xdeadbeaf or 0xdeadbabe markers, and stores the compressed module data after a 24-byte header. The format was commonly used in DOS games to deliver high-quality music in compact file sizes. It is supported by libxmp, which decompresses the content and loads the underlying GAL module format."]},
-        {"title": ".nt", "lines": ["NT is the NoiseTracker module format, developed by Sean Connolly and Mark Cox for the Amiga in 1989-1990. It is an enhanced version of the original MOD format, adding more effects, more samples, and improved playback capabilities. NoiseTracker supported up to 31 instruments and introduced several new effect commands. It was widely used in the demoscene and is considered an important precursor to ProTracker. The format is universally supported by modern module players."]},
-        {"title": ".pmd", "lines": ["PMD is the ProTracker Module format variant, used by various ProTracker implementations on the Amiga and other platforms. It follows the standard MOD structure with 4 channels, 31 instruments, and ProTracker-compatible effects. The format was the de facto standard for Amiga music in the late 1980s and early 1990s. It is universally supported by virtually all module players and is historically one of the most important tracker formats."]},
-        {"title": ".ppm", "lines": ["PPM is the ProTracker PlayMate module format, a variant of the standard MOD format used by certain ProTracker implementations. It maintains compatibility with standard MOD playback while potentially including minor format variations. The format was used in the Amiga music scene during the late 1980s and early 1990s. It is supported by most module players that handle standard MOD files."]},
-        {"title": ".pru", "lines": ["PRU is the Prisma tracker module format, an early tracker format from the late 1980s. It was used primarily on Amiga systems and supported basic sample playback with limited effects. The format predates many more popular tracker formats and is considered a historical artifact. Very few modules in this format survive today, and support is limited to specialized preservation tools."]},
-        {"title": ".pt36", "lines": ["PT36 is the ProTracker v3.6 module format, a specific version of the widely-used ProTracker format for the Amiga. It supports 4 channels, 31 instruments, and the full set of ProTracker effects. ProTracker 3.6 was one of the final versions of the original ProTracker series and was widely used in the demoscene. The format is universally supported by modern module players and is historically significant in tracker music development."]},
-        {"title": ".rh", "lines": ["RH is a rare tracker module format with limited documentation. It appears to be associated with early 1990s tracker software, possibly for Amiga or early PC platforms. The format likely supports basic sample playback and pattern sequencing similar to other tracker formats of the era. Due to its obscurity, very few details are available, and support is limited to specialized preservation efforts."]},
-        {"title": ".rtm", "lines": ["RTM is the Real Tracker module format, developed by Arnaud Hasenfratz in the mid-1990s. It uses RTMM/RTND/RTIN/RTSM object headers, supporting up to 32 channels, instruments with volume/panning envelopes, up to 16 samples per instrument, and comprehensive effects including MIDI support. Real Tracker was notable for its professional features and clean interface. The format is supported by libxmp for preservation purposes."]},
-        {"title": ".sfx", "lines": ["SFX is the SoundFX module format, developed by Hi-Tech Software for the Amiga in the early 1990s. It supports 4 channels with 15 or 31 instruments (v1.3 and v2.0 respectively), basic effects including arpeggio, pitch bend, and volume changes. SoundFX was commonly used in Amiga games and demos. The format is supported by libxmp and other preservation-oriented players."]},
-        {"title": ".sfx2", "lines": ["SFX2 is the SoundFX 2.0 module format, an extended version of SoundFX that supports 31 instruments instead of the original 15. It maintains the same 4-channel structure and basic effect set as SoundFX 1.3 while providing more samples for complex compositions. SoundFX 2.0 was used in Amiga games and music production in the early 1990s. The format is supported by libxmp alongside the original SoundFX format."]},
-        {"title": ".stim", "lines": ["STIM is the Slamtilt module format, created by Sylvain Chipaux (Asle/ReDoX) for the Amiga in the early 1990s. It uses 'STIM' magic bytes and supports 4 channels with up to 31 instruments, using a compact event format with sample/note/effect data packed into 3 bytes per event. Slamtilt was used in some Amiga games and demos. The format is supported by libxmp for archival purposes."]},
-        {"title": ".stx", "lines": ["STX is the STMIK 0.2 module format, a beta Scream Tracker 3 variant used by the STMIK 0.2 driver for DOS games. It uses '!Scream!' and 'SCRM' magic bytes and supports features similar to S3M including multiple channels, instruments, and effects. The format was designed for game music distribution rather than module sharing. It is supported by libxmp and OpenMPT for game music preservation."]},
-        {"title": ".tcb", "lines": ["TCB is a rare tracker module format associated with early 1990s music production. Limited documentation exists, but it appears to be a variant of standard tracker formats used by specific software. The format likely supports basic sample playback and pattern sequencing. Due to its obscurity, very few modules in this format are known to exist, and support is limited to specialized preservation tools."]},
-        {"title": ".tdd", "lines": ["TDD is a rare tracker module format with limited documentation. It appears to be associated with early 1990s tracker software, possibly for Amiga or early PC platforms. The format likely supports basic sample playback and pattern sequencing similar to other tracker formats of the era. Due to its obscurity, very few details are available, and support is limited to specialized preservation efforts."]},
-        {"title": ".tp", "lines": ["TP is the Tracker Packer module format, a compressed variant of standard tracker modules. It typically uses compression algorithms to reduce file sizes while maintaining playback compatibility. The format was used for distributing compact tracker music files, particularly in the demoscene. Decompression is handled transparently by supporting players during playback."]},
-        {"title": ".uni", "lines": ["UNI is the Unic/Unic Tracker module format, developed for Amiga systems in the early 1990s. It is related to the Images Music System format and supports 4 channels with up to 31 instruments. The format includes a sample offset pointer and uses a compact event format. Unic was used in some Amiga games and demos. The format is supported by libxmp for preservation purposes."]},
-        {"title": ".xd", "lines": ["XD is the FastTracker 2 extended module format variant, used by FastTracker 2 and compatible software. It supports up to 32 channels, instruments with volume/panning envelopes, and comprehensive effects including arpeggio, portamento, and vibrato. FastTracker 2 was one of the most popular PC trackers in the mid-1990s. The format is widely supported by modern players including OpenMPT, MilkyTracker, and libxmp-based software."]},
-        {"title": ".mo3", "lines": ["MO3 is a tracker module format developed by Ian Luck for the BASSMOD engine, storing samples encoded with MP3 or Ogg Vorbis compression rather than raw PCM. This results in significantly reduced file sizes while maintaining near-identical audio quality, with lossless encoding also supported for samples that don't compress well with lossy methods. MO3 modules can contain any standard tracker format internally (MOD, S3M, XM, IT) with compressed samples. The format is widely supported by XMPlay, foobar2000, and other BASS-based players."]},
-        {"title": ".ktm", "lines": ["KTM is the Kefrens tracker module format, associated with the Kefrens demoscene group and their music production tools. It supports multiple channels and sample-based synthesis with standard tracker effects. The format was used primarily in the demoscene community during the early 1990s. Today, it is considered a historical format with limited modern support beyond specialized preservation tools."]},
-        {"title": ".ims", "lines": ["IMS is the Images Music System module format, developed for Amiga systems in the early 1990s. It supports 4 channels with 31 instruments, using a compact event format with note/instrument/effect data packed into 3 bytes. The format is related to the Unic format and was used in some Amiga games and demos. It is supported by libxmp for preservation purposes, with playback compatible with standard MOD period tables."]},
-        {"title": ".mdc", "lines": ["MDC is a rare tracker module format with limited documentation. It appears to be associated with early 1990s tracker software, possibly for Amiga or early PC platforms. The format likely supports basic sample playback and pattern sequencing similar to other tracker formats of the era. Due to its obscurity, very few details are available, and support is limited to specialized preservation efforts."]},
-        {"title": ".txn", "lines": ["TXN is a rare tracker module format with limited documentation. It appears to be associated with early 1990s tracker software, possibly for Amiga or early PC platforms. The format likely supports basic sample playback and pattern sequencing similar to other tracker formats of the era. Due to its obscurity, very few details are available, and support is limited to specialized preservation efforts."]}
-      ]},
-      {"title": "Chiptune", "children": [
-        {"title": ".ay", "lines": ["AY files preserve music for the General Instrument AY-3-8910 sound chip and its Yamaha YM2149 variant, a 3-voice programmable sound generator (PSG) with three square-wave channels, a noise generator, and a shared envelope controller. The chip was used in the ZX Spectrum 128k, Amstrad CPC, MSX, Atari ST, Oric-1, and Vectrex. The AY file format (sometimes called the Z80 format) packages the 6502/Z80 driver code and register data for emulator-based playback and is widely used in chiptune archives like the AY Music Archive (AY Music Archive)."]},
-        {"title": ".nsf", "lines": ["NSF (Nintendo Sound Format) is a container that stores the 6502 CPU driver code and wave data ripped from NES/Famicom game cartridges, designed for playback through emulation of the NES APU (2 pulse channels, 1 triangle, 1 noise, 1 DPCM delta channel). Created in the mid-1990s by Kevin Horton, NSF files are the standard format for NES music preservation, used extensively in emulator frontends, the NesDev community, and archives like Zophar's Domain with tens of thousands of tracks catalogued."]},
-        {"title": ".nsfe", "lines": ["NSFE (NSF Extended) is an extension of the NSF format that adds metadata support including track titles, artist names, copyright information, ripper credits, and a playlist for multi-track game soundtracks. It uses chunk-based headers to store extra information while remaining backwards-compatible with standard NSF players. NSFE files are used by emulators and music archives to provide organized, labeled collections of NES game music."]},
-        {"title": ".spc", "lines": ["SPC files capture the complete state of the Sony S-SMP and S-DSP audio processor from the Super Nintendo/Super Famicom, including its 64-sample ADPCM wavetable, 8 voices, digital echo, pitch modulation, and noise generation. Rather than storing a driver program, an SPC saves a snapshot of the SNES sound CPU's 64KB RAM plus all audio registers, enabling cycle-accurate playback without needing the original game ROM. The format is widely used in SNES emulation and music archiving, supported by players like SNESamp and various emulators."]},
-        {"title": ".gbs", "lines": ["GBS (Game Boy Sound) format stores the Z80 driver code and register data for Game Boy and Game Boy Color music, targeting the Sharp LR35902 CPU and the handheld's built-in sound hardware with 4 channels: two pulse-wave with sweep, one wave table, and one noise channel. Created by request of the Game Boy emulation community, GBS files are used by emulators like BGB and No$GBS, and are catalogued in archives such as Zophar's Domain with thousands of tracks from Game Boy titles."]},
-        {"title": ".hes", "lines": ["HES (Home Entertainment System) format preserves music from the NEC PC Engine/TurboGrafx-16 by storing the HuC6280 CPU driver code and data for the console's Yamaha YM2608-derived PSG, which provides 6 pulse-wave channels and 1 noise/DA channel (plus optional wavetable from the CD-ROM Super System). The format was developed for PC Engine emulation and is used in archives and emulators like MagicEngine, with a dedicated collection of several hundred tracks catalogued at Zophar's Domain and similar sites."]},
-        {"title": ".kss", "lines": ["KSS (Konami SCC Sound) format stores music data for MSX, Sega Master System, and Sega Game Gear, supporting the Konami SCC wavetable synthesis chip (5 channels) alongside the standard PSG (SN76489/SN76496) and the MSX AY-3-8910. Originally developed as the MPK format by the MSX community, KSS packages the Z80 driver code and ROM data for multiple sound chips in a single file, making it a versatile multi-system format used in MSX emulation and chiptune archives."]},
-        {"title": ".sap", "lines": ["SAP (Sound Artist Player) format stores music data for the Atari 8-bit family, targeting the POKEY sound chip which provides 4 independently programmable channels with selectable waveforms (pure, buzz, distorted, high-pass filtered). Created by the Atari 8-bit music preservation community, SAP files contain the 6502 driver code and POKEY register data and are played back through emulation. The format is supported by Atari 8-bit emulators like Altirra and is used in dedicated Atari music archives."]},
-        {"title": ".vgm", "lines": ["VGM (Video Game Music) is a log format that records the actual register write commands sent to multiple sound chips across a wide range of arcade, console, and computer systemsincluding the Sega Genesis YM2612, SN76489, and numerous othersrather than storing CPU driver code. Unlike code-based formats like NSF or SID, VGM captures chip interactions in real time, making it system-agnostic and highly accurate for cross-platform music preservation. Supported chips span dozens of platforms, and the format is maintained by the VGMRips community with extensive archives for Master System, Genesis, arcade boards, and more."]},
-        {"title": ".vgz", "lines": ["VGZ is the gzip-compressed variant of the VGM format, reducing file sizes significantly while maintaining identical playback through the same register-logging mechanism. The extension avoids double-dot filename issues that some operating systems have with .vgm.gz, ensuring VGZ files launch VGM players rather than generic archiver programs. VGZ is the preferred distribution format for VGM archives due to its smaller footprint, supported by all major VGM players like VGMPlay and in_mgv."]},
-        {"title": ".sid", "lines": ["SID files preserve Commodore 64 music by storing the 6510 CPU driver code and data for the MOS Technology 6581/8580 SID chip, a 3-voice synthesizer with ADSR envelope controls, ring modulation, oscillator sync, a multimode analog filter (lowpass, bandpass, highpass), and four waveforms per voice (triangle, sawtooth, pulse, noise). The format exists in PSID (standard) and RSID (requiring full C64 hardware emulation) variants, and is the foundation of the High Voltage SID Collection (HVSC) with over 57,000 tracks. SID files are played through emulators like JSidplay2, VICE, and HardSID hardware, and are central to the demoscene and chiptune listening community."]},
-        {"title": ".rsid", "lines": ["RSID is an enhanced SID file variant designed for music that requires more complete Commodore 64 hardware emulation, including CIA timer interactions, raster interrupts, and other advanced techniques that standard PSID files cannot represent. RSID files use a stricter header that mandates full C64 emulation (CPU, VIC-II, CIA chips) rather than the minimal SID-only approach of PSID. The format is used by modern SID composers who push beyond simple register-based playback, and is supported by advanced players like JSidplay2 and the reSID engine."]},
-        {"title": ".vtx", "lines": ["VTX files store chiptune music for the Yamaha AY-3-8910/YM2149 PSG and the Yamaha YM2612 FM synthesis chip used in the Sega Genesis/Mega Drive, using a vector-based encoding that captures register states rather than CPU code. Developed as part of the Vortex Tracker II ecosystem, VTX files are compact and designed for playback through emulation of these specific Yamaha sound chips. The format is used primarily in the Russian and Eastern European chiptune scenes, where Vortex Tracker II remains a popular composition tool."]},
-        {"title": ".pt3", "lines": ["PT3 (ProTracker 3) files are the native format of Vortex Tracker II, a tracker application for composing music using the Yamaha AY-3-8910/YM2149 PSG chip emulated via the YM2149 core. PT3 stores patterns, instruments, and effects data in a compact binary format optimized for the 3-channel square-wave plus noise capabilities of the AY/YM chip. Originating from the Soviet/Russian chiptune scene, PT3 is widely used for ZX Spectrum 128k and MSX music composition and is supported by players like Vortex Tracker II,AY Emu, and various cross-platform replayers."]}
-      ]}
+      {
+        "title": "Audio",
+        "children": [
+          {
+            "title": ".aac",
+            "lines": [
+              "AAC is a lossy audio coding format commonly stored as raw AAC or in MP4-family containers. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".ac3",
+            "lines": [
+              "AC-3 (Dolby Digital) is a lossy audio coding format used for mono and multichannel sound. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".eac3",
+            "lines": [
+              "E-AC-3 (Dolby Digital Plus) extends AC-3 with higher bitrates and additional channel configurations. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp1",
+            "lines": [
+              "MP1 is MPEG Audio Layer I, the earliest of the three MPEG-1 audio layers. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp2",
+            "lines": [
+              "MP2 is MPEG Audio Layer II, a lossy format still encountered in broadcast and older media. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp3",
+            "lines": [
+              "MP3 is MPEG Audio Layer III, a widely used lossy audio format. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".ogg",
+            "lines": [
+              "Ogg is a container that commonly carries Vorbis, Opus, FLAC or Speex audio. GlitchScope decodes its audio stream with FFmpeg."
+            ]
+          },
+          {
+            "title": ".oga",
+            "lines": [
+              "OGA is the audio-oriented filename extension for an Ogg container. GlitchScope decodes its audio stream with FFmpeg."
+            ]
+          },
+          {
+            "title": ".opus",
+            "lines": [
+              "Opus is an open, low-delay lossy audio format standardized by the IETF. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".spx",
+            "lines": [
+              "SPX normally contains Speex speech audio in an Ogg container. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".flac",
+            "lines": [
+              "FLAC is an open lossless audio format that reconstructs the original PCM samples exactly. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".wav",
+            "lines": [
+              "WAV is a RIFF-based audio container, most often used for PCM but capable of carrying other codecs. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".rf64",
+            "lines": [
+              "RF64 extends WAV for files that exceed the classic RIFF 4 GiB size limit. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".aiff",
+            "lines": [
+              "AIFF is Apple's IFF-based audio container, commonly used for uncompressed PCM. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".aif",
+            "lines": [
+              "AIF is an alternative filename extension for an AIFF audio file. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".aifc",
+            "lines": [
+              "AIFC is the compressed-audio variant of the AIFF container. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".caf",
+            "lines": [
+              "CAF is Apple's Core Audio Format container for audio and metadata. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".m4a",
+            "lines": [
+              "M4A is an audio-oriented MP4 container, commonly carrying AAC or ALAC. GlitchScope decodes its audio stream with FFmpeg."
+            ]
+          },
+          {
+            "title": ".m4b",
+            "lines": [
+              "M4B is an MP4 audio container commonly used for audiobooks and chapter metadata. GlitchScope decodes its audio stream with FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp4",
+            "lines": [
+              "MP4 is an ISO Base Media container that may hold audio, video and metadata. GlitchScope plays its supported audio stream through FFmpeg."
+            ]
+          },
+          {
+            "title": ".mov",
+            "lines": [
+              "MOV is Apple's QuickTime container for audio, video and metadata. GlitchScope plays its supported audio stream through FFmpeg."
+            ]
+          },
+          {
+            "title": ".mka",
+            "lines": [
+              "MKA is the audio-oriented filename extension for a Matroska container. GlitchScope decodes its audio stream with FFmpeg."
+            ]
+          },
+          {
+            "title": ".mkv",
+            "lines": [
+              "MKV is a Matroska multimedia container. GlitchScope plays its supported audio stream through FFmpeg."
+            ]
+          },
+          {
+            "title": ".webm",
+            "lines": [
+              "WebM is a restricted Matroska-based container, commonly carrying Opus or Vorbis audio. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".wma",
+            "lines": [
+              "WMA files carry Windows Media Audio codecs, usually inside an ASF container. GlitchScope decodes them with FFmpeg."
+            ]
+          },
+          {
+            "title": ".asf",
+            "lines": [
+              "ASF is Microsoft's Advanced Systems Format container and often carries WMA audio. GlitchScope decodes its audio stream with FFmpeg."
+            ]
+          },
+          {
+            "title": ".amr",
+            "lines": [
+              "AMR is a speech coding format used by mobile telephony, commonly as AMR-NB or AMR-WB. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".ape",
+            "lines": [
+              "APE is Monkey's Audio, a lossless audio format. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".tta",
+            "lines": [
+              "TTA is True Audio, a lossless audio format. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".wv",
+            "lines": [
+              "WV is WavPack, a lossless or hybrid audio format. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".mpc",
+            "lines": [
+              "MPC is Musepack, a lossy audio format designed primarily for music. GlitchScope decodes it with FFmpeg."
+            ]
+          },
+          {
+            "title": ".ts",
+            "lines": [
+              "TS is an MPEG transport-stream container used for broadcast and recorded media. GlitchScope plays its supported audio stream through FFmpeg."
+            ]
+          },
+          {
+            "title": ".m2ts",
+            "lines": [
+              "M2TS is a Blu-ray-style MPEG transport-stream container. GlitchScope plays its supported audio stream through FFmpeg."
+            ]
+          },
+          {
+            "title": ".ra",
+            "lines": [
+              "RA is a RealAudio file or stream container. GlitchScope decodes supported RealAudio codecs with FFmpeg."
+            ]
+          },
+          {
+            "title": ".rm",
+            "lines": [
+              "RM is a RealMedia container that may include RealAudio. GlitchScope plays its supported audio stream through FFmpeg."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Tracker",
+        "children": [
+          {
+            "title": ".mod",
+            "lines": [
+              "MOD-family module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".xm",
+            "lines": [
+              "FastTracker II Extended Module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".it",
+            "lines": [
+              "Impulse Tracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".s3m",
+            "lines": [
+              "Scream Tracker 3 module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".mptm",
+            "lines": [
+              "OpenMPT module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".stm",
+            "lines": [
+              "Scream Tracker 2 module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".nst",
+            "lines": [
+              "NoiseTracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".wow",
+            "lines": [
+              "Mod's Grave module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".ult",
+            "lines": [
+              "UltraTracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".669",
+            "lines": [
+              "Composer 669 or UNIS 669 module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".mtm",
+            "lines": [
+              "MultiTracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".med",
+            "lines": [
+              "MED or OctaMED module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".far",
+            "lines": [
+              "Farandole Composer module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".mdl",
+            "lines": [
+              "Digitrakker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".ams",
+            "lines": [
+              "Extreme's Tracker or Velvet Studio module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".dsm",
+            "lines": [
+              "DSIK module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".amf",
+            "lines": [
+              "Asylum or DSMI module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".okt",
+            "lines": [
+              "Oktalyzer module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".dmf",
+            "lines": [
+              "Digital Tracker or DefleMask module. GlitchScope decodes this extension with libopenmpt, falling back to libxmp when needed."
+            ]
+          },
+          {
+            "title": ".ptm",
+            "lines": [
+              "Poly Tracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".psm",
+            "lines": [
+              "ProTracker Studio or Epic module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".mt2",
+            "lines": [
+              "MadTracker 2 module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".dbm",
+            "lines": [
+              "DigiBooster Pro module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".abk",
+            "lines": [
+              "AMOS Music Bank module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".digi",
+            "lines": [
+              "DIGI Booster module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".dtt",
+            "lines": [
+              "Digital Tracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".flx",
+            "lines": [
+              "FlexTrax module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".gtk",
+            "lines": [
+              "Graoumf Tracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".imf",
+            "lines": [
+              "Imago Orpheus module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".liq",
+            "lines": [
+              "Liquid Tracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".masi",
+            "lines": [
+              "Epic MegaGames MASI module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".mgt",
+            "lines": [
+              "Megatracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".mmd",
+            "lines": [
+              "MED or OctaMED MMD module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".mmdc",
+            "lines": [
+              "compressed MED module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".mmcmp",
+            "lines": [
+              "MMCMP-compressed module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".muse",
+            "lines": [
+              "MUSE-packed module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".nt",
+            "lines": [
+              "NoiseTracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".pmd",
+            "lines": [
+              "ProTracker-compatible module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".ppm",
+            "lines": [
+              "ProTracker Packer module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".pru",
+            "lines": [
+              "Prorunner module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".pt36",
+            "lines": [
+              "ProTracker 3.6 module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".rh",
+            "lines": [
+              "Rob Hubbard module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".rtm",
+            "lines": [
+              "Real Tracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".sfx",
+            "lines": [
+              "SoundFX module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".sfx2",
+            "lines": [
+              "SoundFX 2 module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".stim",
+            "lines": [
+              "Slamtilt module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".stx",
+            "lines": [
+              "STMIK module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".tcb",
+            "lines": [
+              "TCB Tracker module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".tdd",
+            "lines": [
+              "The Dark Demon module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".tp",
+            "lines": [
+              "Tracker Packer module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".uni",
+            "lines": [
+              "UNI module. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".xd",
+            "lines": [
+              "FastTracker II module variant. GlitchScope decodes this extension with libxmp."
+            ]
+          },
+          {
+            "title": ".mo3",
+            "lines": [
+              "MO3 compressed module. GlitchScope decodes this extension with libopenmpt, falling back to libxmp when needed."
+            ]
+          },
+          {
+            "title": ".ktm",
+            "lines": [
+              "Karate module. GlitchScope decodes this extension with libopenmpt, falling back to libxmp when needed."
+            ]
+          },
+          {
+            "title": ".ims",
+            "lines": [
+              "Velvet Studio module. GlitchScope decodes this extension with libopenmpt, falling back to libxmp when needed."
+            ]
+          },
+          {
+            "title": ".mdc",
+            "lines": [
+              "Megadrive tracker module. GlitchScope decodes this extension with libopenmpt, falling back to libxmp when needed."
+            ]
+          },
+          {
+            "title": ".txn",
+            "lines": [
+              "MadTracker 2 module. GlitchScope decodes this extension with libopenmpt, falling back to libxmp when needed."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Chiptune",
+        "children": [
+          {
+            "title": ".ay",
+            "lines": [
+              "AY stores ZX Spectrum or Amstrad CPC music as Z80 program data for AY-family sound hardware. GlitchScope plays it with Game Music Emu."
+            ]
+          },
+          {
+            "title": ".nsf",
+            "lines": [
+              "NSF stores Nintendo NES or Famicom music code and data for emulated playback. GlitchScope plays it with Game Music Emu."
+            ]
+          },
+          {
+            "title": ".nsfe",
+            "lines": [
+              "NSFE is an extensible NSF variant with chunked metadata and playlist information. GlitchScope plays it with Game Music Emu."
+            ]
+          },
+          {
+            "title": ".spc",
+            "lines": [
+              "SPC is a snapshot of the Super Nintendo or Super Famicom audio subsystem. GlitchScope plays it with Game Music Emu."
+            ]
+          },
+          {
+            "title": ".gbs",
+            "lines": [
+              "GBS stores Nintendo Game Boy music code and data for emulated playback. GlitchScope plays it with Game Music Emu."
+            ]
+          },
+          {
+            "title": ".hes",
+            "lines": [
+              "HES stores PC Engine or TurboGrafx-16 music code and data for emulated playback. GlitchScope plays it with Game Music Emu."
+            ]
+          },
+          {
+            "title": ".kss",
+            "lines": [
+              "KSS stores music for MSX and other Z80-based systems using PSG or SCC audio. GlitchScope plays it with Game Music Emu; FM sound is not supported by this backend."
+            ]
+          },
+          {
+            "title": ".sap",
+            "lines": [
+              "SAP stores Atari 8-bit music code and data for the POKEY sound chip. GlitchScope plays it with Game Music Emu."
+            ]
+          },
+          {
+            "title": ".vgm",
+            "lines": [
+              "VGM logs commands sent to sound chips in consoles, arcade boards and computers. GlitchScope plays supported VGM chips with Game Music Emu."
+            ]
+          },
+          {
+            "title": ".vgz",
+            "lines": [
+              "VGZ is a gzip-compressed VGM file. GlitchScope decompresses and plays it with Game Music Emu."
+            ]
+          },
+          {
+            "title": ".sid",
+            "lines": [
+              "SID stores Commodore 64 music code and data for the SID chip; PSID is the common variant. GlitchScope plays it with cRSID."
+            ]
+          },
+          {
+            "title": ".rsid",
+            "lines": [
+              "RSID is a stricter SID variant for tunes that depend on more complete Commodore 64 behavior. GlitchScope plays it with cRSID."
+            ]
+          },
+          {
+            "title": ".vtx",
+            "lines": [
+              "VTX stores compressed AY-3-8910 or YM2149 register data, commonly produced by Vortex Tracker. GlitchScope plays it with its VTX parser and ayumi."
+            ]
+          },
+          {
+            "title": ".pt3",
+            "lines": [
+              "PT3 is a Pro Tracker 3 module for AY-3-8910 or YM2149 music. GlitchScope plays it with pt3player and ayumi."
+            ]
+          },
+          {
+            "title": ".ym",
+            "lines": [
+              "YM stores Atari ST-style YM2149 register dumps, with several format versions. GlitchScope plays it with StSound."
+            ]
+          },
+          {
+            "title": ".lh",
+            "lines": [
+              "LH is a legacy extension used for LHA-compressed YM music. GlitchScope decompresses and plays it with StSound."
+            ]
+          },
+          {
+            "title": ".lha",
+            "lines": [
+              "LHA archives may contain compressed YM music. GlitchScope opens supported YM archives with StSound."
+            ]
+          },
+          {
+            "title": ".ahx",
+            "lines": [
+              "AHX is an Amiga chiptune module designed around synthetic instruments rather than sampled audio. GlitchScope plays it with the HivelyTracker replayer."
+            ]
+          },
+          {
+            "title": ".hvl",
+            "lines": [
+              "HVL is the HivelyTracker module format, extending AHX with additional tracker features. GlitchScope plays it with the HivelyTracker replayer."
+            ]
+          }
+        ]
+      }
     ]
   },
   {
@@ -346,29 +921,190 @@
     "id": 9,
     "title": "Licenses",
     "children": [
-      {"title": "projectM", "lines": ["LGPL-2.1", "https://github.com/projectM-visualizer/projectm", "Copyright (C) 2003-2009 projectM Team"]},
-      {"title": "SoLoud", "lines": ["zlib", "https://github.com/jarikomppa/soloud", "Copyright (c) 2013-2018 Jari Komppa"]},
-      {"title": "FFmpeg", "lines": ["LGPL-2.1+", "https://ffmpeg.org/", "Copyright (c) FFmpeg developers"]},
-      {"title": "libxmp", "lines": ["MIT", "https://github.com/libxmp/libxmp", "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"]},
-      {"title": "libopenmpt", "lines": ["BSD-3-Clause", "https://github.com/OpenMPT/openmpt", "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"]},
-      {"title": "game-music-emu", "lines": ["LGPL-2.1", "https://github.com/libgme/game-music-emu", "Copyright (c) Shay Green"]},
-      {"title": "ayumi", "lines": ["MIT", "https://github.com/true-grue/ayumi", "Copyright (c) Peter Sovietov"]},
-      {"title": "pt3player", "lines": ["MIT", "https://github.com/Volutar/pt3player", "Copyright (c) 2023 Volutar"]},
-      {"title": "libstsound", "lines": ["BSD-2-Clause", "https://github.com/cpcsdk/libstsound", "Copyright holders: Leonard/Oxygene et al."]},
-      {"title": "Hively", "lines": ["MIT", "https://github.com/tildearrow/foo-input-hvl", "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"]},
-      {"title": "cRSID", "lines": ["WTFPL", "https://www.rockbox.org/", "Copyright (c) Hermit (Mihaly Horvath)"]},
-      {"title": "klauspost/compress (Zstandard)", "lines": ["BSD-3-Clause", "https://github.com/klauspost/compress", "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"]},
-      {"title": "go-sdl2", "lines": ["BSD-3-Clause", "https://github.com/veandco/go-sdl2", "Copyright (c) 2013 Go-SDL2 Authors"]},
-      {"title": "SDL2", "lines": ["zlib", "https://libsdl.org/", "Copyright (C) 1997-2026 Sam Lantinga"]},
-      {"title": "x/image", "lines": ["BSD-3-Clause", "https://pkg.go.dev/golang.org/x/image", "Copyright (c) 2009 The Go Authors"]},
-      {"title": "x/text", "lines": ["BSD-3-Clause", "https://pkg.go.dev/golang.org/x/text", "Copyright (c) 2009 The Go Authors"]},
-      {"title": "libogg", "lines": ["BSD-3-Clause", "https://xiph.org/ogg/", "Copyright (c) Xiph.Org Foundation"]},
-      {"title": "libvorbis", "lines": ["BSD-3-Clause", "https://xiph.org/vorbis/", "Copyright (c) Xiph.Org Foundation"]},
-      {"title": "libFLAC", "lines": ["BSD-3-Clause", "https://xiph.org/flac/", "Copyright (c) Xiph.Org Foundation"]},
-      {"title": "mpg123", "lines": ["LGPL-2.1", "https://www.mpg123.de/", "Copyright (c) mpg123 contributors"]},
-      {"title": "zlib", "lines": ["zlib", "https://zlib.net/", "Copyright (c) Jean-loup Gailly and Mark Adler"]},
-      {"title": "GNU Unifont", "lines": ["GPL-2.0+ with font embedding exception", "https://unifoundry.com/unifont/", "Copyright (c) GNU Unifont contributors"]},
-      {"title": "PortsMaster Device-Info", "lines": ["MIT", "https://github.com/PortsMaster/Device-Info", "Copyright (c) PortsMaster contributors"]}
+      {
+        "title": "projectM",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/projectM-visualizer/projectm",
+          "Copyright (C) 2003-2009 projectM Team"
+        ]
+      },
+      {
+        "title": "SoLoud",
+        "lines": [
+          "zlib",
+          "https://github.com/jarikomppa/soloud",
+          "Copyright (c) 2013-2018 Jari Komppa"
+        ]
+      },
+      {
+        "title": "FFmpeg",
+        "lines": [
+          "LGPL-2.1+",
+          "https://ffmpeg.org/",
+          "Copyright (c) FFmpeg developers"
+        ]
+      },
+      {
+        "title": "libxmp",
+        "lines": [
+          "MIT",
+          "https://github.com/libxmp/libxmp",
+          "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"
+        ]
+      },
+      {
+        "title": "libopenmpt",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/OpenMPT/openmpt",
+          "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"
+        ]
+      },
+      {
+        "title": "game-music-emu",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/libgme/game-music-emu",
+          "Copyright (c) Shay Green"
+        ]
+      },
+      {
+        "title": "ayumi",
+        "lines": [
+          "MIT",
+          "https://github.com/true-grue/ayumi",
+          "Copyright (c) Peter Sovietov"
+        ]
+      },
+      {
+        "title": "pt3player",
+        "lines": [
+          "MIT",
+          "https://github.com/Volutar/pt3player",
+          "Copyright (c) 2023 Volutar"
+        ]
+      },
+      {
+        "title": "libstsound",
+        "lines": [
+          "BSD-2-Clause",
+          "https://github.com/cpcsdk/libstsound",
+          "Copyright holders: Leonard/Oxygene et al."
+        ]
+      },
+      {
+        "title": "Hively",
+        "lines": [
+          "MIT",
+          "https://github.com/tildearrow/foo-input-hvl",
+          "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"
+        ]
+      },
+      {
+        "title": "cRSID",
+        "lines": [
+          "WTFPL",
+          "https://www.rockbox.org/",
+          "Copyright (c) Hermit (Mihaly Horvath)"
+        ]
+      },
+      {
+        "title": "klauspost/compress (Zstandard)",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/klauspost/compress",
+          "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"
+        ]
+      },
+      {
+        "title": "go-sdl2",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/veandco/go-sdl2",
+          "Copyright (c) 2013 Go-SDL2 Authors"
+        ]
+      },
+      {
+        "title": "SDL2",
+        "lines": [
+          "zlib",
+          "https://libsdl.org/",
+          "Copyright (C) 1997-2026 Sam Lantinga"
+        ]
+      },
+      {
+        "title": "x/image",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/image",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "x/text",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/text",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "libogg",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/ogg/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libvorbis",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/vorbis/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libFLAC",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/flac/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "mpg123",
+        "lines": [
+          "LGPL-2.1",
+          "https://www.mpg123.de/",
+          "Copyright (c) mpg123 contributors"
+        ]
+      },
+      {
+        "title": "zlib",
+        "lines": [
+          "zlib",
+          "https://zlib.net/",
+          "Copyright (c) Jean-loup Gailly and Mark Adler"
+        ]
+      },
+      {
+        "title": "GNU Unifont",
+        "lines": [
+          "GPL-2.0+ with font embedding exception",
+          "https://unifoundry.com/unifont/",
+          "Copyright (c) GNU Unifont contributors"
+        ]
+      },
+      {
+        "title": "PortsMaster Device-Info",
+        "lines": [
+          "MIT",
+          "https://github.com/PortsMaster/Device-Info",
+          "Copyright (c) PortsMaster contributors"
+        ]
+      }
     ]
   }
 ]

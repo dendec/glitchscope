@@ -231,6 +231,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		Graphics:       GraphicsSettings{RenderWidth: 480, RenderHeight: 360, UpscaleFilter: FilterSmooth},
 		Playback:       PlaybackSettings{ShuffleMode: ShuffleAll, Repeat: RepeatAll},
 		PresetInterval: Preset30s,
+		UI:             DefaultUI(),
 	}
 	if err := SaveSettings(p, orig); err != nil {
 		t.Fatal("save:", err)
@@ -251,6 +252,7 @@ func TestSaveLoadRoundTripAdaptive(t *testing.T) {
 
 	orig := Settings{
 		Graphics: GraphicsSettings{RenderWidth: 640, RenderHeight: 480, UpscaleFilter: FilterPixel, Adaptive: true},
+		UI:       DefaultUI(),
 	}
 	if err := SaveSettings(p, orig); err != nil {
 		t.Fatal("save:", err)

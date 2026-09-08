@@ -1,0 +1,1110 @@
+[
+  {
+    "title": "Başlangıç",
+    "lines": [
+      "**Müziğinizi çalın**",
+      "Menüyü açmak için {menu} tuşuna basın.",
+      "Müzik seçin, bir klasör açın ve ardından bir parça seçin.",
+      "",
+      "**Görselleştiriciyi keyfin çıkarın**",
+      "Çalma işlemi başladıktan sonra menüyü kapatın.",
+      "Görsel stil seçmek için Ön Ayarlar’ı, kalite, hız ve batarya ömrünü dengelemek için Ayarlar’ı kullanın.",
+      "",
+      "Alt kısım her zaman mevcut seçim için kullanılabilen eylemleri gösterir."
+    ],
+    "id": 0
+  },
+  {
+    "title": "Kontroller",
+    "children": [
+      {
+        "title": "Menüde",
+        "lines": [
+          "**Navigasyon**",
+          "{move} seçimi hareket ettirir. Daha hızlı kaydırmak için basılı tutun.",
+          "{focus} paneller arasında geçiş yapar.",
+          "{select} seçilen öğeyi açar veya bir değer uygular.",
+          "{back} geri döner veya düzenlemeyi iptal eder.",
+          "{pages} sayfalar arasında geçiş yapar.",
+          "",
+          "**Menü**",
+          "{menu} menüyü açar veya kapatır.",
+          "Aşağı kısım, mevcut seçim için gerekli işlemleri gösterir."
+        ]
+      },
+      {
+        "title": "Çalma sırasında",
+        "lines": [
+          "**Menü kapalıyken**",
+          "{tracks} bir önceki / sonraki parçayı seçer.",
+          "Sonraki butonu, seçilen rastgeleleştirme modunu dikkate alır.",
+          "{play} çalmayı başlatır veya durdurur.",
+          "{seek} geriye veya ileriye sarma yapar.",
+          "{presets} görselleştirici ayarlarını değiştirir.",
+          "{random} rastgele bir ayarı seçer.",
+          "{overlay} parça bildirimlerini gösterir veya gizler."
+        ]
+      },
+      {
+        "title": "Yardım navigasyonu",
+        "lines": [
+          "Sol taraftan bir konu seçin.",
+          "{select} alt konuları içeren bir konuyu açar.",
+          "{focus} metin paneline geçer.",
+          "{move} metni kaydırır.",
+          "{back} bir önceki seviyeye döner.",
+          "{pages} başka bir uygulama sayfasına döner."
+        ]
+      }
+    ],
+    "id": 1
+  },
+  {
+    "title": "Çalma",
+    "children": [
+      {
+        "title": "Rastgele sırala ve tekrarla",
+        "lines": [
+          "Kapalı: Şarkılar sırayla çalınır.",
+          "Albüm: Mevcut klasörü veya çalma listesini rastgele sıralar.",
+          "Kaynak: Music, Modland veya ModArchive içinde rastgele sıralama.",
+          "Hepsi: Mevcut kaynaklar arasında rastgele sıralama. Çevrimdışı modda “Hepsi”, yalnızca yerel müzikleri kullanır.",
+          "Kaynak ve “Hepsi”, mevcut parça da dahil olmak üzere parçaları tekrarlayabilir.",
+          "Tekrarla Bir, mevcut parça bittiğinde onu tekrar çalar. Manuel “Sonraki”, yine de parçayı ilerletir.",
+          "Yüklenme başarısız olduğunda o parça atlanır. Tekrarlanan başarısızlıklar otomatik kurtarmayı durdurur."
+        ]
+      },
+      {
+        "title": "İzleme",
+        "lines": [
+          "{seek} mevcut parçada ilerler.",
+          "Yeterli bellek bulunduğunda, doğru izleme için Tracker sesi hazırlanır.",
+          "Hazırlık için gerekli bellek miktarı, mevcut bellek durumundan otomatik olarak belirlenir.",
+          "Uzun parçalar veya düşük bellek koşullarında yerel akış yöntemi kullanılır.",
+          "Geriye doğru izleme işlemi ise çözücüye bağlıdır."
+        ]
+      },
+      {
+        "title": "Favoriler",
+        "lines": [
+          "Favoriler çalma listelerinin dışındaki bir parça seçin ve alt kısımdaki Favori ipucunu takip edin.",
+          "Kısa basışlarla Yıldız / Kalp / Not / Yok arasında geçiş yapılır.",
+          "{gamepad_heading}",
+          "Seçili parçayı favorilerden kaldırmak için {favourite} tuşunu basılı tutun.",
+          "Parça gezintisi dışında {play} tuşu Çal / Duraklat işlevini görür.",
+          "{keyboard_heading}",
+          "F tuşu favoriyi değiştirir; Sil tuşu ise onu kaldırır.",
+          ""
+        ]
+      }
+    ],
+    "id": 2
+  },
+  {
+    "title": "Kalite ve Batarya",
+    "children": [
+      {
+        "title": "Performans",
+        "lines": [
+          "Performans modu, görselleştirme kalitesini önceliklendirir ve 30 FPS hedefler.",
+          "Dengeli mod, daha düşük bir çözünürlük sınırıyla 24 FPS hedefler.",
+          "Eco modu, daha düşük bir çözünürlük sınırı ve daha yavaş yükseltme işlemiyle batarya ömrünü önceliklendirir.",
+          "Otomatik çözünürlük, mevcut ayara göre ayarlanır. Sabit çözünürlük bu ayarlamayı devre dışı bırakır.",
+          "En düşük çözünürlük bile yeterince hızlı değilse, ağır bir ayar atlanabilir."
+        ]
+      },
+      {
+        "title": "Görselleştirme Olmadan Müzik",
+        "lines": [
+          "Ayarlar bölümünden Görselleştiriciyi Kapalı konumuna getirin.",
+          "Sade arka plan üzerinde müzik ve menü gezintisi çalışmaya devam eder.",
+          "Önceden Ayarlanmışlar özelliği açıldığında canlı önizleme devreye girer.",
+          "Animasyonu sürdürmek için Görselleştiriciyi tekrar Açık konumuna getirin."
+        ]
+      },
+      {
+        "title": "Önceden Ayar Seçimi",
+        "lines": [
+          "Önceden Ayarlar bölümünü açın ve listede gezinin.",
+          "Bir önceden ayarı duraklatarak ön izlemesini görün.",
+          "{select} bu ayarı seçer; sayfadan ayrıldığınızda uygulanır.",
+          "Önceden ayar otomatik değişimi kontrol eder.",
+          "Başarılı çözünürlükler mevcut çalışma sırasında hatırlanır."
+        ]
+      }
+    ],
+    "id": 3
+  },
+  {
+    "title": "Sorun Giderme",
+    "children": [
+      {
+        "title": "Müzik listelenmedi",
+        "lines": [
+          "Music uygulamasını açın ve desteklenen ses dosyalarını içeren bir klasör seçin.",
+          "Boş bir klasör ile başarısız bir tarama farklı durumlardır; gösterilen hataları kontrol edin.",
+          "İndirilen katalog dizinleri müzikleri listeler, ancak ses dosyalarının kendisini içermez."
+        ]
+      },
+      {
+        "title": "Çevrimdışı kataloglar",
+        "lines": [
+          "Kaydedilen katalog dizinleri, internet bağlantısı olmadan da görüntülenebilir.",
+          "Çevrimdışı olarak çalmak için bir parçanın önceden indirilmiş olması gerekir.",
+          "Tümünü Rastgele seçeneği, çevrimdışıyken yerel müzik dosyalarını kullanır. Ağ erişimi periyodik olarak kontrol edilir."
+        ]
+      },
+      {
+        "title": "Çalınan veya atlanan parçalar",
+        "lines": [
+          "İndirme işlemi, uzaktaki bir dosyayı alır. Ses hazırlama işlemi ise arama yapabilmek için parçayı kod çözer.",
+          "Yükleme sırasında başka bir parça seçebilirsiniz.",
+          "Desteklenmeyen, hasarlı veya ulaşılamayan parçalar otomatik olarak atlanır.",
+          "Tekrarlanan hatalar çalma işlemini durdurursa, başka bir parça veya kaynak seçin."
+        ]
+      },
+      {
+        "title": "Sınırlı arama",
+        "lines": [
+          "Bazı yerel tracker kod çözücüleri güvenilir bir şekilde geriye doğru arama yapamaz.",
+          "Yeterli bellek mevcut olduğunda tracker arama özelliği otomatik olarak hazırlanır.",
+          "Çok uzun parçalar ve düşük bellek koşulları durumunda yerel akış yöntemi kullanılır."
+        ]
+      }
+    ],
+    "id": 4
+  },
+  {
+    "id": 5,
+    "title": "Kataloglar",
+    "children": [
+      {
+        "title": "Modland",
+        "lines": [
+          "**Bu cihazdaki katalog**",
+          "Çalınabilir parçalar: {modland_tracks}",
+          "Klasörler: {modland_directories}",
+          "Ağ: {network_status}",
+          "",
+          "**Modland Hakkında**",
+          "Format ve besteciye göre sınıflandırılmış, tracker, chiptune ve oyun müziklerinden oluşan geniş bir koruma arşivi.",
+          "GlitchScope, çalma işleminden önce yerel olarak kompakt bir dizin oluşturur ve seçilen parçayı önbelleğine indirir.",
+          "Kaydedilen dizin çevrimdışıyken de görüntülenebilir; parçalar zaten önbelleğe alınmamışsa bir bağlantı gerektirir."
+        ]
+      },
+      {
+        "title": "ModArchive",
+        "lines": [
+          "**Bu cihazdaki katalog**",
+          "Çalınabilir parçalar: {modarchive_tracks}",
+          "Klasörler: {modarchive_directories}",
+          "Ağ: {network_status}",
+          "",
+          "**Mod Archive Hakkında**",
+          "Sanatçılar, puanlamalar, incelemeler ve tarihi koleksiyonlar içeren, çalınabilir müzik modüllerine adanmış bir topluluk arşivi.",
+          "GlitchScope, tarihi örnekler ve ek içerikler için kompakt indeksler gönderir; ardından yalnızca seçilen modül verilerini indirir.",
+          "Kaydedilen indeksler çevrimdışı olarak da görüntülenebilir; parçalar zaten önbelleğe alınmamışsa bir bağlantı gerektirir."
+        ]
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "title": "Formatlar",
+    "children": [
+      {
+        "title": "Ses",
+        "children": [
+          {
+            "title": ".aac",
+            "lines": [
+              "AAC, genellikle ham AAC formatında veya MP4 ailesine ait kapsayıcılar içinde saklanan, kayıplı bir ses kodlama formatıdır. GlitchScope, bunu FFmpeg kullanarak çözümleyer."
+            ]
+          },
+          {
+            "title": ".ac3",
+            "lines": [
+              "AC-3 (Dolby Digital), monofonik ve çok kanallı sesler için kullanılan kayıplı bir ses kodlama formatıdır. GlitchScope, bunu FFmpeg kullanarak çözümleyer."
+            ]
+          },
+          {
+            "title": ".eac3",
+            "lines": [
+              "E-AC-3 (Dolby Digital Plus), daha yüksek bant genişlikleri ve ek kanal yapılandırmalarıyla AC-3 formatını geliştirir. GlitchScope, bunu FFmpeg kullanarak kod çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".mp1",
+            "lines": [
+              "MP1, üç MPEG-1 ses katmanının en eski olanı olan MPEG Audio Layer I'dir. GlitchScope, bunu FFmpeg kullanarak kod çözümlemesini gerçekleştirir."
+            ]
+          },
+          {
+            "title": ".mp2",
+            "lines": [
+              "MP2, yayınlar ve eski medya içeriklerinde hâlâ kullanılan, veri kaybına neden olan bir format olan MPEG Audio Layer II'dir. GlitchScope, bunu FFmpeg kullanarak kod çözümlemesini gerçekleştirir."
+            ]
+          },
+          {
+            "title": ".mp3",
+            "lines": [
+              "MP3, yaygın olarak kullanılan kayıplı bir ses formatı olan MPEG Audio Layer III'tür. GlitchScope, bunu FFmpeg kullanarak kod çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".ogg",
+            "lines": [
+              "Ogg, genellikle Vorbis, Opus, FLAC veya Speex ses formatlarını barındıran bir kapsayıcıdır. GlitchScope, bu dosyaların ses akışını FFmpeg kullanarak kod çözer."
+            ]
+          },
+          {
+            "title": ".oga",
+            "lines": [
+              "OGA, Ogg konteyneri için ses odaklı bir dosya uzantısıdır. GlitchScope, ses akışını FFmpeg kullanarak kod çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".opus",
+            "lines": [
+              "Opus, IETF tarafından standartlaştırılmış, açık kaynaklı ve düşük gecikmeli bir kayıplı ses formatıdır. GlitchScope, bunu FFmpeg kullanarak kod çözümlemesi yapar."
+            ]
+          },
+          {
+            "title": ".spx",
+            "lines": [
+              "SPX dosyaları genellikle Ogg kapsayıcısında Speex ses formatını içerir. GlitchScope, bunları FFmpeg kullanarak çözümleyer."
+            ]
+          },
+          {
+            "title": ".flac",
+            "lines": [
+              "FLAC, orijinal PCM örneklerini tam olarak yeniden oluşturan açık kaynaklı, kayıpsız bir ses formatıdır. GlitchScope, bunu FFmpeg kullanarak kod çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".wav",
+            "lines": [
+              "WAV, genellikle PCM için kullanılan ve RIFF tabanlı bir ses kapsayıcısıdır; aynı zamanda diğer kodlayıcıları da destekler. GlitchScope, bunu FFmpeg kullanarak kod çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".rf64",
+            "lines": [
+              "Klasik RIFF 4 GiB boyut sınırını aşan dosyalar için WAV formatının geliştirilmiş hali olan RF64, GlitchScope tarafından FFmpeg kullanılarak kodlanır."
+            ]
+          },
+          {
+            "title": ".aiff",
+            "lines": [
+              "AIFF, Apple'ın IFF tabanlı ses kapsayıcısıdır ve genellikle sıkıştırılmamış PCM dosyaları için kullanılır. GlitchScope, bunu FFmpeg kullanarak kod çözer."
+            ]
+          },
+          {
+            "title": ".aif",
+            "lines": [
+              "AIF, bir AIFF ses dosyası için kullanılan alternatif bir dosya uzantısıdır. GlitchScope, bunu FFmpeg kullanarak kod çözümlemesi yapar."
+            ]
+          },
+          {
+            "title": ".aifc",
+            "lines": [
+              "AIFC, AIFF konteynerinin sıkıştırılmış ses versiyonudur. GlitchScope, bunu FFmpeg kullanarak çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".caf",
+            "lines": [
+              "CAF, ses ve meta verileri için Apple'ın kullandığı Core Audio formatı konteyneridir. GlitchScope, bunu FFmpeg kullanarak kod çözümlemesi yapar."
+            ]
+          },
+          {
+            "title": ".m4a",
+            "lines": [
+              "M4A, genellikle AAC veya ALAC formatlarını içeren, ses odaklı bir MP4 konteyneridir. GlitchScope, ses akışını FFmpeg kullanarak kod çözer."
+            ]
+          },
+          {
+            "title": ".m4b",
+            "lines": [
+              "M4B, sesli kitaplar ve bölüm meta verileri için yaygın olarak kullanılan bir MP4 ses kapsayıcısıdır. GlitchScope, ses akışını FFmpeg kullanarak kod çözer."
+            ]
+          },
+          {
+            "title": ".mp4",
+            "lines": [
+              "MP4, ses, video ve meta verileri barındırabilen bir ISO Base Media kapsayıcısıdır. GlitchScope, desteklediği ses akışlarını FFmpeg aracılığıyla çalar."
+            ]
+          },
+          {
+            "title": ".mov",
+            "lines": [
+              "MOV, Apple'ın ses, video ve meta verileri için kullandığı QuickTime konteyner formatıdır. GlitchScope, desteklediği ses akışlarını FFmpeg aracılığıyla oynatır."
+            ]
+          },
+          {
+            "title": ".mka",
+            "lines": [
+              "MKA, Matroska konteyneri için ses odaklı bir dosya uzantısıdır. GlitchScope, ses akışını FFmpeg kullanarak çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".mkv",
+            "lines": [
+              "MKV, bir Matroska çoklu medya konteyneridir. GlitchScope, desteklediği ses akışlarını FFmpeg aracılığıyla oynatır."
+            ]
+          },
+          {
+            "title": ".webm",
+            "lines": [
+              "WebM, genellikle Opus veya Vorbis ses kodlamalarını içeren, sınırlı özelliklere sahip bir Matroska tabanlı konteynerdir. GlitchScope, bunu FFmpeg kullanarak kod çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".wma",
+            "lines": [
+              "WMA dosyaları, genellikle bir ASF kapsayıcısının içinde yer alan Windows Media Audio kodlayıcılarını içerir. GlitchScope, bunları FFmpeg kullanarak çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".asf",
+            "lines": [
+              "ASF, Microsoft'un Gelişmiş Sistem Formatı kapsayıcısıdır ve genellikle WMA sesini içerir. GlitchScope, ses akışını FFmpeg kullanarak kod çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".amr",
+            "lines": [
+              "AMR, mobil telefonlarda yaygın olarak AMR-NB veya AMR-WB formatlarında kullanılan bir ses kodlama biçimidir. GlitchScope, bunu FFmpeg kullanarak çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".ape",
+            "lines": [
+              "APE, kayıpsız bir ses formatı olan Monkey's Audio'dur. GlitchScope, bunu FFmpeg kullanarak kod çözümlemesi yapar."
+            ]
+          },
+          {
+            "title": ".tta",
+            "lines": [
+              "TTA, kayıpsız bir ses formatı olan True Audio'dur. GlitchScope, bunu FFmpeg kullanarak kod çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".wv",
+            "lines": [
+              "WV, kayıpsız veya hibrit bir ses formatı olan WavPack'tir. GlitchScope, bunu FFmpeg kullanarak çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".mpc",
+            "lines": [
+              "MPC, öncelikle müzik için tasarlanmış, kayıplı bir ses formatı olan Musepack'tir. GlitchScope, bunu FFmpeg kullanarak kod çözümleme işlemi yapar."
+            ]
+          },
+          {
+            "title": ".ts",
+            "lines": [
+              "TS, yayın ve kaydedilmiş medya için kullanılan bir MPEG taşıma akışı konteyneridir. GlitchScope, desteklediği ses akışlarını FFmpeg aracılığıyla çalar."
+            ]
+          },
+          {
+            "title": ".m2ts",
+            "lines": [
+              "M2TS, Blu-ray tarzında bir MPEG taşıma akışı konteyneridir. GlitchScope, desteklediği ses akışlarını FFmpeg aracılığıyla çalar."
+            ]
+          },
+          {
+            "title": ".ra",
+            "lines": [
+              "RA, bir RealAudio dosyası veya akış konteyneridir. GlitchScope, desteklenen RealAudio kodlayıcılarını FFmpeg kullanarak çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".rm",
+            "lines": [
+              "RM, RealAudio içerebilen bir RealMedia kapsayıcısıdır. GlitchScope, desteklediği ses akışlarını FFmpeg aracılığıyla çalar."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Tracker Formatı",
+        "children": [
+          {
+            "title": ".mod",
+            "lines": [
+              "MOD ailesine ait modül. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".xm",
+            "lines": [
+              "FastTracker II Genişletme Modülü. GlitchScope, bu genişletmeyi libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".it",
+            "lines": [
+              "Impulse Tracker modülü. GlitchScope, bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".s3m",
+            "lines": [
+              "Scream Tracker 3 modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".mptm",
+            "lines": [
+              "OpenMPT modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".stm",
+            "lines": [
+              "Scream Tracker 2 modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".nst",
+            "lines": [
+              "NoiseTracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".wow",
+            "lines": [
+              "Mod's Grave modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".ult",
+            "lines": [
+              "UltraTracker modülü. GlitchScope, bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".669",
+            "lines": [
+              "Composer 669 veya UNIS 669 modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".mtm",
+            "lines": [
+              "MultiTracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".med",
+            "lines": [
+              "MED veya OctaMED modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".far",
+            "lines": [
+              "Farandole Besteci modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".mdl",
+            "lines": [
+              "Digitrakker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".ams",
+            "lines": [
+              "Extreme'in Tracker veya Velvet Studio modülü. GlitchScope bu uzantıyı libxmp kullanarak çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".dsm",
+            "lines": [
+              "DSIK modülü. GlitchScope bu uzantıyı libxmp kullanarak çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".amf",
+            "lines": [
+              "Asylum veya DSMI modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".okt",
+            "lines": [
+              "Oktalyzer modülü. GlitchScope, bu uzantıyı libxmp kullanarak çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".dmf",
+            "lines": [
+              "Dijital Tracker veya DefleMask modülü. GlitchScope, bu uzantıyı libopenmpt kullanarak çözümleir; gerekirse libxmp'e geçer."
+            ]
+          },
+          {
+            "title": ".ptm",
+            "lines": [
+              "Poly Tracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".psm",
+            "lines": [
+              "ProTracker Studio veya Epic modülü. GlitchScope bu uzantıyı libxmp kullanarak çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".mt2",
+            "lines": [
+              "MadTracker 2 modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".dbm",
+            "lines": [
+              "DigiBooster Pro modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".abk",
+            "lines": [
+              "AMOS Music Bank modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".digi",
+            "lines": [
+              "DIGI Booster modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".dtt",
+            "lines": [
+              "Dijital Tracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".flx",
+            "lines": [
+              "FlexTrax modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".gtk",
+            "lines": [
+              "Graoumf Tracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".imf",
+            "lines": [
+              "Imago Orpheus modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".liq",
+            "lines": [
+              "Liquid Tracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".masi",
+            "lines": [
+              "Epic MegaGames MASI modülü. GlitchScope, bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".mgt",
+            "lines": [
+              "Megatracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".mmd",
+            "lines": [
+              "MED veya OctaMED MMD modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".mmdc",
+            "lines": [
+              "Sıkıştırılmış MED modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".mmcmp",
+            "lines": [
+              "MMCMP ile sıkıştırılmış modül. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".muse",
+            "lines": [
+              "MUSE ile dolu modül. GlitchScope bu uzantıyı libxmp kullanarak çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".nt",
+            "lines": [
+              "NoiseTracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".pmd",
+            "lines": [
+              "ProTracker ile uyumlu modül. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".ppm",
+            "lines": [
+              "ProTracker Packer modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".pru",
+            "lines": [
+              "Prorunner modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".pt36",
+            "lines": [
+              "ProTracker 3.6 modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".rh",
+            "lines": [
+              "Rob Hubbard modülü. GlitchScope bu uzantıyı libxmp kullanarak çözümleyer."
+            ]
+          },
+          {
+            "title": ".rtm",
+            "lines": [
+              "Gerçek Tracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".sfx",
+            "lines": [
+              "SoundFX modülü. GlitchScope, bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".sfx2",
+            "lines": [
+              "SoundFX 2 modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".stim",
+            "lines": [
+              "Slamtilt modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleyer."
+            ]
+          },
+          {
+            "title": ".stx",
+            "lines": [
+              "STMIK modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".tcb",
+            "lines": [
+              "TCB Tracker modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".tdd",
+            "lines": [
+              "Karanlık Şeytan modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".tp",
+            "lines": [
+              "Tracker Packer modülü. GlitchScope bu uzantıyı libxmp kullanarak çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".uni",
+            "lines": [
+              "UNI modülü. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".xd",
+            "lines": [
+              "FastTracker II modül versiyonu. GlitchScope bu uzantıyı libxmp aracılığıyla çözümleme yapar."
+            ]
+          },
+          {
+            "title": ".mo3",
+            "lines": [
+              "MO3 sıkıştırılmış modülü. GlitchScope, bu uzantıyı libopenmpt kullanarak çözümleir; gerekirse libxmp'e geçer."
+            ]
+          },
+          {
+            "title": ".ktm",
+            "lines": [
+              "Karate modülü. GlitchScope, bu uzantıyı libopenmpt kullanarak kodlar ve gerekirse libxmp'e geçer."
+            ]
+          },
+          {
+            "title": ".ims",
+            "lines": [
+              "Velvet Studio modülü. GlitchScope, bu uzantıyı libopenmpt kullanarak kod çözümlemesi yapar; gerekirse libxmp'e geçer."
+            ]
+          },
+          {
+            "title": ".mdc",
+            "lines": [
+              "Megadrive izleyici modülü. GlitchScope, bu uzantıyı libopenmpt kullanarak kod çözümlemesi yapar; gerekirse libxmp'e geçer."
+            ]
+          },
+          {
+            "title": ".txn",
+            "lines": [
+              "MadTracker 2 modülü. GlitchScope, bu uzantıyı libopenmpt kullanarak kodlar ve gerekirse libxmp'e geçer."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Chiptune Müziği",
+        "children": [
+          {
+            "title": ".ay",
+            "lines": [
+              "AY, ZX Spectrum veya Amstrad CPC müziklerini AY serisi ses donanımları için Z80 program verisi olarak saklar. GlitchScope bunları Game Music Emu özelliğiyle çalar."
+            ]
+          },
+          {
+            "title": ".nsf",
+            "lines": [
+              "NSF, emülasyon yoluyla çalınmak üzere Nintendo NES veya Famicom müzik kodlarını ve verilerini saklar. GlitchScope bunları Game Music Emu aracılığıyla çalar."
+            ]
+          },
+          {
+            "title": ".nsfe",
+            "lines": [
+              "NSFE, parçalara ayrılmış meta verileri ve çalma listesi bilgilerine sahip, genişletilebilir bir NSF türevidir. GlitchScope, bunu Game Music Emu aracılığıyla çalar."
+            ]
+          },
+          {
+            "title": ".spc",
+            "lines": [
+              "SPC, Super Nintendo veya Super Famicom ses alt sisteminin bir anlık görüntüsüdür. GlitchScope, bunu Game Music Emu aracılığıyla çalar."
+            ]
+          },
+          {
+            "title": ".gbs",
+            "lines": [
+              "GBS, emülasyon yoluyla çalınması için Nintendo Game Boy müzik kodlarını ve verilerini saklar. GlitchScope bunları Game Music Emu aracılığıyla çalar."
+            ]
+          },
+          {
+            "title": ".hes",
+            "lines": [
+              "HES, emülasyon yoluyla çalınması için PC Engine veya TurboGrafx-16 müzik kodlarını ve verilerini saklar. GlitchScope bunları Game Music Emu aracılığıyla çalar."
+            ]
+          },
+          {
+            "title": ".kss",
+            "lines": [
+              "KSS, PSG veya SCC ses teknolojilerini kullanan MSX ve diğer Z80 tabanlı sistemler için müzikleri saklar. GlitchScope, bunları Game Music Emu aracılığıyla çalar; bu arka uç FM sesini desteklememektedir."
+            ]
+          },
+          {
+            "title": ".sap",
+            "lines": [
+              "SAP, POKEY ses çipi için Atari 8-bit müzik kodlarını ve verilerini saklar. GlitchScope bunları Game Music Emu özelliğiyle çalar."
+            ]
+          },
+          {
+            "title": ".vgm",
+            "lines": [
+              "VGM, konsollar, arcade sistemleri ve bilgisayarlardaki ses çiplerine gönderilen komutları kaydeder. GlitchScope, desteklenen VGM çiplerini Game Music Emu aracılığıyla çalar."
+            ]
+          },
+          {
+            "title": ".vgz",
+            "lines": [
+              "VGZ, gzip ile sıkıştırılmış bir VGM dosyasıdır. GlitchScope, bunu Game Music Emu aracılığıyla açıp çalar."
+            ]
+          },
+          {
+            "title": ".sid",
+            "lines": [
+              "SID, Commodore 64 müzik kodlarını ve SID çipi için gerekli verileri saklar; PSID ise en yaygın kullanılan türüdür. GlitchScope bunları cRSID ile çalar."
+            ]
+          },
+          {
+            "title": ".rsid",
+            "lines": [
+              "RSID, daha kapsamlı Commodore 64 davranışlarına ihtiyaç duyan melodiler için daha katı kurallara sahip bir SID türüdür. GlitchScope bu formatı cRSID ile oynatır."
+            ]
+          },
+          {
+            "title": ".vtx",
+            "lines": [
+              "VTX, genellikle Vortex Tracker tarafından üretilen sıkıştırılmış AY-3-8910 veya YM2149 kayıt verilerini saklar. GlitchScope, bunları kendi VTX yorumlayıcısı ve ayumi motoru ile çalar."
+            ]
+          },
+          {
+            "title": ".pt3",
+            "lines": [
+              "PT3, AY-3-8910 veya YM2149 müzikleri için tasarlanmış bir Pro Tracker 3 modülüdür. GlitchScope, bunları pt3player ve ayumi araçlarıyla çalar."
+            ]
+          },
+          {
+            "title": ".ym",
+            "lines": [
+              "YM, çeşitli format sürümleriyle Atari ST tarzı YM2149 kayıt verilerini saklar. GlitchScope bunu StSound kullanarak çalar."
+            ]
+          },
+          {
+            "title": ".lh",
+            "lines": [
+              "LH, LHA formatında sıkıştırılmış YM müzikleri için kullanılan eski bir uzantıdır. GlitchScope, bunları StSound ile açarak çalar."
+            ]
+          },
+          {
+            "title": ".lha",
+            "lines": [
+              "LHA arşivleri, sıkıştırılmış YM müziği içerebilir. GlitchScope, desteklenen YM arşivlerini StSound ile açar."
+            ]
+          },
+          {
+            "title": ".ahx",
+            "lines": [
+              "AHX, örneklenmiş ses yerine sentetik enstrümanlar üzerine tasarlanmış bir Amiga chiptune modülüdür. GlitchScope, bunu HivelyTracker çalıcı aracılığıyla oynatır."
+            ]
+          },
+          {
+            "title": ".hvl",
+            "lines": [
+              "HVL, AHX'e ekstra izleyici özellikleri ekleyerek genişleten HivelyTracker modül formatıdır. GlitchScope, bunu HivelyTracker çaları kullanarak oynatır."
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "Cihaz",
+    "lines": []
+  },
+  {
+    "id": 8,
+    "title": "Hakkında",
+    "lines": [
+      "**GlitchScope**",
+      "Linux tabanlı taşınabilir cihazlar ve masaüstü bilgisayarlar için geliştirilmiş bir müzik çalar ve gerçek zamanlı MilkDrop görselleştiricisi.",
+      "",
+      "Yerel ses dosyalarını, tracker modüllerini ve klasik oyun müziği formatlarını çalın veya Modland ve ModArchive kataloglarını inceleyin.",
+      "Görseller projectM tarafından oluşturulur. Sesler ise her format için özel olarak seçilen açık kaynaklı motorlar tarafından çözümlenir.",
+      "",
+      "Performans, Dengeli ve Ekonomi modları, cihaza göre görsel kaliteyi ayarlar. Sadece müzik çalma modunda görselleştirici de devre dışı bırakılabilir.",
+      "",
+      "**Project**",
+      "https://github.com/dendec/glitchscope",
+      "GPL-2.0-or-later lisansı altında sunulmaktadır."
+    ]
+  },
+  {
+    "id": 9,
+    "title": "Lisanslar",
+    "children": [
+      {
+        "title": "projectM",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/projectM-visualizer/projectm",
+          "Copyright (C) 2003-2009 projectM Team"
+        ]
+      },
+      {
+        "title": "SoLoud",
+        "lines": [
+          "zlib",
+          "https://github.com/jarikomppa/soloud",
+          "Copyright (c) 2013-2018 Jari Komppa"
+        ]
+      },
+      {
+        "title": "FFmpeg",
+        "lines": [
+          "LGPL-2.1+",
+          "https://ffmpeg.org/",
+          "Copyright (c) FFmpeg developers"
+        ]
+      },
+      {
+        "title": "libxmp",
+        "lines": [
+          "MIT",
+          "https://github.com/libxmp/libxmp",
+          "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"
+        ]
+      },
+      {
+        "title": "libopenmpt",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/OpenMPT/openmpt",
+          "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"
+        ]
+      },
+      {
+        "title": "game-music-emu",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/libgme/game-music-emu",
+          "Copyright (c) Shay Green"
+        ]
+      },
+      {
+        "title": "ayumi",
+        "lines": [
+          "MIT",
+          "https://github.com/true-grue/ayumi",
+          "Copyright (c) Peter Sovietov"
+        ]
+      },
+      {
+        "title": "pt3player",
+        "lines": [
+          "MIT",
+          "https://github.com/Volutar/pt3player",
+          "Copyright (c) 2023 Volutar"
+        ]
+      },
+      {
+        "title": "libstsound",
+        "lines": [
+          "BSD-2-Clause",
+          "https://github.com/cpcsdk/libstsound",
+          "Copyright holders: Leonard/Oxygene et al."
+        ]
+      },
+      {
+        "title": "Hively",
+        "lines": [
+          "MIT",
+          "https://github.com/tildearrow/foo-input-hvl",
+          "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"
+        ]
+      },
+      {
+        "title": "cRSID",
+        "lines": [
+          "WTFPL",
+          "https://www.rockbox.org/",
+          "Copyright (c) Hermit (Mihaly Horvath)"
+        ]
+      },
+      {
+        "title": "klauspost/compress (Zstandard)",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/klauspost/compress",
+          "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"
+        ]
+      },
+      {
+        "title": "go-sdl2",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/veandco/go-sdl2",
+          "Copyright (c) 2013 Go-SDL2 Authors"
+        ]
+      },
+      {
+        "title": "SDL2",
+        "lines": [
+          "zlib",
+          "https://libsdl.org/",
+          "Copyright (C) 1997-2026 Sam Lantinga"
+        ]
+      },
+      {
+        "title": "x/image",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/image",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "x/text",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/text",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "libogg",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/ogg/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libvorbis",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/vorbis/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libFLAC",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/flac/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "mpg123",
+        "lines": [
+          "LGPL-2.1",
+          "https://www.mpg123.de/",
+          "Copyright (c) mpg123 contributors"
+        ]
+      },
+      {
+        "title": "zlib",
+        "lines": [
+          "zlib",
+          "https://zlib.net/",
+          "Copyright (c) Jean-loup Gailly and Mark Adler"
+        ]
+      },
+      {
+        "title": "GNU Unifont",
+        "lines": [
+          "GPL-2.0+ with font embedding exception",
+          "https://unifoundry.com/unifont/",
+          "Copyright (c) GNU Unifont contributors"
+        ]
+      },
+      {
+        "title": "PortsMaster Device-Info",
+        "lines": [
+          "MIT",
+          "https://github.com/PortsMaster/Device-Info",
+          "Copyright (c) PortsMaster contributors"
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,1110 @@
+[
+  {
+    "title": "Bắt đầu sử dụng",
+    "lines": [
+      "**Phát nhạc của bạn**",
+      "Nhấn {menu} để mở menu.",
+      "Chọn mục Nhạc, mở một thư mục, sau đó chọn bài hát.",
+      "",
+      "**Thưởng thức hiển thị hình ảnh**",
+      "Đóng menu sau khi việc phát nhạc bắt đầu.",
+      "Sử dụng Tùy chọn sẵn để chọn phong cách hiển thị và Cài đặt để cân bằng chất lượng, tốc độ và thời lượng pin.",
+      "",
+      "Phần chân trang luôn hiển thị các thao tác có sẵn cho lựa chọn hiện tại."
+    ],
+    "id": 0
+  },
+  {
+    "title": "Các nút điều khiển",
+    "children": [
+      {
+        "title": "Trong menu",
+        "lines": [
+          "**Navigation**",
+          "{move} dùng để di chuyển vị trí chọn. Giữ để cuộn nhanh hơn.",
+          "{focus} chuyển đổi giữa các bảng điều khiển.",
+          "{select} mở mục được chọn hoặc áp dụng giá trị tương ứng.",
+          "{back} quay lại hoặc hủy bỏ thao tác chỉnh sửa.",
+          "{pages} chuyển sang trang khác.",
+          "",
+          "**Menu**",
+          "{menu} mở hoặc đóng menu.",
+          "Phần chân trang hiển thị các thao tác dành cho mục được chọn hiện tại."
+        ]
+      },
+      {
+        "title": "Khi đang nghe",
+        "lines": [
+          "**Khi menu đang đóng**",
+          "{tracks} chọn bài hát trước / tiếp theo.",
+          "Chức năng Tiếp theo sẽ tuân theo chế độ xáo trộn đã chọn.",
+          "{play} phát hoặc tạm dừng.",
+          "{seek} cuộn ngược hoặc cuộn tiến.",
+          "{presets} thay đổi thiết lập trực quan hóa.",
+          "{random} chọn một thiết lập ngẫu nhiên.",
+          "{overlay} hiển thị hoặc ẩn thông báo bài hát."
+        ]
+      },
+      {
+        "title": "Điều hướng trợ giúp",
+        "lines": [
+          "Chọn một chủ đề ở bên trái.",
+          "{select} mở ra chủ đề chứa các chủ đề con.",
+          "{focus} chuyển sang bảng văn bản.",
+          "{move} cuộn văn bản.",
+          "{back} quay lại cấp độ trước.",
+          "{pages} quay lại trang ứng dụng khác."
+        ]
+      }
+    ],
+    "id": 1
+  },
+  {
+    "title": "Phát nhạc",
+    "children": [
+      {
+        "title": "Đảo bài và lặp lại",
+        "lines": [
+          "Tắt: các bài hát được phát theo thứ tự.",
+          "Album: đảo bài trong thư mục hoặc danh sách phát hiện tại.",
+          "Nguồn: đảo bài trong Music, Modland hoặc ModArchive.",
+          "Tất cả: đảo bài giữa các nguồn có sẵn. Khi ở chế độ ngoại tuyến, tùy chọn Tất cả chỉ sử dụng nhạc cục bộ.",
+          "Các tùy chọn Nguồn và Tất cả đều có thể lặp lại các bài hát, kể cả bài hát đang phát.",
+          "Lặp một lần sẽ lặp lại bài hát đang phát khi nó kết thúc. Tùy chọn Tiếp theo thủ công vẫn sẽ chuyển sang bài hát tiếp theo.",
+          "Các bài hát tải không thành công sẽ bị bỏ qua. Nếu liên tục gặp lỗi, chức năng khôi phục tự động sẽ dừng lại."
+        ]
+      },
+      {
+        "title": "Tìm kiếm vị trí",
+        "lines": [
+          "{seek} dùng để di chuyển trong bản nhạc hiện tại.",
+          "Âm thanh Tracker sẽ được chuẩn bị để tìm kiếm chính xác khi có đủ bộ nhớ.",
+          "Khoảng dự trữ bộ nhớ cần thiết sẽ được tự động xác định dựa trên lượng bộ nhớ hiện có.",
+          "Các bản nhạc dài hoặc trường hợp bộ nhớ thấp sẽ sử dụng phương thức phát trực tuyến gốc thay thế.",
+          "Việc tìm kiếm vị trí ngược lại phụ thuộc vào bộ giải mã."
+        ]
+      },
+      {
+        "title": "Danh sách yêu thích",
+        "lines": [
+          "Chọn một bản nhạc nằm ngoài các danh sách phát yêu thích và làm theo hướng dẫn hiển thị ở phía dưới màn hình.",
+          "Nhấn nhanh để chuyển đổi giữa biểu tượng Ngôi sao / Trái tim / Nốt nhạc / Không có gì.",
+          "{gamepad_heading}",
+          "Giữ {favourite} để xóa bản nhạc được chọn khỏi danh sách yêu thích.",
+          "Khi không đang duyệt bản nhạc, {play} có chức năng Phát / Tạm dừng.",
+          "{keyboard_heading}",
+          "Nhấn F để chuyển qua bản nhạc yêu thích tiếp theo; nhấn Xóa để xóa bản nhạc đó.",
+          ""
+        ]
+      }
+    ],
+    "id": 2
+  },
+  {
+    "title": "Chất lượng âm thanh và pin",
+    "children": [
+      {
+        "title": "Hiệu năng",
+        "lines": [
+          "Chế độ Performance ưu tiên chất lượng hiển thị và đặt mục tiêu 30 FPS.",
+          "Chế độ Balanced đặt mục tiêu 24 FPS với giới hạn độ phân giải thấp hơn.",
+          "Chế độ Eco ưu tiên thời lượng pin với giới hạn độ phân giải thấp hơn và tốc độ nâng cấp độ phân giải chậm hơn.",
+          "Độ phân giải tự động sẽ điều chỉnh theo thiết lập hiện tại. Nếu độ phân giải cố định được kích hoạt, việc điều chỉnh này sẽ bị vô hiệu hóa.",
+          "Nếu độ phân giải thấp nhất vẫn khiến tốc độ chạy quá chậm, bạn có thể bỏ qua thiết lập có tải cao."
+        ]
+      },
+      {
+        "title": "Nhạc không hiển thị hình ảnh minh họa",
+        "lines": [
+          "Hãy tắt chức năng Visualizer trong phần Cài đặt.",
+          "Chức năng phát nhạc và điều hướng menu vẫn hoạt động tốt trên nền đơn sắc.",
+          "Khi mở các Preset, chức năng xem trước trực tiếp vẫn được kích hoạt.",
+          "Hãy bật lại Visualizer để tiếp tục hiển thị hoạt ảnh minh họa."
+        ]
+      },
+      {
+        "title": "Chọn mục đặt sẵn",
+        "lines": [
+          "Mở mục đặt sẵn và duyệt danh sách.",
+          "Dừng ở một mục đặt sẵn để xem trước nội dung.",
+          "{select} sẽ chọn mục đó; nó sẽ được áp dụng ngay khi bạn rời khỏi trang.",
+          "Cài đặt chuyển đổi tự động kiểm soát việc thay đổi mục đặt sẵn.",
+          "Các cài đặt đã được áp dụng thành công sẽ được lưu lại trong suốt lần chạy hiện tại."
+        ]
+      }
+    ],
+    "id": 3
+  },
+  {
+    "title": "Khắc phục sự cố",
+    "children": [
+      {
+        "title": "Không có nhạc nào được liệt kê",
+        "lines": [
+          "Mở mục Nhạc và chọn thư mục chứa các tệp âm thanh được hỗ trợ.",
+          "Thư mục trống và trạng thái quét thất bại là hai trạng thái khác nhau; hãy kiểm tra bất kỳ lỗi nào được hiển thị.",
+          "Các chỉ mục danh mục đã tải về liệt kê danh sách nhạc, nhưng không chứa chính tệp âm thanh đó."
+        ]
+      },
+      {
+        "title": "Các danh mục ngoại tuyến",
+        "lines": [
+          "Các chỉ mục danh mục đã lưu vẫn có thể được xem mà không cần kết nối Internet.",
+          "Bài hát phải được tải về trước mới có thể phát ngoại tuyến.",
+          "Chế độ Ngẫu nhiên toàn bộ sẽ sử dụng các bài hát trong máy để phát khi ngoại tuyến. Tình trạng kết nối mạng sẽ được kiểm tra định kỳ."
+        ]
+      },
+      {
+        "title": "Tải hoặc bỏ qua các bản nhạc",
+        "lines": [
+          "Việc tải xuống sẽ lấy tệp từ xa về. Quá trình chuẩn bị âm thanh sẽ giải mã tệp nhạc để có thể điều chỉnh vị trí phát.",
+          "Bạn có thể chọn một bản nhạc khác trong lúc đang tải.",
+          "Các bản nhạc không được hỗ trợ, bị hỏng hoặc không thể truy cập sẽ tự động bị bỏ qua.",
+          "Nếu việc phát sinh lỗi liên tục khiến máy ngừng phát, hãy chọn một bản nhạc hoặc nguồn khác."
+        ]
+      },
+      {
+        "title": "Tìm kiếm bị hạn chế",
+        "lines": [
+          "Một số bộ giải mã tracker gốc không thể tìm kiếm ngược một cách đáng tin cậy.",
+          "Chức năng tìm kiếm trong tracker sẽ được kích hoạt tự động khi có đủ bộ nhớ.",
+          "Các bản nhạc quá dài và tình trạng bộ nhớ thấp sẽ sử dụng phương thức phát trực tiếp gốc."
+        ]
+      }
+    ],
+    "id": 4
+  },
+  {
+    "id": 5,
+    "title": "Các danh mục",
+    "children": [
+      {
+        "title": "Modland",
+        "lines": [
+          "**Danh mục trên thiết bị này**",
+          "Các bản nhạc có thể phát: {modland_tracks}",
+          "Thư mục: {modland_directories}",
+          "Mạng: {network_status}",
+          "",
+          "**Về Modland**",
+          "Một kho lưu trữ lớn chứa các bản nhạc tracker, chiptune và nhạc trò chơi, được sắp xếp theo định dạng và tác giả.",
+          "GlitchScope lưu trữ một chỉ mục gọn gàng ngay trên thiết bị và tải xuống bản nhạc được chọn vào bộ nhớ đệm trước khi phát.",
+          "Chỉ mục đã lưu vẫn có thể được xem ngoại tuyến; các bản nhạc cần kết nối mạng trừ khi đã được lưu vào bộ nhớ đệm."
+        ]
+      },
+      {
+        "title": "ModArchive",
+        "lines": [
+          "**Danh mục trên thiết bị này**",
+          "Các bản nhạc có thể phát: {modarchive_tracks}",
+          "Các thư mục: {modarchive_directories}",
+          "Mạng: {network_status}",
+          "",
+          "**Giới thiệu về ModArchive**",
+          "Đây là kho lưu trữ cộng đồng dành riêng cho các module nhạc có thể phát, bao gồm thông tin nghệ sĩ, xếp hạng, đánh giá và các bộ sưu tập lịch sử.",
+          "GlitchScope gửi các chỉ mục gọn nhẹ cho phần ảnh chụp nhanh lịch sử và phần phụ lục, sau đó chỉ tải xuống dữ liệu của module được chọn.",
+          "Các chỉ mục đã lưu vẫn có thể được xem ngoại tuyến; các bản nhạc cần kết nối mạng trừ khi đã được lưu trữ trong bộ nhớ đệm."
+        ]
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "title": "Định dạng",
+    "children": [
+      {
+        "title": "Âm thanh",
+        "children": [
+          {
+            "title": ".aac",
+            "lines": [
+              "AAC là định dạng mã hóa âm thanh mất dữ liệu, thường được lưu dưới dạng AAC nguyên bản hoặc trong các container thuộc nhóm MP4. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".ac3",
+            "lines": [
+              "AC-3 (Dolby Digital) là định dạng mã hóa âm thanh mất dữ liệu, được sử dụng cho âm thanh đơn kênh và đa kênh. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".eac3",
+            "lines": [
+              "E-AC-3 (Dolby Digital Plus) mở rộng công nghệ AC-3 với tốc độ bit cao hơn và nhiều cấu hình kênh bổ sung. GlitchScope sẽ giải mã định dạng này bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp1",
+            "lines": [
+              "MP1 chính là MPEG Audio Layer I, lớp âm thanh đầu tiên trong ba lớp âm thanh của MPEG-1. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp2",
+            "lines": [
+              "MP2 là MPEG Audio Layer II, một định dạng mất dữ liệu vẫn còn được sử dụng trong phát sóng và các phương tiện truyền thông cũ. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp3",
+            "lines": [
+              "MP3 là MPEG Audio Layer III, một định dạng âm thanh mất dữ liệu được sử dụng rộng rãi. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".ogg",
+            "lines": [
+              "Ogg là một định dạng contêiner thường được dùng để lưu trữ âm thanh dạng Vorbis, Opus, FLAC hoặc Speex. GlitchScope sẽ giải mã luồng âm thanh của nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".oga",
+            "lines": [
+              "OGA là phần mở rộng tên tệp dành cho định dạng Ogg, tập trung vào chức năng phát âm thanh. GlitchScope sẽ giải mã luồng âm thanh của nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".opus",
+            "lines": [
+              "Opus là định dạng âm thanh có mã hóa, mở nguồn và có độ trễ thấp, được tiêu chuẩn hóa bởi IETF. GlitchScope sẽ giải mã định dạng này bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".spx",
+            "lines": [
+              "SPX thường chứa tệp âm thanh nói Speex được đóng gói trong định dạng Ogg. GlitchScope sẽ giải mã chúng bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".flac",
+            "lines": [
+              "FLAC là định dạng âm thanh không mất dữ liệu mở nguồn, có khả năng tái tạo chính xác các mẫu dữ liệu PCM gốc. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".wav",
+            "lines": [
+              "WAV là định dạng container âm thanh dựa trên RIFF, thường được sử dụng cho dữ liệu PCM nhưng cũng có thể lưu trữ các codec khác. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".rf64",
+            "lines": [
+              "RF64 mở rộng định dạng WAV dành cho những tập tin vượt quá giới hạn kích thước 4 GiB của định dạng RIFF truyền thống. GlitchScope sẽ giải mã chúng bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".aiff",
+            "lines": [
+              "AIFF là định dạng container âm thanh dựa trên IFF của Apple, thường được sử dụng cho dữ liệu PCM không nén. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".aif",
+            "lines": [
+              "AIF là phần mở rộng tên tệp thay thế cho tệp âm thanh AIFF. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".aifc",
+            "lines": [
+              "AIFC là phiên bản âm thanh được nén của định dạng container AIFF. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".caf",
+            "lines": [
+              "CAF là định dạng container Core Audio của Apple dùng để lưu trữ âm thanh và dữ liệu siêu dữ liệu. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".m4a",
+            "lines": [
+              "M4A là định dạng container MP4 chuyên dùng cho âm thanh, thường lưu trữ dữ liệu âm thanh dạng AAC hoặc ALAC. GlitchScope sẽ giải mã luồng âm thanh của nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".m4b",
+            "lines": [
+              "M4B là định dạng container âm thanh MP4 thường được sử dụng cho sách nói và siêu dữ liệu chương. GlitchScope giải mã luồng âm thanh của nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp4",
+            "lines": [
+              "MP4 là một container truyền thông ISO Base Media có thể lưu trữ âm thanh, video và dữ liệu siêu dữ liệu. GlitchScope sẽ phát luồng âm thanh được hỗ trợ thông qua FFmpeg."
+            ]
+          },
+          {
+            "title": ".mov",
+            "lines": [
+              "MOV là định dạng container QuickTime của Apple dùng để lưu trữ âm thanh, video và siêu dữ liệu. GlitchScope sẽ phát luồng âm thanh được hỗ trợ thông qua FFmpeg."
+            ]
+          },
+          {
+            "title": ".mka",
+            "lines": [
+              "MKA là phần mở rộng tên tập tin dành cho định dạng container Matroska, tập trung vào nội dung âm thanh. GlitchScope sẽ giải mã luồng âm thanh của nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".mkv",
+            "lines": [
+              "MKV là định dạng container đa phương tiện Matroska. GlitchScope sẽ phát luồng âm thanh được hỗ trợ thông qua FFmpeg."
+            ]
+          },
+          {
+            "title": ".webm",
+            "lines": [
+              "WebM là một định dạng container dựa trên Matroska với các hạn chế nhất định, thường chứa âm thanh Opus hoặc Vorbis. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".wma",
+            "lines": [
+              "Các tệp WMA chứa mã codec Windows Media Audio, thường nằm bên trong container ASF. GlitchScope sẽ giải mã chúng bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".asf",
+            "lines": [
+              "ASF là định dạng container Advanced Systems Format của Microsoft và thường chứa âm thanh WMA. GlitchScope giải mã luồng âm thanh của nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".amr",
+            "lines": [
+              "AMR là định dạng mã hóa âm thanh được sử dụng trong điện thoại di động, thường ở dạng AMR-NB hoặc AMR-WB. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".ape",
+            "lines": [
+              "APE là Monkey's Audio, một định dạng âm thanh không mất dữ liệu. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".tta",
+            "lines": [
+              "TTA là True Audio, một định dạng âm thanh không mất dữ liệu. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".wv",
+            "lines": [
+              "WV chính là WavPack – một định dạng âm thanh không mất dữ liệu hoặc kiểu lai. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".mpc",
+            "lines": [
+              "MPC chính là Musepack – một định dạng âm thanh mất dữ liệu được thiết kế chủ yếu dành cho âm nhạc. GlitchScope sẽ giải mã nó bằng FFmpeg."
+            ]
+          },
+          {
+            "title": ".ts",
+            "lines": [
+              "TS là định dạng container dạng dòng truyền tải MPEG, được sử dụng cho phương tiện truyền thông phát sóng và ghi âm. GlitchScope sẽ phát luồng âm thanh được hỗ trợ thông qua FFmpeg."
+            ]
+          },
+          {
+            "title": ".m2ts",
+            "lines": [
+              "M2TS là định dạng container dạng luồng truyền MPEG kiểu Blu-ray. GlitchScope sẽ phát luồng âm thanh được hỗ trợ thông qua FFmpeg."
+            ]
+          },
+          {
+            "title": ".ra",
+            "lines": [
+              "RA là định dạng tệp hoặc container dòng truyền dữ liệu RealAudio. GlitchScope sẽ giải mã các codec RealAudio được hỗ trợ bằng cách sử dụng FFmpeg."
+            ]
+          },
+          {
+            "title": ".rm",
+            "lines": [
+              "RM là định dạng container RealMedia có thể chứa RealAudio. GlitchScope sẽ phát luồng âm thanh được hỗ trợ thông qua FFmpeg."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Tracker",
+        "children": [
+          {
+            "title": ".mod",
+            "lines": [
+              "Mô-đun thuộc gia đình MOD. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".xm",
+            "lines": [
+              "Module mở rộng của FastTracker II. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".it",
+            "lines": [
+              "Mô-đun Impulse Tracker. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".s3m",
+            "lines": [
+              "Module của Scream Tracker 3. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".mptm",
+            "lines": [
+              "Mô-đun OpenMPT. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".stm",
+            "lines": [
+              "Module của Scream Tracker 2. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".nst",
+            "lines": [
+              "Mô-đun NoiseTracker. GlitchScope sẽ giải mã đuôi tệp này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".wow",
+            "lines": [
+              "Module Mod's Grave. GlitchScope sẽ giải mã định dạng mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".ult",
+            "lines": [
+              "Mô-đun UltraTracker. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".669",
+            "lines": [
+              "Mô-đun Composer 669 hoặc UNIS 669. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".mtm",
+            "lines": [
+              "Mô-đun MultiTracker. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".med",
+            "lines": [
+              "Mô-đun MED hoặc OctaMED. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".far",
+            "lines": [
+              "Mô-đun soạn nhạc Farandole. GlitchScope sẽ giải mã định dạng mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".mdl",
+            "lines": [
+              "Mô-đun Digitrakker. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".ams",
+            "lines": [
+              "Mô-đun Tracker của Extreme hoặc Velvet Studio. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".dsm",
+            "lines": [
+              "Mô-đun DSIK. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".amf",
+            "lines": [
+              "Mô-đun Asylum hoặc DSMI. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".okt",
+            "lines": [
+              "Mô-đun Oktalyzer. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".dmf",
+            "lines": [
+              "Mô-đun Digital Tracker hoặc DefleMask. GlitchScope sẽ giải mã phần mở rộng này bằng libopenmpt, và chuyển sang sử dụng libxmp khi cần thiết."
+            ]
+          },
+          {
+            "title": ".ptm",
+            "lines": [
+              "Mô-đun Poly Tracker. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".psm",
+            "lines": [
+              "Module của ProTracker Studio hoặc Epic. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".mt2",
+            "lines": [
+              "Module của MadTracker 2. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".dbm",
+            "lines": [
+              "Mô-đun DigiBooster Pro. GlitchScope giải mã đuôi tệp này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".abk",
+            "lines": [
+              "Mô-đun AMOS Music Bank. GlitchScope sẽ giải mã đuôi tệp này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".digi",
+            "lines": [
+              "Mô-đun DIGI Booster. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".dtt",
+            "lines": [
+              "Mô-đun Digital Tracker. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".flx",
+            "lines": [
+              "Mô-đun FlexTrax. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".gtk",
+            "lines": [
+              "Mô-đun Graoumf Tracker. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".imf",
+            "lines": [
+              "Mô-đun Imago Orpheus. GlitchScope giải mã định dạng mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".liq",
+            "lines": [
+              "Mô-đun Liquid Tracker. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".masi",
+            "lines": [
+              "Module MASI của Epic MegaGames. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".mgt",
+            "lines": [
+              "Mô-đun Megatracker. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".mmd",
+            "lines": [
+              "Mô-đun MMD loại MED hoặc OctaMED. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".mmdc",
+            "lines": [
+              "mô-đun MED được nén. GlitchScope sẽ giải mã đuôi tệp này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".mmcmp",
+            "lines": [
+              "Mô-đun được nén bằng MMCMP. GlitchScope sẽ giải mã định dạng mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".muse",
+            "lines": [
+              "Module chứa đầy dữ liệu MUSE. GlitchScope sẽ giải mã định dạng mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".nt",
+            "lines": [
+              "Mô-đun NoiseTracker. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".pmd",
+            "lines": [
+              "Module tương thích với ProTracker. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".ppm",
+            "lines": [
+              "Mô-đun ProTracker Packer. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".pru",
+            "lines": [
+              "Mô-đun Prorunner. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".pt36",
+            "lines": [
+              "Module của ProTracker 3.6. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".rh",
+            "lines": [
+              "Module của Rob Hubbard. GlitchScope giải mã định dạng mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".rtm",
+            "lines": [
+              "Mô-đun Real Tracker. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".sfx",
+            "lines": [
+              "Mô-đun SoundFX. GlitchScope sẽ giải mã đuôi tệp này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".sfx2",
+            "lines": [
+              "Mô-đun SoundFX 2. GlitchScope giải mã định dạng mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".stim",
+            "lines": [
+              "Mô-đun Slamtilt. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".stx",
+            "lines": [
+              "Mô-đun STMIK. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".tcb",
+            "lines": [
+              "Mô-đun Tracker TCB. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".tdd",
+            "lines": [
+              "Mô-đun The Dark Demon. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".tp",
+            "lines": [
+              "Mô-đun Tracker Packer. GlitchScope giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".uni",
+            "lines": [
+              "Mô-đun UNI. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".xd",
+            "lines": [
+              "Phiên bản module của FastTracker II. GlitchScope sẽ giải mã phần mở rộng này bằng libxmp."
+            ]
+          },
+          {
+            "title": ".mo3",
+            "lines": [
+              "Module được nén dạng MO3. GlitchScope sẽ giải mã đuôi tập tin này bằng libopenmpt, và chuyển sang sử dụng libxmp nếu cần thiết."
+            ]
+          },
+          {
+            "title": ".ktm",
+            "lines": [
+              "Mô-đun Karate. GlitchScope sẽ giải mã phần mở rộng này bằng libopenmpt, và chuyển sang sử dụng libxmp nếu cần thiết."
+            ]
+          },
+          {
+            "title": ".ims",
+            "lines": [
+              "Mô-đun Velvet Studio. GlitchScope giải mã định dạng mở rộng này bằng libopenmpt, và chuyển sang sử dụng libxmp khi cần thiết."
+            ]
+          },
+          {
+            "title": ".mdc",
+            "lines": [
+              "Mô-đun tracker dành cho Megadrive. GlitchScope sẽ giải mã phần mở rộng này bằng libopenmpt, và chuyển sang sử dụng libxmp khi cần thiết."
+            ]
+          },
+          {
+            "title": ".txn",
+            "lines": [
+              "Module của MadTracker 2. GlitchScope sẽ giải mã đuôi tệp này bằng libopenmpt, và chuyển sang sử dụng libxmp nếu cần thiết."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Chiptune",
+        "children": [
+          {
+            "title": ".ay",
+            "lines": [
+              "AY lưu nhạc của ZX Spectrum hoặc Amstrad CPC dưới dạng dữ liệu chương trình Z80 để chạy trên phần cứng âm thanh thuộc dòng AY. GlitchScope sẽ phát nhạc này bằng cách sử dụng Game Music Emu."
+            ]
+          },
+          {
+            "title": ".nsf",
+            "lines": [
+              "NSF lưu trữ mã nhạc và dữ liệu của máy Nintendo NES hoặc Famicom để phát lại thông qua mô phỏng. GlitchScope sẽ phát chúng bằng Game Music Emu."
+            ]
+          },
+          {
+            "title": ".nsfe",
+            "lines": [
+              "NSFE là phiên bản mở rộng của định dạng NSF, hỗ trợ thông tin phụ và danh sách bài hát được chia thành các khối. GlitchScope sẽ phát loại tập tin này bằng Game Music Emu."
+            ]
+          },
+          {
+            "title": ".spc",
+            "lines": [
+              "SPC là bản sao trạng thái tại thời điểm nhất định của hệ thống âm thanh trên máy Super Nintendo hoặc Super Famicom. GlitchScope sẽ phát chúng bằng Game Music Emu."
+            ]
+          },
+          {
+            "title": ".gbs",
+            "lines": [
+              "GBS lưu mã nhạc và dữ liệu của Nintendo Game Boy để phát lại thông qua việc mô phỏng. GlitchScope sẽ phát chúng bằng Game Music Emu."
+            ]
+          },
+          {
+            "title": ".hes",
+            "lines": [
+              "HES lưu mã nhạc và dữ liệu của PC Engine hoặc TurboGrafx-16 để phát lại thông qua mô phỏng. GlitchScope sẽ phát chúng bằng Game Music Emu."
+            ]
+          },
+          {
+            "title": ".kss",
+            "lines": [
+              "KSS lưu trữ nhạc dành cho MSX và các hệ thống dựa trên Z80 sử dụng công nghệ âm thanh PSG hoặc SCC. GlitchScope sẽ phát nhạc này bằng Game Music Emu; công nghệ âm thanh FM không được hỗ trợ bởi backend này."
+            ]
+          },
+          {
+            "title": ".sap",
+            "lines": [
+              "SAP lưu trữ mã nhạc và dữ liệu 8-bit của Atari dành cho chip âm thanh POKEY. GlitchScope sẽ phát chúng bằng Game Music Emu."
+            ]
+          },
+          {
+            "title": ".vgm",
+            "lines": [
+              "VGM ghi lại các lệnh được gửi đến các chip âm thanh trên các console, bảng điều khiển arcade và máy tính. GlitchScope sẽ phát các chip VGM được hỗ trợ bằng Game Music Emu."
+            ]
+          },
+          {
+            "title": ".vgz",
+            "lines": [
+              "VGZ là tệp VGM được nén bằng gzip. GlitchScope sẽ giải nén và phát chúng bằng Game Music Emu."
+            ]
+          },
+          {
+            "title": ".sid",
+            "lines": [
+              "SID lưu mã nhạc và dữ liệu của Commodore 64 dành cho chip SID; PSID là phiên bản phổ biến hơn. GlitchScope sẽ phát chúng bằng cRSID."
+            ]
+          },
+          {
+            "title": ".rsid",
+            "lines": [
+              "RSID là phiên bản SID nghiêm ngặt hơn dành cho những bản nhạc yêu cầu chức năng hoạt động đầy đủ hơn của Commodore 64. GlitchScope sẽ phát chúng bằng cRSID."
+            ]
+          },
+          {
+            "title": ".vtx",
+            "lines": [
+              "VTX lưu dữ liệu thanh ghi được nén từ chip AY-3-8910 hoặc YM2149, thường được tạo ra bởi Vortex Tracker. GlitchScope phát nhạc loại này bằng bộ giải mã VTX của mình cùng với ayumi."
+            ]
+          },
+          {
+            "title": ".pt3",
+            "lines": [
+              "PT3 là một module Pro Tracker 3 dành cho các bản nhạc sử dụng chip AY-3-8910 hoặc YM2149. GlitchScope sẽ phát chúng bằng cách kết hợp với pt3player và ayumi."
+            ]
+          },
+          {
+            "title": ".ym",
+            "lines": [
+              "YM lưu các dữ liệu bộ đăng ký YM2149 kiểu Atari ST, với nhiều phiên bản định dạng khác nhau. GlitchScope sẽ phát chúng bằng StSound."
+            ]
+          },
+          {
+            "title": ".lh",
+            "lines": [
+              "LH là một phần mở rộng cũ được dùng cho nhạc YM được nén bằng định dạng LHA. GlitchScope sẽ giải nén và phát nó bằng StSound."
+            ]
+          },
+          {
+            "title": ".lha",
+            "lines": [
+              "Các tập tin lưu trữ LHA có thể chứa nhạc YM đã được nén. GlitchScope sẽ mở các tập tin YM được hỗ trợ bằng StSound."
+            ]
+          },
+          {
+            "title": ".ahx",
+            "lines": [
+              "AHX là một module nhạc chiptune dành cho Amiga, được thiết kế dựa trên các nhạc cụ tổng hợp thay vì âm thanh được lấy mẫu. GlitchScope sẽ phát nó bằng trình phát HivelyTracker."
+            ]
+          },
+          {
+            "title": ".hvl",
+            "lines": [
+              "HVL là định dạng module HivelyTracker, mở rộng AHX bằng thêm các tính năng tracker. GlitchScope phát nhạc loại này bằng bộ phát HivelyTracker."
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "Thiết bị",
+    "lines": []
+  },
+  {
+    "id": 8,
+    "title": "Về GlitchScope",
+    "lines": [
+      "**GlitchScope**",
+      "Một trình phát nhạc cùng bộ hiển thị biểu đồ âm thanh theo thời gian thực, được thiết kế dành cho các thiết bị di động Linux và máy tính để bàn.",
+      "",
+      "Phát nhạc từ tập tin địa phương, các mô-đun tracker và các định dạng nhạc game cổ điển, hoặc khám phá các danh mục Modland và ModArchive.",
+      "Hình ảnh được hiển thị nhờ projectM. Âm thanh được giải mã bằng các công cụ mã nguồn mở chuyên dụng được chọn phù hợp với từng định dạng.",
+      "",
+      "Các chế độ Hiệu năng, Cân bằng và Tiết kiệm sẽ điều chỉnh chất lượng hình ảnh tùy theo thiết bị. Bạn cũng có thể tắt bộ hiển thị biểu đồ khi chỉ phát nhạc.",
+      "",
+      "**Project**",
+      "https://github.com/dendec/glitchscope",
+      "Được cấp phép theo giấy phép GPL-2.0-or-later."
+    ]
+  },
+  {
+    "id": 9,
+    "title": "Các giấy phép",
+    "children": [
+      {
+        "title": "projectM",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/projectM-visualizer/projectm",
+          "Copyright (C) 2003-2009 projectM Team"
+        ]
+      },
+      {
+        "title": "SoLoud",
+        "lines": [
+          "zlib",
+          "https://github.com/jarikomppa/soloud",
+          "Copyright (c) 2013-2018 Jari Komppa"
+        ]
+      },
+      {
+        "title": "FFmpeg",
+        "lines": [
+          "LGPL-2.1+",
+          "https://ffmpeg.org/",
+          "Copyright (c) FFmpeg developers"
+        ]
+      },
+      {
+        "title": "libxmp",
+        "lines": [
+          "MIT",
+          "https://github.com/libxmp/libxmp",
+          "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"
+        ]
+      },
+      {
+        "title": "libopenmpt",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/OpenMPT/openmpt",
+          "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"
+        ]
+      },
+      {
+        "title": "game-music-emu",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/libgme/game-music-emu",
+          "Copyright (c) Shay Green"
+        ]
+      },
+      {
+        "title": "ayumi",
+        "lines": [
+          "MIT",
+          "https://github.com/true-grue/ayumi",
+          "Copyright (c) Peter Sovietov"
+        ]
+      },
+      {
+        "title": "pt3player",
+        "lines": [
+          "MIT",
+          "https://github.com/Volutar/pt3player",
+          "Copyright (c) 2023 Volutar"
+        ]
+      },
+      {
+        "title": "libstsound",
+        "lines": [
+          "BSD-2-Clause",
+          "https://github.com/cpcsdk/libstsound",
+          "Copyright holders: Leonard/Oxygene et al."
+        ]
+      },
+      {
+        "title": "Hively",
+        "lines": [
+          "MIT",
+          "https://github.com/tildearrow/foo-input-hvl",
+          "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"
+        ]
+      },
+      {
+        "title": "cRSID",
+        "lines": [
+          "WTFPL",
+          "https://www.rockbox.org/",
+          "Copyright (c) Hermit (Mihaly Horvath)"
+        ]
+      },
+      {
+        "title": "klauspost/compress (Zstandard)",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/klauspost/compress",
+          "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"
+        ]
+      },
+      {
+        "title": "go-sdl2",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/veandco/go-sdl2",
+          "Copyright (c) 2013 Go-SDL2 Authors"
+        ]
+      },
+      {
+        "title": "SDL2",
+        "lines": [
+          "zlib",
+          "https://libsdl.org/",
+          "Copyright (C) 1997-2026 Sam Lantinga"
+        ]
+      },
+      {
+        "title": "x/image",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/image",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "x/text",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/text",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "libogg",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/ogg/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libvorbis",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/vorbis/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libFLAC",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/flac/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "mpg123",
+        "lines": [
+          "LGPL-2.1",
+          "https://www.mpg123.de/",
+          "Copyright (c) mpg123 contributors"
+        ]
+      },
+      {
+        "title": "zlib",
+        "lines": [
+          "zlib",
+          "https://zlib.net/",
+          "Copyright (c) Jean-loup Gailly and Mark Adler"
+        ]
+      },
+      {
+        "title": "GNU Unifont",
+        "lines": [
+          "GPL-2.0+ with font embedding exception",
+          "https://unifoundry.com/unifont/",
+          "Copyright (c) GNU Unifont contributors"
+        ]
+      },
+      {
+        "title": "PortsMaster Device-Info",
+        "lines": [
+          "MIT",
+          "https://github.com/PortsMaster/Device-Info",
+          "Copyright (c) PortsMaster contributors"
+        ]
+      }
+    ]
+  }
+]

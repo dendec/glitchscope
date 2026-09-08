@@ -60,6 +60,7 @@ func LoadSettings(path string) (Settings, error) {
 		} `json:"track_cache"`
 		PresetInterval *PresetInterval `json:"preset_interval"`
 		UI             *struct {
+			Language     *Language     `json:"language"`
 			Theme        *Theme        `json:"theme"`
 			Transparency *Transparency `json:"transparency"`
 			MenuOpened   *bool         `json:"menu_opened"`
@@ -124,6 +125,9 @@ func LoadSettings(path string) (Settings, error) {
 		s.PresetInterval = *raw.PresetInterval
 	}
 	if raw.UI != nil {
+		if raw.UI.Language != nil {
+			s.UI.Language = *raw.UI.Language
+		}
 		if raw.UI.MenuOpened != nil {
 			s.UI.MenuOpened = *raw.UI.MenuOpened
 		}

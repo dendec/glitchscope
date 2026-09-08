@@ -1,10 +1,18 @@
 package ui
 
 import (
+	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/formats"
+	"github.com/dendec/glitchscope/internal/i18n"
 )
+
+var helpPlaceholderRE = regexp.MustCompile(`\{[a-z0-9_]+\}`)
 
 func TestHelpTopicsLoadFromAsset(t *testing.T) {
 	if len(helpTopics) != 10 {
@@ -19,6 +27,114 @@ func TestHelpTopicsLoadFromAsset(t *testing.T) {
 	if len(helpTopics[HelpLicenses].Children) != 23 {
 		t.Fatalf(" Licenses children = %d, want 23", len(helpTopics[HelpLicenses].Children))
 	}
+}
+
+func TestHelpDocumentsEverySupportedFormat(t *testing.T) {
+	documented := make(map[string]bool, len(formats.SupportedExts))
+	for _, category := range helpTopics[HelpFormats].Children {
+		for _, entry := range category.Children {
+			if documented[entry.Title] {
+				t.Errorf("format %s is documented more than once", entry.Title)
+			}
+			documented[entry.Title] = true
+			if len(entry.Lines) != 1 || entry.Lines[0] == "" {
+				t.Errorf("format %s must have one concise description", entry.Title)
+			}
+			if len(entry.Lines) == 1 && len(entry.Lines[0]) > 200 {
+				t.Errorf("format %s description is too long: %d bytes", entry.Title, len(entry.Lines[0]))
+			}
+		}
+	}
+	for extension := range formats.SupportedExts {
+		if !documented[extension] {
+			t.Errorf("supported format %s is missing from Help", extension)
+		}
+	}
+	for extension := range documented {
+		if !formats.SupportedExts[extension] {
+			t.Errorf("Help documents unsupported format %s", extension)
+		}
+	}
+}
+
+func TestTranslatedHelpPreservesStructureAndLicenses(t *testing.T) {
+	for _, language := range config.AllLanguages() {
+		if language == config.English {
+			continue
+		}
+		o := &Overlay{catalog: i18n.MustLoad(i18n.English), helpTopics: helpTopics}
+		if err := o.SetLanguage(language); err != nil {
+			t.Errorf("%s: %v", language, err)
+			continue
+		}
+		if !sameHelpStructure(helpTopics, o.helpTopics) {
+			t.Errorf("%s Help structure differs from English", language)
+		}
+		if !sameHelpPlaceholders(helpTopics, o.helpTopics) {
+			t.Errorf("%s Help placeholders differ from English", language)
+		}
+		if !reflect.DeepEqual(helpTopics[HelpLicenses].Children, o.helpTopics[HelpLicenses].Children) {
+			t.Errorf("%s translated license metadata or text", language)
+		}
+	}
+}
+
+func sameHelpPlaceholders(left, right []HelpTopic) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if !reflect.DeepEqual(helpPlaceholders(left[i].Title, left[i].Lines), helpPlaceholders(right[i].Title, right[i].Lines)) ||
+			!sameHelpEntryPlaceholders(left[i].Children, right[i].Children) {
+			return false
+		}
+	}
+	return true
+}
+
+func sameHelpEntryPlaceholders(left, right []HelpEntry) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if !reflect.DeepEqual(helpPlaceholders(left[i].Title, left[i].Lines), helpPlaceholders(right[i].Title, right[i].Lines)) ||
+			!sameHelpEntryPlaceholders(left[i].Children, right[i].Children) {
+			return false
+		}
+	}
+	return true
+}
+
+func helpPlaceholders(title string, lines []string) []string {
+	values := helpPlaceholderRE.FindAllString(title, -1)
+	for _, line := range lines {
+		values = append(values, helpPlaceholderRE.FindAllString(line, -1)...)
+	}
+	return values
+}
+
+func sameHelpStructure(left, right []HelpTopic) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i].ID != right[i].ID || !sameHelpEntries(left[i].Children, right[i].Children) {
+			return false
+		}
+	}
+	return true
+}
+
+func sameHelpEntries(left, right []HelpEntry) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if !sameHelpEntries(left[i].Children, right[i].Children) {
+			return false
+		}
+	}
+	return true
 }
 
 func TestHelpMenuTitleMarksOnlySubmenus(t *testing.T) {

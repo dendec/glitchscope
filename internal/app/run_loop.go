@@ -145,7 +145,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 		}
 
 		if a.overlay != nil && a.overlay.IsSettingsPage() {
-			rows := ui.BuildSettingsRows(*a.settings, w, h)
+			rows := ui.BuildSettingsRowsWithCatalog(*a.settings, w, h, a.overlay.Catalog())
 			a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 		}
 	}

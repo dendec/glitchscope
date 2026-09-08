@@ -213,7 +213,7 @@ func (a *App) switchScreen(winW, winH int, forward bool) {
 		a.overlay.PrevScreen()
 	}
 	if a.overlay.IsSettingsPage() {
-		rows := ui.BuildSettingsRows(*a.settings, winW, winH)
+		rows := ui.BuildSettingsRowsWithCatalog(*a.settings, winW, winH, a.overlay.Catalog())
 		a.overlay.SetSettingsRows(rows, 0)
 	}
 	if a.overlay.IsLibraryPage() {
@@ -355,6 +355,18 @@ func (a *App) applySettings(winW, winH int) {
 		return
 	}
 
+	languages := config.AllLanguages()
+	if idx := rows[ui.SettingLanguage].Index; idx >= 0 && idx < len(languages) {
+		language := languages[idx]
+		if language != a.settings.UI.Language {
+			if err := a.overlay.SetLanguage(language); err != nil {
+				slog.Warn("apply UI language", "language", language, "error", err)
+			} else {
+				a.settings.UI.Language = language
+			}
+		}
+	}
+
 	resIndex := rows[ui.SettingResolution].Index
 	resolutions := config.ComputeResolutions(winW, winH)
 
@@ -466,7 +478,7 @@ func (a *App) applySettings(winW, winH int) {
 		slog.Debug("settings saved", "path", a.settingsPath)
 	}
 
-	rows = ui.BuildSettingsRows(*a.settings, winW, winH)
+	rows = ui.BuildSettingsRowsWithCatalog(*a.settings, winW, winH, a.overlay.Catalog())
 	a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 }
 

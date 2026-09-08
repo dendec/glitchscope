@@ -1,0 +1,1110 @@
+[
+  {
+    "title": "Mula Menggunakan",
+    "lines": [
+      "**Mainkan muzik anda**",
+      "Tekan {menu} untuk membuka menu.",
+      "Pilih Music, buka sebuah folder, kemudian pilih lagu yang diinginkan.",
+      "",
+      "**Nikmati visualizer**",
+      "Tutup menu setelah pemutaran bermula.",
+      "Gunakan Presets untuk memilih gaya visual dan Settings untuk menyeimbangkan kualiti, kelajuan serta jangka hayat bateri.",
+      "",
+      "Bahagian kaki halaman sentiasa menunjukkan tindakan yang tersedia untuk pilihan semasa."
+    ],
+    "id": 0
+  },
+  {
+    "title": "Kawalan",
+    "children": [
+      {
+        "title": "Dalam menu",
+        "lines": [
+          "**Navigasi**",
+          "{move} mengalihkan pilihan. Tahan untuk gulung lebih cepat.",
+          "{focus} menukar panel.",
+          "{select} membuka item yang dipilih atau melaksanakan nilai tertentu.",
+          "{back} kembali atau membatalkan pengeditan.",
+          "{pages} menukar halaman.",
+          "",
+          "**Menu**",
+          "{menu} membuka atau menutup menu.",
+          "Bahagian kaki skrin menunjukkan tindakan untuk pilihan semasa."
+        ]
+      },
+      {
+        "title": "Semasa Mendengar",
+        "lines": [
+          "**Dengan menu ditutup**",
+          "{tracks} memilih trek sebelumnya / seterusnya.",
+          "Butang Seterusnya mengikut mod shuffle yang dipilih.",
+          "{play} memainkan atau menangguhkan mainan.",
+          "{seek} bergerak ke belakang atau ke depan.",
+          "{presets} mengubah tetapan visualizer.",
+          "{random} memilih tetapan rawak.",
+          "{overlay} menunjukkan atau menyembunyikan notifikasi trek."
+        ]
+      },
+      {
+        "title": "Navigasi Bantuan",
+        "lines": [
+          "Pilih topik di sebelah kiri.",
+          "{select} membuka satu topik yang mengandungi subtopik.",
+          "{focus} beralih ke panel teks.",
+          "{move} mengimbas teks tersebut.",
+          "{back} kembali ke tahap sebelumnya.",
+          "{pages} kembali ke halaman aplikasi yang lain."
+        ]
+      }
+    ],
+    "id": 1
+  },
+  {
+    "title": "Pemutaran",
+    "children": [
+      {
+        "title": "Shuffle dan ulang",
+        "lines": [
+          "Mati: trek dimainkan mengikut urutan.",
+          "Album: shuffle folder atau senarai main semasa.",
+          "Sumber: shuffle dalam Music, Modland atau ModArchive.",
+          "Semua: shuffle merentasi semua sumber yang tersedia. Dalam mod offline, “Semua” hanya menggunakan muzik tempatan.",
+          "Pilihan “Sumber” dan “Semua” boleh mengulang trek, termasuk trek semasa.",
+          "“Ulang Satu” akan mengulang trek semasa setelah ia tamat. Pilihan “Seterusnya” secara manual tetap akan memindahkan ke trek seterusnya.",
+          "Muatan yang gagal akan diabaikan. Kegagalan berulang akan menghentikan proses pemulihan automatik."
+        ]
+      },
+      {
+        "title": "Mencari Masa",
+        "lines": [
+          "{seek} menggerakkan pemutaran pada trek semasa.",
+          "Audio Tracker disediakan untuk pencarian masa yang tepat apabila memori yang mencukupi tersedia.",
+          "Jumlah memori yang diperlukan untuk persiapan dipilih secara automatik berdasarkan memori yang ada pada masa itu.",
+          "Trek yang panjang atau keadaan memori yang rendah akan menggunakan aliran data asli sebagai gantinya.",
+          "Cara mencari masa ke belakang bergantung pada pemecah isyarat yang digunakan."
+        ]
+      },
+      {
+        "title": "Favorit",
+        "lines": [
+          "Pilih lagu daripada senarai main yang bukan dalam kategori Favorit, kemudian ikut arahan pada bahagian kaki skrin.",
+          "Tekan sebentar untuk bertukar antara ikon Bintang / Hati / Nota / Tiada.",
+          "{gamepad_heading}",
+          "Tahan {favourite} untuk memadam lagu yang dipilih daripada senarai favorit.",
+          "Semasa tidak meneroka lagu, {play} berfungsi sebagai Main / Berhenti.",
+          "{keyboard_heading}",
+          "Tekan F untuk bertukar antara lagu dalam senarai favorit; tekan Padam untuk memadamkannya.",
+          ""
+        ]
+      }
+    ],
+    "id": 2
+  },
+  {
+    "title": "Kualiti dan Bateri",
+    "children": [
+      {
+        "title": "Prestasi",
+        "lines": [
+          "Prestasi mengutamakan kualiti visualizer dan mengekalkan kadar 30 FPS.",
+          "Mod Seimbang menetapkan sasaran 24 FPS dengan had resolusi yang lebih rendah.",
+          "Mod Eco mengutamakan jangka hayat bateri dengan had resolusi yang lebih rendah serta proses peningkatan resolusi yang lebih perlahan.",
+          "Resolusi automatik akan disesuaikan mengikut tetapan semasa. Resolusi tetap akan melumpuhkan penyesuaian ini.",
+          "Tetapan yang berat boleh diabaikan jika resolusi paling rendah masih terlalu perlahan."
+        ]
+      },
+      {
+        "title": "Muzik tanpa visualisasi",
+        "lines": [
+          "Aturkan Visualizer kepada Off dalam Tetapan.",
+          "Muzik dan navigasi menu tetap berfungsi walaupun pada latar belakang kosong.",
+          "Membuka Tetapan Pra-set masih membolehkan prapaparan secara langsung.",
+          "Hidupkan semula Visualizer untuk meneruskan animasi."
+        ]
+      },
+      {
+        "title": "Pemilihan tetapan prasetempat",
+        "lines": [
+          "Buka Preset dan lihat senarainya.",
+          "Tetapkan pada tetapan sedia ada untuk melihat pratontonnya.",
+          "{select} memilihnya; ia akan digunakan apabila anda meninggalkan halaman tersebut.",
+          "Preset auto-switch mengawal perubahan secara automatik.",
+          "Resolusi yang berjaya akan diingati semasa sesi pemainan semasa."
+        ]
+      }
+    ],
+    "id": 3
+  },
+  {
+    "title": "Penyelesaian Masalah",
+    "children": [
+      {
+        "title": "Tiada muzik yang disenaraikan",
+        "lines": [
+          "Buka Bahagian Muzik dan pilih folder yang mengandungi fail audio yang disokong.",
+          "Folder kosong dan imbasan yang gagal merupakan keadaan yang berbeza; semak sebarang ralat yang dipaparkan.",
+          "Indeks katalog yang dimuat turun menyenaraikan muzik, tetapi tidak mengandungi fail audio itu sendiri."
+        ]
+      },
+      {
+        "title": "Katalog Offline",
+        "lines": [
+          "Indeks katalog yang disimpan masih boleh diakses walaupun tanpa sambungan internet.",
+          "Sebuah trek mesti telah dimuat turun terlebih dahulu untuk dimainkan secara offline.",
+          "Fungsi Shuffle All menggunakan muzik tempatan semasa dalam mod offline. Ketersediaan rangkaian akan diperiksa secara berkala."
+        ]
+      },
+      {
+        "title": "Memuat turun atau melangkau trek",
+        "lines": [
+          "Proses memuat turun memperoleh fail dari pelayan jauh. Proses penyediaan audio pula mendekodkan trek tersebut agar boleh dicari.",
+          "Anda boleh memilih trek lain sementara proses memuat turun sedang berjalan.",
+          "Trek yang tidak disokong, rosak atau tidak tersedia akan dilangkau secara automatik.",
+          "Jika berlaku kegagalan berulang yang menghentikan pemainan, pilih trek atau sumber lain."
+        ]
+      },
+      {
+        "title": "Carian terhad",
+        "lines": [
+          "Beberapa pengekod tracker asli tidak dapat melakukan carian ke belakang dengan tepat.",
+          "Carian tracker akan diaktifkan secara automatik apabila memori yang mencukupi tersedia.",
+          "Lagu yang sangat panjang dan keadaan memori yang rendah akan menggunakan aliran data asli."
+        ]
+      }
+    ],
+    "id": 4
+  },
+  {
+    "id": 5,
+    "title": "Katalog",
+    "children": [
+      {
+        "title": "Modland",
+        "lines": [
+          "**Katalog pada peranti ini**",
+          "Lagu yang boleh dimainkan: {modland_tracks}",
+          "Folder: {modland_directories}",
+          "Rangkaian: {network_status}",
+          "",
+          "**Mengenai Modland**",
+          "Arkib penyimpanan yang besar untuk muzik tracker, chiptune dan permainan, diatur mengikut format dan pengarang.",
+          "GlitchScope menyimpan indeks padat secara tempatan dan memuat turun lagu yang dipilih ke dalam cache sebelum dimainkan.",
+          "Indeks yang disimpan masih boleh diakses tanpa sambungan; lagu memerlukan sambungan kecuali sudah disimpan dalam cache."
+        ]
+      },
+      {
+        "title": "ModArchive",
+        "lines": [
+          "**Katalog pada peranti ini**",
+          "Lagu yang boleh dimainkan: {modarchive_tracks}",
+          "Folder: {modarchive_directories}",
+          "Rangkaian: {network_status}",
+          "",
+          "**Mengenai Mod Archive**",
+          "Sebuah arkib komuniti yang khusus untuk mod muzik yang boleh dimainkan, dengan maklumat artis, penilaian, ulasan serta koleksi sejarah.",
+          "GlitchScope menghantar indeks kompak untuk gambaran sejarah dan lampiran, kemudian memuat turun hanya data mod yang dipilih.",
+          "Indeks yang disimpan masih boleh diakses tanpa sambungan; lagu memerlukan sambungan kecuali sudah disimpan dalam cache."
+        ]
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "title": "Format Fail",
+    "children": [
+      {
+        "title": "Audio",
+        "children": [
+          {
+            "title": ".aac",
+            "lines": [
+              "AAC ialah format kodan audio berbentuk lossy yang biasanya disimpan dalam bentuk AAC mentah atau dalam kontainer keluarga MP4. GlitchScope akan mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".ac3",
+            "lines": [
+              "AC-3 (Dolby Digital) ialah format kodan audio berbentuk lossy yang digunakan untuk bunyi mono dan berbilang saluran. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".eac3",
+            "lines": [
+              "E-AC-3 (Dolby Digital Plus) memperluas format AC-3 dengan kadar bit yang lebih tinggi serta konfigurasi saluran tambahan. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp1",
+            "lines": [
+              "MP1 ialah MPEG Audio Layer I, lapisan audio pertama daripada tiga lapisan audio MPEG-1. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp2",
+            "lines": [
+              "MP2 ialah MPEG Audio Layer II, iaitu format berkurangan kualiti yang masih digunakan dalam siaran dan media lama. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp3",
+            "lines": [
+              "MP3 ialah MPEG Audio Layer III, iaitu format audio berkurangan kualiti yang digunakan secara meluas. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".ogg",
+            "lines": [
+              "Ogg ialah format kontainer yang sering digunakan untuk menyimpan audio Vorbis, Opus, FLAC atau Speex. GlitchScope mendekodkan aliran audio tersebut menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".oga",
+            "lines": [
+              "OGA ialah lanjutan nama fail berasaskan audio untuk kontainer Ogg. GlitchScope mendekodkan aliran audio tersebut menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".opus",
+            "lines": [
+              "Opus ialah format audio berkurangan kualiti yang terbuka serta mempunyai kelewatan rendah, yang distandardkan oleh IETF. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".spx",
+            "lines": [
+              "SPX biasanya mengandungi audio suara Speex dalam kontainer Ogg. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".flac",
+            "lines": [
+              "FLAC ialah format audio tanpa kehilangan yang terbuka yang membina semula sampel PCM asal dengan tepat. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".wav",
+            "lines": [
+              "WAV ialah kontainer audio berasaskan RIFF, yang paling kerap digunakan untuk PCM tetapi mampu menyokong kod pemampatan lain. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".rf64",
+            "lines": [
+              "RF64 memanjangkan format WAV untuk fail yang melebihi had saiz 4 GiB bagi format RIFF biasa. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".aiff",
+            "lines": [
+              "AIFF ialah kontainer audio berasaskan IFF daripada Apple, yang sering digunakan untuk PCM tanpa penyusunan semula data. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".aif",
+            "lines": [
+              "AIF ialah lanjutan nama fail alternatif untuk fail audio AIFF. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".aifc",
+            "lines": [
+              "AIFC ialah versi audio yang dikompres daripada kontainer AIFF. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".caf",
+            "lines": [
+              "CAF ialah kontainer Format Audio Core Apple untuk audio dan metadata. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".m4a",
+            "lines": [
+              "M4A ialah kontainer MP4 yang berfokus pada audio, biasanya menyimpan fail dalam format AAC atau ALAC. GlitchScope mendekodkan aliran audio tersebut menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".m4b",
+            "lines": [
+              "M4B ialah kontainer audio MP4 yang sering digunakan untuk buku audio dan metadata bab. GlitchScope mendekodkan aliran audionya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp4",
+            "lines": [
+              "MP4 ialah kontainer media ISO Base yang boleh menyimpan audio, video dan metadata. GlitchScope memainkan aliran audio yang disokong melalui FFmpeg."
+            ]
+          },
+          {
+            "title": ".mov",
+            "lines": [
+              "MOV ialah kontainer QuickTime daripada Apple untuk audio, video dan metadata. GlitchScope memainkan aliran audio yang disokongnya melalui FFmpeg."
+            ]
+          },
+          {
+            "title": ".mka",
+            "lines": [
+              "MKA ialah lanjutan nama fail berasaskan audio untuk kontainer Matroska. GlitchScope mendekodkan aliran audio daripadanya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".mkv",
+            "lines": [
+              "MKV ialah kontainer multimedia Matroska. GlitchScope memainkan aliran audio yang disokongnya melalui FFmpeg."
+            ]
+          },
+          {
+            "title": ".webm",
+            "lines": [
+              "WebM ialah kontainer berasaskan Matroska yang mempunyai sekatan, biasanya menyokong audio Opus atau Vorbis. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".wma",
+            "lines": [
+              "Fail WMA menggunakan kodkod Audio Windows Media, biasanya berada di dalam kontainer ASF. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".asf",
+            "lines": [
+              "ASF ialah kontainer Advanced Systems Format daripada Microsoft yang sering menyimpan audio WMA. GlitchScope mendekodkan aliran audio tersebut menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".amr",
+            "lines": [
+              "AMR ialah format penskodan suara yang digunakan dalam telefon bimbit, biasanya dalam bentuk AMR-NB atau AMR-WB. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".ape",
+            "lines": [
+              "APE ialah Monkey's Audio, iaitu format audio tanpa kehilangan data. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".tta",
+            "lines": [
+              "TTA ialah True Audio, iaitu format audio tanpa kehilangan data. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".wv",
+            "lines": [
+              "WV ialah WavPack, iaitu format audio tanpa kehilangan data atau format hibrid. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".mpc",
+            "lines": [
+              "MPC ialah Musepack, sebuah format audio berkurangan kualiti yang direka khusus untuk muzik. GlitchScope mendekodkannya menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".ts",
+            "lines": [
+              "TS ialah kontainer aliran penghantaran MPEG yang digunakan untuk media siaran dan yang dirakam. GlitchScope memainkan aliran audio yang disokongnya melalui FFmpeg."
+            ]
+          },
+          {
+            "title": ".m2ts",
+            "lines": [
+              "M2TS ialah kontainer aliran penghantaran MPEG gaya Blu-ray. GlitchScope memainkan aliran audio yang disokongnya melalui FFmpeg."
+            ]
+          },
+          {
+            "title": ".ra",
+            "lines": [
+              "RA ialah kontainer fail atau aliran RealAudio. GlitchScope mendekodkan kodkod RealAudio yang disokong menggunakan FFmpeg."
+            ]
+          },
+          {
+            "title": ".rm",
+            "lines": [
+              "RM ialah kontainer RealMedia yang mungkin mengandungi RealAudio. GlitchScope memainkan aliran audio yang disokongnya melalui FFmpeg."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Tracker",
+        "children": [
+          {
+            "title": ".mod",
+            "lines": [
+              "Modul keluarga MOD. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".xm",
+            "lines": [
+              "Modul Lanjutan FastTracker II. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".it",
+            "lines": [
+              "Modul Impulse Tracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".s3m",
+            "lines": [
+              "Modul Scream Tracker 3. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".mptm",
+            "lines": [
+              "Modul OpenMPT. GlitchScope mendekodkan lampiran ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".stm",
+            "lines": [
+              "Modul Scream Tracker 2. GlitchScope mendekodkan sambungan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".nst",
+            "lines": [
+              "Modul NoiseTracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".wow",
+            "lines": [
+              "Modul Mod's Grave. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".ult",
+            "lines": [
+              "Modul UltraTracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".669",
+            "lines": [
+              "Modul Composer 669 atau UNIS 669. GlitchScope mendekodkan lampiran ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".mtm",
+            "lines": [
+              "Modul MultiTracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".med",
+            "lines": [
+              "Modul MED atau OctaMED. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".far",
+            "lines": [
+              "Modul Komposer Farandole. GlitchScope mendekodkan lampiran ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".mdl",
+            "lines": [
+              "Modul Digitrakker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".ams",
+            "lines": [
+              "Modul Extreme’s Tracker atau Velvet Studio. GlitchScope mendekodkan sambungan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".dsm",
+            "lines": [
+              "Modul DSIK. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".amf",
+            "lines": [
+              "Modul Asylum atau DSMI. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".okt",
+            "lines": [
+              "Modul Oktalyzer. GlitchScope mendekodkan lampiran ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".dmf",
+            "lines": [
+              "Modul Digital Tracker atau DefleMask. GlitchScope mendekodkan lanjutan ini menggunakan libopenmpt, dan beralih kepada libxmp apabila diperlukan."
+            ]
+          },
+          {
+            "title": ".ptm",
+            "lines": [
+              "Modul Poly Tracker. GlitchScope mendekodkan lampiran ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".psm",
+            "lines": [
+              "Modul ProTracker Studio atau Epic. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".mt2",
+            "lines": [
+              "Modul MadTracker 2. GlitchScope mendekodkan sambungan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".dbm",
+            "lines": [
+              "Modul DigiBooster Pro. GlitchScope mendekodkan sambungan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".abk",
+            "lines": [
+              "Modul AMOS Music Bank. GlitchScope mendekodkan lampiran ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".digi",
+            "lines": [
+              "Modul DIGI Booster. GlitchScope mendekodkan sambungan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".dtt",
+            "lines": [
+              "Modul Tracker digital. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".flx",
+            "lines": [
+              "Modul FlexTrax. GlitchScope mendekodkan sambungan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".gtk",
+            "lines": [
+              "Modul Graoumf Tracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".imf",
+            "lines": [
+              "Modul Imago Orpheus. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".liq",
+            "lines": [
+              "Modul Liquid Tracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".masi",
+            "lines": [
+              "Modul Epic MegaGames MASI. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".mgt",
+            "lines": [
+              "Modul Megatracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".mmd",
+            "lines": [
+              "Modul MMD jenis MED atau OctaMED. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".mmdc",
+            "lines": [
+              "modul MED yang telah dikompres. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".mmcmp",
+            "lines": [
+              "Modul yang dikompres menggunakan MMCMP. GlitchScope mendekodkan sambungan ini dengan libxmp."
+            ]
+          },
+          {
+            "title": ".muse",
+            "lines": [
+              "Modul yang dipenuhi dengan data MUSE. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".nt",
+            "lines": [
+              "Modul NoiseTracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".pmd",
+            "lines": [
+              "Modul yang serasi dengan ProTracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".ppm",
+            "lines": [
+              "Modul ProTracker Packer. GlitchScope mendekodkan lampiran ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".pru",
+            "lines": [
+              "Modul Prorunner. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".pt36",
+            "lines": [
+              "Modul ProTracker 3.6. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".rh",
+            "lines": [
+              "Modul Rob Hubbard. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".rtm",
+            "lines": [
+              "Modul Real Tracker. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".sfx",
+            "lines": [
+              "Modul SoundFX. GlitchScope mendekodkan sambungan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".sfx2",
+            "lines": [
+              "Modul SoundFX 2. GlitchScope mendekodkan sambungan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".stim",
+            "lines": [
+              "Modul Slamtilt. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".stx",
+            "lines": [
+              "Modul STMIK. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".tcb",
+            "lines": [
+              "Modul Tracker TCB. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".tdd",
+            "lines": [
+              "Modul The Dark Demon. GlitchScope mendekodkan lampiran ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".tp",
+            "lines": [
+              "Modul Tracker Packer. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".uni",
+            "lines": [
+              "Modul UNI. GlitchScope mendekodkan lanjutan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".xd",
+            "lines": [
+              "Variasi modul FastTracker II. GlitchScope mendekodkan sambungan ini menggunakan libxmp."
+            ]
+          },
+          {
+            "title": ".mo3",
+            "lines": [
+              "Modul yang dikompres dalam format MO3. GlitchScope mendekodkan sambungan ini menggunakan libopenmpt, dan beralih kepada libxmp apabila diperlukan."
+            ]
+          },
+          {
+            "title": ".ktm",
+            "lines": [
+              "Modul Karate. GlitchScope mendekodkan lampiran ini menggunakan libopenmpt, dan beralih kepada libxmp jika perlu."
+            ]
+          },
+          {
+            "title": ".ims",
+            "lines": [
+              "Modul Velvet Studio. GlitchScope mendekodkan sambungan ini menggunakan libopenmpt, dan beralih kepada libxmp jika perlu."
+            ]
+          },
+          {
+            "title": ".mdc",
+            "lines": [
+              "Modul tracker untuk Megadrive. GlitchScope mendekodkan lanjutan ini menggunakan libopenmpt, dan beralih kepada libxmp apabila diperlukan."
+            ]
+          },
+          {
+            "title": ".txn",
+            "lines": [
+              "Modul MadTracker 2. GlitchScope mendekodkan lampiran ini menggunakan libopenmpt, dan beralih kepada libxmp jika perlu."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Chiptune",
+        "children": [
+          {
+            "title": ".ay",
+            "lines": [
+              "AY menyimpan muzik ZX Spectrum atau Amstrad CPC dalam bentuk data program Z80 untuk peranti bunyi keluarga AY. GlitchScope memainkannya menggunakan Game Music Emu."
+            ]
+          },
+          {
+            "title": ".nsf",
+            "lines": [
+              "NSF menyimpan kod muzik serta data daripada Nintendo NES atau Famicom untuk dimainkan secara emulasi. GlitchScope memainkannya menggunakan Game Music Emu."
+            ]
+          },
+          {
+            "title": ".nsfe",
+            "lines": [
+              "NSFE ialah varian NSF yang boleh dikembangkan, dengan metadata dan maklumat senarai main yang dibahagikan kepada bahagian-bahagian. GlitchScope memainkannya menggunakan Game Music Emu."
+            ]
+          },
+          {
+            "title": ".spc",
+            "lines": [
+              "SPC ialah salinan pantas daripada subsistem audio Super Nintendo atau Super Famicom. GlitchScope memainkannya menggunakan Game Music Emu."
+            ]
+          },
+          {
+            "title": ".gbs",
+            "lines": [
+              "GBS menyimpan kod muzik serta data Nintendo Game Boy untuk dimainkan secara emulasi. GlitchScope memainkannya menggunakan Game Music Emu."
+            ]
+          },
+          {
+            "title": ".hes",
+            "lines": [
+              "HES menyimpan kod muzik serta data PC Engine atau TurboGrafx-16 untuk dimainkan secara emulasi. GlitchScope memainkannya menggunakan Game Music Emu."
+            ]
+          },
+          {
+            "title": ".kss",
+            "lines": [
+              "KSS menyimpan muzik untuk MSX dan sistem berasaskan Z80 yang lain menggunakan audio PSG atau SCC. GlitchScope memainkannya dengan Game Music Emu; bunyi FM tidak disokong oleh backend ini."
+            ]
+          },
+          {
+            "title": ".sap",
+            "lines": [
+              "SAP menyimpan kod muzik 8-bit Atari serta data untuk cip bunyi POKEY. GlitchScope memainkannya menggunakan Game Music Emu."
+            ]
+          },
+          {
+            "title": ".vgm",
+            "lines": [
+              "VGM mencatat arahan yang dihantar ke cip bunyi dalam konsol, papan permainan arcade dan komputer. GlitchScope memainkan cip VGM yang disokong menggunakan Game Music Emu."
+            ]
+          },
+          {
+            "title": ".vgz",
+            "lines": [
+              "VGZ ialah fail VGM yang dikompres menggunakan gzip. GlitchScope akan mengekstrak data dan memainkannya menggunakan Game Music Emu."
+            ]
+          },
+          {
+            "title": ".sid",
+            "lines": [
+              "SID menyimpan kod muzik serta data untuk cip SID pada Commodore 64; PSID ialah varian yang paling biasa digunakan. GlitchScope memainkannya menggunakan cRSID."
+            ]
+          },
+          {
+            "title": ".rsid",
+            "lines": [
+              "RSID ialah varian SID yang lebih ketat untuk lagu-lagu yang memerlukan tingkah laku Commodore 64 yang lebih lengkap. GlitchScope memainkannya menggunakan cRSID."
+            ]
+          },
+          {
+            "title": ".vtx",
+            "lines": [
+              "VTX menyimpan data register yang telah dikompres daripada AY-3-8910 atau YM2149, yang biasanya dihasilkan oleh Vortex Tracker. GlitchScope memainkannya menggunakan penafsir VTX dan ayumi."
+            ]
+          },
+          {
+            "title": ".pt3",
+            "lines": [
+              "PT3 ialah modul Pro Tracker 3 untuk muzik AY-3-8910 atau YM2149. GlitchScope memainkannya menggunakan pt3player dan ayumi."
+            ]
+          },
+          {
+            "title": ".ym",
+            "lines": [
+              "YM menyimpan data register YM2149 gaya Atari ST dalam pelbagai versi format. GlitchScope memainkannya menggunakan StSound."
+            ]
+          },
+          {
+            "title": ".lh",
+            "lines": [
+              "LH ialah lanjutan lama yang digunakan untuk muzik YM yang dikompres menggunakan LHA. GlitchScope akan mengekstrak dan memainkannya bersama StSound."
+            ]
+          },
+          {
+            "title": ".lha",
+            "lines": [
+              "Arkib LHA mungkin mengandungi muzik YM yang telah dikompres. GlitchScope membuka arkib YM yang disokong menggunakan StSound."
+            ]
+          },
+          {
+            "title": ".ahx",
+            "lines": [
+              "AHX ialah modul chiptune Amiga yang direka khusus untuk alat muzik sintetik, bukannya audio yang disampel. GlitchScope memainkannya menggunakan pemain HivelyTracker."
+            ]
+          },
+          {
+            "title": ".hvl",
+            "lines": [
+              "HVL ialah format modul HivelyTracker, yang memperluas AHX dengan ciri-ciri tracker tambahan. GlitchScope memainkannya menggunakan pemain semula HivelyTracker."
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "Peranti",
+    "lines": []
+  },
+  {
+    "id": 8,
+    "title": "Tentang",
+    "lines": [
+      "**GlitchScope**",
+      "Sebuah pemain muzik serta visualizer MilkDrop secara masa nyata yang dibina khusus untuk peranti Linux berbentuk handheld dan komputer desktop.",
+      "",
+      "Mainkan audio tempatan, modul tracker, serta format muzik permainan klasik, atau terokai katalog Modland dan ModArchive.",
+      "Visualisasi dipaparkan oleh projectM. Audio pula didekodkan menggunakan enjin sumber terbuka khusus yang dipilih untuk setiap format.",
+      "",
+      "Mod Prestasi, Seimbang, dan Ekonomi menyesuaikan kualiti visual mengikut peranti. Visualizer juga boleh dimatikan untuk mod pemainan muzik sahaja.",
+      "",
+      "**Project**",
+      "https://github.com/dendec/glitchscope",
+      "Dilesenkan di bawah GPL-2.0-or-later."
+    ]
+  },
+  {
+    "id": 9,
+    "title": "Lesen",
+    "children": [
+      {
+        "title": "projectM",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/projectM-visualizer/projectm",
+          "Copyright (C) 2003-2009 projectM Team"
+        ]
+      },
+      {
+        "title": "SoLoud",
+        "lines": [
+          "zlib",
+          "https://github.com/jarikomppa/soloud",
+          "Copyright (c) 2013-2018 Jari Komppa"
+        ]
+      },
+      {
+        "title": "FFmpeg",
+        "lines": [
+          "LGPL-2.1+",
+          "https://ffmpeg.org/",
+          "Copyright (c) FFmpeg developers"
+        ]
+      },
+      {
+        "title": "libxmp",
+        "lines": [
+          "MIT",
+          "https://github.com/libxmp/libxmp",
+          "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"
+        ]
+      },
+      {
+        "title": "libopenmpt",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/OpenMPT/openmpt",
+          "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"
+        ]
+      },
+      {
+        "title": "game-music-emu",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/libgme/game-music-emu",
+          "Copyright (c) Shay Green"
+        ]
+      },
+      {
+        "title": "ayumi",
+        "lines": [
+          "MIT",
+          "https://github.com/true-grue/ayumi",
+          "Copyright (c) Peter Sovietov"
+        ]
+      },
+      {
+        "title": "pt3player",
+        "lines": [
+          "MIT",
+          "https://github.com/Volutar/pt3player",
+          "Copyright (c) 2023 Volutar"
+        ]
+      },
+      {
+        "title": "libstsound",
+        "lines": [
+          "BSD-2-Clause",
+          "https://github.com/cpcsdk/libstsound",
+          "Copyright holders: Leonard/Oxygene et al."
+        ]
+      },
+      {
+        "title": "Hively",
+        "lines": [
+          "MIT",
+          "https://github.com/tildearrow/foo-input-hvl",
+          "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"
+        ]
+      },
+      {
+        "title": "cRSID",
+        "lines": [
+          "WTFPL",
+          "https://www.rockbox.org/",
+          "Copyright (c) Hermit (Mihaly Horvath)"
+        ]
+      },
+      {
+        "title": "klauspost/compress (Zstandard)",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/klauspost/compress",
+          "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"
+        ]
+      },
+      {
+        "title": "go-sdl2",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/veandco/go-sdl2",
+          "Copyright (c) 2013 Go-SDL2 Authors"
+        ]
+      },
+      {
+        "title": "SDL2",
+        "lines": [
+          "zlib",
+          "https://libsdl.org/",
+          "Copyright (C) 1997-2026 Sam Lantinga"
+        ]
+      },
+      {
+        "title": "x/image",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/image",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "x/text",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/text",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "libogg",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/ogg/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libvorbis",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/vorbis/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libFLAC",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/flac/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "mpg123",
+        "lines": [
+          "LGPL-2.1",
+          "https://www.mpg123.de/",
+          "Copyright (c) mpg123 contributors"
+        ]
+      },
+      {
+        "title": "zlib",
+        "lines": [
+          "zlib",
+          "https://zlib.net/",
+          "Copyright (c) Jean-loup Gailly and Mark Adler"
+        ]
+      },
+      {
+        "title": "GNU Unifont",
+        "lines": [
+          "GPL-2.0+ with font embedding exception",
+          "https://unifoundry.com/unifont/",
+          "Copyright (c) GNU Unifont contributors"
+        ]
+      },
+      {
+        "title": "PortsMaster Device-Info",
+        "lines": [
+          "MIT",
+          "https://github.com/PortsMaster/Device-Info",
+          "Copyright (c) PortsMaster contributors"
+        ]
+      }
+    ]
+  }
+]

@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/dendec/glitchscope/internal/i18n"
+
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
@@ -16,6 +18,8 @@ type Notifier struct {
 	texW       int
 	texH       int
 	text       string
+	textKey    i18n.Key
+	textArgs   []any
 	fontSize   float64
 	alpha      float64
 	started    time.Time
@@ -35,8 +39,12 @@ func (n *Notifier) Tex() uint32 { return n.tex }
 
 func (n *Notifier) Alpha() float64 { return n.alpha }
 
+func (n *Notifier) TextKey() i18n.Key { return n.textKey }
+
 // ShowTrack begins the fade-in animation for the given track path.
 func (n *Notifier) ShowTrack(path string, fontSize float64, textColor color.RGBA) {
+	n.textKey = ""
+	n.textArgs = nil
 	if n.hidden {
 		return
 	}
@@ -53,6 +61,22 @@ func (n *Notifier) ShowTrack(path string, fontSize float64, textColor color.RGBA
 	n.visible = true
 	n.injected = false
 	n.alpha = 0
+}
+
+func (n *Notifier) ShowMessage(catalog i18n.Catalog, key i18n.Key, fontSize float64, textColor color.RGBA, args ...any) {
+	n.ShowTrack(catalog.Format(key, args...), fontSize, textColor)
+	n.textKey = key
+	n.textArgs = append([]any(nil), args...)
+}
+
+func (n *Notifier) Relocalize(catalog i18n.Catalog, fontSize float64, textColor color.RGBA) {
+	if n.textKey == "" {
+		return
+	}
+	text := catalog.Format(n.textKey, n.textArgs...)
+	if n.rebuildTexture(text, fontSize, textColor) {
+		n.text = text
+	}
 }
 
 // Retheme rebuilds the cached texture with a new text color.
@@ -191,5 +215,7 @@ func (n *Notifier) Hide() {
 	n.tex = 0
 	n.visible = false
 	n.text = ""
+	n.textKey = ""
+	n.textArgs = nil
 	n.alpha = 0
 }

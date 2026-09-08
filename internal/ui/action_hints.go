@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 
+	"github.com/dendec/glitchscope/internal/i18n"
 	"golang.org/x/image/font"
 )
 
@@ -109,8 +110,8 @@ func (o *Overlay) ActionHints() []UIHint {
 	// Delete confirmation is an exclusive state: only Confirm + Cancel.
 	if o.uiPage == PageLibrary && o.ncConfirm {
 		return []UIHint{
-			{Key: o.controlLabel(hintSelect), Label: "Confirm"},
-			{Key: o.controlLabel(hintBack), Label: "Cancel"},
+			{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionConfirm)},
+			{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionCancel)},
 		}
 	}
 
@@ -129,28 +130,28 @@ func (o *Overlay) ActionHints() []UIHint {
 	// Common low-priority hints shared across pages. Drawn when space allows;
 	// the renderer drops trailing hints first.
 	if o.playingPath != "" && !o.loading {
-		label := "Pause"
+		label := o.catalog.Text(i18n.ActionPause)
 		if o.paused {
-			label = "Play"
+			label = o.catalog.Text(i18n.ActionPlay)
 		}
 		hints = append(hints, UIHint{Key: o.controlLabel(hintPlay), Label: label})
 	}
-	hints = append(hints, UIHint{Key: o.controlLabel(hintPages), Label: "Screens"})
+	hints = append(hints, UIHint{Key: o.controlLabel(hintPages), Label: o.catalog.Text(i18n.ActionScreens)})
 	return hints
 }
 
 func (o *Overlay) settingsHints() []UIHint {
 	if o.settingsEditing {
 		return []UIHint{
-			{Key: o.controlLabel(hintSelect), Label: "Apply"},
-			{Key: o.controlLabel(hintBack), Label: "Cancel"},
-			{Key: o.controlLabel(hintMove), Label: "Value"},
+			{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionApply)},
+			{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionCancel)},
+			{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionValue)},
 		}
 	}
 	return []UIHint{
-		{Key: o.controlLabel(hintSelect), Label: "Edit"},
-		{Key: o.controlLabel(hintBack), Label: "Exit"},
-		{Key: o.controlLabel(hintMove), Label: "Setting"},
+		{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionEdit)},
+		{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionExit)},
+		{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionSetting)},
 	}
 }
 
@@ -158,27 +159,27 @@ func (o *Overlay) helpHints() []UIHint {
 	if o.focusPanel == 1 {
 		// Content panel: read/scroll only.
 		return []UIHint{
-			{Key: o.controlLabel(hintBack), Label: "Topics"},
-			{Key: o.controlLabel(hintMove), Label: "Scroll"},
+			{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionTopics)},
+			{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionScroll)},
 		}
 	}
 	// Topic / entry list. Select is meaningful only for a row marked as a
 	// submenu; leaf content is already visible in the right panel.
 	hints := make([]UIHint, 0, 3)
 	if o.helpSelectionHasSubmenu() {
-		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: "Open"})
+		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionOpen)})
 	}
-	hints = append(hints, UIHint{Key: o.controlLabel(hintBack), Label: "Back"})
+	hints = append(hints, UIHint{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionBack)})
 	if o.helpView.InChildren || o.helpView.InGrandChildren {
-		hints = append(hints, UIHint{Key: o.controlLabel(hintMove), Label: "Entry"})
+		hints = append(hints, UIHint{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionEntry)})
 	} else {
-		hints = append(hints, UIHint{Key: o.controlLabel(hintMove), Label: "Topic"})
+		hints = append(hints, UIHint{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionTopic)})
 	}
 	return hints
 }
 
 func (o *Overlay) helpSelectionHasSubmenu() bool {
-	topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+	topic := o.helpTopic(HelpTopicID(o.helpView.TopicCursor))
 	if o.helpView.InGrandChildren {
 		return false
 	}
@@ -193,17 +194,17 @@ func (o *Overlay) helpSelectionHasSubmenu() bool {
 
 func (o *Overlay) presetsHints() []UIHint {
 	hints := []UIHint{
-		{Key: o.controlLabel(hintMove), Label: "Move"},
-		{Key: o.controlLabel(hintBack), Label: "Back"},
+		{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionMove)},
+		{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionBack)},
 	}
 	node := o.presetNav.Selected()
 	if node == nil {
 		return hints
 	}
 	if !node.isLeaf {
-		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: "Open"})
+		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionOpen)})
 	} else {
-		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: "Load"})
+		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionLoad)})
 	}
 	return hints
 }
@@ -214,18 +215,18 @@ func (o *Overlay) libraryHints() []UIHint {
 		switch o.ncRight {
 		case ncRightInfo:
 			return []UIHint{
-				{Key: o.controlLabel(hintMove), Label: "Scroll"},
-				{Key: o.controlLabel(hintBack), Label: "Left panel"},
+				{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionScroll)},
+				{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionLeftPanel)},
 			}
 		case ncRightPlay:
 			return []UIHint{
-				{Key: o.controlLabel(hintSelect), Label: "Play"},
-				{Key: o.controlLabel(hintBack), Label: "Left panel"},
+				{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionPlay)},
+				{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionLeftPanel)},
 			}
 		case ncRightDelete:
 			return []UIHint{
-				{Key: o.controlLabel(hintSelect), Label: "Delete"},
-				{Key: o.controlLabel(hintBack), Label: "Left panel"},
+				{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionDelete)},
+				{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionLeftPanel)},
 			}
 		}
 	}
@@ -234,35 +235,35 @@ func (o *Overlay) libraryHints() []UIHint {
 	if o.focusPanel == 1 {
 		if e := o.currentEntry(); e != nil && e.IsCatalogTrack() && o.isTrackCached != nil && o.isTrackCached(e.filePath) {
 			return []UIHint{
-				{Key: o.controlLabel(hintSelect), Label: "Delete cache"},
-				{Key: o.controlLabel(hintBack), Label: "Left"},
+				{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionDeleteCache)},
+				{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionLeft)},
 			}
 		}
 		return []UIHint{
-			{Key: o.controlLabel(hintSelect), Label: "Play"},
-			{Key: o.controlLabel(hintBack), Label: "Left"},
-			{Key: o.controlLabel(hintMove), Label: "Track"},
+			{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionPlay)},
+			{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionLeft)},
+			{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionTrack)},
 		}
 	}
 
 	// Left panel.
-	backVerb := "Up"
+	backVerb := o.catalog.Text(i18n.ActionUp)
 	if !o.isNC() && o.topLevel().ctx == ctxSourceRoot {
-		backVerb = "Close"
+		backVerb = o.catalog.Text(i18n.ActionClose)
 	}
 	hints := []UIHint{
-		{Key: o.controlLabel(hintSelect), Label: "Open"},
+		{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionOpen)},
 		{Key: o.controlLabel(hintBack), Label: backVerb},
-		{Key: o.controlLabel(hintMove), Label: "Item"},
+		{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionItem)},
 	}
 	if o.HasPlayableTrack() && o.favoritesView != nil {
 		e := o.currentEntry()
 		if e != nil {
 			sym := o.favoritesView.Symbol(e.filePath)
 			if sym != "" {
-				hints = append(hints, UIHint{Key: o.controlLabel(hintFavorite), Label: "Remove"})
+				hints = append(hints, UIHint{Key: o.controlLabel(hintFavorite), Label: o.catalog.Text(i18n.ActionRemove)})
 			} else {
-				hints = append(hints, UIHint{Key: o.controlLabel(hintFavorite), Label: "Fav"})
+				hints = append(hints, UIHint{Key: o.controlLabel(hintFavorite), Label: o.catalog.Text(i18n.ActionFavorite)})
 			}
 		}
 	}

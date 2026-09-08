@@ -5,7 +5,7 @@ import "strings"
 // renderHelpPanels draws a topic or child-entry list on the left and its text on the right.
 func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	maxTextW := o.availableRowTextWidth(panelW)
-	topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+	topic := o.helpTopic(HelpTopicID(o.helpView.TopicCursor))
 	if topic.ID == HelpCatalogs && o.catalogInfoProvider != nil {
 		if info := o.catalogInfoProvider(); info != o.catalogInfo {
 			o.catalogInfo = info
@@ -38,7 +38,7 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 			}
 			leftCursor = o.helpView.EntryCursor
 		} else {
-			for _, t := range helpTopics {
+			for _, t := range o.effectiveHelpTopics() {
 				leftItems = append(leftItems, leftItem{Title: helpMenuTitle(t.Title, len(t.Children) > 0)})
 			}
 		}
@@ -114,7 +114,7 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 	drawListColumn(o, lx, py, pw, ph, o.helpColL, o.panelEntered && o.focusPanel == 0, leftCursor, leftScroll, lh, winW, winH, viewW, viewH)
 	drawListColumn(o, rx, py, pw, ph, o.helpColR, o.panelEntered && o.focusPanel == 1, -1, o.helpView.ContentTop, lh, winW, winH, viewW, viewH)
 	sbW := float32(o.scrollbarWidthPx())
-	leftTotal := len(helpTopics)
+	leftTotal := o.helpTopicCount()
 	if o.helpView.InGrandChildren {
 		if o.helpView.EntryCursor >= 0 && o.helpView.EntryCursor < len(topic.Children) {
 			leftTotal = len(topic.Children[o.helpView.EntryCursor].Children)

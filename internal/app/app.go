@@ -405,6 +405,9 @@ func (a *App) initAudio() {
 		return path, nil
 	}
 	a.overlay = ui.New()
+	if err := a.overlay.SetLanguage(a.settings.UI.Language); err != nil {
+		slog.Warn("load UI language", "language", a.settings.UI.Language, "error", err)
+	}
 	a.presenter = newOverlayPresenter(a.overlay)
 	a.overlay.SetBaseDir(baseDir())
 	a.overlay.SetShowFPS(a.settings.UI.ShowStats)

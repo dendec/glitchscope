@@ -1,0 +1,1110 @@
+[
+  {
+    "title": "การเริ่มต้นใช้งาน",
+    "lines": [
+      "**เล่นเพลงของคุณ**",
+      "กด {menu} เพื่อเปิดเมนู",
+      "เลือกหมวด Music จากนั้นเปิดโฟลเดอร์ แล้วเลือกเพลงที่ต้องการ",
+      "",
+      "**เพลิดเพลินกับ Visualizer**",
+      "ปิดเมนูหลังจากเริ่มเล่นเพลงแล้ว",
+      "ใช้ Presets เพื่อเลือกสไตล์การแสดงผล และใช้ Settings เพื่อปรับสมดุลระหว่างคุณภาพ เร็ว และอายุการใช้งานแบตเตอรี่",
+      "",
+      "ส่วนท้ายหน้าจอจะแสดงตัวเลือกการดำเนินการที่สามารถใช้ได้สำหรับสิ่งที่เลือกอยู่เสมอ"
+    ],
+    "id": 0
+  },
+  {
+    "title": "ควบคุม",
+    "children": [
+      {
+        "title": "ในเมนู",
+        "lines": [
+          "**Navigation**",
+          "{move} ใช้สำหรับเลื่อนตำแหน่งการเลือก กดค้างเพื่อเลื่อนอย่างรวดเร็ว",
+          "{focus} ใช้สำหรับสลับแผงต่าง ๆ",
+          "{select} ใช้เปิดรายการที่เลือกหรือกำหนดค่าให้",
+          "{back} ใช้สำหรับย้อนกลับหรือยกเลิกการแก้ไข",
+          "{pages} ใช้สำหรับสลับหน้าต่าง",
+          "",
+          "**Menu**",
+          "{menu} ใช้เปิดหรือปิดเมนู",
+          "ส่วนท้ายจอจะแสดงคำสั่งต่าง ๆ สำหรับรายการที่เลือกอยู่ในขณะนั้น"
+        ]
+      },
+      {
+        "title": "ขณะฟังเพลง",
+        "lines": [
+          "**เมนูปิดอยู่**",
+          "{tracks} ใช้สำหรับเลือกเพลงก่อนหน้า/ถัดไป。",
+          "การกด Next จะปฏิบัติตามโหมด Shuffle ที่เลือกไว้。",
+          "{play} ใช้สำหรับเล่นหรือหยุดเพลง。",
+          "{seek} ใช้สำหรับเลื่อนเพลงไปด้านหลังหรือด้านหน้า。",
+          "{presets} ใช้สำหรับเปลี่ยนการตั้งค่า Visualizer。",
+          "{random} เลือกการตั้งค่าแบบสุ่ม。",
+          "{overlay} แสดงหรือซ่อนการแจ้งเตือนเกี่ยวกับเพลง。"
+        ]
+      },
+      {
+        "title": "การนำทางคู่มือ",
+        "lines": [
+          "เลือกหัวข้อที่อยู่ด้านซ้ายครับ",
+          "{select} จะเปิดหัวข้อที่มีหัวข้อย่อย",
+          "{focus} จะนำทางไปยังแผงข้อความ",
+          "{move} จะเลื่อนดูข้อความ",
+          "{back} จะกลับไปยังระดับก่อนหน้า",
+          "{pages} จะกลับไปยังหน้าแอปพลิเคชันอื่น"
+        ]
+      }
+    ],
+    "id": 1
+  },
+  {
+    "title": "การเล่นเพลง",
+    "children": [
+      {
+        "title": "การสุ่มเล่นและการทำซ้ำ",
+        "lines": [
+          "ปิด: เล่นเพลงตามลำดับที่กำหนด",
+          "อัลบั้ม: สุ่มเล่นเพลงในโฟลเดอร์หรือพลейลิสต์ปัจจุบัน",
+          "แหล่งที่มา: สุ่มเล่นภายใน Music, Modland หรือ ModArchive",
+          "ทั้งหมด: สุ่มเล่นจากแหล่งที่มาทั้งหมดที่มี ในโหมดออฟไลน์ โหมดทั้งหมดจะใช้เพียงเพลงในเครื่องเท่านั้น",
+          "โหมดแหล่งที่มาและโหมดทั้งหมดสามารถทำซ้ำเพลงได้ รวมถึงเพลงที่กำลังเล่นอยู่ด้วย",
+          "โหมดทำซ้ำหนึ่งครั้งจะทำซ้ำเพลงที่กำลังเล่นเมื่อจบลง ส่วนการกด Next แบบมือถือจะเล่นเพลงต่อไปเหมือนเดิม",
+          "หากดาวน์โหลดล้มเหลวจะข้ามเพลงนั้นไป หากล้มเหลวซ้ำๆ จะหยุดการพยายามดาวน์โหลดโดยอัตโนมัติ"
+        ]
+      },
+      {
+        "title": "การค้นหาตำแหน่งเพลง",
+        "lines": [
+          "{seek} จะใช้ในการเลื่อนไปยังตำแหน่งต่าง ๆ ภายในเพลงปัจจุบัน",
+          "เมื่อมีหน่วยความจำเพียงพอ ระบบจะเตรียมข้อมูลเสียงแบบ Tracker เพื่อให้สามารถค้นหาตำแหน่งได้อย่างแม่นยำ",
+          "ปริมาณหน่วยความจำที่ใช้ในการเตรียมข้อมูลจะถูกกำหนดโดยอัตโนมัติตามหน่วยความจำที่มีอยู่ในขณะนั้น",
+          "สำหรับเพลงที่มีความยาวมากหรือในสภาวะที่มีหน่วยความจำน้อย ระบบจะใช้การสตรีมแบบดั้งเดิมแทน",
+          "การค้นหาตำแหน่งย้อนหลังจะขึ้นอยู่กับตัวถอดรหัสเสียง"
+        ]
+      },
+      {
+        "title": "Favorites",
+        "lines": [
+          "เลือกเพลงจากพลейลิสต์อื่นที่ไม่ใช่ Favorites แล้วทำตามคำแนะนำในส่วนท้ายหน้าจอ",
+          "กดครั้งสั้นจะสลับระหว่างสัญลักษณ์ดาว / หัวใจ / โน้ต / ไม่มี",
+          "{gamepad_heading}",
+          "กดค้าง {favourite} เพื่อลบเพลงที่เลือกออกจากหมวด Favorites",
+          "เมื่อไม่ได้อยู่ในโหมดเลือกเพลง {play} จะเป็นคำสั่งเล่น / หยุดเล่น",
+          "{keyboard_heading}",
+          "กด F เพื่อสลับระหว่างเพลงในหมวด Favorites และกด Delete เพื่อลบออก",
+          ""
+        ]
+      }
+    ],
+    "id": 2
+  },
+  {
+    "title": "คุณภาพเสียงและแบตเตอรี่",
+    "children": [
+      {
+        "title": "ประสิทธิภาพ",
+        "lines": [
+          "โหมด Performance ให้ความสำคัญกับคุณภาพของวิชวลไลเซอร์ โดยมีเป้าหมายที่ 30 FPS",
+          "โหมด Balanced มีเป้าหมายที่ 24 FPS พร้อมขีดจำกัดความละเอียดที่ต่ำกว่า",
+          "โหมด Eco ให้ความสำคัญกับอายุการใช้งานแบตเตอรี่ โดยมีขีดจำกัดความละเอียดที่ต่ำกว่าและมีการปรับความละเอียดให้สูงขึ้นที่ช้ากว่า",
+          "โหมด Auto resolution จะปรับตามการตั้งค่า preset ปัจจุบัน หากกำหนดความละเอียดคงที่ไว้ การปรับนี้จะถูกปิดใช้งาน",
+          "หากความละเอียดต่ำสุดยังคงทำให้การทำงานช้าเกินไป ก็สามารถข้าม preset ที่มีความซับซ้อนสูงได้"
+        ]
+      },
+      {
+        "title": "เพลงโดยไม่มีวิชวลไอเซ็ต",
+        "lines": [
+          "ไปตั้งค่า Visualizer ให้เป็น Off ในหน้า Settings ได้เลยครับ/ค่ะ",
+          "การเล่นเพลงและการนำทางเมนูยังคงทำงานได้ตามปกติแม้จะอยู่บนพื้นหลังสีขาวล้วนก็ตาม",
+          "การเปิด Presets ยังคงทำให้สามารถดูตัวอย่างแบบไลฟ์ได้เช่นเดิม",
+          "หากต้องการให้มีแอนิเมชันกลับมา ให้เปิด Visualizer อีกครั้งครับ/ค่ะ"
+        ]
+      },
+      {
+        "title": "การเลือก Preset",
+        "lines": [
+          "เปิดหน้า Preset เพื่อดูรายการต่าง ๆ",
+          "กดปุ่ม Pause ที่ Preset ใดก็ได้เพื่อดูตัวอย่างเสียง",
+          "{select} จะทำการเลือก Preset นั้น โดยจะถูกนำไปใช้ทันทีเมื่อคุณออกจากหน้านี้",
+          "การควบคุมการสลับ Preset แบบอัตโนมัติ",
+          "ค่าการตั้งค่าที่ใช้งานได้สำเร็จจะถูกจดจำไว้ตลอดช่วงการเล่นปัจจุบัน"
+        ]
+      }
+    ],
+    "id": 3
+  },
+  {
+    "title": "การแก้ไขปัญหา",
+    "children": [
+      {
+        "title": "ยังไม่มีเพลงแสดง",
+        "lines": [
+          "เปิด Music แล้วเลือกโฟลเดอร์ที่มีไฟล์เสียงที่รองรับ",
+          "โฟลเดอร์ที่ว่างเปล่ากับการสแกนที่ล้มเหลวเป็นสถานะที่แตกต่างกัน โปรดตรวจสอบข้อผิดพลาดที่แสดงอยู่",
+          "ดัชนีแคตตาล็อกที่ดาวน์โหลดมาจะแสดงรายชื่อเพลง แต่จะไม่มีไฟล์เสียงอยู่ภายใน"
+        ]
+      },
+      {
+        "title": "คัตตาล็อกออฟไลน์",
+        "lines": [
+          "ดัชนีของคัตตาล็อกที่บันทึกไว้สามารถเรียกดูได้แม้ไม่มีอินเทอร์เน็ต",
+          "ต้องมีการดาวน์โหลดเพลงมาก่อนจึงจะสามารถเล่นแบบออฟไลน์ได้",
+          "ฟีเจอร์ Shuffle All จะใช้เพลงในเครื่องเมื่ออยู่ในโหมดออฟไลน์ โดยจะมีการตรวจสอบสถานะเครือข่ายเป็นระยะๆ"
+        ]
+      },
+      {
+        "title": "การโหลดหรือการข้ามเพลง",
+        "lines": [
+          "ขั้นตอนการดาวน์โหลดจะทำการดึงไฟล์จากแหล่งอื่นมา ส่วนขั้นตอนการเตรียมไฟล์เสียงจะทำการถอดรหัสเพื่อให้สามารถเล่นย้อนหลังได้",
+          "คุณสามารถเลือกเพลงอื่นได้ในระหว่างที่กำลังโหลดอยู่",
+          "เพลงที่ไม่รองรับ ได้รับความเสียหาย หรือไม่สามารถเข้าถึงได้ จะถูกข้ามไปโดยอัตโนมัติ",
+          "หากการเล่นหยุดลงเนื่องจากข้อผิดพลาดซ้ำๆ ให้เลือกเพลงหรือแหล่งข้อมูลอื่นแทน"
+        ]
+      },
+      {
+        "title": "การเลื่อนตำแหน่งที่จำกัด",
+        "lines": [
+          "โปรแกรมถอดรหัส tracker แบบดั้งเดิมบางตัวไม่สามารถเลื่อนตำแหน่งย้อนหลังได้อย่างน่าเชื่อถือ",
+          "การเลื่อนตำแหน่งในรูปแบบ Tracker จะถูกเตรียมไว้โดยอัตโนมัติเมื่อมีหน่วยความจำเพียงพอ",
+          "เพลงที่มีความยาวมากและสภาวะหน่วยความจำต่ำจะใช้ระบบสตรีมมิ่งแบบดั้งเดิม"
+        ]
+      }
+    ],
+    "id": 4
+  },
+  {
+    "id": 5,
+    "title": "รายการคัลเลกชัน",
+    "children": [
+      {
+        "title": "Modland",
+        "lines": [
+          "**รายการในคัตตาล็อกบนอุปกรณ์นี้**",
+          "เพลงที่สามารถเล่นได้: {modland_tracks}",
+          "โฟลเดอร์: {modland_directories}",
+          "เครือข่าย: {network_status}",
+          "",
+          "**เกี่ยวกับ Modland**",
+          "คลังเก็บไฟล์เพลงแนว tracker, chiptune และเพลงประกอบเกมขนาดใหญ่ จัดเรียงตามรูปแบบและผู้สร้าง",
+          "GlitchScope จะเก็บดัชนีขนาดย่อไว้ในเครื่อง และดาวน์โหลดเพลงที่เลือกไว้ในคาชก่อนที่จะเล่น",
+          "ดัชนีที่บันทึกไว้สามารถเรียกดูได้แม้ไม่มีการเชื่อมต่ออินเทอร์เน็ต ส่วนเพลงต่าง ๆ จำเป็นต้องมีการเชื่อมต่อ ยกเว้นกรณีที่มีการเก็บไว้ในคาชแล้ว"
+        ]
+      },
+      {
+        "title": "ModArchive",
+        "lines": [
+          "**รายการในคาตาล็อกของอุปกรณ์นี้**",
+          "เพลงที่สามารถเล่นได้: {modarchive_tracks}",
+          "โฟลเดอร์: {modarchive_directories}",
+          "เครือข่าย: {network_status}",
+          "",
+          "**เกี่ยวกับ Mod Archive**",
+          "เป็นคลังข้อมูลของชุมชนที่อุทิศให้กับโมดูลเพลงที่สามารถนำมาใช้งานได้ พร้อมด้วยข้อมูลเกี่ยวกับศิลปิน คะแนนรีวิว บทวิจารณ์ และคอลเลกชันย้อนยุค",
+          "GlitchScopeจะส่งดัชนีแบบอัดแน่นสำหรับข้อมูลย้อนยุคและเอกสารเสริมมาก่อน จากนั้นจึงดาวน์โหลดเฉพาะข้อมูลโมดูลที่เลือกไว้เท่านั้น",
+          "ดัชนีที่บันทึกไว้สามารถเรียกดูได้แม้ไม่มีการเชื่อมต่ออินเทอร์เน็ต ส่วนเพลงจะต้องมีการเชื่อมต่อเครือข่าย หากยังไม่ได้ถูกเก็บไว้ในคุกกี้"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "title": "รูปแบบไฟล์",
+    "children": [
+      {
+        "title": "ออดิโอ",
+        "children": [
+          {
+            "title": ".aac",
+            "lines": [
+              "AAC เป็นรูปแบบการเข้ารหัสเสียงแบบสูญเสียที่มักถูกเก็บไว้ในรูปแบบ AAC ดิบหรือในคอนเทนเนอร์ประเภท MP4-family GlitchScope จะทำการถอดรหัสไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".ac3",
+            "lines": [
+              "AC-3 (Dolby Digital) เป็นรูปแบบการเข้ารหัสเสียงแบบมีการสูญเสียที่ใช้สำหรับเสียงโมโนและเสียงหลายช่อง โดย GlitchScope จะทำการถอดรหัสด้วย FFmpeg"
+            ]
+          },
+          {
+            "title": ".eac3",
+            "lines": [
+              "E-AC-3 (Dolby Digital Plus) เป็นรูปแบบที่พัฒนามาจาก AC-3 โดยมีอัตราบิตสูงขึ้นและรองรับการตั้งค่าช่องเสียงเพิ่มเติม GlitchScope จะทำการถอดรหัสไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".mp1",
+            "lines": [
+              "MP1 คือ MPEG Audio Layer I ซึ่งเป็นชั้นเสียงแรกสุดในบรรดาสามชั้นเสียงของ MPEG-1 GlitchScope จะทำการถอดรหัสไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".mp2",
+            "lines": [
+              "MP2 คือ MPEG Audio Layer II ซึ่งเป็นรูปแบบไฟล์ที่มีการสูญเสียข้อมูล แต่ยังคงถูกใช้งานอยู่ในการออกอากาศและสื่อรูปแบบเก่า ๆ GlitchScope จะทำการถอดรหัสไฟล์นี้ด้วย FFmpeg"
+            ]
+          },
+          {
+            "title": ".mp3",
+            "lines": [
+              "MP3 คือ MPEG Audio Layer III ซึ่งเป็นรูปแบบไฟล์เสียงแบบสูญเสียที่ใช้กันอย่างแพร่หลาย GlitchScope จะทำการถอดรหัสไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".ogg",
+            "lines": [
+              "Ogg เป็นรูปแบบคอนเทนเนอร์ที่มักใช้บรรจุไฟล์เสียงแบบ Vorbis, Opus, FLAC หรือ Speex โดย GlitchScope จะทำการดีคอดสตรีมเสียงของมันด้วย FFmpeg"
+            ]
+          },
+          {
+            "title": ".oga",
+            "lines": [
+              "OGA คือนามสกุลไฟล์สำหรับไฟล์เสียงที่ใช้กับคอนเทนเนอร์ Ogg โดยเฉพาะ GlitchScope จะทำการดีคอดสตรีมเสียงของมันโดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".opus",
+            "lines": [
+              "Opus เป็นรูปแบบไฟล์เสียงแบบสูญเสียที่เปิดกว้างและมีความล่าช้าต่ำ ซึ่งได้รับการกำหนดมาตรฐานโดย IETF GlitchScope จะทำการถอดรหัสรูปแบบนี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".spx",
+            "lines": [
+              "โดยปกติแล้ว SPX จะเป็นไฟล์เสียงพูด Speex ที่อยู่ภายในคอนเทนเนอร์ Ogg โดย GlitchScope จะทำการถอดรหัสไฟล์นี้ด้วย FFmpeg"
+            ]
+          },
+          {
+            "title": ".flac",
+            "lines": [
+              "FLAC เป็นรูปแบบไฟล์เสียงแบบออปเพนโหมดโลสลีสที่สามารถสร้างสำเนาต้นฉบับของสแนป PCM ได้อย่างแม่นยำ โดย GlitchScope จะทำการดีคอดมันโดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".wav",
+            "lines": [
+              "WAV เป็นคอนเทนเนอร์ไฟล์เสียงที่ใช้รูปแบบ RIFF โดยมักใช้สำหรับข้อมูล PCM แต่ก็สามารถบรรจุโค้ดเคดอื่น ๆ ได้เช่นกัน GlitchScope จะทำการดีคอดไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".rf64",
+            "lines": [
+              "RF64 ช่วยขยายความสามารถของรูปแบบ WAV สำหรับไฟล์ที่มีขนาดใหญ่เกินขีดจำกัด 4 GiB ของรูปแบบ RIFF แบบดั้งเดิม GlitchScope จะทำการถอดรหัสไฟล์เหล่านี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".aiff",
+            "lines": [
+              "AIFF คือไฟล์คอนเทนเนอร์สำหรับไฟล์เสียงที่ใช้มาตรฐาน IFF ของ Apple ซึ่งนิยมใช้สำหรับไฟล์ PCM ที่ไม่ได้รับการบีบอัด GlitchScope จะทำการดีคอดไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".aif",
+            "lines": [
+              "AIF เป็นนามสกุลไฟล์อีกแบบหนึ่งสำหรับไฟล์เสียง AIFF โดย GlitchScope จะทำการถอดรหัสไฟล์นี้ด้วย FFmpeg"
+            ]
+          },
+          {
+            "title": ".aifc",
+            "lines": [
+              "AIFC คือรูปแบบไฟล์เสียงที่ถูกบีบอัดภายใต้คอนเทนเนอร์ AIFF โดย GlitchScope จะทำการดีคอดมันโดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".caf",
+            "lines": [
+              "CAF คือไฟล์คอนเทนเนอร์รูปแบบ Core Audio ของ Apple สำหรับเก็บไฟล์เสียงและข้อมูลมีเดีย โดย GlitchScope จะทำการดีคอดมันโดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".m4a",
+            "lines": [
+              "M4A เป็นคอนเทนเนอร์ MP4 ที่ใช้สำหรับไฟล์เสียง โดยปกติจะบรรจุรูปแบบเสียง AAC หรือ ALAC โปรแกรม GlitchScope จะทำการดีคอดสตรีมเสียงของมันโดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".m4b",
+            "lines": [
+              "M4B คือคอนเทนเนอร์ไฟล์เสียงแบบ MP4 ที่นิยมใช้สำหรับหนังสือเสียงและข้อมูลมีเดียของแต่ละบท GlitchScope จะทำการถอดรหัสสตรีมเสียงของมันโดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".mp4",
+            "lines": [
+              "MP4 เป็นไคเมร่า ISO Base Media ที่สามารถบรรจุทั้งไฟล์เสียง วิดีโอ และข้อมูลเมตาได้ GlitchScope จะทำการเล่นสตรีมเสียงที่รองรับผ่าน FFmpeg"
+            ]
+          },
+          {
+            "title": ".mov",
+            "lines": [
+              "MOV คือไฟล์คอนเทนเนอร์ QuickTime ของ Apple สำหรับไฟล์เสียง วิดีโอ และข้อมูลมีเดีย โปรแกรม GlitchScope จะทำการเล่นสตรีมเสียงที่รองรับผ่าน FFmpeg"
+            ]
+          },
+          {
+            "title": ".mka",
+            "lines": [
+              "MKA คือนามสกุลไฟล์สำหรับไฟล์ที่มีเนื้อหาเป็นเสียงภายในคอนเทนเนอร์ Matroska โดย GlitchScope จะทำการดีคอดสตรีมเสียงของมันโดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".mkv",
+            "lines": [
+              "MKV เป็นคอนเทนเนอร์มัลติมีเดียแบบ Matroska GlitchScope จะทำการเล่นสตรีมเสียงที่รองรับผ่าน FFmpeg"
+            ]
+          },
+          {
+            "title": ".webm",
+            "lines": [
+              "WebM คือคอนเทนเนอร์ที่อิงจาก Matroska ซึ่งมีข้อจำกัด โดยปกติจะใช้บรรจุไฟล์เสียง Opus หรือ Vorbis โดย GlitchScope จะทำการดีคอดมันด้วย FFmpeg"
+            ]
+          },
+          {
+            "title": ".wma",
+            "lines": [
+              "ไฟล์ .wma จะใช้โค้ดเคอร์ Windows Media Audio ซึ่งโดยปกติจะอยู่ภายในคอนเทนเนอร์ ASF GlitchScope จะทำการดีคอดไฟล์เหล่านี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".asf",
+            "lines": [
+              "ASF คือไฟล์คอนเทนเนอร์ Advanced Systems Format ของ Microsoft ซึ่งมักจะบรรจุไฟล์เสียงรูปแบบ WMA โดย GlitchScope จะทำการดีคอดสตรีมเสียงของมันโดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".amr",
+            "lines": [
+              "AMR เป็นรูปแบบการเข้ารหัสเสียงสำหรับการสนทนาทางโทรศัพท์มือถือ โดยมักใช้ในรูปแบบ AMR-NB หรือ AMR-WB GlitchScope จะทำการถอดรหัสไฟล์นี้ด้วย FFmpeg"
+            ]
+          },
+          {
+            "title": ".ape",
+            "lines": [
+              "APE คือ Monkey's Audio ซึ่งเป็นรูปแบบไฟล์เสียงแบบไม่สูญเสียข้อมูล GlitchScope จะทำการถอดรหัสไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".tta",
+            "lines": [
+              "TTA คือ True Audio ซึ่งเป็นรูปแบบไฟล์เสียงที่ไม่มีการสูญเสียคุณภาพ GlitchScope จะทำการดีไคด์ไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".wv",
+            "lines": [
+              "WV คือ WavPack ซึ่งเป็นรูปแบบไฟล์เสียงแบบไม่สูญเสียหรือแบบผสมผสาน GlitchScope จะทำการถอดรหัสไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".mpc",
+            "lines": [
+              "MPC คือ Musepack ซึ่งเป็นรูปแบบไฟล์เสียงแบบมีการสูญเสียข้อมูลที่ออกแบบมาโดยเฉพาะสำหรับเพลง GlitchScope จะทำการถอดรหัสไฟล์นี้โดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".ts",
+            "lines": [
+              "TS คือคอนเทนเนอร์รูปแบบ MPEG transport-stream ที่ใช้สำหรับสื่อที่ออกอากาศและสื่อที่บันทึกไว้ GlitchScope จะทำการเล่นสตรีมเสียงที่รองรับผ่าน FFmpeg"
+            ]
+          },
+          {
+            "title": ".m2ts",
+            "lines": [
+              "M2TS คือคอนเทนเนอร์สำหรับสตรีมข้อมูล MPEG ในรูปแบบ Blu-ray GlitchScope จะทำการเล่นสตรีมเสียงที่รองรับผ่าน FFmpeg"
+            ]
+          },
+          {
+            "title": ".ra",
+            "lines": [
+              "RA คือตัวกล่องบรรจุไฟล์หรือสตรีม RealAudio โดย GlitchScope จะทำการถอดรหัสโค้ดเครื่องมือ RealAudio ที่รองรับโดยใช้ FFmpeg"
+            ]
+          },
+          {
+            "title": ".rm",
+            "lines": [
+              "RM เป็นคอนเทนเนอร์ RealMedia ซึ่งอาจมี RealAudio อยู่ด้วย GlitchScope จะทำการเล่นสตรีมเสียงที่รองรับผ่าน FFmpeg"
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Tracker",
+        "children": [
+          {
+            "title": ".mod",
+            "lines": [
+              "โมดูลในตระกูล MOD. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".xm",
+            "lines": [
+              "โมดูลขยายของ FastTracker II. GlitchScope จะทำการถอดรหัสไฟล์นี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".it",
+            "lines": [
+              "โมดูล Impulse Tracker รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".s3m",
+            "lines": [
+              "โมดูลของ Scream Tracker 3. GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".mptm",
+            "lines": [
+              "โมดูล OpenMPT ใช้ในการเปิดไฟล์นี้ โดย GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".stm",
+            "lines": [
+              "โมดูลของ Scream Tracker 2. GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".nst",
+            "lines": [
+              "โมดูล NoiseTracker. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".wow",
+            "lines": [
+              "โมดูล Mod's Grave ซึ่ง GlitchScope จะทำการดีคอดไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".ult",
+            "lines": [
+              "โมดูล UltraTracker โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".669",
+            "lines": [
+              "โมดูล Composer 669 หรือ UNIS 669 โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".mtm",
+            "lines": [
+              "โมดูล MultiTracker. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".med",
+            "lines": [
+              "โมดูล MED หรือ OctaMED. GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".far",
+            "lines": [
+              "โมดูลสำหรับแต่งเพลงแบบ Farandole โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".mdl",
+            "lines": [
+              "โมดูล Digitrakker. GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".ams",
+            "lines": [
+              "โมดูล Tracker ของ Extreme หรือ Velvet Studio รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".dsm",
+            "lines": [
+              "โมดูล DSIK. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".amf",
+            "lines": [
+              "โมดูล Asylum หรือ DSMI. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".okt",
+            "lines": [
+              "โมดูล Oktalyzer โดย GlitchScope จะทำการถอดรหัสไฟล์ที่มีนามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".dmf",
+            "lines": [
+              "โมดูล Digital Tracker หรือ DefleMask ระบบจะใช้ GlitchScope ในการถอดรหัสนามสกุลไฟล์นี้ร่วมกับ libopenmpt และจะหันไปใช้ libxmp หากจำเป็น"
+            ]
+          },
+          {
+            "title": ".ptm",
+            "lines": [
+              "โมดูล Poly Tracker โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".psm",
+            "lines": [
+              "โมดูล ProTracker Studio หรือ Epic ใช้ GlitchScope ในการถอดรหัสไฟล์ที่มีนามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".mt2",
+            "lines": [
+              "โมดูลของ MadTracker 2. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".dbm",
+            "lines": [
+              "โมดูล DigiBooster Pro โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".abk",
+            "lines": [
+              "โมดูล AMOS Music Bank โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".digi",
+            "lines": [
+              "โมดูล DIGI Booster โดย GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".dtt",
+            "lines": [
+              "โมดูล Digital Tracker รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".flx",
+            "lines": [
+              "โมดูล FlexTrax โดย GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".gtk",
+            "lines": [
+              "โมดูล Graoumf Tracker รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".imf",
+            "lines": [
+              "โมดูล Imago Orpheus โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".liq",
+            "lines": [
+              "โมดูล Liquid Tracker รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".masi",
+            "lines": [
+              "โมดูล Epic MegaGames MASI รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".mgt",
+            "lines": [
+              "โมดูล Megatracker รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".mmd",
+            "lines": [
+              "โมดูล MMD แบบ MED หรือ OctaMED GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".mmdc",
+            "lines": [
+              "โมดูล MED แบบบีบอัด โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".mmcmp",
+            "lines": [
+              "โมดูลที่ถูกบีบอัดด้วย MMCMP. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".muse",
+            "lines": [
+              "โมดูลที่บรรจุไฟล์ MUSE ไว้ โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".nt",
+            "lines": [
+              "โมดูล NoiseTracker โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".pmd",
+            "lines": [
+              "โมดูลที่รองรับ ProTracker. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".ppm",
+            "lines": [
+              "โมดูล ProTracker Packer โดย GlitchScope จะทำการถอดรหัสไฟล์ที่มีนามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".pru",
+            "lines": [
+              "โมดูล Prorunner. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".pt36",
+            "lines": [
+              "โมดูล ProTracker 3.6 รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".rh",
+            "lines": [
+              "โมดูลของ Rob Hubbard. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".rtm",
+            "lines": [
+              "โมดูล Real Tracker รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".sfx",
+            "lines": [
+              "โมดูล SoundFX โดย GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".sfx2",
+            "lines": [
+              "โมดูล SoundFX 2 รูปแบบนี้จะถูกถอดรหัสด้วย libxmp โดย GlitchScope"
+            ]
+          },
+          {
+            "title": ".stim",
+            "lines": [
+              "โมดูล Slamtilt. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".stx",
+            "lines": [
+              "โมดูล STMIK. GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".tcb",
+            "lines": [
+              "โมดูล Tracker สำหรับไฟล์ .tcb โดย GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".tdd",
+            "lines": [
+              "โมดูล The Dark Demon รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".tp",
+            "lines": [
+              "โมดูล Tracker Packer โดย GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".uni",
+            "lines": [
+              "โมดูล UNI. GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้โดยใช้ libxmp"
+            ]
+          },
+          {
+            "title": ".xd",
+            "lines": [
+              "รูปแบบโมดูลของ FastTracker II รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope ด้วย libxmp"
+            ]
+          },
+          {
+            "title": ".mo3",
+            "lines": [
+              "โมดูลที่ถูกบีบอัดในรูปแบบ MO3 โดย GlitchScope จะทำการถอดรหัสไฟล์นี้โดยใช้ libopenmpt และจะใช้ libxmp เป็นทางเลือกหากจำเป็น"
+            ]
+          },
+          {
+            "title": ".ktm",
+            "lines": [
+              "โมดูล Karate. GlitchScope จะทำการถอดรหัสไฟล์นามสกุลนี้โดยใช้ libopenmpt และจะใช้ libxmp เป็นทางเลือกหากจำเป็น"
+            ]
+          },
+          {
+            "title": ".ims",
+            "lines": [
+              "โมดูล Velvet Studio รูปแบบนี้จะถูกดีคอดโดย GlitchScope โดยใช้ libopenmpt และจะหันไปใช้ libxmp หากจำเป็น"
+            ]
+          },
+          {
+            "title": ".mdc",
+            "lines": [
+              "โมดูลสำหรับเล่นเพลงในรูปแบบ Megadrive tracker โดย GlitchScope จะทำการถอดรหัสนามสกุลไฟล์นี้ด้วย libopenmpt และจะใช้ libxmp เป็นทางเลือกถัดไปหากจำเป็น"
+            ]
+          },
+          {
+            "title": ".txn",
+            "lines": [
+              "โมดูลของ MadTracker 2 รูปแบบนี้จะถูกถอดรหัสโดย GlitchScope ใช้ libopenmpt โดยจะใช้ libxmp เป็นทางเลือกหากจำเป็น"
+            ]
+          }
+        ]
+      },
+      {
+        "title": "ชิปทjuน",
+        "children": [
+          {
+            "title": ".ay",
+            "lines": [
+              "AY จะเก็บเสียงดนตรีจาก ZX Spectrum หรือ Amstrad CPC ในรูปแบบของข้อมูลโปรแกรม Z80 เพื่อใช้งานกับฮาร์ดแวร์เสียงในตระกูล AY โดย GlitchScope จะทำหน้าที่เล่นไฟล์นี้ด้วย Game Music Emu"
+            ]
+          },
+          {
+            "title": ".nsf",
+            "lines": [
+              "NSF ใช้เก็บโค้ดและข้อมูลเสียงของเครื่อง Nintendo NES หรือ Famicom เพื่อการเล่นแบบจำลอง โดย GlitchScope จะทำหน้าที่เล่นไฟล์นี้ด้วย Game Music Emu"
+            ]
+          },
+          {
+            "title": ".nsfe",
+            "lines": [
+              "NSFE คือรูปแบบ NSF ที่สามารถขยายฟีเจอร์ได้ โดยมีข้อมูลเมตาและรายการเพลย์ลิสต์แบ่งออกเป็นชิ้นๆ GlitchScope จะเล่นไฟล์นี้โดยใช้ Game Music Emu"
+            ]
+          },
+          {
+            "title": ".spc",
+            "lines": [
+              "SPC คือสำเนาของระบบเสียงของ Super Nintendo หรือ Super Famicom โดย GlitchScope จะทำการเล่นไฟล์นี้ด้วย Game Music Emu"
+            ]
+          },
+          {
+            "title": ".gbs",
+            "lines": [
+              "GBS ใช้เก็บโค้ดและข้อมูลเพลงของ Nintendo Game Boy เพื่อการเล่นแบบจำลอง โดย GlitchScope จะทำการเล่นไฟล์นี้ผ่าน Game Music Emu"
+            ]
+          },
+          {
+            "title": ".hes",
+            "lines": [
+              "HES ใช้เก็บโค้ดและข้อมูลเสียงของ PC Engine หรือ TurboGrafx-16 เพื่อการเล่นแบบจำลอง โดย GlitchScope จะทำการเล่นไฟล์นี้ผ่าน Game Music Emu"
+            ]
+          },
+          {
+            "title": ".kss",
+            "lines": [
+              "รูปแบบ KSS ใช้เก็บเพลงสำหรับ MSX และระบบอื่น ๆ ที่ใช้โปรเซสเซอร์ Z80 พร้อมรองรับเสียงแบบ PSG หรือ SCC GlitchScope จะทำการเล่นไฟล์นี้ด้วย Game Music Emu; ระบบนี้ไม่รองรับเสียงแบบ FM"
+            ]
+          },
+          {
+            "title": ".sap",
+            "lines": [
+              "SAP เป็นรูปแบบไฟล์ที่เก็บโค้ดดนตรีและข้อมูลสำหรับชิปเสียง POKEY ของ Atari 8-bit โดย Game Music Emu จะทำหน้าที่เล่นไฟล์นี้ด้วย GlitchScope"
+            ]
+          },
+          {
+            "title": ".vgm",
+            "lines": [
+              "VGM จะบันทึกคำสั่งที่ส่งไปยังชิปเสียงในเครื่องเกมคอนโซล เครื่องเกมอาร์เคด และคอมพิวเตอร์ GlitchScope จะทำการเล่นชิป VGM ที่รองรับโดยใช้ Game Music Emu"
+            ]
+          },
+          {
+            "title": ".vgz",
+            "lines": [
+              "VGZ คือไฟล์ VGM ที่ถูกบีบอัดด้วย gzip GlitchScope จะทำหน้าที่ถอดบีดอัดและเล่นไฟล์นี้โดยใช้ Game Music Emu"
+            ]
+          },
+          {
+            "title": ".sid",
+            "lines": [
+              "SID ใช้เก็บโค้ดดนตรีและข้อมูลสำหรับชิป SID ของ Commodore 64 โดย PSID คือรูปแบบที่ใช้กันอย่างแพร่หลาย GlitchScope จะใช้ cRSID เพื่อเล่นไฟล์นี้"
+            ]
+          },
+          {
+            "title": ".rsid",
+            "lines": [
+              "RSID คือรูปแบบ SID ที่มีข้อกำหนดเข้มงวดกว่า สำหรับเพลงที่ต้องการให้ทำงานตามพฤติกรรมของ Commodore 64 อย่างสมบูรณ์ยิ่งขึ้น GlitchScope จะเล่นไฟล์นี้โดยใช้ cRSID"
+            ]
+          },
+          {
+            "title": ".vtx",
+            "lines": [
+              "VTX จะเก็บข้อมูลรีจิสเตอร์ที่ถูกบีบอัดของ AY-3-8910 หรือ YM2149 ซึ่งมักถูกสร้างขึ้นโดย Vortex Tracker GlitchScope จะทำการเล่นไฟล์นี้โดยใช้พาร์สเซอร์ VTX และ ayumi"
+            ]
+          },
+          {
+            "title": ".pt3",
+            "lines": [
+              "PT3 คือโมดูล Pro Tracker 3 สำหรับเพลงที่ใช้ชิป AY-3-8910 หรือ YM2149 GlitchScope จะเล่นไฟล์นี้โดยใช้ pt3player และ ayumi"
+            ]
+          },
+          {
+            "title": ".ym",
+            "lines": [
+              "YM ใช้เก็บข้อมูลรีจิสเตอร์ YM2149 แบบ Atari ST โดยมีหลายเวอร์ชันของรูปแบบไฟล์ โปรแกรม GlitchScope จะเล่นไฟล์นี้ด้วย StSound"
+            ]
+          },
+          {
+            "title": ".lh",
+            "lines": [
+              "LH เป็นไลบรารีเก่าแก่ที่ใช้สำหรับไฟล์เพลง YM ที่ถูกบีบอัดด้วยรูปแบบ LHA GlitchScope จะทำหน้าที่ถอดบีดอัดและเล่นไฟล์เหล่านี้โดยใช้ StSound"
+            ]
+          },
+          {
+            "title": ".lha",
+            "lines": [
+              "ไฟล์อาร์ไคฟ์แบบ LHA อาจมีเพลง YM ที่ถูกบีบอัดอยู่ภายใน GlitchScope จะใช้ StSound เพื่อเปิดไฟล์อาร์ไคฟ์ YM ที่รองรับ"
+            ]
+          },
+          {
+            "title": ".ahx",
+            "lines": [
+              "AHX คือโมดูลเพลงแนวชิปทยูนสำหรับ Amiga ที่ออกแบบมาสำหรับใช้กับเครื่องดนตรีสังเคราะห์ แทนที่จะใช้เสียงที่ถูกสแกนมา GlitchScope จะทำการเล่นไฟล์นี้ผ่านตัวเล่นเพลง HivelyTracker"
+            ]
+          },
+          {
+            "title": ".hvl",
+            "lines": [
+              "HVL คือรูปแบบโมดูล HivelyTracker ซึ่งขยายความสามารถของ AHX ด้วยฟีเจอร์ติดตามทรัคเกอร์เพิ่มเติม GlitchScope จะเล่นไฟล์นี้ด้วยโปรแกรมเล่น HivelyTracker"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "อุปกรณ์",
+    "lines": []
+  },
+  {
+    "id": 8,
+    "title": "เกี่ยวกับ",
+    "lines": [
+      "**GlitchScope**",
+      "เป็นเครื่องเล่นเพลงพร้อมวิชวลไลเซอร์แบบแบ่งปันข้อมูลแบบเรียลไทม์ที่ถูกออกแบบมาสำหรับอุปกรณ์ Linux แบบพกพาและคอมพิวเตอร์เดสก์ท็อป",
+      "",
+      "สามารถเล่นไฟล์เสียงท้องถิ่น โมดูล tracker และรูปแบบเพลงจากเกมยุคคลาสสิก หรือสำรวจคัลเลกชัน Modland และ ModArchive ได้",
+      "ภาพกราฟิกจะถูกแสดงผลโดย projectM ส่วนการถอดรหัสเสียงจะทำโดยเอนจินโอเพนซอร์สที่เหมาะสมกับแต่ละรูปแบบ",
+      "",
+      "โหมด Performance, Balanced และ Eco จะปรับคุณภาพภาพให้เหมาะสมกับอุปกรณ์ นอกจากนี้ยังสามารถปิดการแสดงวิชวลไลเซอร์เพื่อเล่นเพลงเพียงอย่างเดียวได้อีกด้วย",
+      "",
+      "**Project**",
+      "https://github.com/dendec/glitchscope",
+      "ได้รับใบอนุญาตภายใต้มาตรฐาน GPL-2.0-or-later"
+    ]
+  },
+  {
+    "id": 9,
+    "title": "ใบอนุญาต",
+    "children": [
+      {
+        "title": "projectM",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/projectM-visualizer/projectm",
+          "Copyright (C) 2003-2009 projectM Team"
+        ]
+      },
+      {
+        "title": "SoLoud",
+        "lines": [
+          "zlib",
+          "https://github.com/jarikomppa/soloud",
+          "Copyright (c) 2013-2018 Jari Komppa"
+        ]
+      },
+      {
+        "title": "FFmpeg",
+        "lines": [
+          "LGPL-2.1+",
+          "https://ffmpeg.org/",
+          "Copyright (c) FFmpeg developers"
+        ]
+      },
+      {
+        "title": "libxmp",
+        "lines": [
+          "MIT",
+          "https://github.com/libxmp/libxmp",
+          "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"
+        ]
+      },
+      {
+        "title": "libopenmpt",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/OpenMPT/openmpt",
+          "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"
+        ]
+      },
+      {
+        "title": "game-music-emu",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/libgme/game-music-emu",
+          "Copyright (c) Shay Green"
+        ]
+      },
+      {
+        "title": "ayumi",
+        "lines": [
+          "MIT",
+          "https://github.com/true-grue/ayumi",
+          "Copyright (c) Peter Sovietov"
+        ]
+      },
+      {
+        "title": "pt3player",
+        "lines": [
+          "MIT",
+          "https://github.com/Volutar/pt3player",
+          "Copyright (c) 2023 Volutar"
+        ]
+      },
+      {
+        "title": "libstsound",
+        "lines": [
+          "BSD-2-Clause",
+          "https://github.com/cpcsdk/libstsound",
+          "Copyright holders: Leonard/Oxygene et al."
+        ]
+      },
+      {
+        "title": "Hively",
+        "lines": [
+          "MIT",
+          "https://github.com/tildearrow/foo-input-hvl",
+          "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"
+        ]
+      },
+      {
+        "title": "cRSID",
+        "lines": [
+          "WTFPL",
+          "https://www.rockbox.org/",
+          "Copyright (c) Hermit (Mihaly Horvath)"
+        ]
+      },
+      {
+        "title": "klauspost/compress (Zstandard)",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/klauspost/compress",
+          "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"
+        ]
+      },
+      {
+        "title": "go-sdl2",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/veandco/go-sdl2",
+          "Copyright (c) 2013 Go-SDL2 Authors"
+        ]
+      },
+      {
+        "title": "SDL2",
+        "lines": [
+          "zlib",
+          "https://libsdl.org/",
+          "Copyright (C) 1997-2026 Sam Lantinga"
+        ]
+      },
+      {
+        "title": "x/image",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/image",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "x/text",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/text",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "libogg",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/ogg/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libvorbis",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/vorbis/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libFLAC",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/flac/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "mpg123",
+        "lines": [
+          "LGPL-2.1",
+          "https://www.mpg123.de/",
+          "Copyright (c) mpg123 contributors"
+        ]
+      },
+      {
+        "title": "zlib",
+        "lines": [
+          "zlib",
+          "https://zlib.net/",
+          "Copyright (c) Jean-loup Gailly and Mark Adler"
+        ]
+      },
+      {
+        "title": "GNU Unifont",
+        "lines": [
+          "GPL-2.0+ with font embedding exception",
+          "https://unifoundry.com/unifont/",
+          "Copyright (c) GNU Unifont contributors"
+        ]
+      },
+      {
+        "title": "PortsMaster Device-Info",
+        "lines": [
+          "MIT",
+          "https://github.com/PortsMaster/Device-Info",
+          "Copyright (c) PortsMaster contributors"
+        ]
+      }
+    ]
+  }
+]

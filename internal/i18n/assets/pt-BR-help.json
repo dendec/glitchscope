@@ -1,0 +1,1110 @@
+[
+  {
+    "title": "Introdução",
+    "lines": [
+      "**Reproduza sua música**",
+      "Aperte {menu} para abrir o menu.",
+      "Escolha Música, abra uma pasta e, em seguida, selecione uma faixa.",
+      "",
+      "**Aproveite o visualizador**",
+      "Feche o menu após o início da reprodução.",
+      "Use Predefinições para escolher um estilo visual e Configurações para equilibrar qualidade, velocidade e duração da bateria.",
+      "",
+      "A parte inferior da tela sempre exibe as ações disponíveis para a seleção atual."
+    ],
+    "id": 0
+  },
+  {
+    "title": "Controles",
+    "children": [
+      {
+        "title": "No menu",
+        "lines": [
+          "**Navigation**",
+          "{move} move a seleção. Mantenha pressionado para rolar mais rápido.",
+          "{focus} alterna entre os painéis.",
+          "{select} abre o item selecionado ou aplica um valor.",
+          "{back} volta para trás ou cancela a edição.",
+          "{pages} alterna entre as páginas.",
+          "",
+          "**Menu**",
+          "{menu} abre ou fecha o menu.",
+          "A parte inferior exibe as ações relacionadas à seleção atual."
+        ]
+      },
+      {
+        "title": "Enquanto ouve",
+        "lines": [
+          "**Com o menu fechado**",
+          "{tracks} seleciona a faixa anterior/próxima.",
+          "Próximo respeita o modo aleatório selecionado.",
+          "{play} reproduz ou pausa.",
+          "{seek} avança ou retrocede na faixa.",
+          "{presets} altera o preset do visualizador.",
+          "{random} escolhe um preset aleatório.",
+          "{overlay} exibe ou oculta notificações de faixa."
+        ]
+      },
+      {
+        "title": "Navegação da Ajuda",
+        "lines": [
+          "Escolha um tópico à esquerda.",
+          "{select} abre um tópico com subtópicos.",
+          "{focus} leva ao painel de texto.",
+          "{move} rola o texto.",
+          "{back} retorna ao nível anterior.",
+          "{pages} volta para outra página do aplicativo."
+        ]
+      }
+    ],
+    "id": 1
+  },
+  {
+    "title": "Reprodução",
+    "children": [
+      {
+        "title": "Aleatório e repetir",
+        "lines": [
+          "Desligado: as faixas são reproduzidas em ordem.",
+          "Álbum: embaralha a pasta ou lista de reprodução atual.",
+          "Fonte: aleatório dentro da Música, Modland ou ModArchive.",
+          "Todos: mistura as músicas das fontes disponíveis. Off-line, “Todos” utiliza apenas músicas locais.",
+          "Fonte e Todos podem repetir faixas, incluindo a faixa atual.",
+          "Repetir Uma repete a faixa atual quando ela termina. Próximo Manual continua avançando.",
+          "Uma carga falha é ignorada. Falhas repetidas interrompem a recuperação automática."
+        ]
+      },
+      {
+        "title": "Busca",
+        "lines": [
+          "{seek} navega pela faixa atual.",
+          "O áudio do Tracker é preparado para uma busca precisa quando há memória suficiente disponível.",
+          "O orçamento de preparação é selecionado automaticamente com base na memória atualmente disponível.",
+          "Faixas longas ou condições de baixa memória utilizam streaming nativo em vez disso.",
+          "A busca para trás, então, depende do decodificador."
+        ]
+      },
+      {
+        "title": "Favoritos",
+        "lines": [
+          "Selecione uma música de listas de reprodução que não estejam em Favoritos e siga a dica de Favorito na parte inferior da tela.",
+          "Uma pressão curta alterna entre Estrela / Coração / Nota / Nenhum.",
+          "{gamepad_heading}",
+          "Mantenha pressionado {favourite} para remover a música selecionada dos favoritos.",
+          "Fora da navegação por músicas, {play} significa Reproduzir / Pausar.",
+          "{keyboard_heading}",
+          "A tecla F alterna entre os favoritos; a tecla Excluir remove um deles.",
+          ""
+        ]
+      }
+    ],
+    "id": 2
+  },
+  {
+    "title": "Qualidade e Bateria",
+    "children": [
+      {
+        "title": "Desempenho",
+        "lines": [
+          "O modo Desempenho dá prioridade à qualidade do visualizador, visando 30 FPS.",
+          "O modo Equilibrado visa 24 FPS com um limite de resolução mais baixo.",
+          "O modo Eco prioriza a duração da bateria, com um limite de resolução mais baixo e upscale mais lento.",
+          "A resolução automática se ajusta ao preset atual. Uma resolução fixa desativa esse ajuste.",
+          "Um preset pesado pode ser ignorado se a menor resolução ainda for muito lenta."
+        ]
+      },
+      {
+        "title": "Música sem visualização",
+        "lines": [
+          "Defina o Visualizador como Desligado nas Configurações.",
+          "A reprodução da música e a navegação pelo menu continuam funcionando em um fundo simples.",
+          "Ao abrir Presets, a pré-visualização em tempo real ainda é ativada.",
+          "Ligue o Visualizador novamente para retomar a animação."
+        ]
+      },
+      {
+        "title": "Seleção de presets",
+        "lines": [
+          "Abra os Presets e navegue pela lista.",
+          "Pare em um preset para visualizar sua prévia.",
+          "{select} o seleciona; ele é aplicado quando você sair da página.",
+          "Os controles de troca automática de preset gerenciam as alterações automáticas.",
+          "As resoluções bem-sucedidas são lembradas durante a execução atual."
+        ]
+      }
+    ],
+    "id": 3
+  },
+  {
+    "title": "Solução de Problemas",
+    "children": [
+      {
+        "title": "Nenhuma música listada",
+        "lines": [
+          "Abra o Music e selecione uma pasta que contenha arquivos de áudio compatíveis.",
+          "Uma pasta vazia e uma varredura falha são situações diferentes; verifique quaisquer erros exibidos.",
+          "Os índices do catálogo baixados listam as músicas, mas não contêm o áudio em si."
+        ]
+      },
+      {
+        "title": "Catálogos off-line",
+        "lines": [
+          "Os índices dos catálogos salvos podem ser consultados mesmo sem conexão com a internet.",
+          "Uma faixa precisa já ter sido baixada para poder ser reproduzida off-line.",
+          "O modo 'Aleatório Total' utiliza a música local enquanto estiver off-line. A disponibilidade da rede é verificada periodicamente."
+        ]
+      },
+      {
+        "title": "Carregando ou pulando faixas",
+        "lines": [
+          "O download busca um arquivo remoto. A preparação do áudio decodifica o arquivo para busca.",
+          "Você pode selecionar outra faixa enquanto ela está sendo carregada.",
+          "Faixas não suportadas, danificadas ou indisponíveis são puladas automaticamente.",
+          "Se falhas repetidas interromperem a reprodução, escolha outra faixa ou fonte."
+        ]
+      },
+      {
+        "title": "Busca limitada",
+        "lines": [
+          "Alguns decodificadores de tracker nativos não conseguem buscar para trás de forma confiável.",
+          "A busca no tracker é preparada automaticamente quando há memória suficiente disponível.",
+          "Trilhas muito longas e condições de baixa memória utilizam streaming nativo."
+        ]
+      }
+    ],
+    "id": 4
+  },
+  {
+    "id": 5,
+    "title": "Catálogos",
+    "children": [
+      {
+        "title": "Modland",
+        "lines": [
+          "**Catálogo neste dispositivo**",
+          "Trilhas reproduzíveis: {modland_tracks}",
+          "Pastas: {modland_directories}",
+          "Rede: {network_status}",
+          "",
+          "**Sobre Modland**",
+          "Um grande arquivo de preservação de músicas de tracker, chiptune e jogos, organizado por formato e autor.",
+          "GlitchScope mantém um índice compacto localmente e baixa uma trilha selecionada para seu cache antes da reprodução.",
+          "O índice salvo permanece acessível off-line; as trilhas exigem conexão, a menos que já estejam no cache."
+        ]
+      },
+      {
+        "title": "ModArchive",
+        "lines": [
+          "**Catálogo neste dispositivo**",
+          "Trilhas reproduzíveis: {modarchive_tracks}",
+          "Pastas: {modarchive_directories}",
+          "Rede: {network_status}",
+          "",
+          "**Sobre o Mod Archive**",
+          "Um arquivo comunitário dedicado a módulos musicais reproduzíveis, com informações sobre artistas, avaliações, resenhas e coleções históricas.",
+          "GlitchScope envia índices compactos para o registro histórico e o suplemento, e depois baixa apenas os dados do módulo selecionado.",
+          "Os índices salvos permanecem acessíveis off-line; as trilhas exigem conexão, a menos que já estejam no cache."
+        ]
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "title": "Formatos",
+    "children": [
+      {
+        "title": "Áudio",
+        "children": [
+          {
+            "title": ".aac",
+            "lines": [
+              "O AAC é um formato de codificação de áudio com perda, geralmente armazenado como AAC bruto ou em contêineres da família MP4. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".ac3",
+            "lines": [
+              "O AC-3 (Dolby Digital) é um formato de codificação de áudio com perda utilizado para som mono e multicanal. GlitchScope o decodifica com FFmpeg."
+            ]
+          },
+          {
+            "title": ".eac3",
+            "lines": [
+              "O E-AC-3 (Dolby Digital Plus) aprimora o AC-3 com taxas de bits mais altas e configurações de canal adicionais. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp1",
+            "lines": [
+              "O MP1 é o MPEG Audio Layer I, o primeiro dos três layers de áudio do MPEG-1. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp2",
+            "lines": [
+              "MP2 é o MPEG Audio Layer II, um formato com perda de qualidade ainda utilizado em transmissões e mídias mais antigas. GlitchScope o decodifica com FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp3",
+            "lines": [
+              "O MP3 é o MPEG Audio Layer III, um formato de áudio com perda amplamente utilizado. GlitchScope o decodifica com FFmpeg."
+            ]
+          },
+          {
+            "title": ".ogg",
+            "lines": [
+              "O Ogg é um contêiner que geralmente armazena áudio em formatos como Vorbis, Opus, FLAC ou Speex. GlitchScope decodifica seu fluxo de áudio usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".oga",
+            "lines": [
+              "OGA é a extensão de nome de arquivo voltada para áudio, utilizada em contêineres Ogg. GlitchScope decodifica seu fluxo de áudio com FFmpeg."
+            ]
+          },
+          {
+            "title": ".opus",
+            "lines": [
+              "O Opus é um formato de áudio lossy, aberto e com baixo atraso, padronizado pelo IETF. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".spx",
+            "lines": [
+              "O SPX geralmente contém áudio de fala Speex em um contêiner Ogg. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".flac",
+            "lines": [
+              "O FLAC é um formato de áudio sem perda aberto que reconstrói com precisão os amostras PCM originais. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".wav",
+            "lines": [
+              "O WAV é um contêiner de áudio baseado em RIFF, geralmente usado para PCM, mas capaz de suportar outros codecs. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".rf64",
+            "lines": [
+              "O RF64 expande o formato WAV para arquivos que ultrapassam o limite de tamanho de 4 GiB do RIFF clássico. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".aiff",
+            "lines": [
+              "AIFF é o contêiner de áudio baseado em IFF da Apple, frequentemente usado para PCM não compactado. GlitchScope o decodifica com FFmpeg."
+            ]
+          },
+          {
+            "title": ".aif",
+            "lines": [
+              "AIF é uma extensão alternativa de nome de arquivo para arquivos de áudio AIFF. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".aifc",
+            "lines": [
+              "O AIFC é a variante de áudio compactado do contêiner AIFF. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".caf",
+            "lines": [
+              "O CAF é o contêiner de formato Core Audio da Apple para áudio e metadados. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".m4a",
+            "lines": [
+              "O M4A é um contêiner MP4 voltado para áudio, que geralmente armazena arquivos em formato AAC ou ALAC. GlitchScope decodifica seu fluxo de áudio usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".m4b",
+            "lines": [
+              "O M4B é um contêiner de áudio MP4 amplamente utilizado para audiolivros e metadados de capítulos. GlitchScope decodifica seu fluxo de áudio com FFmpeg."
+            ]
+          },
+          {
+            "title": ".mp4",
+            "lines": [
+              "O MP4 é um contêiner ISO Base Media que pode conter áudio, vídeo e metadados. GlitchScope reproduz seu fluxo de áudio suportado por meio de FFmpeg."
+            ]
+          },
+          {
+            "title": ".mov",
+            "lines": [
+              "O MOV é o container QuickTime da Apple para áudio, vídeo e metadados. GlitchScope reproduz seu fluxo de áudio compatível por meio de FFmpeg."
+            ]
+          },
+          {
+            "title": ".mka",
+            "lines": [
+              "O MKA é a extensão de nome de arquivo voltada para áudio de um contêiner Matroska. GlitchScope decodifica seu fluxo de áudio usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".mkv",
+            "lines": [
+              "O MKV é um contêiner multimídia Matroska. O GlitchScope reproduz seu fluxo de áudio suportado por meio de FFmpeg."
+            ]
+          },
+          {
+            "title": ".webm",
+            "lines": [
+              "O WebM é um contêiner baseado em Matroska com restrições, que geralmente contém áudio Opus ou Vorbis. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".wma",
+            "lines": [
+              "Arquivos .wma utilizam codecs Windows Media Audio, geralmente dentro de um contêiner ASF. GlitchScope os decodifica com FFmpeg."
+            ]
+          },
+          {
+            "title": ".asf",
+            "lines": [
+              "O ASF é o container Advanced Systems Format da Microsoft e geralmente contém áudio WMA. GlitchScope decodifica seu fluxo de áudio usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".amr",
+            "lines": [
+              "O AMR é um formato de codificação de áudio utilizado em telefonia móvel, geralmente nas versões AMR-NB ou AMR-WB. GlitchScope o decodifica com FFmpeg."
+            ]
+          },
+          {
+            "title": ".ape",
+            "lines": [
+              "O APE é o Monkey's Audio, um formato de áudio sem perda. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".tta",
+            "lines": [
+              "TTA é True Audio, um formato de áudio sem perda. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".wv",
+            "lines": [
+              "O WV é o WavPack, um formato de áudio sem perda ou híbrido. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".mpc",
+            "lines": [
+              "MPC é o Musepack, um formato de áudio com perda projetado principalmente para música. GlitchScope o decodifica usando FFmpeg."
+            ]
+          },
+          {
+            "title": ".ts",
+            "lines": [
+              "O TS é um contêiner de fluxo de transporte MPEG utilizado para mídias transmitidas e gravadas. GlitchScope reproduz seu fluxo de áudio compatível por meio de FFmpeg."
+            ]
+          },
+          {
+            "title": ".m2ts",
+            "lines": [
+              "O M2TS é um contêiner de fluxo de transporte MPEG no estilo Blu-ray. GlitchScope reproduz seu fluxo de áudio suportado por meio de FFmpeg."
+            ]
+          },
+          {
+            "title": ".ra",
+            "lines": [
+              "O RA é um contêiner de arquivos ou fluxo RealAudio. GlitchScope decodifica os codecs RealAudio compatíveis com FFmpeg."
+            ]
+          },
+          {
+            "title": ".rm",
+            "lines": [
+              "O RM é um contêiner RealMedia que pode conter RealAudio. GlitchScope reproduz seu fluxo de áudio suportado por meio de FFmpeg."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Tracker",
+        "children": [
+          {
+            "title": ".mod",
+            "lines": [
+              "Módulo da família MOD. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".xm",
+            "lines": [
+              "Módulo estendido do FastTracker II. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".it",
+            "lines": [
+              "Módulo Impulse Tracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".s3m",
+            "lines": [
+              "Módulo do Scream Tracker 3. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".mptm",
+            "lines": [
+              "Módulo OpenMPT. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".stm",
+            "lines": [
+              "Módulo do Scream Tracker 2. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".nst",
+            "lines": [
+              "Módulo NoiseTracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".wow",
+            "lines": [
+              "Módulo do Mod's Grave. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".ult",
+            "lines": [
+              "Módulo UltraTracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".669",
+            "lines": [
+              "Módulo Composer 669 ou UNIS 669. GlitchScope decodifica essa extensão com libxmp."
+            ]
+          },
+          {
+            "title": ".mtm",
+            "lines": [
+              "Módulo MultiTracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".med",
+            "lines": [
+              "Módulo MED ou OctaMED. GlitchScope decodifica essa extensão com libxmp."
+            ]
+          },
+          {
+            "title": ".far",
+            "lines": [
+              "Módulo Farandole Composer. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".mdl",
+            "lines": [
+              "Módulo Digitrakker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".ams",
+            "lines": [
+              "Módulo do Extreme’s Tracker ou Velvet Studio. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".dsm",
+            "lines": [
+              "Módulo DSIK. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".amf",
+            "lines": [
+              "Módulo Asylum ou DSMI. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".okt",
+            "lines": [
+              "Módulo Oktalyzer. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".dmf",
+            "lines": [
+              "Módulo Digital Tracker ou DefleMask. GlitchScope decodifica essa extensão usando libopenmpt, recorrendo a libxmp quando necessário."
+            ]
+          },
+          {
+            "title": ".ptm",
+            "lines": [
+              "Módulo Poly Tracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".psm",
+            "lines": [
+              "Módulo ProTracker Studio ou Epic. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".mt2",
+            "lines": [
+              "Módulo do MadTracker 2. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".dbm",
+            "lines": [
+              "Módulo DigiBooster Pro. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".abk",
+            "lines": [
+              "Módulo do AMOS Music Bank. GlitchScope decodifica essa extensão com libxmp."
+            ]
+          },
+          {
+            "title": ".digi",
+            "lines": [
+              "Módulo DIGI Booster. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".dtt",
+            "lines": [
+              "Módulo de Digital Tracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".flx",
+            "lines": [
+              "Módulo FlexTrax. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".gtk",
+            "lines": [
+              "Módulo Graoumf Tracker. GlitchScope decodifica esta extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".imf",
+            "lines": [
+              "Módulo Imago Orpheus. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".liq",
+            "lines": [
+              "Módulo Liquid Tracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".masi",
+            "lines": [
+              "Módulo Epic MegaGames MASI. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".mgt",
+            "lines": [
+              "Módulo Megatracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".mmd",
+            "lines": [
+              "Módulo MMD MED ou OctaMED. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".mmdc",
+            "lines": [
+              "módulo MED compactado. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".mmcmp",
+            "lines": [
+              "Módulo compactado em MMCMP. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".muse",
+            "lines": [
+              "Módulo compactado em MUSE. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".nt",
+            "lines": [
+              "Módulo NoiseTracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".pmd",
+            "lines": [
+              "Módulo compatível com ProTracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".ppm",
+            "lines": [
+              "Módulo ProTracker Packer. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".pru",
+            "lines": [
+              "Módulo Prorunner. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".pt36",
+            "lines": [
+              "Módulo ProTracker 3.6. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".rh",
+            "lines": [
+              "Módulo de Rob Hubbard. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".rtm",
+            "lines": [
+              "Módulo Real Tracker. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".sfx",
+            "lines": [
+              "Módulo de SoundFX. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".sfx2",
+            "lines": [
+              "Módulo SoundFX 2. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".stim",
+            "lines": [
+              "Módulo Slamtilt. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".stx",
+            "lines": [
+              "Módulo STMIK. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".tcb",
+            "lines": [
+              "Módulo Tracker TCB. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".tdd",
+            "lines": [
+              "O módulo The Dark Demon. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".tp",
+            "lines": [
+              "Módulo Tracker Packer. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".uni",
+            "lines": [
+              "Módulo UNI. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".xd",
+            "lines": [
+              "Variante de módulo do FastTracker II. GlitchScope decodifica essa extensão usando libxmp."
+            ]
+          },
+          {
+            "title": ".mo3",
+            "lines": [
+              "Módulo compactado em MO3. GlitchScope decodifica essa extensão usando libopenmpt, recorrendo a libxmp quando necessário."
+            ]
+          },
+          {
+            "title": ".ktm",
+            "lines": [
+              "Módulo Karate. GlitchScope decodifica essa extensão usando libopenmpt, recorrendo a libxmp quando necessário."
+            ]
+          },
+          {
+            "title": ".ims",
+            "lines": [
+              "Módulo do Velvet Studio. GlitchScope decodifica essa extensão usando libopenmpt, recorrendo a libxmp quando necessário."
+            ]
+          },
+          {
+            "title": ".mdc",
+            "lines": [
+              "Módulo de tracker para Megadrive. GlitchScope decodifica essa extensão usando libopenmpt, recorrendo a libxmp quando necessário."
+            ]
+          },
+          {
+            "title": ".txn",
+            "lines": [
+              "Módulo do MadTracker 2. GlitchScope decodifica essa extensão usando libopenmpt, recorrendo a libxmp quando necessário."
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Chiptune",
+        "children": [
+          {
+            "title": ".ay",
+            "lines": [
+              "O formato AY armazena músicas do ZX Spectrum ou Amstrad CPC como dados de programa Z80, para serem reproduzidas pelos hardwares de som da família AY. GlitchScope reproduz esses arquivos usando Game Music Emu."
+            ]
+          },
+          {
+            "title": ".nsf",
+            "lines": [
+              "O NSF armazena o código e os dados musicais do Nintendo NES ou Famicom para reprodução emulada. GlitchScope o reproduz usando Game Music Emu."
+            ]
+          },
+          {
+            "title": ".nsfe",
+            "lines": [
+              "O NSFE é uma variante extensível do NSF, com metadados e informações de playlist divididos em blocos. GlitchScope o reproduz usando Game Music Emu."
+            ]
+          },
+          {
+            "title": ".spc",
+            "lines": [
+              "O SPC é um registro do subsistema de áudio do Super Nintendo ou Super Famicom. O GlitchScope reproduz arquivos desse formato usando o Game Music Emu."
+            ]
+          },
+          {
+            "title": ".gbs",
+            "lines": [
+              "O GBS armazena o código de música e os dados do Nintendo Game Boy para reprodução emulada. GlitchScope o reproduz usando Game Music Emu."
+            ]
+          },
+          {
+            "title": ".hes",
+            "lines": [
+              "O HES armazena o código musical e os dados do PC Engine ou TurboGrafx-16 para reprodução emulada. GlitchScope o reproduz usando Game Music Emu."
+            ]
+          },
+          {
+            "title": ".kss",
+            "lines": [
+              "O KSS armazena músicas para MSX e outros sistemas baseados em Z80 que utilizam áudio PSG ou SCC. GlitchScope reproduz essas músicas com Game Music Emu; este backend não suporta som FM."
+            ]
+          },
+          {
+            "title": ".sap",
+            "lines": [
+              "O SAP armazena o código musical e os dados do Atari 8-bit para o chip de som POKEY. GlitchScope reproduz esses arquivos usando Game Music Emu."
+            ]
+          },
+          {
+            "title": ".vgm",
+            "lines": [
+              "Os arquivos VGM registram os comandos enviados aos chips de som em consoles, placas de arcade e computadores. GlitchScope reproduz os chips VGM compatíveis com Game Music Emu."
+            ]
+          },
+          {
+            "title": ".vgz",
+            "lines": [
+              "O VGZ é um arquivo VGM compactado com gzip. GlitchScope o descompacta e o reproduz usando Game Music Emu."
+            ]
+          },
+          {
+            "title": ".sid",
+            "lines": [
+              "O SID armazena o código musical e os dados do Commodore 64 para o chip SID; o PSID é a variante mais comum. GlitchScope o reproduz usando cRSID."
+            ]
+          },
+          {
+            "title": ".rsid",
+            "lines": [
+              "O RSID é uma variante mais rigorosa do SID, voltada para músicas que exigem um comportamento mais completo do Commodore 64. GlitchScope o reproduz usando cRSID."
+            ]
+          },
+          {
+            "title": ".vtx",
+            "lines": [
+              "O VTX armazena dados de registro compactados do AY-3-8910 ou YM2149, normalmente gerados pelo Vortex Tracker. GlitchScope reproduz esses arquivos usando seu analisador VTX e ayumi."
+            ]
+          },
+          {
+            "title": ".pt3",
+            "lines": [
+              "O PT3 é um módulo Pro Tracker 3 para músicas em formatos AY-3-8910 ou YM2149. GlitchScope o reproduz usando pt3player e ayumi."
+            ]
+          },
+          {
+            "title": ".ym",
+            "lines": [
+              "O YM armazena dumps de registradores YM2149 no estilo Atari ST, disponível em várias versões de formato. GlitchScope reproduz arquivos deste tipo usando StSound."
+            ]
+          },
+          {
+            "title": ".lh",
+            "lines": [
+              "O LH é uma extensão legada utilizada para música YM compactada em LHA. GlitchScope a descompacta e a reproduz com StSound."
+            ]
+          },
+          {
+            "title": ".lha",
+            "lines": [
+              "Os arquivos LHA podem conter música YM compactada. GlitchScope abre arquivos YM compatíveis com StSound."
+            ]
+          },
+          {
+            "title": ".ahx",
+            "lines": [
+              "O AHX é um módulo de chiptune para Amiga desenvolvido com base em instrumentos sintéticos, em vez de áudio amostrado. GlitchScope o reproduz usando o reprodutor HivelyTracker."
+            ]
+          },
+          {
+            "title": ".hvl",
+            "lines": [
+              "O HVL é o formato de módulo HivelyTracker, que expande o AHX com recursos adicionais de tracker. O GlitchScope reproduz arquivos desse formato usando o reprodutor HivelyTracker."
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "Dispositivo",
+    "lines": []
+  },
+  {
+    "id": 8,
+    "title": "Sobre",
+    "lines": [
+      "**GlitchScope**",
+      "Um player de música e visualizador em tempo real MilkDrop desenvolvido para dispositivos portáteis Linux e computadores de mesa.",
+      "",
+      "Reproduza áudio local, módulos de tracker e formatos clássicos de música de jogos, ou explore os catálogos Modland e ModArchive.",
+      "As imagens são geradas pelo projectM. O áudio é decodificado por mecanismos open-source especializados, escolhidos para cada formato.",
+      "",
+      "Os modos Desempenho, Equilibrado e Ecológico ajustam a qualidade visual de acordo com o dispositivo. O visualizador também pode ser desativado para reprodução apenas de música.",
+      "",
+      "**Project**",
+      "https://github.com/dendec/glitchscope",
+      "Licenciado sob GPL-2.0-or-later."
+    ]
+  },
+  {
+    "id": 9,
+    "title": "Licenças",
+    "children": [
+      {
+        "title": "projectM",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/projectM-visualizer/projectm",
+          "Copyright (C) 2003-2009 projectM Team"
+        ]
+      },
+      {
+        "title": "SoLoud",
+        "lines": [
+          "zlib",
+          "https://github.com/jarikomppa/soloud",
+          "Copyright (c) 2013-2018 Jari Komppa"
+        ]
+      },
+      {
+        "title": "FFmpeg",
+        "lines": [
+          "LGPL-2.1+",
+          "https://ffmpeg.org/",
+          "Copyright (c) FFmpeg developers"
+        ]
+      },
+      {
+        "title": "libxmp",
+        "lines": [
+          "MIT",
+          "https://github.com/libxmp/libxmp",
+          "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"
+        ]
+      },
+      {
+        "title": "libopenmpt",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/OpenMPT/openmpt",
+          "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"
+        ]
+      },
+      {
+        "title": "game-music-emu",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/libgme/game-music-emu",
+          "Copyright (c) Shay Green"
+        ]
+      },
+      {
+        "title": "ayumi",
+        "lines": [
+          "MIT",
+          "https://github.com/true-grue/ayumi",
+          "Copyright (c) Peter Sovietov"
+        ]
+      },
+      {
+        "title": "pt3player",
+        "lines": [
+          "MIT",
+          "https://github.com/Volutar/pt3player",
+          "Copyright (c) 2023 Volutar"
+        ]
+      },
+      {
+        "title": "libstsound",
+        "lines": [
+          "BSD-2-Clause",
+          "https://github.com/cpcsdk/libstsound",
+          "Copyright holders: Leonard/Oxygene et al."
+        ]
+      },
+      {
+        "title": "Hively",
+        "lines": [
+          "MIT",
+          "https://github.com/tildearrow/foo-input-hvl",
+          "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"
+        ]
+      },
+      {
+        "title": "cRSID",
+        "lines": [
+          "WTFPL",
+          "https://www.rockbox.org/",
+          "Copyright (c) Hermit (Mihaly Horvath)"
+        ]
+      },
+      {
+        "title": "klauspost/compress (Zstandard)",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/klauspost/compress",
+          "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"
+        ]
+      },
+      {
+        "title": "go-sdl2",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/veandco/go-sdl2",
+          "Copyright (c) 2013 Go-SDL2 Authors"
+        ]
+      },
+      {
+        "title": "SDL2",
+        "lines": [
+          "zlib",
+          "https://libsdl.org/",
+          "Copyright (C) 1997-2026 Sam Lantinga"
+        ]
+      },
+      {
+        "title": "x/image",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/image",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "x/text",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/text",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "libogg",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/ogg/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libvorbis",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/vorbis/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libFLAC",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/flac/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "mpg123",
+        "lines": [
+          "LGPL-2.1",
+          "https://www.mpg123.de/",
+          "Copyright (c) mpg123 contributors"
+        ]
+      },
+      {
+        "title": "zlib",
+        "lines": [
+          "zlib",
+          "https://zlib.net/",
+          "Copyright (c) Jean-loup Gailly and Mark Adler"
+        ]
+      },
+      {
+        "title": "GNU Unifont",
+        "lines": [
+          "GPL-2.0+ with font embedding exception",
+          "https://unifoundry.com/unifont/",
+          "Copyright (c) GNU Unifont contributors"
+        ]
+      },
+      {
+        "title": "PortsMaster Device-Info",
+        "lines": [
+          "MIT",
+          "https://github.com/PortsMaster/Device-Info",
+          "Copyright (c) PortsMaster contributors"
+        ]
+      }
+    ]
+  }
+]

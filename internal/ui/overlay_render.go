@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/player"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
@@ -678,7 +679,7 @@ func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH int) {
 	if o.pageIndicatorDirty {
 		o.rebuildPageIndicatorTextures()
 	}
-	pages := []string{"Library", "Presets", "Settings", "Help"}
+	pages := []string{o.catalog.Text(i18n.PageLibrary), o.catalog.Text(i18n.PagePresets), o.catalog.Text(i18n.PageSettings), o.catalog.Text(i18n.PageHelp)}
 	gap := int(o.fontSize * pageIndicatorGapFactor)
 
 	x := o.pageIndicatorX(winW)
@@ -695,7 +696,7 @@ func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH int) {
 
 func (o *Overlay) rebuildPageIndicatorTextures() {
 	o.pageIndicatorDirty = false
-	pages := []string{"Library", "Presets", "Settings", "Help"}
+	pages := []string{o.catalog.Text(i18n.PageLibrary), o.catalog.Text(i18n.PagePresets), o.catalog.Text(i18n.PageSettings), o.catalog.Text(i18n.PageHelp)}
 	textColor := o.textColor()
 	for i, name := range pages {
 		o.deleteTex(&o.pageIndicatorTex[i])

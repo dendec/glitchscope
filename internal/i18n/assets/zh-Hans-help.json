@@ -1,0 +1,1110 @@
+[
+  {
+    "title": "入门指南",
+    "lines": [
+      "**播放您的音乐**",
+      "按下 {menu} 即可打开菜单。",
+      "选择“音乐”，打开一个文件夹，然后挑选一首曲目。",
+      "",
+      "**尽情享受视觉效果吧**",
+      "播放开始后请关闭菜单。",
+      "使用预设来选择视觉风格，通过设置来平衡质量、速度与电池续航时间。",
+      "",
+      "页脚始终显示当前选中项可用的操作。"
+    ],
+    "id": 0
+  },
+  {
+    "title": "控制",
+    "children": [
+      {
+        "title": "菜单中",
+        "lines": [
+          "**导航**",
+          "{move}用于移动播放位置。长按可加快滚动速度。",
+          "{focus}用于切换面板。",
+          "{select}用于打开所选项目或应用对应数值。",
+          "{back}用于返回上一页或取消编辑。",
+          "{pages}用于切换页面。",
+          "",
+          "**菜单**",
+          "{menu}用于打开或关闭菜单。",
+          "页脚区域会显示与当前所选项目相关的操作选项。"
+        ]
+      },
+      {
+        "title": "播放时",
+        "lines": [
+          "**菜单已关闭时**",
+          "{tracks}用于选择上一首/下一首曲目。",
+          "下一首曲目的选择会遵循所选的随机播放模式。",
+          "{play}用于播放或暂停音乐。",
+          "{seek}用于向前或向后跳转播放位置。",
+          "{presets}用于更改可视化效果预设。",
+          "{random}用于选择随机预设。",
+          "{overlay}用于显示或隐藏曲目相关通知。"
+        ]
+      },
+      {
+        "title": "帮助导航",
+        "lines": [
+          "在左侧选择所需主题。",
+          "{select}用于打开包含子主题的页面。",
+          "{focus}用于切换到文本面板。",
+          "{move}用于滚动文本内容。",
+          "{back}用于返回上一级目录。",
+          "{pages}用于返回到其他应用程序页面。"
+        ]
+      }
+    ],
+    "id": 1
+  },
+  {
+    "title": "播放",
+    "children": [
+      {
+        "title": "随机播放与循环播放",
+        "lines": [
+          "关闭：歌曲按顺序播放。",
+          "专辑模式：对当前文件夹或播放列表进行随机播放。",
+          "源文件模式：在 Music、Modland 或 ModArchive 内部进行随机播放。",
+          "全部模式：在所有可用源文件之间进行随机播放。离线模式下，“全部”仅使用本地音乐。",
+          "“源文件模式”和“全部模式”均可循环播放歌曲，包括当前正在播放的歌曲。",
+          "“单次循环”模式会在当前歌曲播放完毕时重复播放它，而“手动下一首”仍会继续播放下一首歌曲。",
+          "加载失败时会跳过该歌曲。若连续失败，则停止自动恢复尝试。"
+        ]
+      },
+      {
+        "title": "跳转",
+        "lines": [
+          "{seek}：在当前歌曲中跳转。",
+          "当内存充足时，会为精确跳转准备跟踪器音频。",
+          "预处理所需的内存量会根据当前可用内存自动确定。",
+          "对于长度较长的歌曲或内存不足的情况，会采用原生流式播放方式。",
+          "向后跳转的功能则取决于解码器的支持情况。"
+        ]
+      },
+      {
+        "title": "收藏夹",
+        "lines": [
+          "若要选择收藏夹播放列表之外的歌曲，请按照页面底部的提示操作。",
+          "短按按钮可在星形/心形/音符/无之间切换。",
+          "{gamepad_heading}",
+          "按住 {favourite} 可将所选歌曲从收藏夹中移除。",
+          "在浏览歌曲之外，{play} 的功能为播放/暂停。",
+          "{keyboard_heading}",
+          "按 F 键可在收藏歌曲之间切换；按 Delete 键可将其移除。",
+          ""
+        ]
+      }
+    ],
+    "id": 2
+  },
+  {
+    "title": "音质与电池",
+    "children": [
+      {
+        "title": "性能",
+        "lines": [
+          "性能模式以可视化效果为优先，目标帧率为 30 FPS。",
+          "平衡模式的目标帧率为 24 FPS，且分辨率上限较低。",
+          "节能模式侧重电池续航，分辨率上限较低，且上采样速度较慢。",
+          "自动分辨率会根据当前预设进行调整；若设置为固定分辨率，则无法进行此调整。",
+          "如果最低分辨率下的运行速度仍然过慢，可跳过高负载预设。"
+        ]
+      },
+      {
+        "title": "无可视化效果的音乐播放",
+        "lines": [
+          "请在设置中将可视化效果关闭。",
+          "即便背景为纯色，音乐播放与菜单导航功能依然正常使用。",
+          "打开预设时仍会显示其实时预览效果。",
+          "若要恢复动画效果，请再次开启可视化效果。"
+        ]
+      },
+      {
+        "title": "预设选择",
+        "lines": [
+          "打开“预设”选项，然后浏览预设列表。",
+          "在某个预设上暂停，即可查看其预览效果。",
+          "{select} 用于选择该预设；离开页面时即会应用该预设。",
+          "预设自动切换功能可控制自动更改的设置。",
+          "在当前运行过程中，已成功解决的设置会被保留。"
+        ]
+      }
+    ],
+    "id": 3
+  },
+  {
+    "title": "故障排除",
+    "children": [
+      {
+        "title": "未列出任何音乐",
+        "lines": [
+          "打开“音乐”页面，选择包含受支持音频文件的文件夹。",
+          "空文件夹与扫描失败属于不同状态，请查看显示的任何错误信息。",
+          "下载的目录索引仅列出音乐信息，不包含音频文件本身。"
+        ]
+      },
+      {
+        "title": "离线歌单",
+        "lines": [
+          "已保存的歌单索引在无网络环境下仍可查看。",
+          "若要离线播放，必须先下载对应的曲目。",
+          "“全部随机播放”功能在离线时会使用本地音乐，并会定期检查网络连接状态。"
+        ]
+      },
+      {
+        "title": "正在加载或跳过曲目",
+        "lines": [
+          "下载功能用于获取远程文件，而音频准备功能则用于解码曲目以便快速定位。",
+          "在加载过程中，您可以选择其他曲目。",
+          "不支持的、损坏的或无法获取的曲目会自动被跳过。",
+          "如果反复出现错误导致无法播放，请选择其他曲目或来源。"
+        ]
+      },
+      {
+        "title": "寻轨功能受限",
+        "lines": [
+          "某些原生追踪器解码器无法实现稳定的反向寻轨。",
+          "当内存充足时，系统会自动启用追踪器寻轨功能。",
+          "对于过长的曲目或在内存较低的情况下，系统会使用原生流式播放方式。"
+        ]
+      }
+    ],
+    "id": 4
+  },
+  {
+    "id": 5,
+    "title": "目录",
+    "children": [
+      {
+        "title": "Modland",
+        "lines": [
+          "**本设备上的目录**",
+          "可播放曲目：{modland_tracks}",
+          "文件夹：{modland_directories}",
+          "网络：{network_status}",
+          "",
+          "**关于 Modland**",
+          "这是一个按格式和创作者分类的庞大音乐存档，收录了追踪器音乐、芯片音乐以及游戏音乐。",
+          "GlitchScope 会在本地保存一个精简的索引，并在播放前将选定的曲目下载到缓存中。",
+          "已保存的索引可在离线状态下浏览；除非已被缓存，否则播放曲目需要网络连接。"
+        ]
+      },
+      {
+        "title": "ModArchive",
+        "lines": [
+          "**本设备上的目录**",
+          "可播放曲目：{modarchive_tracks}",
+          "文件夹：{modarchive_directories}",
+          "网络：{network_status}",
+          "",
+          "**关于 ModArchive**",
+          "这是一个专为可播放音乐模块打造的社区档案库，内含艺术家信息、评分、评论以及历史系列内容。",
+          "GlitchScope 会预先发送历史快照与补充内容的紧凑索引，随后仅下载用户选定的模块数据。",
+          "已保存的索引可在离线状态下查看；除非已缓存，否则曲目需要网络连接才能播放。"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "title": "格式",
+    "children": [
+      {
+        "title": "音频",
+        "children": [
+          {
+            "title": ".aac",
+            "lines": [
+              "AAC 是一种有损音频编码格式，通常以原始 AAC 格式或 MP4 系列容器存储。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".ac3",
+            "lines": [
+              "AC-3（杜比数字）是一种用于单声道及多声道声音的有损音频编码格式。GlitchScope通过FFmpeg对其进行解码。"
+            ]
+          },
+          {
+            "title": ".eac3",
+            "lines": [
+              "E-AC-3（Dolby Digital Plus）在 AC-3 的基础上提升了比特率，并支持更多声道配置。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".mp1",
+            "lines": [
+              "MP1 即 MPEG Audio Layer I，是三种 MPEG-1 音频层中最早期的一种。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".mp2",
+            "lines": [
+              "MP2 即 MPEG Audio Layer II，是一种有损音频格式，至今仍被用于广播及旧版媒体中。GlitchScope 通过 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".mp3",
+            "lines": [
+              "MP3 即 MPEG Audio Layer III，是一种广泛使用的有损音频格式。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".ogg",
+            "lines": [
+              "Ogg 是一种常用作 Vorbis、Opus、FLAC 或 Speex 音频载体格式的容器。GlitchScope 通过 FFmpeg 对其音频流进行解码。"
+            ]
+          },
+          {
+            "title": ".oga",
+            "lines": [
+              "OGA 是 Ogg 容器专用的音频格式文件扩展名。GlitchScope 使用 FFmpeg 对其音频流进行解码。"
+            ]
+          },
+          {
+            "title": ".opus",
+            "lines": [
+              "Opus 是由 IETF 制定的开源、低延迟的有损音频格式。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".spx",
+            "lines": [
+              "SPX 文件通常以 Ogg 容器格式存储 Speex 语音音频。GlitchScope 会使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".flac",
+            "lines": [
+              "FLAC 是一种开源的无损音频格式，能够完整还原原始的 PCM 样本。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".wav",
+            "lines": [
+              "WAV 是一种基于 RIFF 格式的音频容器，通常用于存储 PCM 音频，但也支持其他编码格式。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".rf64",
+            "lines": [
+              "对于那些超过传统 RIFF 4 GiB 大小限制的文件，RF64 对 WAV 格式进行了扩展。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".aiff",
+            "lines": [
+              "AIFF 是基于 IFF 格式的苹果公司音频容器，常用于存储未压缩的 PCM 音频。GlitchScope 通过 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".aif",
+            "lines": [
+              "AIF 是 AIFF 音频文件的另一种文件扩展名。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".aifc",
+            "lines": [
+              "AIFC 是 AIFF 容器格式的压缩音频版本。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".caf",
+            "lines": [
+              "CAF 是苹果公司用于存储音频及元数据的 Core Audio 格式容器。GlitchScope 通过 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".m4a",
+            "lines": [
+              "M4A 是一种以音频为主的 MP4 容器格式，通常存储 AAC 或 ALAC 音频。GlitchScope 使用 FFmpeg 对其音频流进行解码。"
+            ]
+          },
+          {
+            "title": ".m4b",
+            "lines": [
+              "M4B 是一种 MP4 音频容器，常用于有声书及章节元数据。GlitchScope 使用 FFmpeg 对其音频流进行解码。"
+            ]
+          },
+          {
+            "title": ".mp4",
+            "lines": [
+              "MP4 是一种 ISO 基础媒体容器，可用于存储音频、视频及元数据。GlitchScope 会通过 FFmpeg 播放其支持的音频流。"
+            ]
+          },
+          {
+            "title": ".mov",
+            "lines": [
+              "MOV 是 Apple 的 QuickTime 容器格式，用于存储音频、视频及元数据。GlitchScope 会通过 FFmpeg 播放其支持的音频流。"
+            ]
+          },
+          {
+            "title": ".mka",
+            "lines": [
+              "MKA 是 Matroska 容器专用的音频导向文件扩展名。GlitchScope 会使用 FFmpeg 对其音频流进行解码。"
+            ]
+          },
+          {
+            "title": ".mkv",
+            "lines": [
+              "MKV 是一种 Matroska 多媒体容器格式。GlitchScope 会通过 FFmpeg 播放其支持的音频流。"
+            ]
+          },
+          {
+            "title": ".webm",
+            "lines": [
+              "WebM 是一种基于 Matroska 的受限容器格式，通常用于存储 Opus 或 Vorbis 音频。GlitchScope 通过 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".wma",
+            "lines": [
+              "WMA 文件采用 Windows Media Audio 编码格式，通常存储在 ASF 容器中。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".asf",
+            "lines": [
+              "ASF 是微软开发的 Advanced Systems Format 容器格式，通常用于存储 WMA 音频。GlitchScope 会使用 FFmpeg 对其音频流进行解码。"
+            ]
+          },
+          {
+            "title": ".amr",
+            "lines": [
+              "AMR 是一种用于移动电话通话的语音编码格式，常见类型为 AMR-NB 和 AMR-WB。GlitchScope 通过 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".ape",
+            "lines": [
+              "APE 即 Monkey's Audio，是一种无损音频格式。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".tta",
+            "lines": [
+              "TTA 即 True Audio，是一种无损音频格式。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".wv",
+            "lines": [
+              "WV 即 WavPack，是一种无损或混合型的音频格式。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".mpc",
+            "lines": [
+              "MPC 即 Musepack，是一种专为音乐设计的有损音频格式。GlitchScope 使用 FFmpeg 对其进行解码。"
+            ]
+          },
+          {
+            "title": ".ts",
+            "lines": [
+              "TS 是一种用于广播及录制媒体的 MPEG 传输流容器。GlitchScope 会通过 FFmpeg 播放其支持的音频流。"
+            ]
+          },
+          {
+            "title": ".m2ts",
+            "lines": [
+              "M2TS 是一种类似蓝光格式的 MPEG 传输流容器。GlitchScope 会通过 FFmpeg 播放其支持的音频流。"
+            ]
+          },
+          {
+            "title": ".ra",
+            "lines": [
+              "RA 是 RealAudio 文件或流容器。GlitchScope 会使用 FFmpeg 对受支持的 RealAudio 编码进行解码。"
+            ]
+          },
+          {
+            "title": ".rm",
+            "lines": [
+              "RM 是一种 RealMedia 容器格式，可能包含 RealAudio 音频。GlitchScope 会通过 FFmpeg 播放其支持的音频流。"
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Tracker 格式",
+        "children": [
+          {
+            "title": ".mod",
+            "lines": [
+              "MOD系列模块。GlitchScope使用libxmp来解码此格式。"
+            ]
+          },
+          {
+            "title": ".xm",
+            "lines": [
+              "FastTracker II 扩展模块。GlitchScope 使用 libxmp 对该扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".it",
+            "lines": [
+              "Impulse Tracker 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".s3m",
+            "lines": [
+              "Scream Tracker 3 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".mptm",
+            "lines": [
+              "OpenMPT 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".stm",
+            "lines": [
+              "Scream Tracker 2 模块。GlitchScope 使用 libxmp 对此扩展名进行解码。"
+            ]
+          },
+          {
+            "title": ".nst",
+            "lines": [
+              "NoiseTracker 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".wow",
+            "lines": [
+              "Mod's Grave 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".ult",
+            "lines": [
+              "UltraTracker 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".669",
+            "lines": [
+              "669 编曲器或 UNIS 669 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".mtm",
+            "lines": [
+              "MultiTracker 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".med",
+            "lines": [
+              "MED 或 OctaMED 模块。GlitchScope 使用 libxmp 对该扩展名进行解码。"
+            ]
+          },
+          {
+            "title": ".far",
+            "lines": [
+              "Farandole 作曲模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".mdl",
+            "lines": [
+              "Digitrakker 模块。GlitchScope 使用 libxmp 对此扩展名进行解码。"
+            ]
+          },
+          {
+            "title": ".ams",
+            "lines": [
+              "Extreme 的 Tracker 或 Velvet Studio 模块。GlitchScope 使用 libxmp 对此文件扩展名进行解码。"
+            ]
+          },
+          {
+            "title": ".dsm",
+            "lines": [
+              "DSIK 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".amf",
+            "lines": [
+              "Asylum 或 DSMI 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".okt",
+            "lines": [
+              "Oktalyzer 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".dmf",
+            "lines": [
+              "数字追踪器或 DefleMask 模块。GlitchScope 使用 libopenmpt 对此格式进行解码，必要时则会转而使用 libxmp。"
+            ]
+          },
+          {
+            "title": ".ptm",
+            "lines": [
+              "Poly Tracker 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".psm",
+            "lines": [
+              "ProTracker Studio 或 Epic 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".mt2",
+            "lines": [
+              "MadTracker 2 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".dbm",
+            "lines": [
+              "DigiBooster Pro 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".abk",
+            "lines": [
+              "AMOS 音乐库模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".digi",
+            "lines": [
+              "DIGI Booster 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".dtt",
+            "lines": [
+              "数字追踪器模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".flx",
+            "lines": [
+              "FlexTrax 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".gtk",
+            "lines": [
+              "Graoumf Tracker 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".imf",
+            "lines": [
+              "Imago Orpheus 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".liq",
+            "lines": [
+              "Liquid Tracker 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".masi",
+            "lines": [
+              "Epic MegaGames 的 MASI 模块。GlitchScope 使用 libxmp 对该扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".mgt",
+            "lines": [
+              "Megatracker 模块。GlitchScope 使用 libxmp 对此扩展名进行解码。"
+            ]
+          },
+          {
+            "title": ".mmd",
+            "lines": [
+              "MED 或 OctaMED MMD 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".mmdc",
+            "lines": [
+              "压缩后的 MED 模块。GlitchScope 使用 libxmp 对该扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".mmcmp",
+            "lines": [
+              "经 MMCMP 压缩的模块文件。GlitchScope 使用 libxmp 对该扩展名进行解码。"
+            ]
+          },
+          {
+            "title": ".muse",
+            "lines": [
+              "包含 MUSE 模块的文件。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".nt",
+            "lines": [
+              "NoiseTracker 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".pmd",
+            "lines": [
+              "兼容 ProTracker 的模块。GlitchScope 使用 libxmp 对此格式进行解码。"
+            ]
+          },
+          {
+            "title": ".ppm",
+            "lines": [
+              "ProTracker Packer 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".pru",
+            "lines": [
+              "Prorunner 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".pt36",
+            "lines": [
+              "ProTracker 3.6 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".rh",
+            "lines": [
+              "Rob Hubbard 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".rtm",
+            "lines": [
+              "Real Tracker 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".sfx",
+            "lines": [
+              "SoundFX 模块。GlitchScope 使用 libxmp 对此扩展名进行解码。"
+            ]
+          },
+          {
+            "title": ".sfx2",
+            "lines": [
+              "SoundFX 2 模块。GlitchScope 使用 libxmp 对该文件格式进行解码。"
+            ]
+          },
+          {
+            "title": ".stim",
+            "lines": [
+              "Slamtilt 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".stx",
+            "lines": [
+              "STMIK 模块。GlitchScope 使用 libxmp 对此扩展名进行解码。"
+            ]
+          },
+          {
+            "title": ".tcb",
+            "lines": [
+              "TCB 跟踪器模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".tdd",
+            "lines": [
+              "The Dark Demon 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".tp",
+            "lines": [
+              "Tracker Packer 模块。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".uni",
+            "lines": [
+              "UNI 模块。GlitchScope 使用 libxmp 对此扩展名进行解码。"
+            ]
+          },
+          {
+            "title": ".xd",
+            "lines": [
+              "FastTracker II 模块变体。GlitchScope 使用 libxmp 对此扩展格式进行解码。"
+            ]
+          },
+          {
+            "title": ".mo3",
+            "lines": [
+              "MO3压缩模块。GlitchScope会使用libopenmpt来解码此格式的文件，必要时则会转而使用libxmp进行解码。"
+            ]
+          },
+          {
+            "title": ".ktm",
+            "lines": [
+              "空手道模块。GlitchScope 使用 libopenmpt 对该格式进行解码，必要时则会转而使用 libxmp。"
+            ]
+          },
+          {
+            "title": ".ims",
+            "lines": [
+              "Velvet Studio 模块。GlitchScope 使用 libopenmpt 对该格式进行解码，必要时会转而使用 libxmp。"
+            ]
+          },
+          {
+            "title": ".mdc",
+            "lines": [
+              "Megadrive 跟踪器模块。GlitchScope 使用 libopenmpt 对该格式进行解码，必要时则会转而使用 libxmp。"
+            ]
+          },
+          {
+            "title": ".txn",
+            "lines": [
+              "MadTracker 2 模块。GlitchScope 使用 libopenmpt 对该格式进行解码，必要时则会转而使用 libxmp。"
+            ]
+          }
+        ]
+      },
+      {
+        "title": "芯片音乐",
+        "children": [
+          {
+            "title": ".ay",
+            "lines": [
+              "AY 格式将 ZX Spectrum 或 Amstrad CPC 音乐以 Z80 程序数据的形式存储，以便在 AY 系列音效硬件上播放。GlitchScope 通过 Game Music Emu 功能来播放这类文件。"
+            ]
+          },
+          {
+            "title": ".nsf",
+            "lines": [
+              "NSF 文件用于存储 Nintendo NES 或 Famicom 的音乐代码与数据，以便进行模拟播放。GlitchScope 通过 Game Music Emu 模块来播放这些文件。"
+            ]
+          },
+          {
+            "title": ".nsfe",
+            "lines": [
+              "NSFE 是一种可扩展的 NSF 变体，具备分块式的元数据与播放列表信息。GlitchScope 通过 Game Music Emu 播放该格式的文件。"
+            ]
+          },
+          {
+            "title": ".spc",
+            "lines": [
+              "SPC 是超级任天堂或超级Famicom游戏机音频子系统的快照。GlitchScope通过Game Music Emu来播放这种格式的音频文件。"
+            ]
+          },
+          {
+            "title": ".gbs",
+            "lines": [
+              "GBS 文件用于存储 Nintendo Game Boy 的音乐代码与数据，以便进行模拟播放。GlitchScope 通过 Game Music Emu 模块来播放这类文件。"
+            ]
+          },
+          {
+            "title": ".hes",
+            "lines": [
+              "HES 文件用于存储 PC Engine 或 TurboGrafx-16 的音乐代码与数据，以便进行模拟播放。GlitchScope 通过 Game Music Emu 模块来播放这些文件。"
+            ]
+          },
+          {
+            "title": ".kss",
+            "lines": [
+              "KSS 格式用于存储基于 PSG 或 SCC 音频技术的 MSX 及其他 Z80 系统的音乐文件。GlitchScope 通过 Game Music Emu 播放这类文件；该播放引擎不支持 FM 音效。"
+            ]
+          },
+          {
+            "title": ".sap",
+            "lines": [
+              "SAP 文件用于存储 Atari 8 位音乐代码以及 POKEY 音频芯片所需的数据。GlitchScope 通过游戏音乐模拟器功能来播放这些内容。"
+            ]
+          },
+          {
+            "title": ".vgm",
+            "lines": [
+              "VGM 用于记录发送至游戏机、街机及电脑中音效芯片的指令。GlitchScope 能通过 Game Music Emu 播放兼容的 VGM 音效芯片音频。"
+            ]
+          },
+          {
+            "title": ".vgz",
+            "lines": [
+              "VGZ 是经过 gzip 压缩的 VGM 文件。GlitchScope 会通过 Game Music Emu 对其进行解压并播放。"
+            ]
+          },
+          {
+            "title": ".sid",
+            "lines": [
+              "SID 文件用于存储 Commodore 64 的音乐代码以及 SID 芯片所需的数据；PSID 是其常见的变体形式。GlitchScope 会通过 cRSID 格式来播放这类文件。"
+            ]
+          },
+          {
+            "title": ".rsid",
+            "lines": [
+              "RSID 是一种更为严格的 SID 变体，专为需要更完整 Commodore 64 行为特性的曲目设计。GlitchScope 会使用 cRSID 格式来播放此类文件。"
+            ]
+          },
+          {
+            "title": ".vtx",
+            "lines": [
+              "VTX 格式用于存储经过压缩的 AY-3-8910 或 YM2149 寄存器数据，这类文件多由 Vortex Tracker 生成。GlitchScope 通过其内置的 VTX 解析器与 ayumi 模块来播放此类文件。"
+            ]
+          },
+          {
+            "title": ".pt3",
+            "lines": [
+              "PT3 是专为 AY-3-8910 或 YM2149 音频芯片设计的 Pro Tracker 3 模块。GlitchScope 通过 pt3player 与 ayumi 工具来播放该格式的文件。"
+            ]
+          },
+          {
+            "title": ".ym",
+            "lines": [
+              "YM 格式用于存储 Atari ST 风格的 YM2149 寄存器数据，存在多种格式版本。GlitchScope 会通过 StSound 播放此类文件。"
+            ]
+          },
+          {
+            "title": ".lh",
+            "lines": [
+              "LH 是用于处理经 LHA 压缩的 YM 音乐的旧版扩展格式。GlitchScope 会通过 StSound 对其进行解压并播放。"
+            ]
+          },
+          {
+            "title": ".lha",
+            "lines": [
+              "LHA 压缩包中可能包含经过压缩的 YM 音乐。GlitchScope 会使用 StSound 来播放支持的 YM 压缩包。"
+            ]
+          },
+          {
+            "title": ".ahx",
+            "lines": [
+              "AHX 是一种 Amiga 风格的芯片音乐模块，它基于合成乐器而非采样音频制作。GlitchScope 会使用 HivelyTracker 播放器来播放此类文件。"
+            ]
+          },
+          {
+            "title": ".hvl",
+            "lines": [
+              "HVL 是 HivelyTracker 模块格式，它在 AHX 的基础上增加了更多追踪器功能。GlitchScope 通过 HivelyTracker 播放器来播放该格式的文件。"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "设备",
+    "lines": []
+  },
+  {
+    "id": 8,
+    "title": "关于",
+    "lines": [
+      "**GlitchScope**",
+      "一款专为 Linux 手持设备与桌面电脑设计的音乐播放器及实时 MilkDrop 视觉化工具。",
+      "",
+      "可播放本地音频、tracker 模块以及经典游戏音乐格式的文件，还能浏览 Modland 和 ModArchive 目录中的内容。",
+      "视觉效果由 projectM 负责渲染，而音频则由针对不同格式选定的专用开源解码引擎进行解码。",
+      "",
+      "性能模式、平衡模式与节能模式会根据设备性能调整视觉效果质量。如仅需播放音乐，也可关闭视觉化效果。",
+      "",
+      "**Project**",
+      "https://github.com/dendec/glitchscope",
+      "本软件采用 GPL-2.0 或更高版本许可证授权。"
+    ]
+  },
+  {
+    "id": 9,
+    "title": "许可证",
+    "children": [
+      {
+        "title": "projectM",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/projectM-visualizer/projectm",
+          "Copyright (C) 2003-2009 projectM Team"
+        ]
+      },
+      {
+        "title": "SoLoud",
+        "lines": [
+          "zlib",
+          "https://github.com/jarikomppa/soloud",
+          "Copyright (c) 2013-2018 Jari Komppa"
+        ]
+      },
+      {
+        "title": "FFmpeg",
+        "lines": [
+          "LGPL-2.1+",
+          "https://ffmpeg.org/",
+          "Copyright (c) FFmpeg developers"
+        ]
+      },
+      {
+        "title": "libxmp",
+        "lines": [
+          "MIT",
+          "https://github.com/libxmp/libxmp",
+          "Copyright (C) 1996-2026 Claudio Matsuoka and Hipolito Carraro Jr"
+        ]
+      },
+      {
+        "title": "libopenmpt",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/OpenMPT/openmpt",
+          "Copyright (c) Olivier Lapicque (1997-2003), OpenMPT contributors (2004-2025)"
+        ]
+      },
+      {
+        "title": "game-music-emu",
+        "lines": [
+          "LGPL-2.1",
+          "https://github.com/libgme/game-music-emu",
+          "Copyright (c) Shay Green"
+        ]
+      },
+      {
+        "title": "ayumi",
+        "lines": [
+          "MIT",
+          "https://github.com/true-grue/ayumi",
+          "Copyright (c) Peter Sovietov"
+        ]
+      },
+      {
+        "title": "pt3player",
+        "lines": [
+          "MIT",
+          "https://github.com/Volutar/pt3player",
+          "Copyright (c) 2023 Volutar"
+        ]
+      },
+      {
+        "title": "libstsound",
+        "lines": [
+          "BSD-2-Clause",
+          "https://github.com/cpcsdk/libstsound",
+          "Copyright holders: Leonard/Oxygene et al."
+        ]
+      },
+      {
+        "title": "Hively",
+        "lines": [
+          "MIT",
+          "https://github.com/tildearrow/foo-input-hvl",
+          "Copyright (c) 2006-2015 Xeron/IRIS, 2008-2015 Christopher Snowhill"
+        ]
+      },
+      {
+        "title": "cRSID",
+        "lines": [
+          "WTFPL",
+          "https://www.rockbox.org/",
+          "Copyright (c) Hermit (Mihaly Horvath)"
+        ]
+      },
+      {
+        "title": "klauspost/compress (Zstandard)",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/klauspost/compress",
+          "Copyright (c) 2012 The Go Authors, 2019 Klaus Post"
+        ]
+      },
+      {
+        "title": "go-sdl2",
+        "lines": [
+          "BSD-3-Clause",
+          "https://github.com/veandco/go-sdl2",
+          "Copyright (c) 2013 Go-SDL2 Authors"
+        ]
+      },
+      {
+        "title": "SDL2",
+        "lines": [
+          "zlib",
+          "https://libsdl.org/",
+          "Copyright (C) 1997-2026 Sam Lantinga"
+        ]
+      },
+      {
+        "title": "x/image",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/image",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "x/text",
+        "lines": [
+          "BSD-3-Clause",
+          "https://pkg.go.dev/golang.org/x/text",
+          "Copyright (c) 2009 The Go Authors"
+        ]
+      },
+      {
+        "title": "libogg",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/ogg/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libvorbis",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/vorbis/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "libFLAC",
+        "lines": [
+          "BSD-3-Clause",
+          "https://xiph.org/flac/",
+          "Copyright (c) Xiph.Org Foundation"
+        ]
+      },
+      {
+        "title": "mpg123",
+        "lines": [
+          "LGPL-2.1",
+          "https://www.mpg123.de/",
+          "Copyright (c) mpg123 contributors"
+        ]
+      },
+      {
+        "title": "zlib",
+        "lines": [
+          "zlib",
+          "https://zlib.net/",
+          "Copyright (c) Jean-loup Gailly and Mark Adler"
+        ]
+      },
+      {
+        "title": "GNU Unifont",
+        "lines": [
+          "GPL-2.0+ with font embedding exception",
+          "https://unifoundry.com/unifont/",
+          "Copyright (c) GNU Unifont contributors"
+        ]
+      },
+      {
+        "title": "PortsMaster Device-Info",
+        "lines": [
+          "MIT",
+          "https://github.com/PortsMaster/Device-Info",
+          "Copyright (c) PortsMaster contributors"
+        ]
+      }
+    ]
+  }
+]

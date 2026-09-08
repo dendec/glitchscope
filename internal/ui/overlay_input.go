@@ -191,7 +191,7 @@ func (o *Overlay) moveCursor(dir int) {
 				o.helpMoveTopic(dir)
 			}
 		} else {
-			topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+			topic := o.helpTopic(HelpTopicID(o.helpView.TopicCursor))
 			next := o.helpView.ContentTop + dir
 			maxTop := o.helpMaxContentTop(topic)
 			if next >= 0 && next <= maxTop {
@@ -484,7 +484,7 @@ func (o *Overlay) Select() bool {
 			o.enterHelpChildren()
 		} else if o.focusPanel == 0 && o.helpView.InChildren && !o.helpView.InGrandChildren {
 			// check if current entry has sub-entries (categories with children)
-			topic := helpTopic(HelpTopicID(o.helpView.TopicCursor))
+			topic := o.helpTopic(HelpTopicID(o.helpView.TopicCursor))
 			if o.helpView.EntryCursor >= 0 && o.helpView.EntryCursor < len(topic.Children) {
 				entry := topic.Children[o.helpView.EntryCursor]
 				if len(entry.Children) > 0 {

@@ -23,11 +23,38 @@ if [ ! -f "$FULL_FONT" ]; then
 fi
 
 UNICODES=$(python3 -c "import json; print(','.join(json.load(open('$RANGES_JSON'))))")
+TEXT_FILE=$(mktemp)
+trap 'rm -f "$TEXT_FILE"' EXIT
+python3 - "$TEXT_FILE" internal/i18n/assets/*.json internal/ui/assets/help.json <<'PY'
+import json
+import sys
+
+
+def strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for child in value.values():
+            yield from strings(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from strings(child)
+
+
+characters = set()
+for name in sys.argv[2:]:
+    with open(name, encoding="utf-8") as stream:
+        for text in strings(json.load(stream)):
+            characters.update(text)
+with open(sys.argv[1], "w", encoding="utf-8") as stream:
+    stream.write("".join(sorted(characters)))
+PY
 
 echo "=== Subsetting with ranges: $UNICODES ==="
 mkdir -p "$(dirname "$OUT_FONT")"
 python3 -m fontTools.subset "$FULL_FONT" \
-    --unicodes="$UNICODES" \
+	--unicodes="$UNICODES" \
+	--text-file="$TEXT_FILE" \
     --no-subset-tables+=OS/2 \
     --no-prune-unicode-ranges \
     --output-file="$OUT_FONT"

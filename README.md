@@ -14,6 +14,7 @@ Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing 
 - **Online Module Catalogs** — Browse Modland, yearly ModArchive additions, the 2007 official addendum, and the 1987-2007 ModArchive snapshot; bundled `1980-2007.gsa` and `2007-addendum.gsa` indexes provide offline navigation, while selected tracks are fetched individually with HTTP Range requests
 - **Preset Auto-Switch** — Configurable timer-based preset rotation (Off, 15s, 30s, 60s, 2m)
 - **UI & Themes** — Clean 2-column interface with nine distinct color themes and customizable overlay transparency
+- **Localized UI & Help** — English, Russian, Simplified/Traditional Chinese, Japanese, Korean, Vietnamese, Thai, Indonesian, Malay, Brazilian Portuguese, Spanish, German, French, and Turkish; switch languages in Settings without restarting
 - **Gamepad & Keyboard** — Full controller mapping optimized for PortMaster handhelds (TrimUI Smart Pro, Anbernic, Miyoo, etc.)
 
 ## Building
@@ -75,7 +76,8 @@ Settings are automatically saved to `config.json` next to the binary:
   "preset_interval": 30,
   "ui": {
     "theme": "dark",
-    "transparency": 0
+    "transparency": 0,
+    "language": "en"
   }
 }
 ```
