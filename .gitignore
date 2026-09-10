@@ -26,6 +26,7 @@ settings.json
 # full font downloaded at build, subset generated from it
 internal/ui/assets/unifont-full.otf
 internal/ui/assets/unifont.otf
+internal/ui/assets/icons/
 favorites.json
 favourites.json
 internal/soloud/soloud_test.go

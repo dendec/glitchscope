@@ -237,43 +237,50 @@ baseDir, пустой путь, путь == baseDir, удаление играю
 - Иконка источника является presentation-слоем и не входит в сравниваемый
   navigation label: внутреннее состояние хранит `sourceKind`.
 
-### 2.7 Icon font для источников
-Добавить второй монохромный шрифт для иконок, не заменяя Unifont. Unifont
-остаётся основным шрифтом текста, кириллицы и UI. Новый font face используется
-только для source markers и, при необходимости, будущих action markers.
+### 2.7 Bitmap-иконки главного меню Library
+Иконки пунктов Library — отдельные 1-bit PNG, а не glyphs основного Unifont.
+Исходники берутся из сабмодуля `lib/pixelarticons`; в приложение попадают только
+выбранные файлы из `internal/ui/icon_assets.json`:
 
-**Ограничение subset:** в приложение попадают только glyphs, реально
-используемые UI. Нельзя копировать полный icon font или Unicode-блок целиком.
-Создать отдельный manifest, например `internal/ui/icon_ranges.json`, со списком
-точных codepoints. Для первой версии нужны только иконки:
-- local filesystem / computer;
-- network / remote catalog;
-- radio;
-- microphone;
-- optional root/home marker, если он нужен отдельно от `/`.
+- `folder.svg` — Local music;
+- `heart.svg` — Favorites;
+- `mic.svg` — Microphone;
+- `radio.svg` — неактивная заглушка Radio;
+- `globe.svg` — Catalogs.
+- `music.svg`, `sparkles.svg`, `settings-cog.svg`, `circle-question.svg` —
+  индикатор страниц Library, Presets, Settings и Help.
+- `chevron-left.svg`, `chevron-right.svg` — границы переключателя страниц.
+- `star.svg`, `heart.svg`, `music.svg` — папки Star, Heart и Note в Favorites.
+- `play.svg`, `trash.svg` — кнопки Play и Delete в информационной панели.
 
-**Сборка и хранение:**
-- выбрать монохромный font с лицензией, совместимой с дистрибуцией проекта;
-- зафиксировать версию и источник полного font в `Dockerfile.builder`;
-- subset-ить полный font через `fontTools.subset` по `icon_ranges.json`;
-- сохранить результат в `internal/ui/assets/` и подключить через `go:embed`;
-- добавить лицензию и attribution в `portmaster/licenses/`;
-- не включать цветные emoji tables, variation-selector варианты и неиспользуемые
-  glyphs без отдельной необходимости.
+Перед сборкой `scripts/generate-icons.py` рендерит SVG через `rsvg-convert`,
+порогом alpha превращает его в бинарную маску и сохраняет белую фигуру с
+прозрачным фоном в `internal/ui/assets/icons/`. Генерируются размеры 16, 24 и
+36 px, соответствующие строкам UI на 480p, 720p и 1080p. Эти файлы являются
+производными и не коммитятся.
 
-**Рендеринг:**
-- добавить отдельный `iconFace` с тем же lifecycle, что и основной `face`;
-- закрывать его в `Overlay.Close` и пересоздавать при изменении размера;
-- измерять icon glyphs через `iconFace`, а текст — через `face`;
-- вынести генерацию icon texture в отдельный helper, не смешивая icon codepoint
-  с navigation labels;
-- проверить baseline, размер, контраст, clipping и fallback при отсутствии glyph.
+Генерация запускается в builder image и как отдельная цель `make icons`; цели
+`test`, `lint`, `dist` и `dist-arm64` зависят от неё. Генератор сначала собирает
+полный набор во временном каталоге, поэтому ошибка рендера не оставляет
+частично обновлённый assets-каталог. Лицензия и attribution Pixelarticons
+зафиксированы в `portmaster/licenses/THIRD_PARTY_LICENSES.md`.
 
-**Проверки:**
-- тест/скрипт проверяет, что каждый codepoint из manifest есть в итоговом OTF;
-- тест/скрипт проверяет отсутствие лишних codepoints сверх разрешённых диапазонов;
-- `make test`, `make lint`, `make dist` проходят с чистым и повторяемым font build;
-- визуально проверить root/source list на целевых разрешениях и на ARM-сборке.
+На этапе рендеринга UI иконка занимает ячейку текущей высоты строки, а не
+визуальную высоту буквы. При промежуточной высоте строки выбирается ближайший
+подготовленный bitmap-размер и он масштабируется до ячейки через `GL_NEAREST`;
+мыла от bilinear filtering не возникает. Метки Favorites справа занимают полную высоту строки; под них резервируется
+отдельная колонка и при сокращении имени, и при marquee. Кнопки Play/Delete
+используют общую раскладку в пикселях: cursor, иконка, отступ, label. Пробелы
+не используются для позиционирования bitmap относительно текста.
+Цвет и контрастный контур иконки
+совпадают с текстом текущей темы. Presentation-слой иконки не входит в
+navigation label: внутреннее состояние по-прежнему хранит source kind.
+Radio всегда присутствует в корне как неактивный пункт `Radio — unavailable`:
+он не создаёт navigation level и не связан с playback backend.
+Downloads использует `TrackCache.CachedVirtualPaths()` как read-only snapshot и
+показывает все сохранённые треки обоих каталогов в одном списке. Удаление и
+воспроизведение используют существующие catalog actions; отдельного cache-owner
+в UI нет.
 
 ### 2.8 Breadcrumbs и вход в каталоги — см. 2.6; right-pane info без Delete —
 этап 2.5+2.2; Play/Delete кнопки + confirm — после 2.3/2.4.

@@ -1,0 +1,65 @@
+{
+  "sizes": [16, 24, 36],
+  "icons": [
+    {
+      "name": "local-music",
+      "source": "lib/pixelarticons/svg/folder.svg"
+    },
+    {
+      "name": "favorite",
+      "source": "lib/pixelarticons/svg/heart.svg"
+    },
+    {
+      "name": "microphone",
+      "source": "lib/pixelarticons/svg/mic.svg"
+    },
+    {
+      "name": "radio",
+      "source": "lib/pixelarticons/svg/radio.svg"
+    },
+    {
+      "name": "catalogs",
+      "source": "lib/pixelarticons/svg/globe.svg"
+    },
+    {
+      "name": "library",
+      "source": "lib/pixelarticons/svg/music.svg"
+    },
+    {
+      "name": "presets",
+      "source": "lib/pixelarticons/svg/sparkles.svg"
+    },
+    {
+      "name": "settings",
+      "source": "lib/pixelarticons/svg/settings-cog.svg"
+    },
+    {
+      "name": "help",
+      "source": "lib/pixelarticons/svg/circle-question.svg"
+    },
+    {
+      "name": "play",
+      "source": "lib/pixelarticons/svg/play.svg"
+    },
+    {
+      "name": "delete",
+      "source": "lib/pixelarticons/svg/trash.svg"
+    },
+    {
+      "name": "star",
+      "source": "lib/pixelarticons/svg/star.svg"
+    },
+    {
+      "name": "page-prev",
+      "source": "lib/pixelarticons/svg/chevron-left.svg"
+    },
+    {
+      "name": "page-next",
+      "source": "lib/pixelarticons/svg/chevron-right.svg"
+    },
+    {
+      "name": "downloads",
+      "source": "lib/pixelarticons/svg/download.svg"
+    }
+  ]
+}

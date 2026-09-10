@@ -164,8 +164,8 @@ func (c *TrackCache) Delete(virtualPath string) error {
 }
 
 // Prune enforces age and size limits using least-recently-used order. The
-// protected virtual path is never removed (normally the playing track).
-func (c *TrackCache) Prune(retention time.Duration, keepForever bool, maxBytes int64, protected string) error {
+// protected virtual paths are never removed (playing track and favorites).
+func (c *TrackCache) Prune(retention time.Duration, keepForever bool, maxBytes int64, protectedVirtualPaths []string) error {
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
 	if !c.initialized {
@@ -177,14 +177,20 @@ func (c *TrackCache) Prune(retention time.Duration, keepForever bool, maxBytes i
 	if listErr != nil {
 		return listErr
 	}
-	protectedPath := c.LocalPath(protected)
+	protectedPaths := make(map[string]struct{}, len(protectedVirtualPaths))
+	for _, virtualPath := range protectedVirtualPaths {
+		if path := c.LocalPath(virtualPath); path != "" && path != virtualPath {
+			protectedPaths[path] = struct{}{}
+		}
+	}
 	now := time.Now()
 	remaining := files[:0]
 	var total int64
 	var errs []error
 	for _, file := range files {
 		expired := !keepForever && (retention == 0 || now.Sub(file.usedAt) >= retention)
-		if expired && file.path != protectedPath {
+		_, protected := protectedPaths[file.path]
+		if expired && !protected {
 			if err := os.Remove(file.path); err != nil {
 				errs = append(errs, fmt.Errorf("remove expired %s: %w", file.path, err))
 				remaining = append(remaining, file)
@@ -201,7 +207,7 @@ func (c *TrackCache) Prune(retention time.Duration, keepForever bool, maxBytes i
 			if total <= maxBytes {
 				break
 			}
-			if file.path == protectedPath {
+			if _, protected := protectedPaths[file.path]; protected {
 				continue
 			}
 			if err := os.Remove(file.path); err != nil {

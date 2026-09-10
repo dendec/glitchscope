@@ -123,7 +123,7 @@ func BuildSettingsRowsWithCatalog(s config.Settings, winW, winH int, catalog i18
 		{Label: catalog.Text(i18n.SettingsTheme), Values: themeValues, Index: themeIndex},
 		{Label: catalog.Text(i18n.SettingsTransparency), Values: transValues, Index: transIndex},
 		{Label: catalog.Text(i18n.SettingsStats), Values: []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueOn)}, Index: boolIndex(s.UI.ShowStats)},
-		{Header: true, Label: "── " + catalog.Text(i18n.SettingsCache) + " ───────"},
+		{Header: true, Label: "── " + catalog.Text(i18n.SourceDownloads) + " ───────"},
 		{Label: catalog.Text(i18n.SettingsSize), Values: cacheSizeValues, Index: cacheSizeIndex},
 		{Label: catalog.Text(i18n.SettingsLifetime), Values: cacheRetentionValues, Index: cacheRetentionIndex},
 	}
@@ -230,13 +230,17 @@ func settingDescription(catalog i18n.Catalog, setting, value int) string {
 		}
 	case SettingCacheRetention:
 		if value == 0 {
-			return catalog.Text(i18n.DescriptionCacheSession)
+			return downloadsDescription(catalog, i18n.DescriptionCacheSession)
 		}
-		return catalog.Text(i18n.DescriptionCacheRetention)
+		return downloadsDescription(catalog, i18n.DescriptionCacheRetention)
 	case SettingCacheSize:
-		return catalog.Text(i18n.DescriptionCacheSize)
+		return downloadsDescription(catalog, i18n.DescriptionCacheSize)
 	}
 	return ""
+}
+
+func downloadsDescription(catalog i18n.Catalog, policyKey i18n.Key) string {
+	return catalog.Text(policyKey) + " " + catalog.Text(i18n.InfoFavoritesStayOffline)
 }
 
 func performanceTextKeys(mode config.PerformanceMode) (i18n.Key, i18n.Key) {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/mic"
 	"github.com/dendec/glitchscope/internal/player"
@@ -186,6 +187,12 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 
 func (a *App) deleteCachedTrack(path string) {
 	if a.trackCache == nil || !a.trackCache.IsCached(path) {
+		return
+	}
+	if a.favorites != nil && a.favorites.GetPlaylist(path) != "" {
+		if a.overlay != nil {
+			a.overlay.ShowMessage(i18n.InfoFavoritesStayOffline)
+		}
 		return
 	}
 	if a.pl != nil && a.pl.TrackPath() == path {

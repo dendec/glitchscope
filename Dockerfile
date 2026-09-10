@@ -12,11 +12,17 @@ COPY internal/ internal/
 COPY lib/ lib/
 COPY test_data/ test_data/
 COPY portmaster/ portmaster/
+COPY scripts/ scripts/
 
 # Use the generated font subset copied with the source tree.  Do not replace it
 # with the builder image's cached font: the subset depends on the current locale
 # assets and internal/ui/font_ranges.json.
 RUN test -s internal/ui/assets/unifont.otf
+
+# Rasterize the selected Pixelarticons into the binary assets used by the UI.
+RUN python3 scripts/generate-icons.py \
+    --manifest internal/ui/icon_assets.json \
+    --output internal/ui/assets/icons
 
 # Build Go app for target architecture
 RUN --mount=type=cache,target=/root/.cache/go-build \

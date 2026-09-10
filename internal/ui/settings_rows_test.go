@@ -14,7 +14,7 @@ func TestSettingsRowsUseCompactSectionsAndLabels(t *testing.T) {
 		"── Playback ────", "Shuffle", "Repeat",
 		"── Visualization ──", "Performance", "Visualizer", "Rotation", "Resolution", "Filter", "Sensitivity",
 		"── Appearance ───", "Language", "Theme", "Transparency", "Stats",
-		"── Cache ───────", "Size", "Keep for",
+		"── Downloads ───────", "Size", "Keep for",
 	}
 	if len(rows) != len(want) {
 		t.Fatalf("settings rows = %d, want %d", len(rows), len(want))

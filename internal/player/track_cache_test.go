@@ -28,7 +28,7 @@ func TestTrackCachePruneAgeAndProtectedTrack(t *testing.T) {
 	keepPath := filepath.Join(base, ".cache", "modland", "files", "MOD", "playing.mod")
 	writeCacheFile(t, oldPath, 8, time.Now().Add(-48*time.Hour))
 	writeCacheFile(t, keepPath, 8, time.Now().Add(-48*time.Hour))
-	if err := cache.Prune(24*time.Hour, false, 0, ModlandPrefix+"MOD/playing.mod"); err != nil {
+	if err := cache.Prune(24*time.Hour, false, 0, []string{ModlandPrefix + "MOD/playing.mod"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
@@ -46,7 +46,7 @@ func TestTrackCachePruneUsesLRUForSize(t *testing.T) {
 	newer := filepath.Join(base, ".cache", "modarchive", "files", "newer.mod")
 	writeCacheFile(t, older, 8, time.Now().Add(-time.Hour))
 	writeCacheFile(t, newer, 8, time.Now())
-	if err := cache.Prune(0, true, 8, ""); err != nil {
+	if err := cache.Prune(0, true, 8, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(older); !os.IsNotExist(err) {
@@ -54,6 +54,25 @@ func TestTrackCachePruneUsesLRUForSize(t *testing.T) {
 	}
 	if _, err := os.Stat(newer); err != nil {
 		t.Fatalf("newest path removed: %v", err)
+	}
+}
+
+func TestTrackCachePruneSizePreservesAllProtectedDownloads(t *testing.T) {
+	base := t.TempDir()
+	cache := NewTrackCache(base)
+	protectedOld := filepath.Join(base, ".cache", "modland", "files", "MOD", "favorite.mod")
+	unprotectedNew := filepath.Join(base, ".cache", "modland", "files", "MOD", "other.mod")
+	writeCacheFile(t, protectedOld, 8, time.Now().Add(-time.Hour))
+	writeCacheFile(t, unprotectedNew, 8, time.Now())
+
+	if err := cache.Prune(0, true, 8, []string{ModlandPrefix + "MOD/favorite.mod"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(protectedOld); err != nil {
+		t.Fatalf("favorite download removed: %v", err)
+	}
+	if _, err := os.Stat(unprotectedNew); !os.IsNotExist(err) {
+		t.Fatalf("unprotected download still exists: %v", err)
 	}
 }
 

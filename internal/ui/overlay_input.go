@@ -567,10 +567,10 @@ func (o *Overlay) Select() bool {
 					o.switchToNC(o.musicDir)
 				case sourceMicrophone:
 					o.micMenuRequested = true
-				case sourceFavorites:
+				case sourceFavorites, sourceDownloads, sourceModland, sourceModArchive:
 					o.switchToProvider(e.source)
-				case sourceModland, sourceModArchive:
-					o.switchToProvider(e.source)
+				case sourceRadio:
+					// Placeholder only. Keep focus in the source menu.
 				}
 				return false
 			case e.kind == entryFavoriteFolder:

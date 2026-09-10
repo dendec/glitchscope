@@ -335,7 +335,7 @@ func (a *App) Init() {
 	a.initFavorites()
 	a.deleteSvc = newDeleteService(baseDir())
 	if a.overlay != nil {
-		a.overlay.SetTrackCacheLookup(a.trackCache.IsCached, a.trackCache.HasDescendant)
+		a.overlay.SetTrackCacheLookup(a.trackCache.IsCached, a.trackCache.HasDescendant, a.trackCache.CachedVirtualPaths)
 	}
 	if a.deleteSvc.baseErr != nil {
 		slog.Error("delete service unavailable", "error", a.deleteSvc.baseErr)
@@ -578,9 +578,14 @@ func (a *App) pruneTrackCache() {
 		return
 	}
 	policy := a.settings.TrackCache
-	protected := ""
+	protected := make([]string, 0, 8)
 	if a.pl != nil {
-		protected = a.pl.TrackPath()
+		protected = append(protected, a.pl.TrackPath())
+	}
+	if a.favorites != nil {
+		for _, spec := range player.PlaylistSpecs() {
+			protected = append(protected, a.favorites.Tracks(spec.ID)...)
+		}
 	}
 	if err := a.trackCache.Prune(policy.Retention.Duration(), policy.Retention == config.CacheForever, int64(policy.MaxBytes), protected); err != nil {
 		slog.Warn("track cache cleanup", "error", err)

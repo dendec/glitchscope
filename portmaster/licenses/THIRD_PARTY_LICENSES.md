@@ -78,6 +78,11 @@ This file contains license information for all third-party libraries used in gli
 **License:** MIT
 **Source:** https://github.com/PortsMaster/Device-Info
 
+## Pixelarticons
+**License:** MIT
+**Source:** https://github.com/halfmage/pixelarticons
+**Used for:** rasterized 1-bit UI source icons
+
 ---
 
 ## License Compatibility

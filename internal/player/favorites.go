@@ -35,27 +35,26 @@ var playlistOrder = []PlaylistID{PlaylistStar, PlaylistHeart, PlaylistNote}
 
 // PlaylistSpec describes one favorites playlist for UI display.
 type PlaylistSpec struct {
-	ID     PlaylistID
-	Symbol rune
-	Label  string
+	ID    PlaylistID
+	Label string
 }
 
 // playlistSpecs is the canonical list of playlists with their display metadata.
 var playlistSpecs = []PlaylistSpec{
-	{PlaylistStar, '★', "Star"},
-	{PlaylistHeart, '♥', "Heart"},
-	{PlaylistNote, '♪', "Note"},
+	{PlaylistStar, "Star"},
+	{PlaylistHeart, "Heart"},
+	{PlaylistNote, "Note"},
 }
 
 // PlaylistSpecs returns the canonical playlist specifications. The caller must
 // not modify the returned slice.
 func PlaylistSpecs() []PlaylistSpec { return playlistSpecs }
 
-// PlaylistSymbol returns the symbol for a playlist ID, or "" if unknown.
-func PlaylistSymbol(id PlaylistID) string {
-	for _, s := range playlistSpecs {
-		if s.ID == id {
-			return string(s.Symbol)
+// PlaylistLabel returns the display name for a playlist ID, or an empty string.
+func PlaylistLabel(id PlaylistID) string {
+	for _, spec := range playlistSpecs {
+		if spec.ID == id {
+			return spec.Label
 		}
 	}
 	return ""
@@ -176,17 +175,6 @@ func normalisePath(track string) (string, error) {
 // GetPlaylist returns which playlist the track belongs to, or empty string.
 func (f *Favorites) GetPlaylist(trackPath string) PlaylistID {
 	return f.lookup[trackPath]
-}
-
-// Symbol returns the display symbol for the track's playlist, or "".
-func (f *Favorites) Symbol(trackPath string) string {
-	id := f.lookup[trackPath]
-	for _, spec := range playlistSpecs {
-		if spec.ID == id {
-			return string(spec.Symbol)
-		}
-	}
-	return ""
 }
 
 // Tracks returns a copy of the track list for the given playlist.

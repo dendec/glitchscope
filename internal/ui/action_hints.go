@@ -235,7 +235,7 @@ func (o *Overlay) libraryHints() []UIHint {
 	if o.focusPanel == 1 {
 		if e := o.currentEntry(); e != nil && e.IsCatalogTrack() && o.isTrackCached != nil && o.isTrackCached(e.filePath) {
 			return []UIHint{
-				{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionDeleteCache)},
+				{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionDeleteDownload)},
 				{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionLeft)},
 			}
 		}
@@ -259,8 +259,7 @@ func (o *Overlay) libraryHints() []UIHint {
 	if o.HasPlayableTrack() && o.favoritesView != nil {
 		e := o.currentEntry()
 		if e != nil {
-			sym := o.favoritesView.Symbol(e.filePath)
-			if sym != "" {
+			if o.favoritesView.GetPlaylist(e.filePath) != "" {
 				hints = append(hints, UIHint{Key: o.controlLabel(hintFavorite), Label: o.catalog.Text(i18n.ActionRemove)})
 			} else {
 				hints = append(hints, UIHint{Key: o.controlLabel(hintFavorite), Label: o.catalog.Text(i18n.ActionFavorite)})

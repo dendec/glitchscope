@@ -447,10 +447,11 @@ func (l *Library) AddVirtualAlbums(albums []Album) {
 
 // AddCatalogAlbum appends an on-the-fly album (e.g. from modarchive navigation)
 // and returns its stable index in Albums. If an album with the same path already
-// exists, its existing index is returned instead of duplicating.
+// exists, its current snapshot is replaced and the stable index is returned.
 func (l *Library) AddCatalogAlbum(album Album) int {
 	for i, a := range l.Albums {
 		if a.Path == album.Path {
+			l.Albums[i] = album
 			return i
 		}
 	}

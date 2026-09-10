@@ -209,41 +209,6 @@ func TestFavoritesRemoveNonexistent(t *testing.T) {
 	}
 }
 
-func TestFavoritesSymbol(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "favorites.json")
-	track := filepath.Join(dir, "a.mod")
-
-	f, err := LoadFavorites(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if f.Symbol(track) != "" {
-		t.Fatal("symbol should be empty for unfavourited track")
-	}
-
-	mustCycle(t, f, track) // → Star
-	if f.Symbol(track) != "★" {
-		t.Fatalf("symbol: got %q, want %q", f.Symbol(track), "★")
-	}
-
-	mustCycle(t, f, track) // → Heart
-	if f.Symbol(track) != "♥" {
-		t.Fatalf("symbol: got %q, want %q", f.Symbol(track), "♥")
-	}
-
-	mustCycle(t, f, track) // → Note
-	if f.Symbol(track) != "♪" {
-		t.Fatalf("symbol: got %q, want %q", f.Symbol(track), "♪")
-	}
-
-	mustCycle(t, f, track) // → None
-	if f.Symbol(track) != "" {
-		t.Fatalf("symbol after remove: got %q, want empty", f.Symbol(track))
-	}
-}
-
 func TestFavoritesTracksReturnsCopy(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "favorites.json")

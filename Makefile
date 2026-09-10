@@ -7,6 +7,8 @@ FONT_SUBSET := internal/ui/assets/unifont.otf
 FONT_RANGES := internal/ui/font_ranges.json
 FONT_REQUIRED := U+2014,U+2026,U+2192,U+23F8,U+25B6,U+25B8,U+25C0
 FONT_URL := https://unifoundry.com/pub/unifont/unifont-17.0.05/font-builds/unifont-17.0.05.otf
+ICON_MANIFEST := internal/ui/icon_assets.json
+ICON_ASSETS := internal/ui/assets/icons
 GO       := go
 GOFLAGS  := CGO_ENABLED=1
 
@@ -52,9 +54,10 @@ MODARCHIVE_CATALOG := .cache/modarchive/catalog
 MODARCHIVE_SNAPSHOT := .cache/modarchive/1980-2007.gsa
 MODARCHIVE_ADDENDUM := .cache/modarchive/2007-addendum.gsa
 
-.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font
+.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font icons
 
 DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
+DOCKER_ICON_RUN = docker run --rm --user "$$(id -u):$$(id -g)" -v "$(CURDIR):/build" -w /build $(DOCKER_BUILDER) bash -c
 
 # Builder image: C/C++ static dependencies compiled once for amd64 & arm64
 builder:
@@ -65,10 +68,13 @@ builder:
 subset-font:
 	@./scripts/subset-font.sh
 
-lint: builder
+icons: builder
+	$(DOCKER_ICON_RUN) 'python3 scripts/generate-icons.py --manifest $(ICON_MANIFEST) --output $(ICON_ASSETS)'
+
+lint: icons builder
 	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) golangci-lint run --verbose --timeout=5m ./cmd/... ./internal/...'
 
-test: builder
+test: icons builder
 	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go test -count=1 ./cmd/... ./internal/...'
 
 # Build modarchive catalog via crawler (only if missing).
@@ -100,7 +106,7 @@ modland-catalog: $(MODLAND_CATALOG)
 modarchive-catalog: $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
 
 # Docker build (amd64)
-dist: subset-font builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
+dist: subset-font icons builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t glitchscope:amd64 -f Dockerfile .
 	@# Backup music directory if it exists before rm -rf.
 	@if [ -d "$(X64_DIST_DIR)/music" ]; then \
@@ -132,7 +138,7 @@ dist: subset-font builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(
 # ARM64 cross-build via Docker
 DOCKER_IMAGE_ARM64 := glitchscope:arm64
 
-dist-arm64: subset-font builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
+dist-arm64: subset-font icons builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)

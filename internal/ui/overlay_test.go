@@ -65,9 +65,31 @@ func TestSourceEntriesUseLocalizedDisplayNames(t *testing.T) {
 		micDevices: []string{"test microphone"},
 	}
 	entries := o.buildSourceEntries()
-	want := []string{"Локальная музыка/", "Микрофон/", "Modland/", "ModArchive/"}
+	want := []string{"Локальная музыка/", "Загрузки/", "Микрофон/", "Radio — Недоступно", "Modland/", "ModArchive/"}
 	if got := labelsOf(entries); !reflect.DeepEqual(got, want) {
 		t.Fatalf("source labels = %#v, want %#v", got, want)
+	}
+}
+
+func TestDownloadsSourceListsCachedVirtualTracks(t *testing.T) {
+	paths := []string{player.ModlandPrefix + "MOD/Artist/one.mod", player.ModArchivePrefix + "pub/modules/two.xm"}
+	o := &Overlay{
+		catalog:      i18n.MustLoad(i18n.English),
+		navStack:     []navLevel{{ctx: ctxSourceRoot}},
+		cachedTracks: func() []string { return append([]string(nil), paths...) },
+	}
+	o.addCatalogAlbum = func(album player.Album) int {
+		o.cachedAlbums = []player.Album{album}
+		return 0
+	}
+	o.isTrackCached = func(string) bool { return true }
+	o.switchToProvider(sourceDownloads)
+
+	if !o.isCatalog() || o.topLevel().label != "Downloads" {
+		t.Fatalf("downloads level = %#v", o.topLevel())
+	}
+	if len(o.albumEntries) != 3 || o.albumEntries[1].filePath != paths[0] || o.albumEntries[2].filePath != paths[1] {
+		t.Fatalf("download entries = %#v, want parent plus cached tracks", o.albumEntries)
 	}
 }
 
@@ -84,8 +106,8 @@ func TestCompactHeaderGeometryAt640x480(t *testing.T) {
 	if got := o.headerHeight(16); got != 18 {
 		t.Fatalf("headerHeight(16) = %d, want 18", got)
 	}
-	if got := o.pageIndicatorX(640); got != 166 {
-		t.Fatalf("pageIndicatorX(640) = %d, want 166", got)
+	if got := o.pageIndicatorX(640); got != 112 {
+		t.Fatalf("pageIndicatorX(640) = %d, want 112", got)
 	}
 }
 
@@ -99,8 +121,8 @@ func TestCompactHeaderGeometryScalesWithHeight(t *testing.T) {
 	if got := o.headerHeight(32); got != 36 {
 		t.Fatalf("headerHeight(32) = %d, want 36", got)
 	}
-	if got := o.pageIndicatorX(1280); got != 332 {
-		t.Fatalf("pageIndicatorX(1280) = %d, want 332", got)
+	if got := o.pageIndicatorX(1280); got != 224 {
+		t.Fatalf("pageIndicatorX(1280) = %d, want 224", got)
 	}
 }
 
@@ -484,21 +506,21 @@ func TestMicrophoneDeviceSelection(t *testing.T) {
 func TestMicrophoneDeviceRefreshKeepsSourceCursor(t *testing.T) {
 	o := &Overlay{navStack: []navLevel{{ctx: ctxSourceRoot}}, panelEntered: true}
 	o.SetMicDevices([]string{"USB microphone", "Webcam microphone"})
-	o.albumCursor = 1
+	o.albumCursor = 2
 	o.ShowMicrophoneDevices([]string{"USB microphone", "Webcam microphone"})
 	o.albumCursor = 2 // select the second device after the parent entry
 	o.navStack[len(o.navStack)-1].cursor = 2
 
 	o.ShowMicrophoneDevices([]string{"USB microphone", "Webcam microphone"})
-	if o.navStack[0].cursor != 1 {
-		t.Fatalf("source cursor after device refresh = %d, want 1", o.navStack[0].cursor)
+	if o.navStack[0].cursor != 2 {
+		t.Fatalf("source cursor after device refresh = %d, want 2", o.navStack[0].cursor)
 	}
 	if o.albumCursor != 0 {
 		t.Fatalf("device cursor after refresh = %d, want 0", o.albumCursor)
 	}
 	o.Back()
-	if o.albumCursor != 1 || o.currentEntry().source != sourceMicrophone {
-		t.Fatalf("cursor after leaving microphone menu = %d (%#v), want source microphone at 1", o.albumCursor, o.currentEntry())
+	if o.albumCursor != 2 || o.currentEntry().source != sourceMicrophone {
+		t.Fatalf("cursor after leaving microphone menu = %d (%#v), want source microphone at 2", o.albumCursor, o.currentEntry())
 	}
 }
 
@@ -506,13 +528,13 @@ func TestMicrophoneSourceHiddenWithoutDevices(t *testing.T) {
 	o := &Overlay{navStack: []navLevel{{ctx: ctxSourceRoot}}}
 	o.SetMicDevices(nil)
 
-	if len(o.albumEntries) != 3 || o.albumEntries[0].source != sourceMusic || o.albumEntries[1].source != sourceModland || o.albumEntries[2].source != sourceModArchive {
-		t.Fatalf("source entries without devices = %#v, want music and remote catalogs", o.albumEntries)
+	if len(o.albumEntries) != 5 || o.albumEntries[0].source != sourceMusic || o.albumEntries[1].source != sourceDownloads || o.albumEntries[2].source != sourceRadio || o.albumEntries[3].source != sourceModland || o.albumEntries[4].source != sourceModArchive {
+		t.Fatalf("source entries without devices = %#v, want music, downloads, radio placeholder, and remote catalogs", o.albumEntries)
 	}
 
 	o.micActive = true
 	o.SetMicDevices(nil)
-	if len(o.albumEntries) != 4 || o.albumEntries[1].source != sourceMicrophone {
+	if len(o.albumEntries) != 6 || o.albumEntries[2].source != sourceMicrophone || o.albumEntries[3].source != sourceRadio {
 		t.Fatalf("source entries during capture = %#v, want music, microphone, and remote catalogs", o.albumEntries)
 	}
 }
@@ -524,8 +546,8 @@ func TestMicrophoneSourceHiddenWhenCaptureStopsAfterDeviceRemoval(t *testing.T) 
 	o.SetMicDevices(nil)
 	o.SetMicActive(false)
 
-	if len(o.albumEntries) != 3 || o.albumEntries[0].source != sourceMusic || o.albumEntries[1].source != sourceModland || o.albumEntries[2].source != sourceModArchive {
-		t.Fatalf("source entries after capture stops = %#v, want music and remote catalogs", o.albumEntries)
+	if len(o.albumEntries) != 5 || o.albumEntries[0].source != sourceMusic || o.albumEntries[1].source != sourceDownloads || o.albumEntries[2].source != sourceRadio || o.albumEntries[3].source != sourceModland || o.albumEntries[4].source != sourceModArchive {
+		t.Fatalf("source entries after capture stops = %#v, want music, downloads, radio placeholder, and remote catalogs", o.albumEntries)
 	}
 }
 
@@ -796,7 +818,7 @@ func TestOfflineSourceRootKeepsProvidersAndFiltersModland(t *testing.T) {
 	o.isTrackCached = func(path string) bool { return strings.Contains(path, "/Cached/") }
 	o.hasCachedUnder = func(path string) bool { return strings.Contains(path, "/Cached") }
 	entries := o.buildSourceEntries()
-	if len(entries) != 3 || entries[1].source != sourceModland || entries[2].source != sourceModArchive {
+	if len(entries) != 5 || entries[1].source != sourceDownloads || entries[2].source != sourceRadio || entries[3].source != sourceModland || entries[4].source != sourceModArchive {
 		t.Fatalf("offline source entries = %#v", entries)
 	}
 	formats := o.buildFormatEntries()
@@ -968,10 +990,10 @@ func TestNCCatalogRoundTrip(t *testing.T) {
 	o.switchToSourceRoot()
 	o.panelEntered = true
 
-	if len(o.albumEntries) != 4 {
-		t.Fatalf("expected four source entries, got %d: %v", len(o.albumEntries), o.albums)
+	if len(o.albumEntries) != 6 {
+		t.Fatalf("expected six source entries, got %d: %v", len(o.albumEntries), o.albums)
 	}
-	modlandIdx := 2
+	modlandIdx := 4
 	o.albumCursor = modlandIdx
 
 	// Enter Modland from the virtual source root.

@@ -2,6 +2,7 @@
 package ui
 
 import (
+	"image/color"
 	"log/slog"
 	"math"
 	"reflect"
@@ -103,6 +104,8 @@ const (
 	sourceMusic sourceKind = iota
 	sourceMicrophone
 	sourceFavorites
+	sourceDownloads
+	sourceRadio
 	sourceModland
 	sourceModArchive
 )
@@ -144,6 +147,7 @@ type Overlay struct {
 	addCatalogAlbum func(player.Album) int // adds on-the-fly catalog album to lib, returns stable index
 	isTrackCached   func(string) bool
 	hasCachedUnder  func(string) bool
+	cachedTracks    func() []string
 	cachedAlbums    []player.Album // one-frame snapshot of libAlbums(); never mutated by the overlay
 	navStack        []navLevel
 	albumEntries    []navEntry
@@ -261,6 +265,10 @@ type Overlay struct {
 	pageIndicatorTexH  [4]int
 	pageIndicatorDirty bool
 	textureCacheReady  bool
+	actionPlacements   []actionPlacement
+	iconTextures       map[string]uint32
+	iconTextureSize    int
+	iconTextureColor   color.RGBA
 
 	albumsDirty         bool
 	albumsContentDirty  bool
@@ -380,6 +388,7 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.presetsColR.tex)
 	o.deleteTex(&o.helpColL.tex)
 	o.deleteTex(&o.helpColR.tex)
+	o.deleteIconTextures()
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
 	o.statsMarquee.invalidate(o)
@@ -432,6 +441,11 @@ func (o *Overlay) Draw(width, height int) {
 // ShowTrack begins the fade-in animation for the given track path.
 func (o *Overlay) ShowTrack(path string) {
 	o.notif.ShowTrack(path, o.fontSize, o.textColor())
+}
+
+// ShowMessage displays a localized notification.
+func (o *Overlay) ShowMessage(key i18n.Key) {
+	o.notif.ShowMessage(o.catalog, key, o.fontSize, o.textColor())
 }
 
 // Inject stamps the notification text into projectM's feedback framebuffer.
@@ -527,7 +541,6 @@ func (o *Overlay) SelectedTrackPath() string {
 // FavoritesView is a read-only interface for displaying favorites.
 type FavoritesView interface {
 	GetPlaylist(path string) player.PlaylistID
-	Symbol(path string) string
 	Tracks(id player.PlaylistID) []string
 	Count(id player.PlaylistID) int
 	TotalCount() int
@@ -785,16 +798,17 @@ func (o *Overlay) SetOnline(v bool) {
 }
 
 // SetTrackCacheLookup supplies the read-only cache projection used by offline navigation.
-func (o *Overlay) SetTrackCacheLookup(isCached, hasDescendant func(string) bool) {
+func (o *Overlay) SetTrackCacheLookup(isCached, hasDescendant func(string) bool, cachedTracks func() []string) {
 	o.isTrackCached = isCached
 	o.hasCachedUnder = hasDescendant
+	o.cachedTracks = cachedTracks
 	o.refreshSourceRoot()
 }
 
 // RefreshTrackCache redraws cache-dependent actions and rebuilds an offline
 // provider tree so newly empty folders disappear immediately.
 func (o *Overlay) RefreshTrackCache() {
-	if !o.online && (o.source == sourceModland || o.source == sourceModArchive) {
+	if o.source == sourceDownloads || (!o.online && (o.source == sourceModland || o.source == sourceModArchive)) {
 		o.switchToProvider(o.source)
 	}
 	o.markAllDirty()

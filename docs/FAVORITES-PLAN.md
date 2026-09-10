@@ -1,8 +1,12 @@
 Favorites — план реализации
 
-В source root всегда отображается виртуальная папка `favorites/`. В ней находятся
-только непустые плейлисты `★ Star`, `♥ Heart` и `♪ Note`. Один трек может входить
+В source root при наличии избранных треков отображается виртуальная папка `favorites/`. В ней находятся
+только непустые плейлисты Star, Heart и Note с соответствующими bitmap-иконками.
+Один трек может входить
 только в один плейлист.
+Любая из трёх отметок также закрепляет скачанный remote-трек: автоматическая
+очистка Downloads по сроку или лимиту его не удаляет.
+Явное Delete download также блокируется, пока отметка Favorite не снята.
 
 При запуске трека из favorites текущей playback queue становится снимок всего
 плейлиста в порядке добавления. Последующие изменения favorites не меняют уже
@@ -72,7 +76,6 @@ const (
 
 type PlaylistSpec struct {
     ID     PlaylistID
-    Symbol rune
     Label  string
 }
 
@@ -89,7 +92,6 @@ func LoadFavorites(path string) (*Favorites, error)
 func NewReadOnlyFavorites() *Favorites
 
 func (f *Favorites) GetPlaylist(trackPath string) PlaylistID
-func (f *Favorites) Symbol(trackPath string) string
 func (f *Favorites) Tracks(id PlaylistID) []string
 func (f *Favorites) Count(id PlaylistID) int
 func (f *Favorites) TotalCount() int
@@ -192,7 +194,7 @@ scroll, focus, Back и Enter:
 source root -> Favorites/ -> playlist -> tracks
 ```
 
-- `favorites/` отображается всегда;
+- `favorites/` отображается при наличии избранных треков;
 - внутри видны только непустые playlists в порядке `PlaylistSpecs()`;
 - Enter на playlist открывает tracks в порядке добавления;
 - Enter на track запускает async playback с pending queue;
@@ -204,7 +206,6 @@ Overlay хранит read-only interface:
 ```go
 type FavoritesView interface {
     GetPlaylist(path string) player.PlaylistID
-    Symbol(path string) string
     Tracks(id player.PlaylistID) []string
     Count(id player.PlaylistID) int
 }
@@ -218,14 +219,12 @@ Refresh перестраивает source root и открытый favourite pla
 сохраняется, если он остался; иначе cursor clamp-ится. После удаления последнего
 track overlay возвращается в `favorites/`.
 
-В track lists (NC mode) после имени отображается `★`, `♥` или `♪` как суффикс.
-Внутри playlists символы не отображаются — только `▸` для now-playing.
+В списках треков справа отображается bitmap-иконка Star, Heart или Note,
+включая списки внутри Favorites. Ячейка равна высоте строки; имена и marquee
+не заходят в колонку отметок. Теперь символами основного шрифта эти отметки
+не рисуются; модель предоставляет playlist ID, UI выбирает соответствующий bitmap.
 F-действие игнорируется при просмотре внутри favorites playlist.
-Hint `Fav` показывается для любого playable track. Hint `Remove` показывается
-только для track, который уже входит в favorites.
-
-Glyphs `U+2605`, `U+2665` и `U+266A` добавляются в `font_ranges.json`; build
-проверяет их наличие в итоговом OTF.
+Hint `Fav` показывается для playable track без отметки, `Remove` — с отметкой.
 
 ## 6. Проверки
 
@@ -253,7 +252,7 @@ Glyphs `U+2605`, `U+2665` и `U+266A` добавляются в `font_ranges.jso
 
 ### UI
 
-- `favorites/` присутствует при пустом состоянии, пустые playlists скрыты;
+- пустые favorites и playlists скрыты;
 - Back, Enter, cursor и scroll используют общий nav stack;
 - selection возвращает полный playlist и index;
 - refresh сохраняет выбранный path и закрывает пустой playlist;

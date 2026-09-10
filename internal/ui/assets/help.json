@@ -189,8 +189,8 @@
           "",
           "**About Modland**",
           "A large preservation archive of tracker, chiptune and game music organized by format and author.",
-          "GlitchScope keeps a compact index locally and downloads a selected track to its cache before playback.",
-          "The saved index remains browsable offline; tracks require a connection unless already cached."
+          "GlitchScope keeps a compact index locally and downloads a selected track before playback.",
+          "Downloads are available offline. Mark a track as any Favorite to protect its download from automatic cleanup."
         ]
       },
       {
@@ -204,7 +204,7 @@
           "**About The Mod Archive**",
           "A community archive dedicated to playable music modules, with artists, ratings, reviews and historical collections.",
           "GlitchScope ships compact indexes for the historical snapshot and addendum, then downloads only the selected module data.",
-          "Saved indexes remain browsable offline; tracks require a connection unless already cached."
+          "Downloads are available offline. Mark a track as any Favorite to protect its download from automatic cleanup."
         ]
       }
     ]

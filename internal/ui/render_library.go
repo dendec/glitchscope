@@ -38,13 +38,25 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		px, py := float32(0), float32(panelY)
 		textOffset := float32(textPadding(o.fontSize))
 		textY := py - textOffset
+		textX := px
+		marqueeX := px
+		marqueeW := float32(max(1, textW-o.favoriteIconTextInset(lh)))
+		if o.topLevel().ctx == ctxSourceRoot || o.showsFavoriteFolderIcons() {
+			iconOffset := o.sourceIconTextOffset(lh)
+			textX += float32(iconOffset)
+			marqueeX += float32(iconOffset)
+			marqueeW -= float32(iconOffset)
+			if marqueeW < 1 {
+				marqueeW = 1
+			}
+		}
 		drawPanelBg(o, px, py, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		if o.panelEntered && len(o.albums) > 0 {
 			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh) - textOffset
 			o.drawCursorHighlight(px, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 		}
 		glDrawOverlayTextClipped(o.programText, o.albumsTex, 1,
-			px, textY, float32(o.albumsTexW), float32(o.albumsTexH),
+			textX, textY, float32(o.albumsTexW), float32(o.albumsTexH),
 			px, py, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		am := panelH / lh
 		if am < 1 {
@@ -54,8 +66,10 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		// Cursor highlight row — drawn as separate overlay, no texture rebuild needed.
 		if o.panelEntered && len(o.albums) > 0 {
 			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh) - textOffset
-			o.drawMarqueeCol(&o.marqueeL, px, py, float32(textW), float32(panelH), lh, rowY, winW, winH, viewW, viewH)
+			o.drawMarqueeCol(&o.marqueeL, marqueeX, py, marqueeW, float32(panelH), lh, rowY, winW, winH, viewW, viewH)
 		}
+		o.drawLibraryIcons(px, py, float32(panelW), float32(panelH), o.albumsScroll,
+			min(o.albumsScroll+max(panelH/lh, 1), len(o.albumEntries)), lh, winW, winH, viewW, viewH)
 		if o.focusPanel == 0 {
 			drawPanelBorder(o, px, py, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
 		}
@@ -138,12 +152,13 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 			glDrawOverlayTextClipped(o.programText, o.ncActionsTex, 1,
 				tx, actionY, float32(o.ncActionsTexW), float32(o.ncActionsTexH),
 				tx, actionY, float32(panelW), actionH, winW, winH, viewW, viewH)
+			o.drawActionIcons(tx, actionY, float32(panelW), actionH, winW, winH, viewW, viewH)
 		}
 	}
 }
 
 func (o *Overlay) actionBarHeight(lh int) int {
-	return lh + o.scalePx(8)
+	return lh + 2*textPadding(o.fontSize)
 }
 
 func (o *Overlay) hasNCSelection() bool {
@@ -152,37 +167,6 @@ func (o *Overlay) hasNCSelection() bool {
 	}
 	e := o.currentEntry()
 	return e != nil && e.kind != entryParent
-}
-
-func (o *Overlay) rebuildNCActionsTex() {
-	o.deleteTex(&o.ncActionsTex)
-	deleteAvailable := o.ncInfoFile != "" || (o.ncInfoIsDir && o.ncInfoDir != o.baseDir)
-	play := "  [" + o.catalog.Text(i18n.ActionPlay) + "]"
-	if o.ncRight == ncRightPlay {
-		play = " >[" + o.catalog.Text(i18n.ActionPlay) + "]"
-	}
-	delete := ""
-	if deleteAvailable {
-		delete = "    [" + o.catalog.Text(i18n.ActionDelete) + "]"
-		if o.ncConfirm {
-			delete = "    [" + o.catalog.Text(i18n.ActionDelete) + "?]"
-		}
-		if o.ncRight == ncRightDelete {
-			delete = "   >[" + o.catalog.Text(i18n.ActionDelete) + "]"
-		}
-	}
-	o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH = o.renderTextToTex(play+delete, o.textColor())
-}
-
-func (o *Overlay) rebuildCatalogActionsTex() {
-	o.deleteTex(&o.ncActionsTex)
-	label := "  [" + o.catalog.Text(i18n.ActionDeleteCache) + "]"
-	if o.ncConfirm {
-		label = " >[" + o.catalog.Text(i18n.ActionDeleteCache) + "?]"
-	} else if o.focusPanel == 1 {
-		label = " >[" + o.catalog.Text(i18n.ActionDeleteCache) + "]"
-	}
-	o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH = o.renderTextToTex(label, o.textColor())
 }
 
 func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
@@ -215,24 +199,32 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	if end > len(o.albums) {
 		end = len(o.albums)
 	}
-	maxTextPx := o.availableRowTextWidth(maxW) - 2*o.borderWidthPx()
+	maxTextPx := o.availableRowTextWidth(maxW) - 2*o.borderWidthPx() - o.favoriteIconTextInset(lh)
+	minTextureW := maxW
+	if o.topLevel().ctx == ctxSourceRoot || o.showsFavoriteFolderIcons() {
+		iconOffset := o.sourceIconTextOffset(lh)
+		maxTextPx -= iconOffset
+		minTextureW -= iconOffset
+	}
+	if maxTextPx < 1 {
+		maxTextPx = 1
+	}
+	if minTextureW < 1 {
+		minTextureW = 1
+	}
 	var rows []listRow
 	for i := start; i < end; i++ {
 		name := o.albums[i]
 		prefix := "  "
-		suffix := ""
+		if o.topLevel().ctx == ctxSourceRoot || o.showsFavoriteFolderIcons() {
+			// The renderer reserves a real pixel slot for the source icon.
+			prefix = ""
+		}
 		if o.isNC() {
 			// NC: highlight by file path match.
 			e := o.albumEntries[i]
 			if e.IsNCFile() && e.filePath == o.playingPath {
 				prefix = "▸ "
-			}
-			// Show favourite symbol as suffix if track is in a playlist.
-			if e.IsNCFile() && o.favoritesView != nil {
-				sym := o.favoritesView.Symbol(e.filePath)
-				if sym != "" {
-					suffix = " " + sym
-				}
 			}
 		} else if o.topLevel().ctx == ctxFavorites {
 			// Inside playlist: only now-playing marker.
@@ -240,26 +232,16 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 			if e.IsFavoriteTrack() && e.filePath == o.playingPath {
 				prefix = "▸ "
 			}
-		} else {
-			if name == o.playingAlbum {
-				prefix = "▸ "
-			}
-			// Catalog tracks: show favourite symbol.
-			if o.favoritesView != nil {
-				e := o.albumEntries[i]
-				sym := o.favoritesView.Symbol(e.filePath)
-				if sym != "" {
-					suffix = " " + sym
-				}
-			}
+		} else if name == o.playingAlbum {
+			prefix = "▸ "
 		}
-		line := prefix + name + suffix
+		line := prefix + name
 		rows = append(rows, listRow{text: line, active: i == cursor && o.panelEntered && o.focusPanel == 0})
 		if i == cursor && o.focusPanel == 0 {
 			o.rebuildMarqueeLine(&o.marqueeL, line, maxTextPx, false)
 		}
 	}
-	o.albumsTex, o.albumsTexW, o.albumsTexH = o.renderListRows(rows, maxTextPx, maxW)
+	o.albumsTex, o.albumsTexW, o.albumsTexH = o.renderListRows(rows, maxTextPx, minTextureW)
 	o.albumsContentDirty = false
 }
 

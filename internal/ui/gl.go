@@ -227,16 +227,24 @@ static unsigned int createRectProgram() {
 	return createProgram(vs, fs);
 }
 
-static unsigned int texUpload(unsigned char *pixels, int w, int h) {
+static unsigned int texUploadFiltered(unsigned char *pixels, int w, int h, GLint filter) {
 	GLuint tex;
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 	return tex;
+}
+
+static unsigned int texUpload(unsigned char *pixels, int w, int h) {
+	return texUploadFiltered(pixels, w, h, GL_LINEAR);
+}
+
+static unsigned int texUploadNearest(unsigned char *pixels, int w, int h) {
+	return texUploadFiltered(pixels, w, h, GL_NEAREST);
 }
 
 static void texDelete(unsigned int tex) {
@@ -323,6 +331,15 @@ func glUploadTexture(rgba *image.RGBA) uint32 {
 	}
 	pix := (*C.uchar)(unsafe.Pointer(&rgba.Pix[0]))
 	return uint32(C.texUpload(pix, C.int(rgba.Rect.Dx()), C.int(rgba.Rect.Dy())))
+}
+
+// glUploadNearestTexture uploads an RGBA image without filtering it during sampling.
+func glUploadNearestTexture(rgba *image.RGBA) uint32 {
+	if len(rgba.Pix) == 0 {
+		return 0
+	}
+	pix := (*C.uchar)(unsafe.Pointer(&rgba.Pix[0]))
+	return uint32(C.texUploadNearest(pix, C.int(rgba.Rect.Dx()), C.int(rgba.Rect.Dy())))
 }
 
 // ClearBackground presents a quiet player screen without running projectM.

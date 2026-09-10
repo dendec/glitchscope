@@ -660,13 +660,21 @@ func centeredTextY(containerHeight, lineHeight, padding int) int {
 
 func (o *Overlay) pageIndicatorWidth() int {
 	width := 0
+	iconSlot := o.pageIndicatorIconSize() + o.scalePx(2)
 	for i, textureWidth := range o.pageIndicatorTexW {
-		width += textureWidth
+		width += iconSlot + textureWidth
 		if i > 0 {
 			width += int(o.fontSize * pageIndicatorGapFactor)
 		}
 	}
-	return width
+	return width + iconSlot*2
+}
+
+func (o *Overlay) pageIndicatorIconSize() int {
+	if o.face != nil {
+		return o.face.Metrics().Height.Ceil()
+	}
+	return int(math.Round(o.fontSize))
 }
 
 func (o *Overlay) pageIndicatorX(winW int) int {
@@ -683,15 +691,25 @@ func (o *Overlay) renderPageIndicator(winW, winH, viewW, viewH int) {
 	gap := int(o.fontSize * pageIndicatorGapFactor)
 
 	x := o.pageIndicatorX(winW)
-	y := float32(centeredTextY(o.headerHeight(o.face.Metrics().Height.Ceil()), o.face.Metrics().Height.Ceil(), textPadding(o.fontSize)))
+	lh := o.face.Metrics().Height.Ceil()
+	headerH := o.headerHeight(lh)
+	y := float32(centeredTextY(headerH, lh, textPadding(o.fontSize)))
+	iconY := float32((headerH - lh) / 2)
+	iconGap := o.scalePx(2)
+	o.ensureIconTextures(lh, o.textColor())
+	o.drawIcon(iconPagePrev, float32(x), iconY, float32(lh), winW, winH, viewW, viewH)
+	x += lh + iconGap
 
 	for i := range pages {
+		o.drawIcon(pageIconName(UIPage(i)), float32(x), iconY, float32(lh), winW, winH, viewW, viewH)
+		x += lh + iconGap
 		if o.pageIndicatorTex[i] != 0 {
 			glDrawOverlayText(o.programText, o.pageIndicatorTex[i], 1,
 				float32(x), y, float32(o.pageIndicatorTexW[i]), float32(o.pageIndicatorTexH[i]), winW, winH, viewW, viewH)
 		}
 		x += o.pageIndicatorTexW[i] + gap
 	}
+	o.drawIcon(iconPageNext, float32(x-gap), iconY, float32(lh), winW, winH, viewW, viewH)
 }
 
 func (o *Overlay) rebuildPageIndicatorTextures() {

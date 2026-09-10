@@ -21,6 +21,7 @@ RUN dpkg --add-architecture arm64 \
         libmpg123-dev libmpg123-dev:arm64 \
         zlib1g-dev zlib1g-dev:arm64 \
         python3-fonttools \
+        python3-pil librsvg2-bin \
         autoconf automake libtool \
     && rm -rf /var/lib/apt/lists/*
 

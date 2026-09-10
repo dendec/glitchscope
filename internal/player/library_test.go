@@ -162,12 +162,17 @@ func TestAddCatalogAlbumDedup(t *testing.T) {
 		t.Fatalf("Albums count = %d, want 2", len(lib.Albums))
 	}
 
-	// Adding the same album again should return the same index (dedup).
-	idx2 := lib.AddCatalogAlbum(catAlbum)
+	// Adding the same album again should refresh it at the same stable index.
+	updated := catAlbum
+	updated.Tracks = append(updated.Tracks, ModArchivePrefix+"http://example.com/test/new.mod")
+	idx2 := lib.AddCatalogAlbum(updated)
 	if idx2 != 1 {
 		t.Fatalf("AddCatalogAlbum dedup returned %d, want 1", idx2)
 	}
 	if len(lib.Albums) != 2 {
 		t.Fatalf("Albums count after dedup = %d, want 2", len(lib.Albums))
+	}
+	if len(lib.Albums[1].Tracks) != 2 {
+		t.Fatalf("updated catalog album tracks = %v", lib.Albums[1].Tracks)
 	}
 }

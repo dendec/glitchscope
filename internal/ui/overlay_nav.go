@@ -150,11 +150,13 @@ func (o *Overlay) buildSourceEntries() []navEntry {
 	if o.favoritesView != nil && o.favoritesView.TotalCount() > 0 {
 		entries = append(entries, navEntry{label: o.catalog.Text(i18n.SourceFavorites) + "/", kind: entrySource, source: sourceFavorites, albumIdx: -1})
 	}
+	entries = append(entries, navEntry{label: o.catalog.Text(i18n.SourceDownloads) + "/", kind: entrySource, source: sourceDownloads, albumIdx: -1})
 	if len(o.micDevices) > 0 || o.micActive {
 		entries = append(entries, navEntry{label: o.micLabel(), kind: entrySource, source: sourceMicrophone, albumIdx: -1})
 	}
 	slog.Debug("buildSourceEntries", "online", o.online)
 	entries = append(entries,
+		navEntry{label: "Radio — " + o.catalog.Text(i18n.ValueUnavailable), kind: entrySource, source: sourceRadio, albumIdx: -1},
 		navEntry{label: "Modland/", kind: entrySource, source: sourceModland, albumIdx: -1},
 		navEntry{label: "ModArchive/", kind: entrySource, source: sourceModArchive, albumIdx: -1},
 	)
@@ -196,7 +198,9 @@ func (o *Overlay) relocalizeSourceLabels() {
 		case ctxMicrophone:
 			o.navStack[i].label = o.catalog.Text(i18n.SourceMicrophone)
 		case ctxCatalog:
-			if i == 1 && o.source == sourceModland {
+			if i == 1 && o.source == sourceDownloads {
+				o.navStack[i].label = o.catalog.Text(i18n.SourceDownloads)
+			} else if i == 1 && o.source == sourceModland {
 				o.navStack[i].label = "Modland"
 			} else if i == 1 && o.source == sourceModArchive {
 				o.navStack[i].label = "ModArchive"
@@ -803,6 +807,10 @@ func (o *Overlay) switchToProvider(source sourceKind) {
 	switch source {
 	case sourceFavorites:
 		o.switchToFavoritesRoot()
+	case sourceDownloads:
+		o.switchToDownloads()
+	case sourceRadio:
+		// Placeholder only. Radio has no navigation or playback backend yet.
 	case sourceModland:
 		entries := o.buildFormatEntries()
 		slog.Debug("switchToProvider modland", "formats", len(entries))
@@ -810,6 +818,16 @@ func (o *Overlay) switchToProvider(source sourceKind) {
 	case sourceModArchive:
 		o.pushLevel(navLevel{ctx: ctxCatalog, label: "ModArchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
 	}
+}
+
+func (o *Overlay) switchToDownloads() {
+	if o.cachedTracks == nil || o.addCatalogAlbum == nil {
+		return
+	}
+	tracks := o.cachedTracks()
+	albumName := o.catalog.Text(i18n.SourceDownloads)
+	albumIdx := o.addCatalogAlbum(player.Album{Name: albumName, Path: "downloads:", Tracks: tracks})
+	o.pushLevel(navLevel{ctx: ctxCatalog, label: albumName, entries: o.buildCatalogTrackEntries(albumIdx)})
 }
 
 // switchToFavoritesRoot opens the Favorites folder showing non-empty playlists.
@@ -824,7 +842,7 @@ func (o *Overlay) switchToFavoritesRoot() {
 			continue
 		}
 		entries = append(entries, navEntry{
-			label:  fmt.Sprintf("%s (%d)", string(spec.Symbol), count),
+			label:  fmt.Sprintf("%s (%d)", spec.Label, count),
 			kind:   entryFavoriteFolder,
 			source: sourceFavorites,
 			format: string(spec.ID),
@@ -852,14 +870,14 @@ func (o *Overlay) switchToFavoritesPlaylist(kind player.PlaylistID) {
 			filePath: path,
 		})
 	}
-	symbol := player.PlaylistSymbol(kind)
-	if symbol == "" {
-		symbol = "★"
+	label := player.PlaylistLabel(kind)
+	if label == "" {
+		label = string(kind)
 	}
 	o.pushLevel(navLevel{
 		ctx:        ctxFavorites,
 		entries:    entries,
-		label:      symbol,
+		label:      label,
 		playlistID: string(kind),
 	})
 }
