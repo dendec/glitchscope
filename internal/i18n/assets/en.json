@@ -29,7 +29,7 @@
   "descriptions.shuffle_off": "Play tracks in order.",
   "descriptions.shuffle_album": "Shuffle the current folder or playlist.",
   "descriptions.shuffle_source": "Shuffle within the current music source.",
-  "descriptions.shuffle_all": "Shuffle all sources. Offline, only local music is selected.",
+  "descriptions.shuffle_all": "Shuffle all sources. Offline, local and downloaded remote tracks are selected.",
   "descriptions.cache_session": "Downloaded tracks are removed after they stop playing.",
   "descriptions.cache_retention": "Automatically remove downloads you have not played for this long.",
   "descriptions.cache_size": "When space runs low, remove downloads you have not played for the longest time.",

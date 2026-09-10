@@ -2,6 +2,9 @@ package app
 
 import (
 	"log/slog"
+	"net/url"
+	"path"
+	"strings"
 
 	"github.com/dendec/glitchscope/internal/catalog"
 	"github.com/dendec/glitchscope/internal/filesystem"
@@ -17,11 +20,15 @@ import (
 // invariant in AGENTS.md §2.
 func (a *App) updateLocalShuffleSource(albums []player.Album, status filesystem.Status) {
 	if status != filesystem.StatusOK {
-		slog.Warn("local shuffle index: scan not OK, keeping previous source", "status", status)
+		available := a.localShuffleSrc != nil && a.localShuffleSrc.TrackCount() > 0
+		slog.Warn("local shuffle index scan not OK, keeping previous source",
+			"status", status, "available", available)
 		return
 	}
 	a.localScanFingerprint = player.ScanFingerprint(albums)
 	a.localShuffleSrc = player.NewLocalShuffleSource(albums, a.localScanFingerprint)
+	slog.Info("local shuffle index ready", "tracks", a.localShuffleSrc.TrackCount(),
+		"directories", a.localShuffleSrc.DirectoryCount())
 }
 
 // buildShuffleCatalog opens each provider's persistent shuffle index,
@@ -32,6 +39,11 @@ func (a *App) updateLocalShuffleSource(albums []player.Album, status filesystem.
 // The result is installed atomically so the render thread can keep using
 // the old (nil or empty) catalog while the rebuild is in progress.
 func (a *App) buildShuffleCatalog() {
+	if a.trackCache != nil {
+		if err := a.trackCache.ReconcileManifest(); err != nil {
+			slog.Warn("track cache manifest reconcile", "error", err)
+		}
+	}
 	var sources []catalog.SourceIndex
 
 	if a.modlandShuffleSrc != nil {
@@ -57,8 +69,77 @@ func (a *App) buildShuffleCatalog() {
 	}
 
 	cat := catalog.NewShuffleCatalog(sources...)
+	a.refreshOfflineProjection()
 	a.shuffleCatalog.Store(cat)
 	slog.Info("shuffle catalog ready", "sources", len(sources), "tracks", cat.TotalTrackCount())
+}
+
+// refreshOfflineProjection publishes a complete source-preserving view of
+// local tracks and cached remote tracks. It never mutates the snapshot already
+// used by playback, so selection cannot observe a half-updated cache index.
+func (a *App) refreshOfflineProjection() {
+	var indexes []catalog.SourceIndex
+	if a.localShuffleSrc != nil {
+		indexes = append(indexes, a.localShuffleSrc)
+	}
+
+	if a.trackCache != nil {
+		bySource := make(map[catalog.SourceKind][]catalog.ShuffleTrack)
+		for _, virtualPath := range a.trackCache.CachedVirtualPaths() {
+			track := offlineShuffleTrack(virtualPath)
+			bySource[track.Source] = append(bySource[track.Source], track)
+		}
+		for _, source := range []catalog.SourceKind{catalog.SourceModland, catalog.SourceModArchive} {
+			if tracks := bySource[source]; len(tracks) > 0 {
+				indexes = append(indexes, catalog.NewListSource(source, tracks))
+			}
+		}
+	}
+
+	a.offlineProjection.Store(catalog.NewOfflineProjection(indexes...))
+}
+
+func offlineShuffleTrack(virtualPath string) catalog.ShuffleTrack {
+	if player.IsModland(virtualPath) {
+		remote := player.RemotePath(virtualPath)
+		directory := path.Dir(remote)
+		if directory == "." {
+			directory = ""
+		}
+		return catalog.ShuffleTrack{
+			Path:         virtualPath,
+			Source:       catalog.SourceModland,
+			DirectoryKey: catalog.DirectoryKey{Source: catalog.SourceModland, Locator: directory},
+			TrackKey:     path.Base(remote),
+			AlbumName:    path.Base(directory),
+		}
+	}
+
+	remote := player.RemotePath(virtualPath)
+	parsed, err := url.Parse(remote)
+	if err != nil {
+		return catalog.ShuffleTrack{Path: virtualPath, Source: catalog.SourceModArchive}
+	}
+	locator := *parsed
+	locator.Fragment = ""
+	locator.RawFragment = ""
+	albumName := path.Base(strings.TrimSuffix(parsed.Path, "/"))
+	if parsed.Fragment == "" {
+		directory := path.Dir(parsed.Path)
+		locator.Path = directory + "/"
+		albumName = path.Base(directory)
+	}
+	trackKey := path.Base(parsed.Fragment)
+	if trackKey == "." || trackKey == "/" || trackKey == "" {
+		trackKey = path.Base(parsed.Path)
+	}
+	return catalog.ShuffleTrack{
+		Path:         virtualPath,
+		Source:       catalog.SourceModArchive,
+		DirectoryKey: catalog.DirectoryKey{Source: catalog.SourceModArchive, Locator: locator.String()},
+		TrackKey:     trackKey,
+		AlbumName:    albumName,
+	}
 }
 
 // openModlandShuffleSource opens modland.idx, rebuilding it synchronously

@@ -328,10 +328,12 @@ func (a *App) testSignal() []float32 {
 
 func (a *App) Init() {
 	a.initAudio()
+	// TrackCache must exist before the background shuffle indexes are built so
+	// the offline projection can reconcile existing cached files atomically.
+	a.trackCache = player.NewTrackCache(baseDir())
 	a.initLibrary()
 	a.initFavorites()
 	a.deleteSvc = newDeleteService(baseDir())
-	a.trackCache = player.NewTrackCache(baseDir())
 	if a.overlay != nil {
 		a.overlay.SetTrackCacheLookup(a.trackCache.IsCached, a.trackCache.HasDescendant)
 	}
@@ -399,8 +401,14 @@ func (a *App) initAudio() {
 		}
 		if localPath != "" {
 			if a.trackCache != nil {
-				_ = a.trackCache.Touch(path)
-				a.pruneTrackCache()
+				if err := a.trackCache.RegisterDownloaded(path); err != nil {
+					slog.Warn("track cache manifest update", "path", path, "error", err)
+				}
+				if err := a.trackCache.Touch(path); err != nil {
+					slog.Debug("track cache touch", "path", path, "error", err)
+				}
+				// CheckPending prunes and publishes the offline snapshot for both
+				// successful and failed loads. Avoid walking the cache twice here.
 			}
 			return localPath, nil
 		}
@@ -577,6 +585,9 @@ func (a *App) pruneTrackCache() {
 	if err := a.trackCache.Prune(policy.Retention.Duration(), policy.Retention == config.CacheForever, int64(policy.MaxBytes), protected); err != nil {
 		slog.Warn("track cache cleanup", "error", err)
 	}
+	// Prune reconciles the disk-backed manifest even when some removals fail;
+	// publish the resulting complete offline snapshot in either case.
+	a.refreshOfflineProjection()
 }
 
 func (a *App) startTrackCacheCleanup() {

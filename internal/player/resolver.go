@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const modArchiveCacheBaseURL = "http://modarchive.textfiles.com/"
+
 // Resolver maps virtual track paths (modland:, modarchive:) to local cache
 // files on disk. It is the single owner of the cache-path rules; Library
 // uses it as a dependency for metadata extraction and cache checks.
@@ -43,6 +45,39 @@ func (r *Resolver) CacheCandidatePath(virtualPath string) string {
 	}
 	if IsModArchive(virtualPath) {
 		return ModArchiveCachePath(r.baseDir, remote)
+	}
+	return ""
+}
+
+// VirtualPathForCacheFile reconstructs a playable provider path for a file
+// inside a download cache root. Registered manifest paths remain preferable
+// because they preserve exact ModArchive fragments.
+func (r *Resolver) VirtualPathForCacheFile(localPath string) string {
+	if r.baseDir == "" {
+		return ""
+	}
+	providers := []struct {
+		root   string
+		prefix string
+	}{
+		{filepath.Join(r.baseDir, ".cache", "modland", "files"), ModlandPrefix},
+		{filepath.Join(r.baseDir, ".cache", "modarchive", "files"), ModArchivePrefix},
+	}
+	for _, provider := range providers {
+		rel, err := filepath.Rel(provider.root, localPath)
+		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		rel = filepath.ToSlash(rel)
+		if provider.prefix == ModArchivePrefix {
+			// Ordinary ModArchive ZIP downloads are extracted to the URL path
+			// with its .zip suffix removed.
+			if filepath.Ext(rel) == "" {
+				rel += ".zip"
+			}
+			return provider.prefix + modArchiveCacheBaseURL + rel
+		}
+		return provider.prefix + rel
 	}
 	return ""
 }
@@ -136,5 +171,5 @@ func safeCacheJoin(root, slashPath string) string {
 // cache file is treated as absent.
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
-	return err == nil && info.Size() > 0
+	return err == nil && info.Mode().IsRegular() && info.Size() > 0
 }

@@ -193,6 +193,17 @@ func (a *App) deleteCachedTrack(path string) {
 	}
 	if err := a.trackCache.Delete(path); err != nil {
 		slog.Warn("delete cached track", "path", path, "error", err)
+		// The file removal itself is authoritative. A manifest/index write
+		// failure must not leave the UI and offline projection claiming that
+		// a successfully deleted file is still available.
+		a.refreshOfflineProjection()
+		if !a.trackCache.IsCached(path) {
+			if a.overlay != nil {
+				a.overlay.ShowTrack("removed from cache")
+				a.overlay.RefreshTrackCache()
+			}
+			return
+		}
 		if a.overlay != nil {
 			a.overlay.ShowTrack("cache delete failed")
 		}
@@ -202,6 +213,7 @@ func (a *App) deleteCachedTrack(path string) {
 		a.overlay.ShowTrack("removed from cache")
 		a.overlay.RefreshTrackCache()
 	}
+	a.refreshOfflineProjection()
 }
 
 // switchScreen moves the overlay to the next/previous page and rebuilds

@@ -68,7 +68,7 @@
           "Aus: Die Titel werden in der Reihenfolge abgespielt.",
           "Album: Die aktuelle Ordnerstruktur oder Wiedergabeliste wird zufällig geordnet.",
           "Quelle: Zufallswiedergabe innerhalb von „Lokale Musik“, Modland oder ModArchive.",
-          "Alle: Zufällige Wiedergabe über alle verfügbaren Quellen. Im Offline-Modus verwendet „Alle“ nur lokale Musik.",
+          "Alle: Zufällige Wiedergabe über alle verfügbaren Quellen. Im Offline-Modus verwendet „Alle“ lokale Musik und heruntergeladene Remote-Titel.",
           "Quelle und Alle können Titel wiederholen, einschließlich des aktuellen Titels.",
           "„Wiederholen 1“ wiederholt die aktuelle Titel, sobald diese zu Ende ist. „Manuell Weiter“ geht dennoch zum nächsten Titel über.",
           "Eine fehlgeschlagene Ladenversuche wird übersprungen. Wiederholte Fehlschläge beenden die automatische Wiederherstellung."
@@ -152,7 +152,7 @@
         "lines": [
           "Die gespeicherten Katalogindizes können auch ohne Internet angezeigt werden.",
           "Ein Track muss bereits heruntergeladen sein, um offline abgespielt zu werden.",
-          "„Shuffle All“ verwendet im Offline-Modus nur lokale Musik. Die Netzwerkverfügbarkeit wird regelmäßig geprüft."
+          "„Shuffle All“ verwendet offline lokale Musik und heruntergeladene Remote-Titel; „Shuffle Source“ verwendet nur zwischengespeicherte Titel der Quelle. Die Netzwerkverfügbarkeit wird regelmäßig geprüft."
         ]
       },
       {

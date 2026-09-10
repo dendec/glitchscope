@@ -68,7 +68,7 @@
           "Mati: trek dimainkan mengikut urutan.",
           "Album: shuffle folder atau senarai main semasa.",
           "Sumber: kocok dalam Muzik Tempatan, Modland atau ModArchive.",
-          "Semua: shuffle merentasi semua sumber yang tersedia. Dalam mod offline, “Semua” hanya menggunakan muzik tempatan.",
+          "Semua: shuffle merentasi semua sumber yang tersedia. Dalam mod offline, “Semua” menggunakan muzik tempatan dan trek jauh yang telah dimuat turun.",
           "Pilihan “Sumber” dan “Semua” boleh mengulang trek, termasuk trek semasa.",
           "“Ulang Satu” akan mengulang trek semasa setelah ia tamat. Pilihan “Seterusnya” secara manual tetap akan memindahkan ke trek seterusnya.",
           "Muatan yang gagal akan diabaikan. Kegagalan berulang akan menghentikan proses pemulihan automatik."
@@ -152,7 +152,7 @@
         "lines": [
           "Indeks katalog yang disimpan masih boleh diakses walaupun tanpa sambungan internet.",
           "Sebuah trek mesti telah dimuat turun terlebih dahulu untuk dimainkan secara offline.",
-          "Fungsi Shuffle All menggunakan muzik tempatan semasa dalam mod offline. Ketersediaan rangkaian akan diperiksa secara berkala."
+          "Semasa offline, Shuffle All menggunakan muzik tempatan dan trek jauh yang telah dimuat turun; Shuffle Source hanya menggunakan trek cache daripada sumber tersebut. Ketersediaan rangkaian akan diperiksa secara berkala."
         ]
       },
       {

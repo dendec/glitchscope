@@ -1,6 +1,9 @@
 package app
 
 import (
+	"math/rand"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dendec/glitchscope/internal/catalog"
@@ -85,5 +88,38 @@ func TestBuildShuffleCatalogWithNoSources(t *testing.T) {
 	}
 	if len(cat.Available()) != 0 {
 		t.Fatalf("Available() = %d, want 0", len(cat.Available()))
+	}
+}
+
+func TestRefreshOfflineProjectionIncludesCachedRemoteTracks(t *testing.T) {
+	base := t.TempDir()
+	physical := filepath.Join(base, ".cache", "modland", "files", "MOD", "cached.mod")
+	if err := os.MkdirAll(filepath.Dir(physical), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(physical, []byte("module"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &App{trackCache: player.NewTrackCache(base)}
+	if err := a.trackCache.ReconcileManifest(); err != nil {
+		t.Fatal(err)
+	}
+	a.refreshOfflineProjection()
+
+	projection := a.offlineProjection.Load()
+	if projection == nil {
+		t.Fatal("offline projection is nil")
+	}
+	index := projection.SourceIndex(catalog.SourceModland)
+	if index == nil || index.TrackCount() != 1 {
+		t.Fatalf("cached Modland index = %#v, want one track", index)
+	}
+	track, err := projection.RandomTrackFromSource(catalog.SourceModland, rand.New(rand.NewSource(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if track.Path != player.ModlandPrefix+"MOD/cached.mod" || track.Source != catalog.SourceModland {
+		t.Fatalf("cached track = %+v", track)
 	}
 }

@@ -754,12 +754,15 @@ func TestAlbumKeyIncludesTrackCount(t *testing.T) {
 	}
 }
 
-func TestOfflineShuffleAllExcludesMaterializedCatalogs(t *testing.T) {
+func TestOfflineShuffleAllExcludesUncachedMaterializedCatalogs(t *testing.T) {
 	state := playbackState{pl: &player.Player{}, lib: &player.Library{Albums: []player.Album{
 		{Name: "local", Path: "/music", Tracks: []string{"a"}},
 		{Name: "remote", Path: "modland:test", Tracks: []string{"modland:test/a"}},
 	}}}
 	state.offline.Store(true)
+	// A materialized remote album is not evidence that its audio file is
+	// cached. Without an offline projection, only the local compatibility pool
+	// is safe to use.
 	for range 10 {
 		track, ok := state.advance(config.PlaybackSettings{ShuffleMode: config.ShuffleAll, Repeat: config.RepeatAll})
 		if !ok || track.path != "a" {

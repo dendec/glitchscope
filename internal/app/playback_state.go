@@ -144,6 +144,11 @@ type playbackState struct {
 	// Accessed atomically so a background goroutine can install it without
 	// blocking the render thread.
 	shuffleCatalog atomic.Pointer[catalog.ShuffleCatalog]
+
+	// offlineProjection contains the local source and only the cached subset
+	// of each remote source. It is published as a complete immutable snapshot
+	// after cache reconciliation.
+	offlineProjection atomic.Pointer[catalog.OfflineProjection]
 }
 
 // play starts playback of a track. It syncs the playlist/library cursor and
@@ -347,13 +352,23 @@ func (s *playbackState) repeatOne() (trackRef, bool) {
 //
 // Shuffle Source and Shuffle All prefer the lazy ShuffleCatalog coordinator
 // (a single weighted pick per call, no stored permutation, repeats allowed)
-// and only fall back to the legacy pool-based engine when the coordinator is
-// unavailable or has no eligible source — e.g. before shuffle indexes are
-// built, or in tests that construct playbackState directly.
+// and fall back to the legacy pool-based engine only while the coordinator is
+// unavailable. In offline mode a remote source never falls back to an
+// uncached library pool.
 func (s *playbackState) advanceShuffled(settings config.PlaybackSettings) (trackRef, bool) {
 	if settings.ShuffleMode == config.ShuffleSource || settings.ShuffleMode == config.ShuffleAll {
 		if t, ok := s.advanceShuffleLazy(settings); ok {
 			return t, true
+		}
+		// Before the offline projection is ready, legacy fallback is safe for
+		// local playback only. Once a projection is published, an empty or
+		// source-ineligible result is authoritative; never fall back to an
+		// uncached library pool.
+		if s.offline.Load() {
+			if s.offlineProjection.Load() != nil ||
+				settings.ShuffleMode == config.ShuffleSource && s.currentSource() != "local" {
+				return trackRef{}, false
+			}
 		}
 	}
 	pool, key := s.shufflePool(settings)
@@ -370,11 +385,10 @@ func (s *playbackState) advanceShuffled(settings config.PlaybackSettings) (track
 
 // advanceShuffleLazy picks one track directly from the ShuffleCatalog
 // coordinator for Shuffle Source / Shuffle All. Returns false when the
-// coordinator or the requested source is unavailable so the caller falls
-// back to legacy pool-based selection.
+// coordinator or the requested source is unavailable so the caller can use
+// the compatibility path where that is safe.
 func (s *playbackState) advanceShuffleLazy(settings config.PlaybackSettings) (trackRef, bool) {
-	cat := s.shuffleCatalog.Load()
-	if cat == nil || s.shuffle.rng == nil {
+	if s.shuffle.rng == nil {
 		return trackRef{}, false
 	}
 
@@ -388,11 +402,31 @@ func (s *playbackState) advanceShuffleLazy(settings config.PlaybackSettings) (tr
 		if !ok {
 			return trackRef{}, false
 		}
-		t, err = cat.RandomTrackFromSource(kind, s.shuffle.rng)
+		if s.offline.Load() {
+			projection := s.offlineProjection.Load()
+			if projection == nil {
+				return trackRef{}, false
+			}
+			t, err = projection.RandomTrackFromSource(kind, s.shuffle.rng)
+		} else {
+			cat := s.shuffleCatalog.Load()
+			if cat == nil {
+				return trackRef{}, false
+			}
+			t, err = cat.RandomTrackFromSource(kind, s.shuffle.rng)
+		}
 	case config.ShuffleAll:
 		if s.offline.Load() {
-			t, err = cat.RandomTrackFromSource(catalog.SourceLocal, s.shuffle.rng)
+			projection := s.offlineProjection.Load()
+			if projection == nil {
+				return trackRef{}, false
+			}
+			t, err = projection.RandomTrackAll(s.shuffle.rng)
 		} else {
+			cat := s.shuffleCatalog.Load()
+			if cat == nil {
+				return trackRef{}, false
+			}
 			t, err = cat.RandomTrackAll(s.shuffle.rng)
 		}
 	default:

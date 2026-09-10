@@ -129,22 +129,66 @@ func TestAdvanceShuffleLazyUnknownSourceFallsBack(t *testing.T) {
 	}
 }
 
-func TestOfflineLazyShuffleSelectsOnlyLocalSource(t *testing.T) {
+func TestOfflineLazyShuffleUsesLocalAndCachedRemoteSources(t *testing.T) {
 	local := &fakeSourceIndex{source: catalog.SourceLocal, tracks: []catalog.ShuffleTrack{{Source: catalog.SourceLocal, Path: "/music/a.mod"}}}
 	remote := &fakeSourceIndex{source: catalog.SourceModland, tracks: []catalog.ShuffleTrack{fakeModlandTrack()}}
 	state := playbackState{pl: &player.Player{}, lib: &player.Library{}}
 	state.shuffle.rng = rand.New(rand.NewSource(1))
 	state.shuffleCatalog.Store(catalog.NewShuffleCatalog(local, remote))
+	state.offlineProjection.Store(catalog.NewOfflineProjection(local, remote))
 	state.offline.Store(true)
+	seen := make(map[string]bool)
 	for range 100 {
 		track, ok := state.advanceShuffleLazy(config.PlaybackSettings{ShuffleMode: config.ShuffleAll})
-		if !ok || track.path != "/music/a.mod" {
-			t.Fatalf("offline pick = %+v, %v", track, ok)
+		if !ok {
+			t.Fatalf("offline pick failed: %+v", track)
 		}
+		seen[track.path] = true
 	}
-	state.shuffleCatalog.Store(catalog.NewShuffleCatalog(remote))
-	if _, ok := state.advanceShuffleLazy(config.PlaybackSettings{ShuffleMode: config.ShuffleAll}); ok {
-		t.Fatal("offline remote source selected")
+	if !seen["/music/a.mod"] || !seen[fakeModlandTrack().Path] {
+		t.Fatalf("offline picks = %v, want local and cached remote tracks", seen)
+	}
+
+	// Shuffle Source remains source-bound while offline, but uses the cached
+	// subset when the active source is remote.
+	state.lib = &player.Library{Albums: []player.Album{{
+		Name: "Modland", Path: "modland:Protracker/Fake", Tracks: []string{fakeModlandTrack().Path},
+	}}}
+	state.lib.SelectAlbum(0)
+	track, ok := state.advanceShuffleLazy(config.PlaybackSettings{ShuffleMode: config.ShuffleSource})
+	if !ok || track.path != fakeModlandTrack().Path {
+		t.Fatalf("offline remote Shuffle Source = %+v, %v", track, ok)
+	}
+}
+
+func TestOfflineShuffleDoesNotFallbackAfterEmptyProjection(t *testing.T) {
+	state := playbackState{
+		pl:  &player.Player{},
+		lib: &player.Library{Albums: []player.Album{{Name: "local", Tracks: []string{"uncached.mod"}}}},
+	}
+	state.shuffle.rng = rand.New(rand.NewSource(1))
+	state.shuffleCatalog.Store(catalog.NewShuffleCatalog(&fakeSourceIndex{
+		source: catalog.SourceLocal,
+		tracks: []catalog.ShuffleTrack{{Source: catalog.SourceLocal, Path: "uncached.mod"}},
+	}))
+	state.offlineProjection.Store(catalog.NewOfflineProjection())
+	state.offline.Store(true)
+
+	if _, ok := state.advanceShuffled(config.PlaybackSettings{ShuffleMode: config.ShuffleAll}); ok {
+		t.Fatal("offline Shuffle All selected from library after empty projection")
+	}
+}
+
+func TestOfflineShuffleDoesNotRequireOnlineCatalog(t *testing.T) {
+	local := &fakeSourceIndex{source: catalog.SourceLocal, tracks: []catalog.ShuffleTrack{{Source: catalog.SourceLocal, Path: "/music/a.mod"}}}
+	state := playbackState{pl: &player.Player{}, lib: &player.Library{}}
+	state.shuffle.rng = rand.New(rand.NewSource(1))
+	state.offlineProjection.Store(catalog.NewOfflineProjection(local))
+	state.offline.Store(true)
+
+	track, ok := state.advanceShuffleLazy(config.PlaybackSettings{ShuffleMode: config.ShuffleAll})
+	if !ok || track.path != "/music/a.mod" {
+		t.Fatalf("offline pick without online catalog = %+v, %v", track, ok)
 	}
 }
 

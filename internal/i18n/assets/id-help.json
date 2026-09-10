@@ -68,7 +68,7 @@
           "Off: lagu diputar secara berurutan.",
           "Album: mengacak folder atau playlist saat ini.",
           "Sumber: acak dalam Musik Lokal, Modland, atau ModArchive.",
-          "All: mengacak semua sumber yang tersedia. Di mode Offline, All hanya menggunakan musik lokal.",
+          "All: mengacak semua sumber yang tersedia. Di mode Offline, All menggunakan musik lokal dan musik jarak jauh yang sudah diunduh.",
           "Source dan All dapat memutar ulang lagu, termasuk lagu yang sedang diputar.",
           "Repeat One akan memutar ulang lagu saat ini setelah selesai. Manual Next tetap akan melanjutkan ke lagu berikutnya.",
           "Lagu yang gagal dimuat akan diabaikan. Kegagalan berulang akan menghentikan proses pemulihan otomatis."
@@ -152,7 +152,7 @@
         "lines": [
           "Indeks katalog yang disimpan tetap dapat diakses tanpa koneksi internet.",
           "Sebuah lagu harus sudah diunduh terlebih dahulu agar dapat diputar secara offline.",
-          "Shuffle All menggunakan musik lokal saat dalam mode offline. Ketersediaan jaringan akan diperiksa secara berkala."
+          "Saat offline, Shuffle All menggunakan musik lokal dan musik jarak jauh yang sudah diunduh; Shuffle Source hanya menggunakan trek cache dari sumber tersebut. Ketersediaan jaringan akan diperiksa secara berkala."
         ]
       },
       {

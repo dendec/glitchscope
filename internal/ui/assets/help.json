@@ -68,7 +68,7 @@
           "Off: tracks play in order.",
           "Album: shuffle the current folder or playlist.",
           "Source: shuffle within Local Music, Modland or ModArchive.",
-          "All: shuffle across available sources. Offline, All uses only local music.",
+          "All: shuffle across available sources. Offline, All uses local music and downloaded remote tracks.",
           "Source and All can repeat tracks, including the current track.",
           "Repeat One repeats the current track when it ends. Manual Next still moves on.",
           "A failed load is skipped. Repeated failures stop automatic recovery."
@@ -152,7 +152,7 @@
         "lines": [
           "Saved catalog indexes remain browsable without internet.",
           "A track must already be downloaded to play offline.",
-          "Shuffle All uses local music while offline. Network availability is checked periodically."
+          "Offline Shuffle All uses local music and downloaded remote tracks; Shuffle Source uses only cached tracks from that source. Network availability is checked periodically."
         ]
       },
       {
