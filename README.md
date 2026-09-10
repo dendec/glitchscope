@@ -114,3 +114,8 @@ seconds. Opening the menu dismisses it permanently; missing the hint lets it
 reappear next time. Help begins with Quick Start, Controls, Playback, Quality and
 Battery, and Troubleshooting. Button names match the context hints at the bottom
 of the menu. Settings includes short explanations of the selected options.
+
+Режим **Ultra / Ультра** в настройках производительности рисует каждый кадр
+в полном разрешении окна с целевой частотой текущего экрана (например,
+60/120/144 Гц; запасное значение — 60 Гц). Автоматическое снижение разрешения
+отключено; фактический FPS зависит от GPU и сложности пресета.

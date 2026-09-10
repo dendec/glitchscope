@@ -20,7 +20,7 @@
       {
         "title": "Trong menu",
         "lines": [
-          "**Navigation**",
+          "**Điều hướng**",
           "{move} dùng để di chuyển vị trí chọn. Giữ để cuộn nhanh hơn.",
           "{focus} chuyển đổi giữa các bảng điều khiển.",
           "{select} mở mục được chọn hoặc áp dụng giá trị tương ứng.",
@@ -106,9 +106,10 @@
       {
         "title": "Hiệu năng",
         "lines": [
-          "Chế độ Performance ưu tiên chất lượng hiển thị và đặt mục tiêu 30 FPS.",
-          "Chế độ Balanced đặt mục tiêu 24 FPS với giới hạn độ phân giải thấp hơn.",
-          "Chế độ Eco ưu tiên thời lượng pin với giới hạn độ phân giải thấp hơn và tốc độ nâng cấp độ phân giải chậm hơn.",
+          "Ultra: Độ phân giải đầy đủ, tốc độ khung hình lên đến tần số quét màn hình. Luôn giữ chất lượng cao nhất.",
+          "Hiệu năng: Hình ảnh giàu chi tiết với tốc độ mục tiêu 30 FPS.",
+          "Cân bằng: Cân bằng chất lượng hình ảnh và thời lượng pin với mục tiêu 24 FPS.",
+          "Tiết kiệm: Giảm độ phân giải và đặt mục tiêu 24 FPS để tiết kiệm pin.",
           "Độ phân giải tự động sẽ điều chỉnh theo thiết lập hiện tại. Nếu độ phân giải cố định được kích hoạt, việc điều chỉnh này sẽ bị vô hiệu hóa.",
           "Nếu độ phân giải thấp nhất vẫn khiến tốc độ chạy quá chậm, bạn có thể bỏ qua thiết lập có tải cao."
         ]
@@ -912,7 +913,7 @@
       "",
       "Các chế độ Hiệu năng, Cân bằng và Tiết kiệm sẽ điều chỉnh chất lượng hình ảnh tùy theo thiết bị. Bạn cũng có thể tắt bộ hiển thị biểu đồ khi chỉ phát nhạc.",
       "",
-      "**Project**",
+      "**Dự án**",
       "https://github.com/dendec/glitchscope",
       "Được cấp phép theo giấy phép GPL-2.0-or-later."
     ]

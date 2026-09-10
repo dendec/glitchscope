@@ -56,6 +56,10 @@ func BuildSettingsRowsWithCatalog(s config.Settings, winW, winH int, catalog i18
 	resolutions := config.ComputeResolutions(winW, winH)
 	resValues, resIndex := buildResolutionValuesWithLabels(s, resolutions, catalog.Text(i18n.ValueAuto), catalog.Text(i18n.ValueUnavailable))
 
+	if s.Graphics.PerformanceMode == config.PerfModeUltra {
+		resValues, resIndex = []string{fmt.Sprintf("%dx%d", winW, winH)}, 0
+	}
+
 	filterValues := []string{catalog.Text(i18n.ValueSmooth), catalog.Text(i18n.ValuePixel)}
 	filterIndex := comparableIndex(config.AllFilters(), s.Graphics.UpscaleFilter)
 	repeatValues := []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueRepeatOne), catalog.Text(i18n.ValueRepeatAll)}
@@ -65,10 +69,21 @@ func BuildSettingsRowsWithCatalog(s config.Settings, winW, winH int, catalog i18
 	shuffleIndex := comparableIndex(config.AllShuffleModes(), s.Playback.ShuffleMode)
 	themeValues, themeIndex := optionPair(config.AllThemes(), s.UI.Theme)
 	transValues, transIndex := optionPair(config.AllTransparencies(), s.UI.Transparency)
-	perfValues := []string{catalog.Text(i18n.ValuePerformance), catalog.Text(i18n.ValueBalanced), catalog.Text(i18n.ValueEco)}
+	perfModes := config.AllPerformanceModes()
+	perfValues := make([]string, len(perfModes))
+	for i, mode := range perfModes {
+		label, _ := performanceTextKeys(mode)
+		perfValues[i] = catalog.Text(label)
+	}
 	perfIndex := comparableIndex(config.AllPerformanceModes(), s.Graphics.PerformanceMode)
-	cacheRetentionValues, cacheRetentionIndex := optionPair(config.AllCacheRetentions(), s.TrackCache.Retention)
-	cacheSizeValues, cacheSizeIndex := optionPair(config.AllCacheSizeLimits(), s.TrackCache.MaxBytes)
+	cacheRetentionValues, cacheRetentionIndex := localizedCacheRetentions(catalog, s.TrackCache.Retention)
+	cacheSizes := config.AllCacheSizeLimits()
+	cacheSizeValues, cacheSizeIndex := optionPair(cacheSizes, s.TrackCache.MaxBytes)
+	for i, size := range cacheSizes {
+		if size == config.CacheUnlimited {
+			cacheSizeValues[i] = catalog.Text(i18n.CacheUnlimited)
+		}
+	}
 	languages := config.AllLanguages()
 	languageValues := make([]string, len(languages))
 	languageIndex := 0
@@ -179,13 +194,10 @@ func boolIndex(v bool) int {
 func settingDescription(catalog i18n.Catalog, setting, value int) string {
 	switch setting {
 	case SettingPerformanceMode:
-		switch value {
-		case 0:
-			return catalog.Text(i18n.DescriptionPerformance)
-		case 1:
-			return catalog.Text(i18n.DescriptionBalanced)
-		case 2:
-			return catalog.Text(i18n.DescriptionEco)
+		modes := config.AllPerformanceModes()
+		if value >= 0 && value < len(modes) {
+			_, description := performanceTextKeys(modes[value])
+			return catalog.Text(description)
 		}
 	case SettingVisualizer:
 		if value == 0 {
@@ -225,4 +237,44 @@ func settingDescription(catalog i18n.Catalog, setting, value int) string {
 		return catalog.Text(i18n.DescriptionCacheSize)
 	}
 	return ""
+}
+
+func performanceTextKeys(mode config.PerformanceMode) (i18n.Key, i18n.Key) {
+	switch mode {
+	case config.PerfModeUltra:
+		return i18n.ValueUltra, i18n.DescriptionUltra
+	case config.PerfModeBalanced:
+		return i18n.ValueBalanced, i18n.DescriptionBalanced
+	case config.PerfModeEco:
+		return i18n.ValueEco, i18n.DescriptionEco
+	default:
+		return i18n.ValuePerformance, i18n.DescriptionPerformance
+	}
+}
+
+// The resolution row has one fixed choice in Ultra; its description must not
+// suggest that the adaptive setting can lower the resolution.
+func (o *Overlay) selectedSettingDescription(setting, value int) string {
+	if setting == SettingResolution && len(o.settingsRows[SettingResolution].Values) == 1 {
+		return o.catalog.Text(i18n.DescriptionUltra)
+	}
+	return settingDescription(o.catalog, setting, value)
+}
+
+func localizedCacheRetentions(catalog i18n.Catalog, current config.CacheRetention) ([]string, int) {
+	all := config.AllCacheRetentions()
+	keys := map[config.CacheRetention]i18n.Key{
+		config.CacheDoNotKeep:  i18n.CacheNone,
+		config.CacheOneDay:     i18n.CacheOneDay,
+		config.CacheSevenDays:  i18n.CacheSevenDays,
+		config.CacheThirtyDays: i18n.CacheThirtyDays,
+		config.CacheNinetyDays: i18n.CacheNinetyDays,
+		config.CacheSixMonths:  i18n.CacheSixMonths,
+		config.CacheForever:    i18n.CacheForever,
+	}
+	values := make([]string, len(all))
+	for i, retention := range all {
+		values[i] = catalog.Text(keys[retention])
+	}
+	return values, comparableIndex(all, current)
 }

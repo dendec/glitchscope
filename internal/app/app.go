@@ -180,6 +180,8 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	resolutions := config.ComputeResolutions(int(w), int(h))
 	var renderW, renderH int
 	switch {
+	case gs.Graphics.PerformanceMode == config.PerfModeUltra:
+		renderW, renderH = int(w), int(h)
 	case gs.Graphics.Adaptive && len(resolutions) > 0:
 		a.adaptive.Reset(int(w), int(h), gs.Graphics.PerformanceMode.Params())
 		renderW, renderH = a.adaptive.resolutions[a.adaptive.index].Width, a.adaptive.resolutions[a.adaptive.index].Height

@@ -70,7 +70,7 @@ func TestActionHintsSourceRoot(t *testing.T) {
 		{Key: "Up/Down", Label: "Item"},
 	}
 	// Pages + (no play/pause) are appended as common hints.
-	want = append(want, UIHint{Key: "P/N", Label: "Screens"})
+	want = append(want, UIHint{Key: "P/N", Label: "Pages"})
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(source root) = %v, want %v", got, want)
 	}
@@ -87,7 +87,7 @@ func TestActionHintsNCLeftPanel(t *testing.T) {
 		{Key: "Enter", Label: "Open"},
 		{Key: "Backspace", Label: "Up"},
 		{Key: "Up/Down", Label: "Item"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(NC left) = %v, want %v", got, want)
@@ -100,7 +100,7 @@ func TestActionHintsNCRightPlay(t *testing.T) {
 	want := []UIHint{
 		{Key: "Enter", Label: "Play"},
 		{Key: "Backspace", Label: "Left panel"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(NC Play) = %v, want %v", got, want)
@@ -113,7 +113,7 @@ func TestActionHintsNCRightDelete(t *testing.T) {
 	want := []UIHint{
 		{Key: "Enter", Label: "Delete"},
 		{Key: "Backspace", Label: "Left panel"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(NC Delete) = %v, want %v", got, want)
@@ -142,7 +142,7 @@ func TestActionHintsSettingsEditing(t *testing.T) {
 		{Key: "Enter", Label: "Apply"},
 		{Key: "Backspace", Label: "Cancel"},
 		{Key: "Up/Down", Label: "Value"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(settings editing) = %v, want %v", got, want)
@@ -157,7 +157,7 @@ func TestActionHintsSettingsBrowse(t *testing.T) {
 		{Key: "Enter", Label: "Edit"},
 		{Key: "Backspace", Label: "Exit"},
 		{Key: "Up/Down", Label: "Setting"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(settings browse) = %v, want %v", got, want)
@@ -172,7 +172,7 @@ func TestActionHintsHelpContent(t *testing.T) {
 	want := []UIHint{
 		{Key: "Backspace", Label: "Topics"},
 		{Key: "Up/Down", Label: "Scroll"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(help content) = %v, want %v", got, want)
@@ -189,7 +189,7 @@ func TestActionHintsHelpTopics(t *testing.T) {
 		{Key: "Enter", Label: "Open"},
 		{Key: "Backspace", Label: "Back"},
 		{Key: "Up/Down", Label: "Topic"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(help topics) = %v, want %v", got, want)
@@ -205,7 +205,7 @@ func TestActionHintsHelpLeafHasNoOpen(t *testing.T) {
 	want := []UIHint{
 		{Key: "Backspace", Label: "Back"},
 		{Key: "Up/Down", Label: "Topic"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(help leaf) = %v, want %v", got, want)
@@ -231,7 +231,7 @@ func TestActionHintsGamepadMapping(t *testing.T) {
 		{Key: "D-pad", Label: "Move"},
 		{Key: "B", Label: "Back"},
 		{Key: "A", Label: "Open"},
-		{Key: "L1/R1", Label: "Screens"},
+		{Key: "L1/R1", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(gamepad presets) = %v, want %v", got, want)
@@ -294,7 +294,7 @@ func TestActionHintsPresetsDirectory(t *testing.T) {
 		{Key: "Up/Down", Label: "Move"},
 		{Key: "Backspace", Label: "Back"},
 		{Key: "Enter", Label: "Open"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(presets dir) = %v, want %v", got, want)
@@ -319,7 +319,7 @@ func TestActionHintsPresetsLeaf(t *testing.T) {
 		{Key: "Up/Down", Label: "Move"},
 		{Key: "Backspace", Label: "Back"},
 		{Key: "Enter", Label: "Load"},
-		{Key: "P/N", Label: "Screens"},
+		{Key: "P/N", Label: "Pages"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActionHints(presets leaf) = %v, want %v", got, want)

@@ -89,10 +89,10 @@
         "lines": [
           "Select a track outside Favorites playlists and follow the Favorite hint in the footer.",
           "A short press cycles Star / Heart / Note / None.",
-            "{gamepad_heading}",
+          "{gamepad_heading}",
           "Hold {favourite} to remove the selected track from favorites.",
           "Outside track browsing, {play} is Play / Pause.",
-            "{keyboard_heading}",
+          "{keyboard_heading}",
           "F cycles the favorite; Delete removes it.",
           ""
         ]
@@ -106,9 +106,10 @@
       {
         "title": "Performance",
         "lines": [
-          "Performance prioritizes visualizer quality and targets 30 FPS.",
-          "Balanced targets 24 FPS with a lower resolution ceiling.",
-          "Eco prioritizes battery life with a lower resolution ceiling and slower upscaling.",
+          "Ultra: Full resolution, with a frame rate up to your display’s refresh rate. Quality stays at its maximum.",
+          "Performance: Rich visual detail at a target of 30 FPS.",
+          "Balanced: A balance of detail and battery life, targeting 24 FPS.",
+          "Eco: Lower resolution and a target of 24 FPS to extend battery life.",
           "Auto resolution adjusts to the current preset. A fixed resolution disables this adjustment.",
           "A heavy preset can be skipped if the lowest resolution is still too slow."
         ]

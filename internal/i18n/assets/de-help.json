@@ -106,9 +106,10 @@
       {
         "title": "Leistung",
         "lines": [
-          "Bei der Leistungsstufe hat die Qualität des Visualizers Vorrang, wobei ein Zielwert von 30 FPS angestrebt wird.",
-          "Bei der ausgewogenen Stufe wird mit 24 FPS ein Zielwert verfolgt, wobei die maximale Auflösung geringer ist.",
-          "Bei der energiesparenden Stufe steht die Akkulaufzeit im Vordergrund, wobei die maximale Auflösung geringer ist und die Aufskalierung langsamer erfolgt.",
+          "Ultra: Volle Auflösung und eine Bildrate bis zur Bildwiederholrate des Displays, bei durchgehend höchster Qualität.",
+          "Leistung: Hohe Detailqualität mit einem Ziel von 30 FPS.",
+          "Ausgewogen: Ausgewogene Bildqualität und Akkulaufzeit mit einem Ziel von 24 FPS.",
+          "Energiesparen: Niedrigere Auflösung und ein Ziel von 24 FPS für längere Akkulaufzeit.",
           "Die automatische Auflösung passt sich der aktuellen Einstellung an. Bei einer festen Auflösung wird diese Anpassung deaktiviert.",
           "Wenn selbst bei der niedrigsten Auflösung die Geschwindigkeit immer noch zu langsam ist, kann auf eine ressourcenintensive Einstellung verzichtet werden."
         ]
@@ -912,7 +913,7 @@
       "",
       "Die Modi Performance, Balanced und Eco passen die Visualqualität an das Gerät an. Der Visualizer kann auch deaktiviert werden, um ausschließlich Musik abzuspielen.",
       "",
-      "**Project**",
+      "**Projekt**",
       "https://github.com/dendec/glitchscope",
       "Lizenziert unter GPL-2.0-or-later."
     ]

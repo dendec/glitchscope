@@ -77,7 +77,7 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 		if o.settingsEditing {
 			value = o.settingsValueCursor
 		}
-		description := settingDescription(o.catalog, o.settingsCursor, value)
+		description := o.selectedSettingDescription(o.settingsCursor, value)
 		if description != "" && maxRows-len(rightRows) >= 2 {
 			rightRows = append(rightRows, listRow{})
 			lines := wrapHelpLines([]string{description}, o.face, maxTextPx)

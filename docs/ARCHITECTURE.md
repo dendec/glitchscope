@@ -88,7 +88,7 @@ NC сохраняет статус listing для явного отображе�
 систему. Playback и индекс обновляются только после успешного удаления;
 ошибка rescan явно показывается как частично неизвестное состояние.
 
-Основной цикл обрабатывает ввод и UI с частотой до 60 Гц, а главный projectM
+Основной цикл обрабатывает ввод и UI с частотой до 60 Гц (в Ultra — с частотой текущего дисплея), а главный projectM
 планируется независимо с частотой выбранного performance mode. GL-операции остаются на закреплённом
 main thread; между кадрами визуализации выводится последняя захваченная текстура.
 Показатель `FPS` и adaptive resolution используют частоту завершённых кадров
@@ -186,3 +186,15 @@ read-only fallback по известным CFW-файлам, device tree, `/proc
 immutable metadata provider-specific shuffle indexes. Открытие темы лениво
 запускает обычную сборку индекса, если shuffle был выключен при старте; Help не
 обходит каталоги и не владеет их данными.
+
+Ultra renders on every loop iteration at the current SDL display refresh rate
+(60 Hz fallback), checked once per second for display moves/mode changes.
+It uses the full drawable window resolution, overrides the resolution selector,
+and bypasses adaptive quality reduction and learned preset resolution profiles.
+GPU overload reduces achieved FPS without lowering resolution. Existing modes
+retain their cadence; Ultra uses software pacing with the existing VSync-off policy.
+
+На странице Presets каждый вывод UI начинается с привязки и очистки экранного
+framebuffer, даже если превью пропустило кадр по таймеру. Привязка и инъекция
+в feedback главного projectM на этой странице запрещены: главный визуализатор
+приостановлен, а обновление текста не зависит от частоты превью.

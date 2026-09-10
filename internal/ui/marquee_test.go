@@ -44,3 +44,19 @@ func TestMarqueeWaitsBeforeScrolling(t *testing.T) {
 		t.Fatalf("offset after one second = %v, want %v", m.offset, marqueeSpeed)
 	}
 }
+
+// The preview can render at 25 FPS while the UI presents at 60–240 Hz.
+// Its independent cadence must not affect text travel over the same time.
+func TestMarqueeDistanceIndependentOfPresentationRate(t *testing.T) {
+	start := time.Unix(0, 0)
+	for _, hz := range []int{25, 60, 120, 144, 240} {
+		m := marqueeState{tex: 1, texW: 1000}
+		o := &Overlay{}
+		for frame := 0; frame <= hz*3; frame++ {
+			o.updateMarqueeCol(&m, start.Add(time.Duration(frame)*time.Second/time.Duration(hz)))
+		}
+		if m.offset != 2*marqueeSpeed {
+			t.Fatalf("%d Hz: distance=%v, want %v", hz, m.offset, 2*marqueeSpeed)
+		}
+	}
+}

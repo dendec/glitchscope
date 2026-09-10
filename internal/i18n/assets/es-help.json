@@ -20,14 +20,14 @@
       {
         "title": "En el menú",
         "lines": [
-          "**Navigation**",
+          "**Navegación**",
           "{move} mueve la selección. Manténgalo presionado para desplazarse más rápido.",
           "{focus} cambia los paneles.",
           "{select} abre el elemento seleccionado o aplica un valor.",
           "{back} vuelve atrás o cancela la edición.",
           "{pages} cambia de página.",
           "",
-          "**Menu**",
+          "**Menú**",
           "{menu} abre o cierra el menú.",
           "El pie de página muestra acciones relacionadas con la selección actual."
         ]
@@ -106,9 +106,10 @@
       {
         "title": "Rendimiento",
         "lines": [
-          "El modo Rendimiento da prioridad a la calidad del visualizador y busca alcanzar 30 FPS.",
-          "El modo Equilibrado busca 24 FPS con un límite de resolución más bajo.",
-          "El modo Eco prioriza la vida útil de la batería, con un límite de resolución más bajo y un escalado más lento.",
+          "Ultra: Resolución completa y hasta la frecuencia de actualización de la pantalla, sin reducir la calidad.",
+          "Rendimiento: Gran nivel de detalle, con un objetivo de 30 FPS.",
+          "Equilibrado: Equilibrio entre calidad y autonomía, con un objetivo de 24 FPS.",
+          "Eco: Menor resolución y un objetivo de 24 FPS para prolongar la autonomía.",
           "La resolución automática se ajusta según la configuración preestablecida actual. Una resolución fija desactiva este ajuste.",
           "Se puede omitir una configuración de alto rendimiento si la resolución más baja sigue siendo demasiado lenta."
         ]
@@ -912,7 +913,7 @@
       "",
       "Los modos Rendimiento, Equilibrado y Ecológico adaptan la calidad visual al dispositivo. También es posible desactivar el visualizador para reproducciones exclusivas de música.",
       "",
-      "**Project**",
+      "**Proyecto**",
       "https://github.com/dendec/glitchscope",
       "Licenciado bajo GPL-2.0-o-más-reciente."
     ]

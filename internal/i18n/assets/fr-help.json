@@ -106,9 +106,10 @@
       {
         "title": "Performance",
         "lines": [
-          "Le mode Performance privilégie la qualité du visualiseur et vise 30 FPS.",
-          "Le mode Équilibré vise 24 FPS avec une limite de résolution plus basse.",
-          "Le mode Éco privilégie l’autonomie de la batterie, avec une limite de résolution plus basse et un upscaling plus lent.",
+          "Ultra: Pleine résolution, jusqu’à la fréquence de rafraîchissement de l’écran, sans réduction de qualité.",
+          "Performance: Un rendu détaillé, avec une cible de 30 images/s.",
+          "Équilibré: Un équilibre entre qualité et autonomie, avec une cible de 24 images/s.",
+          "Éco: Une résolution réduite et une cible de 24 images/s pour prolonger l’autonomie.",
           "La résolution automatique s’adapte à la préférence actuelle. Une résolution fixe désactive cet ajustement.",
           "Un preset lourd peut être ignoré si la résolution la plus basse reste trop lente."
         ]
@@ -912,7 +913,7 @@
       "",
       "Les modes Performance, Équilibré et Éco adaptent la qualité visuelle en fonction du dispositif. Le visualiseur peut également être désactivé pour une lecture uniquement audio.",
       "",
-      "**Project**",
+      "**Projet**",
       "https://github.com/dendec/glitchscope",
       "Licencié sous GPL-2.0-or-later."
     ]

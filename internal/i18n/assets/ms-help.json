@@ -106,9 +106,10 @@
       {
         "title": "Prestasi",
         "lines": [
-          "Prestasi mengutamakan kualiti visualizer dan mengekalkan kadar 30 FPS.",
-          "Mod Seimbang menetapkan sasaran 24 FPS dengan had resolusi yang lebih rendah.",
-          "Mod Eco mengutamakan jangka hayat bateri dengan had resolusi yang lebih rendah serta proses peningkatan resolusi yang lebih perlahan.",
+          "Ultra: Resolusi penuh sehingga kadar segar semula skrin, dengan kualiti visual kekal maksimum.",
+          "Prestasi: Perincian visual tinggi dengan sasaran 30 FPS.",
+          "Seimbang: Keseimbangan kualiti dan hayat bateri dengan sasaran 24 FPS.",
+          "Jimat kuasa: Resolusi lebih rendah dengan sasaran 24 FPS untuk menjimatkan bateri.",
           "Resolusi automatik akan disesuaikan mengikut tetapan semasa. Resolusi tetap akan melumpuhkan penyesuaian ini.",
           "Tetapan yang berat boleh diabaikan jika resolusi paling rendah masih terlalu perlahan."
         ]
@@ -912,7 +913,7 @@
       "",
       "Mod Prestasi, Seimbang, dan Ekonomi menyesuaikan kualiti visual mengikut peranti. Visualizer juga boleh dimatikan untuk mod pemainan muzik sahaja.",
       "",
-      "**Project**",
+      "**Projek**",
       "https://github.com/dendec/glitchscope",
       "Dilesenkan di bawah GPL-2.0-or-later."
     ]

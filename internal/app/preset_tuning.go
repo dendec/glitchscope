@@ -86,7 +86,7 @@ func (a *App) presetProfileKey(name string) presetProfileKey {
 
 func (a *App) activatePresetProfile(name string, data []byte) {
 	profile := a.presetTuning.activate(a.presetProfileKey(name), data)
-	if !a.settings.Graphics.Adaptive || !profile.ready {
+	if a.settings.Graphics.PerformanceMode == config.PerfModeUltra || !a.settings.Graphics.Adaptive || !profile.ready {
 		return
 	}
 	index := max(profile.index, a.settings.Graphics.PerformanceMode.Params().AdaptiveMaxIndex)

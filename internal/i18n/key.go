@@ -70,6 +70,7 @@ const (
 	ValueShuffleAlbum     Key = "values.shuffle_album"
 	ValueShuffleSource    Key = "values.shuffle_source"
 	ValueShuffleAll       Key = "values.shuffle_all"
+	ValueUltra            Key = "values.ultra"
 	ValuePerformance      Key = "values.performance"
 	ValueBalanced         Key = "values.balanced"
 	ValueEco              Key = "values.eco"
@@ -77,6 +78,7 @@ const (
 	ValueOnline           Key = "values.online"
 	ValueOffline          Key = "values.offline"
 
+	DescriptionUltra            Key = "descriptions.ultra"
 	DescriptionPerformance      Key = "descriptions.performance"
 	DescriptionBalanced         Key = "descriptions.balanced"
 	DescriptionEco              Key = "descriptions.eco"
@@ -123,4 +125,16 @@ const (
 	SourceMicrophoneCapturing   Key = "sources.microphone_capturing"
 	SourceStopCapture           Key = "sources.stop_capture"
 	SourceNoInputDevices        Key = "sources.no_input_devices"
+)
+
+// Localized cache choices; persistence remains owned by config.
+const (
+	CacheNone       Key = "cache.none"
+	CacheOneDay     Key = "cache.one_day"
+	CacheSevenDays  Key = "cache.seven_days"
+	CacheThirtyDays Key = "cache.thirty_days"
+	CacheNinetyDays Key = "cache.ninety_days"
+	CacheSixMonths  Key = "cache.six_months"
+	CacheForever    Key = "cache.forever"
+	CacheUnlimited  Key = "cache.unlimited"
 )

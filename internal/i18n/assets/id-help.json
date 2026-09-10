@@ -106,9 +106,10 @@
       {
         "title": "Kinerja",
         "lines": [
-          "Mode Kinerja menekankan kualitas visualizer dengan target 30 FPS.",
-          "Mode Seimbang menargetkan 24 FPS dengan batas resolusi yang lebih rendah.",
-          "Mode Eco memprioritaskan daya baterai dengan batas resolusi yang lebih rendah dan proses upscaling yang lebih lambat.",
+          "Ultra: Resolusi penuh hingga laju penyegaran layar, dengan kualitas visual tetap maksimal.",
+          "Kinerja: Detail visual tinggi dengan target 30 FPS.",
+          "Seimbang: Keseimbangan kualitas dan daya tahan baterai dengan target 24 FPS.",
+          "Hemat daya: Resolusi lebih rendah dengan target 24 FPS untuk menghemat baterai.",
           "Resolusi Otomatis menyesuaikan diri dengan preset saat ini. Resolusi tetap menonaktifkan penyesuaian ini.",
           "Preset yang berat dapat diabaikan jika resolusi terendah tetap terlalu lambat."
         ]
@@ -912,7 +913,7 @@
       "",
       "Mode Performa, Seimbang, dan Ekonomis menyesuaikan kualitas visual sesuai perangkat. Visualizer juga dapat dinonaktifkan untuk pemutaran musik saja.",
       "",
-      "**Project**",
+      "**Proyek**",
       "https://github.com/dendec/glitchscope",
       "Dilisensikan di bawah GPL-2.0-or-later."
     ]

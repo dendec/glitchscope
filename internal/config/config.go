@@ -77,6 +77,7 @@ const (
 	PerfModePerformance PerformanceMode = iota // 30 FPS visualizer, default
 	PerfModeBalanced                           // 24 FPS, moderate savings
 	PerfModeEco                                // 24 FPS, lower resolution for battery life
+	PerfModeUltra                              // native resolution at display refresh rate
 )
 
 // ModeParams holds the tuning knobs for one performance mode.
@@ -99,6 +100,10 @@ type ModeParams struct {
 // Params returns the tuning parameters for mode m.
 func (m PerformanceMode) Params() ModeParams {
 	switch m {
+	case PerfModeUltra:
+		p := PerfModePerformance.Params()
+		p.VisualizerFPS = 60 // fallback until the display rate is known
+		return p
 	case PerfModeBalanced:
 		return ModeParams{
 			VisualizerFPS:      24,
@@ -143,6 +148,8 @@ func (m PerformanceMode) Params() ModeParams {
 
 func (m PerformanceMode) String() string {
 	switch m {
+	case PerfModeUltra:
+		return "Ultra"
 	case PerfModePerformance:
 		return "Performance"
 	case PerfModeBalanced:
@@ -168,6 +175,8 @@ func (m *PerformanceMode) UnmarshalJSON(data []byte) error {
 		*m = PerfModePerformance
 	case "Balanced":
 		*m = PerfModeBalanced
+	case "Ultra":
+		*m = PerfModeUltra
 	case "Eco":
 		*m = PerfModeEco
 	default:
@@ -178,7 +187,7 @@ func (m *PerformanceMode) UnmarshalJSON(data []byte) error {
 
 func (m PerformanceMode) Validate() error {
 	switch m {
-	case PerfModePerformance, PerfModeBalanced, PerfModeEco:
+	case PerfModePerformance, PerfModeBalanced, PerfModeEco, PerfModeUltra:
 		return nil
 	default:
 		return fmt.Errorf("invalid performance mode %d", m)
@@ -187,7 +196,7 @@ func (m PerformanceMode) Validate() error {
 
 // AllPerformanceModes returns all valid performance modes.
 func AllPerformanceModes() []PerformanceMode {
-	return []PerformanceMode{PerfModePerformance, PerfModeBalanced, PerfModeEco}
+	return []PerformanceMode{PerfModeUltra, PerfModePerformance, PerfModeBalanced, PerfModeEco}
 }
 
 // GraphicsSettings is the persisted user-tunable graphics parameters.

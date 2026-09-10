@@ -20,7 +20,7 @@
       {
         "title": "No menu",
         "lines": [
-          "**Navigation**",
+          "**Navegação**",
           "{move} move a seleção. Mantenha pressionado para rolar mais rápido.",
           "{focus} alterna entre os painéis.",
           "{select} abre o item selecionado ou aplica um valor.",
@@ -106,9 +106,10 @@
       {
         "title": "Desempenho",
         "lines": [
-          "O modo Desempenho dá prioridade à qualidade do visualizador, visando 30 FPS.",
-          "O modo Equilibrado visa 24 FPS com um limite de resolução mais baixo.",
-          "O modo Eco prioriza a duração da bateria, com um limite de resolução mais baixo e upscale mais lento.",
+          "Ultra: Resolução total, com quadros até a taxa de atualização da tela, sem reduzir a qualidade.",
+          "Desempenho: Alto nível de detalhe, com meta de 30 FPS.",
+          "Equilibrado: Equilíbrio entre qualidade e autonomia, com meta de 24 FPS.",
+          "Econômico: Resolução reduzida e meta de 24 FPS para economizar bateria.",
           "A resolução automática se ajusta ao preset atual. Uma resolução fixa desativa esse ajuste.",
           "Um preset pesado pode ser ignorado se a menor resolução ainda for muito lenta."
         ]
@@ -912,7 +913,7 @@
       "",
       "Os modos Desempenho, Equilibrado e Ecológico ajustam a qualidade visual de acordo com o dispositivo. O visualizador também pode ser desativado para reprodução apenas de música.",
       "",
-      "**Project**",
+      "**Projeto**",
       "https://github.com/dendec/glitchscope",
       "Licenciado sob GPL-2.0-or-later."
     ]

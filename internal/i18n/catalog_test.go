@@ -2,6 +2,8 @@ package i18n
 
 import (
 	"encoding/json"
+	"regexp"
+	"slices"
 	"testing"
 )
 
@@ -65,6 +67,28 @@ func TestPluralRules(t *testing.T) {
 	for _, test := range tests {
 		if got := pluralForm(test.language, test.n); got != test.want {
 			t.Errorf("%s %d = %s, want %s", test.language, test.n, got, test.want)
+		}
+	}
+}
+
+// Format strings are part of the caller contract, even when their wording changes.
+func TestTranslationsPreserveFormatArguments(t *testing.T) {
+	pattern := regexp.MustCompile(`%(?:[0-9]+)?(?:\.[0-9]+)?[dsf]`)
+	english, err := loadAsset(English)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for language := range supportedLanguages {
+		catalog, loadErr := loadAsset(language)
+		if loadErr != nil {
+			t.Fatal(loadErr)
+		}
+		for key, source := range english {
+			want := pattern.FindAllString(source, -1)
+			got := pattern.FindAllString(catalog[key], -1)
+			if !slices.Equal(got, want) {
+				t.Errorf("%s %s: format arguments %v, want %v", language, key, got, want)
+			}
 		}
 	}
 }

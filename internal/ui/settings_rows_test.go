@@ -14,7 +14,7 @@ func TestSettingsRowsUseCompactSectionsAndLabels(t *testing.T) {
 		"── Playback ────", "Shuffle", "Repeat",
 		"── Visualization ──", "Performance", "Visualizer", "Rotation", "Resolution", "Filter", "Sensitivity",
 		"── Appearance ───", "Language", "Theme", "Transparency", "Stats",
-		"── Cache ───────", "Size", "Lifetime",
+		"── Cache ───────", "Size", "Keep for",
 	}
 	if len(rows) != len(want) {
 		t.Fatalf("settings rows = %d, want %d", len(rows), len(want))
@@ -67,5 +67,63 @@ func TestLanguageSwitchPreservesUIStateAndInvalidatesText(t *testing.T) {
 	}
 	if got := o.helpTopic(HelpQuickStart).Title; got != "Начало работы" {
 		t.Fatalf("Russian Help title = %q", got)
+	}
+}
+
+func TestUltraSettingsRows(t *testing.T) {
+	s := config.DefaultSettings()
+	s.Graphics.PerformanceMode = config.PerfModeUltra
+	rows := BuildSettingsRows(s, 1920, 1080)
+	perf := rows[SettingPerformanceMode]
+	if perf.Values[perf.Index] != "Ultra" {
+		t.Fatalf("performance row: %+v", perf)
+	}
+	resolution := rows[SettingResolution]
+	if len(resolution.Values) != 1 || resolution.Values[resolution.Index] != "1920x1080" {
+		t.Fatalf("Ultra resolution: %+v", resolution)
+	}
+}
+
+func TestPerformanceChoicesDescendAndKeepDescriptions(t *testing.T) {
+	modes := []config.PerformanceMode{config.PerfModeUltra, config.PerfModePerformance, config.PerfModeBalanced, config.PerfModeEco}
+	labels := []i18n.Key{i18n.ValueUltra, i18n.ValuePerformance, i18n.ValueBalanced, i18n.ValueEco}
+	descriptions := []i18n.Key{i18n.DescriptionUltra, i18n.DescriptionPerformance, i18n.DescriptionBalanced, i18n.DescriptionEco}
+	for _, language := range config.AllLanguages() {
+		catalog := i18n.MustLoad(i18n.Language(language))
+		for index, mode := range modes {
+			settings := config.DefaultSettings()
+			settings.Graphics.PerformanceMode = mode
+			row := BuildSettingsRowsWithCatalog(settings, 640, 480, catalog)[SettingPerformanceMode]
+			if len(row.Values) != len(modes) || row.Index != index || row.Values[index] != catalog.Text(labels[index]) {
+				t.Fatalf("%v %v: %+v", language, mode, row)
+			}
+			if got := settingDescription(catalog, SettingPerformanceMode, index); got != catalog.Text(descriptions[index]) {
+				t.Fatalf("%v %v: mismatched description %q", language, mode, got)
+			}
+		}
+	}
+}
+
+func TestLocalizedCacheChoicesPreserveSelection(t *testing.T) {
+	catalog := i18n.MustLoad(i18n.Russian)
+	settings := config.DefaultSettings()
+	settings.TrackCache.Retention = config.CacheThirtyDays
+	settings.TrackCache.MaxBytes = config.CacheUnlimited
+	rows := BuildSettingsRowsWithCatalog(settings, 640, 480, catalog)
+	retention, size := rows[SettingCacheRetention], rows[SettingCacheSize]
+	if retention.Values[retention.Index] != "30 дней" || size.Values[size.Index] != "Без ограничений" {
+		t.Fatalf("cache choices: %+v, %+v", retention, size)
+	}
+}
+
+func TestUltraResolutionDescriptionIsFixed(t *testing.T) {
+	settings := config.DefaultSettings()
+	settings.Graphics.PerformanceMode = config.PerfModeUltra
+	o := &Overlay{
+		catalog:      i18n.MustLoad(i18n.English),
+		settingsRows: BuildSettingsRows(settings, 640, 480),
+	}
+	if got := o.selectedSettingDescription(SettingResolution, 0); got != o.catalog.Text(i18n.DescriptionUltra) {
+		t.Fatalf("Ultra resolution suggests adaptive behavior: %q", got)
 	}
 }
