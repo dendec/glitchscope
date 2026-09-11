@@ -162,7 +162,7 @@ func newEmpty(path string, writable bool) *Favorites {
 // normalisePath canonicalises a track path. Local paths get Abs+Clean; virtual
 // paths (with a known provider prefix) are kept as-is after basic validation.
 func normalisePath(track string) (string, error) {
-	if IsModland(track) || IsModArchive(track) {
+	if IsModland(track) || IsModArchive(track) || IsRadio(track) {
 		return track, nil
 	}
 	abs, err := filepath.Abs(track)
@@ -362,6 +362,9 @@ func (f *Favorites) Writable() bool { return f.writable }
 
 // FavoriteTrackTitle returns a display name for a favourited track path.
 func FavoriteTrackTitle(path string) string {
+	if IsRadio(path) {
+		return strings.TrimPrefix(path, RadioPrefix)
+	}
 	if IsModland(path) || IsModArchive(path) {
 		remote := RemotePath(path)
 		if u, err := url.Parse(remote); err == nil && u.Fragment != "" {
@@ -386,7 +389,7 @@ func FavoriteTrackTitle(path string) string {
 // IsLocalPath reports whether path is a local filesystem path (not a
 // catalog URL like modland:... or modarchive:...).
 func IsLocalPath(path string) bool {
-	return !IsModland(path) && !IsModArchive(path)
+	return !IsModland(path) && !IsModArchive(path) && !IsRadio(path)
 }
 
 // FilterAvailable returns only the tracks that exist on disk. Local files

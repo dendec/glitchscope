@@ -12,6 +12,7 @@ Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing 
 - **Graphics Settings** — Custom render resolution scaling (e.g., 320x240, 480x360, 640x480) and upscale filters (Smooth/Pixel)
 - **Playback Modes** — Shuffle (Album, Source, All) and Repeat (Off, Repeat One, Repeat All). Manual Next honors shuffle. Offline Shuffle All selects local music and already-downloaded remote tracks; Shuffle Source is restricted to the cached subset of the selected remote source. Connectivity is rechecked every 30 seconds. Failed loads are skipped, with bounded recovery to avoid an endless loop of broken tracks.
 - **Online Module Catalogs** — Browse Modland, yearly ModArchive additions, the 2007 official addendum, and the 1987-2007 ModArchive snapshot; bundled `1980-2007.gsa` and `2007-addendum.gsa` indexes provide offline navigation, while selected tracks are fetched individually with HTTP Range requests
+- **Internet Radio** — Browse Radio Browser stations by popularity, random selection, tag, language, or country; station listings are cached locally, MP3/AAC streams use the existing FFmpeg/SoLoud pipeline, and ICY track titles appear in the station panel. Local `.m3u`, `.m3u8`, and `.pls` station playlists are also supported. Basic unencrypted HLS is supported; byte ranges, gaps, discontinuities and changing init segments are rejected explicitly (see [radio review](docs/RADIO-REVIEW.md))
 - **Preset Auto-Switch** — Configurable timer-based preset rotation (Off, 15s, 30s, 60s, 2m)
 - **UI & Themes** — Clean 2-column interface with nine distinct color themes and customizable overlay transparency
 - **Localized UI & Help** — English, Russian, Simplified/Traditional Chinese, Japanese, Korean, Vietnamese, Thai, Indonesian, Malay, Brazilian Portuguese, Spanish, German, French, and Turkish; switch languages in Settings without restarting
@@ -24,6 +25,8 @@ Building via Docker handles all static C/C++ dependencies (`projectM`, `SoLoud`,
 ```bash
 # Build Docker builder image and AMD64 distribution package
 make dist
+# Set the version embedded in the binary, window title, and Go HTTP User-Agent.
+make VERSION=1.2 dist
 # Output: dist/linux-amd64/
 ```
 

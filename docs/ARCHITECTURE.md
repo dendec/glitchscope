@@ -15,9 +15,19 @@
 | Playback queue | `internal/app` playback state | player commands, overlay snapshot |
 | Удаление файлов | `internal/app/delete_service.go` | confirmation UI, rescan |
 | Favorites | `internal/player` (`favorites.go`) | overlay navigation, input actions, JSON storage |
+| Outbound Go HTTP transport and policy | `internal/util` | catalogs, connectivity probe, Radio Browser and ICY metadata |
 | Remote catalogs | `internal/modland`, `internal/modarchive` | provider navigation and downloads |
+| Internet radio directory and stream metadata | `internal/radio` | Radio navigation, station cache, player URL resolution, ICY panel data |
 | Provider-neutral directory cache | `internal/catalog` | provider loaders, shuffle selection, UI listings |
 | Downloaded track cache policy | `internal/player.TrackCache` | `internal/config`, downloader wiring, catalog UI |
+
+Радиопоток разделён на два слоя: `internal/radio.Client.OpenStream` владеет
+Go HTTP/ICY-транспортом и отдаёт очищенный от ICY metadata поток байт, а
+`internal/player` передаёт его в отдельный FFmpeg decoder worker. Native
+`FfmpegStream` держит bounded compressed/PCM buffers; SoLoud audio callback
+читает только готовый PCM и не выполняет сеть, DNS, reconnect или блокирующее
+декодирование. Базовые HLS master/media playlists и TS/fMP4 segments также
+собираются в `internal/radio` до передачи в тот же decoder pipeline.
 
 **Каталоговые альбомы** (modland/modarchive) хранятся в `lib.Albums` через
 `Library.AddCatalogAlbum`. Overlay создаёт альбомы on-the-fly во время навигации
@@ -210,3 +220,39 @@ retain their cadence; Ultra uses software pacing with the existing VSync-off pol
 framebuffer, даже если превью пропустило кадр по таймеру. Привязка и инъекция
 в feedback главного projectM на этой странице запрещены: главный визуализатор
 приостановлен, а обновление текста не зависит от частоты превью.
+
+## Radio and network execution boundaries
+
+All Go HTTP requests use `internal/util.Get`: connect/TLS timeout 5 s,
+response headers 15 s, at most three attempts, and 30 s per outstanding body
+read. The body deadline excludes consumer pauses and imposes no maximum stream
+lifetime. Closing a response cancels its request, including reconnect work.
+Directory requests have tighter operation deadlines.
+
+Radio loading owns a cancellable stream context, forwarded from the load request
+until prebuffer completes. It is then owned by the source, not the completed load
+worker. Stop/switch detaches the SoLoud voice and queues stream destruction off
+the UI thread; Player.Close waits for load, producer, watchdog and destruction
+workers. Only shutdown waits for native decoder joins. The PCM buffer is a
+preallocated SPSC ring (4 seconds stereo, 44.1 kHz); the audio callback uses only
+atomic indices and sample copies. Compressed input is capped at 2 MiB. A paused
+consumer applying backpressure is not classified as a network stall.
+
+Radio Browser listings, click notifications and favicon downloads run in workers.
+At most two favicon jobs run concurrently; decoding validates a 2 MP source
+budget, prepares a bitmap no larger than 256×256 off the GL thread, and the UI
+retains at most 32 prepared images. GL upload stays on the main thread.
+ModArchive cache misses also run in a cancellable worker with request IDs;
+navigation renders a loading entry and never calls the synchronous network API.
+
+A radio stream ending after startup enters bounded failure recovery, including
+under Repeat One. Live sources cannot seek or use the tracker restart fallback.
+Failed station descriptors remain available for manual retries and Favorites;
+imported playlist descriptors are persisted independently of the last source.
+Cache writes execute in submission order without waiting on disk from the UI.
+
+Basic HLS supports master/media playlists, sequence-based deduplication, redirects,
+and TS/fMP4 segment transport. Encrypted streams, byte ranges, gaps,
+discontinuities and changing initialization segments return explicit errors.
+Partial segment transfers are never replayed into the same decoder. See
+[RADIO-REVIEW.md](RADIO-REVIEW.md) for verification and remaining platform checks.

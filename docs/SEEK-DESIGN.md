@@ -204,3 +204,10 @@ through requestID, and Close cancels and waits for all workers.
 Verbose logging reports decode time and the kernel's process peak RSS (including
 native allocations). Peak RSS is a process-lifetime high-water mark, not memory
 attributed exclusively to the most recent track.
+
+## Live radio
+
+Radio has no seekable timeline. `Player.Seek` rejects radio before the
+non-seekable tracker restart fallback; keyboard/stick seek and saved-position
+restoration skip live sources. Resume restores the station and queue, not an
+offset inside the stream.

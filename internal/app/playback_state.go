@@ -178,6 +178,15 @@ func (s *playbackState) selectPlaybackContext(path string) {
 			return
 		}
 	}
+	// A restored or otherwise directly selected radio station has no local
+	// directory to derive a playlist from. Keep it in an isolated one-item
+	// radio queue so recovery can never fall back to the library's last track.
+	if player.IsRadio(path) {
+		s.playlist = []string{path}
+		s.playlistIdx = 0
+		s.playlistAlbum = "Radio"
+		return
+	}
 	s.playlist = nil
 	s.playlistIdx = -1
 	s.playlistAlbum = ""
@@ -320,6 +329,10 @@ func (s *playbackState) advance(settings config.PlaybackSettings) (trackRef, boo
 		return trackRef{}, false
 	}
 
+	if s.isRadioPlayback() {
+		return s.advanceRadio(settings)
+	}
+
 	if settings.Repeat == config.RepeatOne {
 		return s.repeatOne()
 	}
@@ -329,6 +342,50 @@ func (s *playbackState) advance(settings config.PlaybackSettings) (trackRef, boo
 	}
 
 	return s.advanceSequential(settings)
+}
+
+func (s *playbackState) isRadioPlayback() bool {
+	if s.pl != nil && player.IsRadio(s.pl.TrackPath()) {
+		return true
+	}
+	return s.playlistIdx >= 0 && s.playlistIdx < len(s.playlist) && player.IsRadio(s.playlist[s.playlistIdx])
+}
+
+func (s *playbackState) radioCurrentPath() string {
+	if s.pl != nil {
+		if path := s.pl.TrackPath(); player.IsRadio(path) {
+			return path
+		}
+	}
+	if s.playlistIdx >= 0 && s.playlistIdx < len(s.playlist) {
+		return s.playlist[s.playlistIdx]
+	}
+	return ""
+}
+
+// advanceRadio applies the same repeat/shuffle policy as other sources while
+// deliberately staying inside the active radio queue. In particular, a
+// failed stream must not advance through the local library by accident.
+func (s *playbackState) advanceRadio(settings config.PlaybackSettings) (trackRef, bool) {
+	if settings.Repeat == config.RepeatOne {
+		return s.repeatOne()
+	}
+	if settings.ShuffleMode == config.ShuffleOff {
+		return s.advancePlaylistSequential(settings)
+	}
+	if len(s.playlist) <= 1 {
+		if settings.Repeat == config.RepeatAll && len(s.playlist) == 1 {
+			return trackRef{path: s.playlist[0], album: s.playlistAlbum}, true
+		}
+		return trackRef{}, false
+	}
+
+	key := "radio:" + s.playlistKey()
+	if s.shuffle.needsRebuild(key, settings.Repeat) {
+		pool := excludeCurrentTrack(s.playlistTracks(), s.radioCurrentPath())
+		s.shuffle.build(pool, key)
+	}
+	return s.shuffle.next()
 }
 
 // repeatOne returns the current track regardless of context.
@@ -638,6 +695,9 @@ func (s *playbackState) currentAlbumTracks() []trackRef {
 }
 
 func (s *playbackState) currentSource() string {
+	if s.isRadioPlayback() {
+		return "radio"
+	}
 	if s.lib != nil {
 		album := s.lib.CurrentAlbum()
 		if player.IsModland(album.Path) {

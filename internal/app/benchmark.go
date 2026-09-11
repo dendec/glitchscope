@@ -371,7 +371,7 @@ func readBenchmarkedPresets(outPath string) map[string]bool {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			slog.Debug("readBenchmarkedPresets: close", "path", outPath, "error", err)
+			slog.Warn("readBenchmarkedPresets: close failed", "path", outPath, "error", err)
 		}
 	}()
 

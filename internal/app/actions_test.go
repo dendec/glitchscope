@@ -8,6 +8,7 @@ import (
 
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/radio"
 )
 
 func TestWalkAudioFiles(t *testing.T) {
@@ -248,6 +249,25 @@ func TestCanRestorePosition(t *testing.T) {
 				t.Fatalf("canRestorePosition(%+v, %t) = %t, want %t", test.position, test.allowRemote, got, test.want)
 			}
 		})
+	}
+}
+
+func TestCanRestoreRadioPosition(t *testing.T) {
+	client := radio.New(t.TempDir())
+	t.Cleanup(client.Close)
+	station := radio.Station{
+		StationUUID: "saved",
+		Name:        "Saved Radio",
+		URL:         "https://example.test/stream",
+	}
+	client.AddStations([]radio.Station{station})
+
+	a := App{radio: client}
+	if !a.canRestorePosition(config.PlaybackPosition{Path: station.Path()}, false) {
+		t.Fatal("radio station with cached metadata should be restorable")
+	}
+	if (&App{}).canRestorePosition(config.PlaybackPosition{Path: station.Path()}, false) {
+		t.Fatal("radio station without metadata should not be restorable")
 	}
 }
 

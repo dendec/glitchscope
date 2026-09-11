@@ -1,4 +1,5 @@
 APP      := glitchscope
+VERSION  ?= 1.0
 DIST_DIR := dist
 LOCAL_DIST_DIR := $(DIST_DIR)/local
 X64_DIST_DIR := $(DIST_DIR)/linux-amd64
@@ -61,9 +62,7 @@ DOCKER_ICON_RUN = docker run --rm --user "$$(id -u):$$(id -g)" -v "$(CURDIR):/bu
 
 # Builder image: C/C++ static dependencies compiled once for amd64 & arm64
 builder:
-	@if ! docker image inspect $(DOCKER_BUILDER) > /dev/null 2>&1; then \
-		docker build -t $(DOCKER_BUILDER) -f Dockerfile.builder .; \
-	fi
+	docker build -t $(DOCKER_BUILDER) -f Dockerfile.builder .
 
 subset-font:
 	@./scripts/subset-font.sh
@@ -107,7 +106,7 @@ modarchive-catalog: $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_AD
 
 # Docker build (amd64)
 dist: subset-font icons builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
-	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 -t glitchscope:amd64 -f Dockerfile .
+	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=amd64 --build-arg APP_VERSION=$(VERSION) -t glitchscope:amd64 -f Dockerfile .
 	@# Backup music directory if it exists before rm -rf.
 	@if [ -d "$(X64_DIST_DIR)/music" ]; then \
 		cp -r "$(X64_DIST_DIR)/music" "$(X64_DIST_DIR)/music.bak"; \
@@ -139,7 +138,7 @@ dist: subset-font icons builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATAL
 DOCKER_IMAGE_ARM64 := glitchscope:arm64
 
 dist-arm64: subset-font icons builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
-	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
+	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 --build-arg APP_VERSION=$(VERSION) -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
 	@rm -rf $(ARM64_DIST_DIR)
 	@mkdir -p $(ARM64_DIST_DIR)
 	@docker rm -f glitchscope-extract 2>/dev/null || true

@@ -7,6 +7,7 @@ import (
 
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/input"
+	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/presets"
 	"github.com/dendec/glitchscope/internal/projectm"
 	"github.com/dendec/glitchscope/internal/ui"
@@ -214,9 +215,10 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 		if selectedAlbum >= 0 {
 			trackAlbumIdx = selectedAlbum
 		}
+		playback := a.playbackState.snapshot(selectedAlbum, a.presenter.needsTrackInfos(trackAlbumIdx))
+		playback = a.resolveRadioPlayingInfo(playback)
 		a.presenter.Update(fpsAvg, a.settings.Graphics.Adaptive && a.settings.Graphics.PerformanceMode != config.PerfModeUltra,
-			a.settings.Graphics.RenderHeight, a.prof.ReadStats(),
-			a.playbackState.snapshot(selectedAlbum, a.presenter.needsTrackInfos(trackAlbumIdx)))
+			a.settings.Graphics.RenderHeight, a.prof.ReadStats(), playback)
 	}
 }
 
@@ -258,7 +260,7 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 	// Continuous seeking: velocity scales with stick deflection (or a held
 	// ,/. key) and accelerates when held at max for long enough. The
 	// discrete ±5s on a single ,/. press is still handled by the action.
-	if a.pl != nil {
+	if a.pl != nil && !player.IsRadio(a.pl.TrackPath()) {
 		state := sdl.GetKeyboardState()
 		var velocity float64
 		switch {
@@ -282,6 +284,7 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 }
 
 func (a *App) updateFramePlayback(now time.Time) {
+	a.pollRadio()
 	if !a.settings.Graphics.VisualizerOff && !a.onPresetsPage && a.pending.name != "" && now.After(a.pending.at) {
 		a.transitionPreset(a.pending.name)
 		a.pending = pendingPreset{}
@@ -303,37 +306,29 @@ func (a *App) updateFramePlayback(now time.Time) {
 		loadingPath := a.pl.TrackPath()
 		started, failed := a.pl.CheckPending()
 		if failed {
-			a.pruneTrackCache()
-			if a.overlay != nil {
-				a.overlay.ShowTrack(" playback error")
-			}
-			a.resumePath = ""
-			a.resumeSeconds = 0
-			if track, ok := a.nextAfterFailure(loadingPath, a.settings.Playback); ok {
-				a.startTrack(track.path, track.album)
-			} else {
-				slog.Warn("playback recovery stopped", "reason", "no next candidate or failure limit reached")
-				if a.overlay != nil {
-					a.overlay.ShowTrack("no playable track; select another track")
-				}
-			}
+			a.recoverPlaybackFailure(loadingPath)
 		} else {
 			// A load completed successfully. For catalog tracks the file
 			// may now be cached on disk, so the right panel must re-read
 			// its metadata (Cached, duration, comment) — even if the load
 			// finished before the presenter ever observed loading=true.
 			if started {
+				a.notifyRadioStarted(loadingPath)
 				a.failedTracks = nil
 				a.presenter.invalidateTrackInfos()
-				a.pruneTrackCache()
+				if !player.IsRadio(loadingPath) {
+					a.pruneTrackCache()
+				}
 			}
 			if a.resumeAttempted && a.resumePath != "" && a.pl.TrackPath() == a.resumePath && a.pl.IsValidVoice() {
 				resumePath := a.resumePath
-				if err := a.pl.Seek(a.resumeSeconds); err != nil {
-					slog.Warn("restore playback position", "path", resumePath, "error", err)
+				if !player.IsRadio(resumePath) {
+					if err := a.pl.Seek(a.resumeSeconds); err != nil {
+						slog.Warn("restore playback position", "path", resumePath, "error", err)
+					}
 				}
 				if a.overlay != nil && a.overlay.UIVisible() {
-					a.overlay.NavigateToTrack(resumePath)
+					a.navigateOverlayToTrack(resumePath)
 				}
 				a.resumePath = ""
 				a.resumeSeconds = 0
@@ -343,7 +338,12 @@ func (a *App) updateFramePlayback(now time.Time) {
 	}
 
 	if a.pl != nil && a.lib != nil && a.mic == nil && a.pl.Voice() != 0 && a.pl.TrackFinished() {
-		a.autoAdvance()
+		if path := a.pl.TrackPath(); player.IsRadio(path) {
+			a.pl.Stop()
+			a.recoverPlaybackFailure(path)
+		} else {
+			a.autoAdvance()
+		}
 	}
 }
 
@@ -476,11 +476,25 @@ func (a *App) leavePresetsPage() {
 // autoAdvance picks the next track based on shuffle/repeat settings.
 func (a *App) autoAdvance() {
 	if track, ok := a.playbackState.advance(a.settings.Playback); ok {
-		a.playTrack(track.path, track.album)
-		if a.overlay != nil {
-			a.overlay.NavigateToTrack(track.path)
-			a.presenter.invalidateTrackInfos()
+		a.playNextTrack(track)
+	}
+}
+
+// playNextTrack keeps the overlay synchronized with every automatic transition,
+// whether the previous track ended normally or failed to load. This is shared
+// by all sources so the cursor and right panel follow the newly selected track.
+func (a *App) playNextTrack(track trackRef) {
+	a.startTrack(track.path, track.album)
+	if a.overlay != nil {
+		if player.IsRadio(track.path) && a.radio != nil {
+			if station, ok := a.radio.Lookup(track.path); ok {
+				a.overlay.SetPlayingInfo(station.DisplayName(), track.path)
+			}
+		} else {
+			a.overlay.SetPlayingInfo(track.album, track.path)
 		}
+		a.navigateOverlayToTrack(track.path)
+		a.presenter.invalidateTrackInfos()
 	}
 }
 
@@ -573,4 +587,27 @@ func (a *App) displayRefreshRate() int32 {
 		return 60
 	}
 	return mode.RefreshRate
+}
+
+// recoverPlaybackFailure also handles a live stream ending after startup;
+// Repeat One must not trap the listener on a failed radio source.
+func (a *App) recoverPlaybackFailure(path string) {
+	if player.IsRadio(path) && a.radio != nil {
+		a.radio.MarkDead(path)
+	}
+	if !player.IsRadio(path) {
+		a.pruneTrackCache()
+	}
+	if a.overlay != nil {
+		a.overlay.ShowTrack(" playback error")
+	}
+	a.resumePath, a.resumeSeconds = "", 0
+	if track, ok := a.nextAfterFailure(path, a.settings.Playback); ok {
+		a.playNextTrack(track)
+	} else {
+		slog.Warn("playback recovery stopped", "reason", "no next candidate or failure limit reached")
+		if a.overlay != nil {
+			a.overlay.ShowTrack("no playable track; select another track")
+		}
+	}
 }

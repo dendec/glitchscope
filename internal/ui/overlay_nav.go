@@ -14,6 +14,7 @@ import (
 	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/modarchive"
 	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/radio"
 )
 
 // This file owns the library navigation model: local-album / modland / modarchive
@@ -56,32 +57,40 @@ const (
 	entryMicrophoneDevice                     // SDL capture device entry
 	entryMicrophoneStop                       // stops active capture
 	entryInfo                                 // non-selectable informational row
+	entryRadioCategory
+	entryRadioFilter
+	entryRadioStation
 )
 
 // navEntry is one row in the library's left (navigation) panel.
 type navEntry struct {
-	label    string
-	kind     navEntryKind
-	source   sourceKind // set when kind == entrySource
-	albumIdx int        // index into Overlay.allAlbums when kind is a leaf album, else -1
-	format   string     // set when kind == entryFormat
-	url      string     // set when kind == entryModArchiveDir
-	dirPath  string     // set when kind == entryNCDir
-	filePath string     // set when kind == entryNCFile
-	trackIdx int        // set when kind == entryCatalogTrack
-	device   string     // set when kind == entryMicrophoneDevice
+	label        string
+	kind         navEntryKind
+	source       sourceKind // set when kind == entrySource
+	albumIdx     int        // index into Overlay.allAlbums when kind is a leaf album, else -1
+	format       string     // set when kind == entryFormat
+	url          string     // set when kind == entryModArchiveDir
+	dirPath      string     // set when kind == entryNCDir
+	filePath     string     // set when kind == entryNCFile
+	trackIdx     int        // set when kind == entryCatalogTrack
+	device       string     // set when kind == entryMicrophoneDevice
+	radioKind    radio.BrowseKind
+	radioFilter  string
+	radioStation radio.Station
 }
 
 // navLevel is one visible listing in the unified navigation stack.
 // The stack bottom is the virtual source root; Back never pops it.
 type navLevel struct {
-	ctx        navCtx
-	entries    []navEntry
-	cursor     int
-	scroll     int
-	dirPath    string // ctxNC: the filesystem directory this level lists
-	label      string // ctxCatalog: breadcrumb label for this level
-	playlistID string // ctxFavorites: PlaylistID ("star", "heart", "note")
+	ctx         navCtx
+	entries     []navEntry
+	cursor      int
+	scroll      int
+	dirPath     string // ctxNC: the filesystem directory this level lists
+	label       string // ctxCatalog: breadcrumb label for this level
+	playlistID  string // ctxFavorites: PlaylistID ("star", "heart", "note")
+	radioKind   radio.BrowseKind
+	radioFilter string
 }
 
 // splitModlandName splits "Modland: Format/Author" into format and author.
@@ -156,7 +165,7 @@ func (o *Overlay) buildSourceEntries() []navEntry {
 	}
 	slog.Debug("buildSourceEntries", "online", o.online)
 	entries = append(entries,
-		navEntry{label: "Radio — " + o.catalog.Text(i18n.ValueUnavailable), kind: entrySource, source: sourceRadio, albumIdx: -1},
+		navEntry{label: "Radio/", kind: entrySource, source: sourceRadio, albumIdx: -1},
 		navEntry{label: "Modland/", kind: entrySource, source: sourceModland, albumIdx: -1},
 		navEntry{label: "ModArchive/", kind: entrySource, source: sourceModArchive, albumIdx: -1},
 	)
@@ -361,11 +370,8 @@ func (o *Overlay) buildModArchiveEntries(targetURL string) []navEntry {
 			if !o.online {
 				return nil
 			}
-			var err error
-			items, err = modarchive.FetchDirectory(o.baseDir, targetURL)
-			if err != nil {
-				return nil
-			}
+			o.beginModArchiveDirectory(targetURL)
+			return []navEntry{{label: o.catalog.Text(i18n.ValueLoading), kind: entryInfo}}
 		}
 		o.modArchiveItems[targetURL] = items
 	}
@@ -582,7 +588,7 @@ func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
 		if !entry.IsRegular() {
 			continue
 		}
-		if !filesystem.IsAudioFile(entry) {
+		if !filesystem.IsAudioFile(entry) && !radio.IsPlaylistPath(name) {
 			continue
 		}
 		files = append(files, navEntry{
@@ -810,14 +816,60 @@ func (o *Overlay) switchToProvider(source sourceKind) {
 	case sourceDownloads:
 		o.switchToDownloads()
 	case sourceRadio:
-		// Placeholder only. Radio has no navigation or playback backend yet.
+		o.pushLevel(navLevel{ctx: ctxRadio, label: "Radio", entries: o.buildRadioCategoryEntries()})
 	case sourceModland:
 		entries := o.buildFormatEntries()
 		slog.Debug("switchToProvider modland", "formats", len(entries))
 		o.pushLevel(navLevel{ctx: ctxCatalog, label: "Modland", entries: entries})
 	case sourceModArchive:
-		o.pushLevel(navLevel{ctx: ctxCatalog, label: "ModArchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
+		o.pushLevel(navLevel{ctx: ctxCatalog, dirPath: modarchive.BaseURL, label: "ModArchive", entries: o.buildModArchiveEntries(modarchive.BaseURL)})
 	}
+}
+
+func (o *Overlay) buildRadioCategoryEntries() []navEntry {
+	return []navEntry{
+		{label: o.catalog.Text(i18n.RadioPopular), kind: entryRadioCategory, radioKind: radio.BrowsePopular},
+		{label: o.catalog.Text(i18n.RadioRandom), kind: entryRadioCategory, radioKind: radio.BrowseRandom},
+		{label: o.catalog.Text(i18n.RadioByTag), kind: entryRadioCategory, radioKind: radio.BrowseTag},
+		{label: o.catalog.Text(i18n.RadioByLanguage), kind: entryRadioCategory, radioKind: radio.BrowseLanguage},
+		{label: o.catalog.Text(i18n.RadioByCountry), kind: entryRadioCategory, radioKind: radio.BrowseCountry},
+	}
+}
+
+func (o *Overlay) buildRadioFilterEntries(kind radio.BrowseKind) []navEntry {
+	values, loaded := o.radioValues[kind]
+	entries := make([]navEntry, 0, len(values)+1)
+	for _, value := range values {
+		entries = append(entries, navEntry{label: value, kind: entryRadioFilter, radioKind: kind, radioFilter: value})
+	}
+	if len(entries) == 0 {
+		key := i18n.ValueLoading
+		if loaded {
+			key = i18n.RadioEmpty
+		}
+		entries = append(entries, navEntry{label: o.catalog.Text(key), kind: entryInfo})
+	}
+	return entries
+}
+
+func (o *Overlay) buildRadioStationEntries(kind radio.BrowseKind, filter string) []navEntry {
+	stations, loaded := o.radioQueries[radioQueryKey(kind, filter)]
+	entries := make([]navEntry, 0, len(stations)+1)
+	for _, station := range stations {
+		entries = append(entries, navEntry{label: station.DisplayName(), kind: entryRadioStation, radioKind: kind, radioFilter: filter, radioStation: station})
+	}
+	if len(entries) == 0 {
+		key := i18n.ValueLoading
+		if loaded {
+			key = i18n.RadioEmpty
+		}
+		entries = append(entries, navEntry{label: o.catalog.Text(key), kind: entryInfo})
+	}
+	return entries
+}
+
+func radioQueryKey(kind radio.BrowseKind, filter string) string {
+	return string(kind) + "\x00" + strings.ToLower(strings.TrimSpace(filter))
 }
 
 func (o *Overlay) switchToDownloads() {
@@ -919,11 +971,51 @@ func (o *Overlay) NavigateToTrack(path string) {
 	if path == "" {
 		return
 	}
+	if player.IsRadio(path) {
+		// Radio stations need their full Station metadata, so the app should use
+		// NavigateToRadioStation. Never interpret a virtual radio path as local
+		// filesystem input.
+		return
+	}
 	if player.IsModland(path) || player.IsModArchive(path) {
 		o.navigateToCatalogTrack(path)
 		return
 	}
 	o.navigateToLocalTrack(path)
+}
+
+// NavigateToRadioStation opens the Library on the currently playing station.
+// It creates a small station view even when the station came from a playlist
+// and is not present in a cached Radio Browser query.
+func (o *Overlay) NavigateToRadioStation(station radio.Station) {
+	if station.Path() == "" {
+		return
+	}
+	// Prefer the station listing that is already open. This keeps the user's
+	// browsing context and moves its cursor to the station selected by
+	// automatic recovery or normal auto-advance.
+	if len(o.navStack) > 0 && o.topLevel().ctx == ctxRadio {
+		for i, entry := range o.topLevel().entries {
+			if entry.kind == entryRadioStation && entry.radioStation.Path() == station.Path() {
+				o.albumCursor = i
+				o.albumsScroll = 0
+				o.focusPanel = 0
+				o.syncPanels()
+				return
+			}
+		}
+	}
+	o.switchToProvider(sourceRadio)
+	o.pushLevel(navLevel{
+		ctx:       ctxRadio,
+		label:     station.DisplayName(),
+		radioKind: radio.BrowseKind("now-playing"),
+		entries:   []navEntry{{label: station.DisplayName(), kind: entryRadioStation, radioStation: station}},
+	})
+	o.albumCursor = min(1, len(o.albumEntries)-1)
+	o.albumsScroll = 0
+	o.focusPanel = 0
+	o.syncPanels()
 }
 
 // navigateToLocalTrack enters the parent directory of a local file and
@@ -1111,7 +1203,7 @@ func (o *Overlay) navigateToModArchiveTrack(path string) {
 					break
 				}
 			}
-			o.pushLevel(navLevel{ctx: ctxCatalog, label: target.label, entries: dirEntries})
+			o.pushLevel(navLevel{ctx: ctxCatalog, dirPath: target.url, label: target.label, entries: dirEntries})
 		}
 	}
 

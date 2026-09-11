@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"log/slog"
 	"math/rand"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"github.com/dendec/glitchscope/internal/mic"
 	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/presets"
+	"github.com/dendec/glitchscope/internal/radio"
 	"github.com/dendec/glitchscope/internal/ui"
 )
 
@@ -45,23 +47,21 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 			}
 			// When opening the UI, navigate to the currently playing track.
 			if !wasVisible && a.pl != nil {
-				path := a.pl.TrackPath()
-				a.overlay.SetPlayingInfo(a.currentAlbumName(), path)
-				a.overlay.NavigateToTrack(path)
+				a.navigateOverlayToPlayingTrack()
 			}
 		}
 		return
 	case input.ActionSeekForward:
-		if a.pl != nil {
+		if a.pl != nil && !player.IsRadio(a.pl.TrackPath()) {
 			if err := a.pl.Seek(min(a.pl.Position()+5, a.pl.Duration())); err != nil {
-				slog.Debug("seek forward", "error", err)
+				slog.Warn("seek forward failed", "error", err)
 			}
 		}
 		return
 	case input.ActionSeekBackward:
-		if a.pl != nil {
+		if a.pl != nil && !player.IsRadio(a.pl.TrackPath()) {
 			if err := a.pl.Seek(max(a.pl.Position()-5, 0)); err != nil {
-				slog.Debug("seek backward", "error", err)
+				slog.Warn("seek backward failed", "error", err)
 			}
 		}
 		return
@@ -109,6 +109,10 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 			if a.overlay.Select() && a.pl != nil {
 				path := a.overlay.NCPlaySelected()
 				if path != "" {
+					if radio.IsPlaylistPath(path) {
+						a.playRadioPlaylist(path)
+						return
+					}
 					if fi, err := os.Stat(path); err == nil && fi.IsDir() {
 						a.playDirectory(path)
 					} else {
@@ -143,6 +147,10 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 				a.startMicCapture(device)
 			} else if a.overlay.ConsumeMicStopRequest() {
 				a.stopMicCapture()
+			} else if kind, filter, ok := a.overlay.ConsumeRadioBrowseRequest(); ok {
+				a.requestRadio(kind, filter)
+			} else if station, stations, ok := a.overlay.ConsumeRadioStationSelection(); ok {
+				a.startRadioStation(station, stations)
 			} else if selected && a.lib != nil && a.pl != nil {
 				if a.overlay.IsCatalogMode() {
 					albumName, path, tracks, idx := a.overlay.SelectedCatalogInfo()
@@ -248,9 +256,7 @@ func (a *App) handleNormalAction(act input.Action) {
 			wasVisible := a.overlay.UIVisible()
 			a.overlay.ToggleUI()
 			if !wasVisible && a.pl != nil {
-				path := a.pl.TrackPath()
-				a.overlay.SetPlayingInfo(a.currentAlbumName(), path)
-				a.overlay.NavigateToTrack(path)
+				a.navigateOverlayToPlayingTrack()
 			}
 		}
 
@@ -283,6 +289,35 @@ func (a *App) handleNormalAction(act input.Action) {
 	case input.ActionPrevPreset:
 		a.loadPreset(a.presetIdx - 1)
 	}
+}
+
+func (a *App) navigateOverlayToPlayingTrack() {
+	if a.overlay == nil || a.pl == nil {
+		return
+	}
+	path := a.pl.TrackPath()
+	if player.IsRadio(path) && a.radio != nil {
+		if station, ok := a.radio.Lookup(path); ok {
+			a.overlay.SetPlayingInfo(station.DisplayName(), path)
+			a.overlay.NavigateToRadioStation(station)
+			return
+		}
+	}
+	a.overlay.SetPlayingInfo(a.currentAlbumName(), path)
+	a.overlay.NavigateToTrack(path)
+}
+
+func (a *App) navigateOverlayToTrack(path string) {
+	if a.overlay == nil {
+		return
+	}
+	if player.IsRadio(path) && a.radio != nil {
+		if station, ok := a.radio.Lookup(path); ok {
+			a.overlay.NavigateToRadioStation(station)
+			return
+		}
+	}
+	a.overlay.NavigateToTrack(path)
 }
 
 // currentPresetName returns the name of the current preset, or "" if none.
@@ -511,9 +546,19 @@ func (a *App) playTrack(path, album string) {
 func (a *App) startTrack(path, album string) {
 	a.stopMicCapture() // any playback wins over microphone input
 	a.configureTrackerRenderBudget()
+	if player.IsRadio(path) && a.radio != nil {
+		if station, ok := a.radio.Lookup(path); ok {
+			a.beginRadioMetadata(station)
+		}
+	}
 
 	if a.overlay != nil {
 		label := player.TrackTitle(path)
+		if player.IsRadio(path) && a.radio != nil {
+			if station, ok := a.radio.Lookup(path); ok {
+				label = station.DisplayName()
+			}
+		}
 		if album != "" {
 			label = album + " — " + label
 		}
@@ -524,6 +569,115 @@ func (a *App) startTrack(path, album string) {
 		return
 	}
 	slog.Info("now loading", "track", path, "album", album)
+}
+
+func (a *App) requestRadio(kind radio.BrowseKind, filter string) {
+	if a.radio == nil {
+		return
+	}
+	if kind == radio.BrowseTag || kind == radio.BrowseLanguage || kind == radio.BrowseCountry {
+		if filter == "" {
+			values, stale := a.radio.Values(kind)
+			if values != nil {
+				a.overlay.SetRadioValues(kind, values)
+			}
+			if !stale {
+				return
+			}
+		} else if stations, stale := a.radio.Snapshot(kind, filter); stations != nil {
+			a.overlay.SetRadioStations(kind, filter, stations)
+			if !stale {
+				return
+			}
+		}
+	} else if stations, stale := a.radio.Snapshot(kind, filter); stations != nil {
+		a.overlay.SetRadioStations(kind, filter, stations)
+		if !stale {
+			return
+		}
+	}
+	a.radio.Begin(a.appCtx, kind, filter)
+}
+
+func (a *App) startRadioStation(station radio.Station, queue ...[]radio.Station) {
+	if a.radio == nil || station.StreamURL() == "" {
+		return
+	}
+	stations := []radio.Station{station}
+	if len(queue) > 0 && len(queue[0]) > 0 {
+		stations = append([]radio.Station(nil), queue[0]...)
+		if slices.IndexFunc(stations, func(candidate radio.Station) bool { return candidate.Path() == station.Path() }) < 0 {
+			stations = append(stations, station)
+		}
+	}
+	a.radio.AddStations(stations)
+	paths := make([]string, len(stations))
+	for i := range stations {
+		paths[i] = stations[i].Path()
+	}
+	idx := slices.Index(paths, station.Path())
+	if idx < 0 {
+		return
+	}
+	a.playbackState.setPlaylist(paths, idx, "Radio")
+	path := station.Path()
+	if a.overlay != nil {
+		a.overlay.SetPlayingInfo(station.DisplayName(), path)
+	}
+	a.playTrack(path, "Radio")
+}
+
+func (a *App) beginRadioMetadata(station radio.Station) {
+	if a.overlay != nil {
+		a.overlay.SetRadioNowPlaying(station.Path(), "")
+	}
+	a.beginRadioFavicon(station)
+}
+
+func (a *App) beginRadioFavicon(station radio.Station) {
+	if a.radio == nil || strings.TrimSpace(station.Favicon) == "" {
+		return
+	}
+	path := station.Path()
+	if a.radioFaviconRequested[path] {
+		return
+	}
+	select {
+	case a.radioFaviconSlots <- struct{}{}:
+	default:
+		return
+	}
+	a.radioFaviconRequested[path] = true
+	a.radioFaviconWG.Add(1)
+	go func() {
+		defer a.radioFaviconWG.Done()
+		defer func() { <-a.radioFaviconSlots }()
+		data, err := a.radio.FetchFavicon(a.appCtx, station.Favicon)
+		var bitmap *image.RGBA
+		if err == nil && len(data) > 0 {
+			bitmap, err = ui.DecodeRadioFavicon(data)
+		}
+		select {
+		case a.radioFavicons <- radioFaviconEvent{path: path, data: bitmap, err: err}:
+		case <-a.appCtx.Done():
+		}
+	}()
+}
+
+func (a *App) playRadioPlaylist(path string) {
+	stations, err := radio.ParsePlaylist(path)
+	if err != nil || len(stations) == 0 {
+		if err != nil {
+			slog.Warn("radio playlist", "path", path, "error", err)
+		}
+		if a.overlay != nil {
+			a.overlay.ShowTrack("radio playlist is empty")
+		}
+		return
+	}
+	a.radio.AddStations(stations)
+	a.startRadioStation(stations[0], stations)
+	a.playbackState.playlistAlbum = filepath.Base(path)
 }
 
 // currentAlbumName returns the display name of the currently playing album,
@@ -636,6 +790,12 @@ func (a *App) playFile(path string) {
 func (a *App) playFavoriteFile(path string) {
 	if a.favorites == nil {
 		return
+	}
+	if player.IsRadio(path) && a.radio != nil {
+		if station, ok := a.radio.Lookup(path); ok {
+			a.startRadioStation(station)
+			return
+		}
 	}
 	// Determine which playlist this track belongs to.
 	kind := a.favorites.GetPlaylist(path)
@@ -859,4 +1019,27 @@ func (a *App) rememberMenuOpened() {
 	if err := config.SaveSettings(a.settingsPath, *a.settings); err != nil {
 		slog.Warn("save menu acknowledgement", "error", err)
 	}
+}
+
+func (a *App) notifyRadioStarted(path string) {
+	if a.radio == nil || !player.IsRadio(path) {
+		return
+	}
+	station, ok := a.radio.Lookup(path)
+	if !ok || strings.HasPrefix(station.StationUUID, "local-") {
+		return
+	}
+	if a.radioClickCancel != nil {
+		a.radioClickCancel()
+	}
+	ctx, cancel := context.WithCancel(a.appCtx)
+	a.radioClickCancel = cancel
+	a.radioClickWG.Add(1)
+	go func() {
+		defer a.radioClickWG.Done()
+		defer cancel()
+		if err := a.radio.Click(ctx, station.StationUUID); err != nil && ctx.Err() == nil {
+			slog.Warn("radio click counter failed", "station", station.StationUUID, "error", err)
+		}
+	}()
 }

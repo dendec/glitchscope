@@ -24,18 +24,24 @@ shift
 
 run_in_env() {
 	local cmd="$1"
-	docker run --rm -v "$ROOT:/build" -v "$GO_CACHE_VOL:/root/.cache/go-build" -w /build "$IMAGE" bash -c "$GO_ENV $cmd"
+	docker run --rm -e GLITCHSCOPE_RADIO_TEST_URL -v "$ROOT:/build" -v "$GO_CACHE_VOL:/root/.cache/go-build" -w /build "$IMAGE" bash -c "$GO_ENV $cmd"
 }
 
 case "$sub" in
 test)
 	run_in_env 'go test -count=1 ./cmd/... ./internal/...'
 	;;
+race)
+	run_in_env 'go test -race -count=1 ./internal/player ./internal/radio ./internal/util ./internal/ui ./internal/app ./internal/modarchive'
+	;;
+native-radio)
+	docker run --rm -v "$ROOT:/build" -w /build "$IMAGE" bash -c 'g++ -std=c++11 -DWITH_NULL -g -fsanitize=address,undefined -fno-omit-frame-pointer -Ilib/soloud/include -I/opt/ffmpeg/amd64/include scripts/test-radio-native.cpp internal/soloud/stream_source.cpp lib/soloud/src/core/*.cpp lib/soloud/src/backend/null/soloud_null.cpp /opt/ffmpeg/amd64/lib/libavformat.a /opt/ffmpeg/amd64/lib/libavcodec.a /opt/ffmpeg/amd64/lib/libswresample.a /opt/ffmpeg/amd64/lib/libavutil.a -lpthread -lm -o /tmp/test-radio-native && /tmp/test-radio-native'
+	;;
 lint)
 	run_in_env 'golangci-lint run --timeout=5m ./cmd/... ./internal/...'
 	;;
 *)
-	echo "usage: $0 {test|lint}" >&2
+	echo "usage: $0 {test|lint|race|native-radio}" >&2
 	exit 2
 	;;
 esac

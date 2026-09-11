@@ -13,6 +13,7 @@ import (
 	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/modarchive"
 	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/radio"
 )
 
 func TestDisplayTrackPath(t *testing.T) {
@@ -59,13 +60,97 @@ func TestDisplayTrackPath(t *testing.T) {
 	}
 }
 
+func TestDisplayTrackPathRadioNowPlaying(t *testing.T) {
+	o := &Overlay{
+		playingAlbum:         "Adrenalin FM",
+		radioNowPlayingPath:  "radio:station-1",
+		radioNowPlayingTitle: "Motley Crue - Anarchy In The U.K.",
+	}
+	if got, want := o.displayTrackPath("radio:station-1"), "radio/Adrenalin FM/Motley Crue - Anarchy In The U.K."; got != want {
+		t.Fatalf("displayTrackPath(radio) = %q, want %q", got, want)
+	}
+}
+
+func TestRadioNavigationUsesCachedRowsAndLocalizedLoading(t *testing.T) {
+	o := &Overlay{
+		catalog:      i18n.MustLoad(i18n.Russian),
+		radioQueries: make(map[string][]radio.Station),
+		radioValues:  make(map[radio.BrowseKind][]string),
+	}
+	if got := o.buildRadioStationEntries(radio.BrowsePopular, "")[0].label; got != "Загрузка…" {
+		t.Fatalf("empty radio listing = %q", got)
+	}
+	station := radio.Station{StationUUID: "one", Name: "Station One", URL: "https://example.test/stream"}
+	o.radioQueries[radioQueryKey(radio.BrowsePopular, "")] = []radio.Station{station}
+	entries := o.buildRadioStationEntries(radio.BrowsePopular, "")
+	if len(entries) != 1 || entries[0].label != station.Name || entries[0].radioStation.Path() != station.Path() {
+		t.Fatalf("radio entries = %#v", entries)
+	}
+}
+
+func TestNavigateToRadioStationOpensRadioView(t *testing.T) {
+	o := &Overlay{catalog: i18n.MustLoad(i18n.English), online: true}
+	station := radio.Station{StationUUID: "station-1", Name: "Station One", URL: "https://example.test/stream"}
+	o.NavigateToRadioStation(station)
+	if o.topLevel().ctx != ctxRadio {
+		t.Fatalf("radio navigation context = %v, want %v", o.topLevel().ctx, ctxRadio)
+	}
+	entry := o.currentEntry()
+	if entry == nil || entry.kind != entryRadioStation || entry.radioStation.Path() != station.Path() {
+		t.Fatalf("radio navigation entry = %#v", entry)
+	}
+}
+
+func TestNavigateToRadioStationMovesCursorInOpenListing(t *testing.T) {
+	first := radio.Station{StationUUID: "first", Name: "First", URL: "https://example.test/first"}
+	second := radio.Station{StationUUID: "second", Name: "Second", URL: "https://example.test/second"}
+	o := &Overlay{
+		catalog: i18n.MustLoad(i18n.English),
+		navStack: []navLevel{{
+			ctx: ctxRadio,
+			entries: withParentEntry([]navEntry{
+				{label: first.Name, kind: entryRadioStation, radioStation: first},
+				{label: second.Name, kind: entryRadioStation, radioStation: second},
+			}),
+		}},
+		albumEntries: withParentEntry([]navEntry{
+			{label: first.Name, kind: entryRadioStation, radioStation: first},
+			{label: second.Name, kind: entryRadioStation, radioStation: second},
+		}),
+		source: sourceRadio,
+	}
+	o.albums = labelsOf(o.albumEntries)
+	o.NavigateToRadioStation(second)
+
+	if len(o.navStack) != 1 || o.albumCursor != 2 {
+		t.Fatalf("radio navigation changed listing or cursor: levels=%d cursor=%d", len(o.navStack), o.albumCursor)
+	}
+	if entry := o.currentEntry(); entry == nil || entry.radioStation.Path() != second.Path() {
+		t.Fatalf("current radio entry = %#v, want second station", entry)
+	}
+}
+
+func TestRadioInfoShowsMetadata(t *testing.T) {
+	station := radio.Station{Name: "Station", Codec: "AAC", Bitrate: 128, Tags: "jazz", Country: "France", Favicon: "https://example.test/icon.png"}
+	lines := radioInfoLines(i18n.MustLoad(i18n.English), station, "Artist - Title")
+	joined := strings.Join(lines, "\n")
+	for _, want := range []string{"Station", "Now: Artist - Title", "Codec: AAC", "Bitrate: 128 kbps", "Tags: jazz", "Country: France"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("radio info %q does not contain %q", joined, want)
+		}
+	}
+	if strings.Contains(joined, station.Favicon) {
+		t.Errorf("radio info should not expose favicon URL: %q", joined)
+	}
+}
+
 func TestSourceEntriesUseLocalizedDisplayNames(t *testing.T) {
 	o := &Overlay{
 		catalog:    i18n.MustLoad(i18n.Russian),
 		micDevices: []string{"test microphone"},
 	}
 	entries := o.buildSourceEntries()
-	want := []string{"Локальная музыка/", "Загрузки/", "Микрофон/", "Radio — Недоступно", "Modland/", "ModArchive/"}
+	want := []string{"Локальная музыка/", "Загрузки/", "Микрофон/", "Radio/", "Modland/", "ModArchive/"}
 	if got := labelsOf(entries); !reflect.DeepEqual(got, want) {
 		t.Fatalf("source labels = %#v, want %#v", got, want)
 	}
@@ -529,7 +614,7 @@ func TestMicrophoneSourceHiddenWithoutDevices(t *testing.T) {
 	o.SetMicDevices(nil)
 
 	if len(o.albumEntries) != 5 || o.albumEntries[0].source != sourceMusic || o.albumEntries[1].source != sourceDownloads || o.albumEntries[2].source != sourceRadio || o.albumEntries[3].source != sourceModland || o.albumEntries[4].source != sourceModArchive {
-		t.Fatalf("source entries without devices = %#v, want music, downloads, radio placeholder, and remote catalogs", o.albumEntries)
+		t.Fatalf("source entries without devices = %#v, want music, downloads, radio, and remote catalogs", o.albumEntries)
 	}
 
 	o.micActive = true
@@ -547,7 +632,7 @@ func TestMicrophoneSourceHiddenWhenCaptureStopsAfterDeviceRemoval(t *testing.T) 
 	o.SetMicActive(false)
 
 	if len(o.albumEntries) != 5 || o.albumEntries[0].source != sourceMusic || o.albumEntries[1].source != sourceDownloads || o.albumEntries[2].source != sourceRadio || o.albumEntries[3].source != sourceModland || o.albumEntries[4].source != sourceModArchive {
-		t.Fatalf("source entries after capture stops = %#v, want music, downloads, radio placeholder, and remote catalogs", o.albumEntries)
+		t.Fatalf("source entries after capture stops = %#v, want music, downloads, radio, and remote catalogs", o.albumEntries)
 	}
 }
 
@@ -1283,5 +1368,13 @@ func TestPopLevelClampsStaleSelection(t *testing.T) {
 	}
 	if o.albumCursor != 0 || o.albumsScroll != 0 || o.currentEntry() == nil {
 		t.Fatalf("invalid restored selection: cursor=%d scroll=%d", o.albumCursor, o.albumsScroll)
+	}
+}
+
+func TestRadioCompletedEmptyQueryDoesNotRemainLoading(t *testing.T) {
+	o := &Overlay{radioQueries: map[string][]radio.Station{radioQueryKey(radio.BrowsePopular, ""): nil}, catalog: i18n.MustLoad(i18n.English)}
+	entries := o.buildRadioStationEntries(radio.BrowsePopular, "")
+	if len(entries) != 1 || entries[0].label != "No stations found" {
+		t.Fatalf("empty query = %#v", entries)
 	}
 }

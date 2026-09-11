@@ -795,3 +795,29 @@ func TestFailureRecoveryHasFiniteBudget(t *testing.T) {
 		}
 	}
 }
+
+func TestRadioFailureRecoveryStaysInRadioQueue(t *testing.T) {
+	state := playbackState{
+		pl:          &player.Player{},
+		lib:         &player.Library{Albums: []player.Album{{Name: "Local", Tracks: []string{"local.mp3"}}}},
+		playlist:    []string{"radio:first", "radio:second"},
+		playlistIdx: 0,
+	}
+
+	track, ok := state.nextAfterFailure("radio:first", config.PlaybackSettings{})
+	if !ok || track.path != "radio:second" {
+		t.Fatalf("radio recovery = %+v, %v; want radio:second", track, ok)
+	}
+}
+
+func TestDirectRadioPlaybackCreatesIsolatedQueue(t *testing.T) {
+	state := playbackState{pl: &player.Player{}, lib: &player.Library{Albums: []player.Album{{Name: "Local", Tracks: []string{"local.mp3"}}}}}
+	state.selectPlaybackContext("radio:station")
+
+	if len(state.playlist) != 1 || state.playlist[0] != "radio:station" {
+		t.Fatalf("radio playlist = %#v, want isolated radio queue", state.playlist)
+	}
+	if _, ok := state.advance(config.PlaybackSettings{}); ok {
+		t.Fatal("single failed radio station advanced into another source")
+	}
+}

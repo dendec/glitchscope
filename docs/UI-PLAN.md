@@ -134,8 +134,9 @@ const (
   участвует в навигации — только в плейбэке и playing state.
 - `sourceModland` и `sourceModArchive` используют текущую album/provider-модель
   (`navStack`, `SetAlbums`/`SetTrackInfos`, `overlayPresenter`).
-- `sourceRadio` в будущем показывает станции, `sourceMicrophone` — действие и
-  состояние захвата; эти источники не обязаны притворяться каталогами.
+- `sourceRadio` показывает категории Radio Browser, фильтры и станции в том же
+  navigation stack; `sourceMicrophone` — действие и состояние захвата. Эти
+  источники не обязаны притворяться альбомными каталогами.
 - Вход в UI: локальный трек открывает `/music` в каталоге трека; remote-трек
   открывает соответствующий provider deep-link; без плейбэка открывается `/` или
   последний выбранный источник по отдельному решению UX.
@@ -245,7 +246,7 @@ baseDir, пустой путь, путь == baseDir, удаление играю
 - `folder.svg` — Local music;
 - `heart.svg` — Favorites;
 - `mic.svg` — Microphone;
-- `radio.svg` — неактивная заглушка Radio;
+- `radio.svg` — источник Internet Radio;
 - `globe.svg` — Catalogs.
 - `music.svg`, `sparkles.svg`, `settings-cog.svg`, `circle-question.svg` —
   индикатор страниц Library, Presets, Settings и Help.
@@ -275,8 +276,9 @@ baseDir, пустой путь, путь == baseDir, удаление играю
 Цвет и контрастный контур иконки
 совпадают с текстом текущей темы. Presentation-слой иконки не входит в
 navigation label: внутреннее состояние по-прежнему хранит source kind.
-Radio всегда присутствует в корне как неактивный пункт `Radio — unavailable`:
-он не создаёт navigation level и не связан с playback backend.
+Radio всегда присутствует в корне и открывает собственные уровни категорий,
+фильтров и станций. Выбор станции использует общий playback backend, а её
+метаданные отображаются в существующей правой информационной панели.
 Downloads использует `TrackCache.CachedVirtualPaths()` как read-only snapshot и
 показывает все сохранённые треки обоих каталогов в одном списке. Удаление и
 воспроизведение используют существующие catalog actions; отдельного cache-owner
@@ -359,3 +361,13 @@ days, 6 months, `Forever`) и лимит размера (128/256/512 MB, 1/2/4 G
 Действия обозначаются глаголами, одинаковые функции называются одинаково в меню
 и справке. Имена форматов, приложений и библиотек не переводятся как обычные слова.
 Захват микрофона не называется записью: аудиофайл не создаётся.
+
+### Radio / ModArchive network isolation
+
+Missing ModArchive listings show a loading row while a cancellable worker loads
+the directory. Results carry a request ID and update only matching navigation
+levels; shutdown cancels and joins the worker before releasing catalog resources.
+Radio distinguishes a completed empty listing from an outstanding request.
+Category labels are localized. Radio favicon decode/background removal runs off
+the render thread, with pixel and cache limits; only upload and display stay on
+GL. See ARCHITECTURE.md for the stream lifecycle and memory budgets.

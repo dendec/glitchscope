@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/radio"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -26,6 +27,7 @@ type scrollHold struct {
 // Update advances animations and handles scroll acceleration. Call every frame.
 // gamepadUp/gamepadDown report D-Pad state (SDL button events don't auto-repeat).
 func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
+	o.pollModArchiveDirectory()
 	// Refresh the per-frame album snapshot before any navigation/render work
 	// of this frame reads it (runs even while the UI is hidden).
 	o.refreshAlbumsCache()
@@ -278,7 +280,7 @@ func (o *Overlay) moveCursor(dir int) {
 	// Catalog track info panel: the right side is a scrollable info view
 	// (same scroll state as NC), not a track list.
 	if o.focusPanel == 1 {
-		if e := o.currentEntry(); e != nil && e.IsCatalogTrack() {
+		if e := o.currentEntry(); e != nil && (e.IsCatalogTrack() || e.kind == entryRadioStation) {
 			o.scrollNCInfo(dir)
 			return
 		}
@@ -346,7 +348,7 @@ func (o *Overlay) infoPanelFocused() bool {
 		return o.ncRight == ncRightInfo
 	}
 	e := o.currentEntry()
-	return e != nil && e.IsCatalogTrack()
+	return e != nil && (e.IsCatalogTrack() || e.kind == entryRadioStation)
 }
 
 func (o *Overlay) FocusLeft() {
@@ -570,7 +572,7 @@ func (o *Overlay) Select() bool {
 				case sourceFavorites, sourceDownloads, sourceModland, sourceModArchive:
 					o.switchToProvider(e.source)
 				case sourceRadio:
-					// Placeholder only. Keep focus in the source menu.
+					o.switchToProvider(sourceRadio)
 				}
 				return false
 			case e.kind == entryFavoriteFolder:
@@ -583,6 +585,26 @@ func (o *Overlay) Select() bool {
 				o.micStopRequested = true
 				return false
 			case e.kind == entryInfo:
+				return false
+			case e.kind == entryRadioCategory:
+				o.radioBrowseKind = e.radioKind
+				o.radioBrowseFilter = ""
+				o.radioBrowseRequested = true
+				if e.radioKind == radio.BrowseTag || e.radioKind == radio.BrowseLanguage || e.radioKind == radio.BrowseCountry {
+					o.pushLevel(navLevel{ctx: ctxRadio, label: e.label, entries: o.buildRadioFilterEntries(e.radioKind), radioKind: e.radioKind})
+				} else {
+					o.pushLevel(navLevel{ctx: ctxRadio, label: e.label, entries: o.buildRadioStationEntries(e.radioKind, ""), radioKind: e.radioKind})
+				}
+				return false
+			case e.kind == entryRadioFilter:
+				o.radioBrowseKind = e.radioKind
+				o.radioBrowseFilter = e.radioFilter
+				o.radioBrowseRequested = true
+				o.pushLevel(navLevel{ctx: ctxRadio, label: e.radioFilter, entries: o.buildRadioStationEntries(e.radioKind, e.radioFilter), radioKind: e.radioKind, radioFilter: e.radioFilter})
+				return false
+			case e.kind == entryRadioStation:
+				station := e.radioStation
+				o.radioSelected = &station
 				return false
 			case e.IsNCDirectory():
 				o.ncEnterDir(e.dirPath)
@@ -606,7 +628,7 @@ func (o *Overlay) Select() bool {
 			case e.kind == entryModArchiveDir:
 				entries := o.buildModArchiveEntries(e.url)
 				if entries != nil {
-					o.pushLevel(navLevel{ctx: ctxCatalog, label: strings.TrimSuffix(e.label, "/"), entries: entries})
+					o.pushLevel(navLevel{ctx: ctxCatalog, dirPath: e.url, label: strings.TrimSuffix(e.label, "/"), entries: entries})
 					return false
 				}
 				return false

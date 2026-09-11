@@ -208,8 +208,8 @@ static unsigned int createImageProgram() {
 		"uniform float opacity;\n"
 		"varying vec2 uv;\n"
 		"void main() {\n"
-		"  vec3 color = texture2D(text, uv).rgb;\n"
-		"  gl_FragColor = vec4(color, opacity);\n"
+		"  vec4 image = texture2D(text, uv);\n"
+		"  gl_FragColor = vec4(image.rgb, image.a * opacity);\n"
 		"}";
 	return createProgram(vs, fs);
 }

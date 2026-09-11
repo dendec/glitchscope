@@ -4,6 +4,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"image"
+	"io"
 	"log/slog"
 	"math"
 	"math/rand"
@@ -26,7 +28,9 @@ import (
 	"github.com/dendec/glitchscope/internal/presets"
 	"github.com/dendec/glitchscope/internal/prof"
 	"github.com/dendec/glitchscope/internal/projectm"
+	"github.com/dendec/glitchscope/internal/radio"
 	"github.com/dendec/glitchscope/internal/ui"
+	"github.com/dendec/glitchscope/internal/version"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -42,7 +46,15 @@ type App struct {
 	playbackState
 	presenter overlayPresenter
 
-	mic *mic.Capture // active microphone capture, nil when off
+	mic                   *mic.Capture // active microphone capture, nil when off
+	radio                 *radio.Client
+	radioMetadata         chan radioMetadataEvent
+	radioFaviconWG        sync.WaitGroup
+	radioClickWG          sync.WaitGroup
+	radioClickCancel      context.CancelFunc
+	radioFaviconSlots     chan struct{}
+	radioFavicons         chan radioFaviconEvent
+	radioFaviconRequested map[string]bool
 
 	modlandSizes map[string]int64 // remote path → expected size for downloads
 
@@ -109,6 +121,17 @@ type App struct {
 	trackerBudgetSet bool
 }
 
+type radioMetadataEvent struct {
+	path  string
+	title string
+}
+
+type radioFaviconEvent struct {
+	path string
+	data *image.RGBA
+	err  error
+}
+
 // New creates an App with display initialised. Player/overlay/input/library
 // are created later by Init().
 func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
@@ -132,7 +155,7 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	if fullscreen {
 		winFlags |= sdl.WINDOW_FULLSCREEN
 	}
-	win, err := sdl.CreateWindow("Portable Music Visualizer",
+	win, err := sdl.CreateWindow(version.WindowTitle(),
 		sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		int32(width), int32(height), winFlags)
 	if err != nil {
@@ -225,15 +248,14 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 func (a *App) Close() {
 	// Wait for background shuffle build to finish before tearing down
 	// resources it may be using (shuffle sources, baseDir, etc.).
-	a.shuffleWg.Wait()
 	// Abort background work (e.g. the connectivity probe) before tearing down
 	// resources it may observe, so no in-flight goroutine touches a freed overlay.
 	if a.appCancel != nil {
 		a.appCancel()
 	}
+	a.shuffleWg.Wait()
 	a.connectivityWg.Wait()
 	a.trackCacheWg.Wait()
-	modarchive.CloseSnapshotCatalog()
 	if a.modlandShuffleSrc != nil {
 		_ = a.modlandShuffleSrc.Close()
 	}
@@ -253,13 +275,23 @@ func (a *App) Close() {
 	if a.rt != nil {
 		a.rt.Destroy()
 	}
+	a.radioFaviconWG.Wait()
+	if a.radioClickCancel != nil {
+		a.radioClickCancel()
+	}
+	a.radioClickWG.Wait()
+	if a.radio != nil {
+		a.radio.Close()
+	}
 	if a.overlay != nil {
 		a.overlay.Close()
 	}
 	if a.pl != nil {
 		a.pl.Close()
+		a.radio = nil
 		a.pruneTrackCache()
 	}
+	modarchive.CloseSnapshotCatalog()
 	if a.mic != nil {
 		a.mic.Close()
 		a.mic = nil
@@ -368,11 +400,34 @@ func (a *App) initAudio() {
 		return
 	}
 	a.pl = pl
+	a.radio = radio.New(baseDir())
+	a.radioMetadata = make(chan radioMetadataEvent, 8)
+	a.radioFaviconSlots = make(chan struct{}, 2)
+	a.radioFavicons = make(chan radioFaviconEvent, 8)
+	a.radioFaviconRequested = make(map[string]bool)
+	a.pl.OpenStream = func(ctx context.Context, path string) (io.ReadCloser, error) {
+		station, ok := a.radio.Lookup(path)
+		if !ok {
+			return nil, fmt.Errorf("radio station %q is not cached", path)
+		}
+		streamURL := station.StreamURL()
+		if streamURL == "" {
+			return nil, fmt.Errorf("radio station %q has no stream URL", path)
+		}
+		// The HTTP body must outlive the async load worker after prebuffering;
+		// source destruction closes it through FfmpegStream.SetOnDestroy.
+		return a.radio.OpenStream(ctx, streamURL, func(title string) {
+			select {
+			case a.radioMetadata <- radioMetadataEvent{path: path, title: title}:
+			default:
+			}
+		})
+	}
 	a.configureTrackerRenderBudget()
 	a.pl.Downloader = func(ctx context.Context, path string, expectedSize int64, onProgress func(read, total int64)) (string, error) {
 		if (player.IsModland(path) || player.IsModArchive(path)) && a.trackCache != nil && a.trackCache.IsCached(path) {
 			if err := a.trackCache.Touch(path); err != nil {
-				slog.Debug("track cache touch", "path", path, "error", err)
+				slog.Warn("track cache touch failed", "path", path, "error", err)
 			}
 			return a.trackCache.LocalPath(path), nil
 		}
@@ -405,7 +460,7 @@ func (a *App) initAudio() {
 					slog.Warn("track cache manifest update", "path", path, "error", err)
 				}
 				if err := a.trackCache.Touch(path); err != nil {
-					slog.Debug("track cache touch", "path", path, "error", err)
+					slog.Warn("track cache touch failed", "path", path, "error", err)
 				}
 				// CheckPending prunes and publishes the offline snapshot for both
 				// successful and failed loads. Avoid walking the cache twice here.
@@ -471,7 +526,7 @@ func (a *App) configureTrackerRenderBudget() {
 	}
 	availableKB, err := prof.AvailableMemoryKB()
 	if err != nil {
-		slog.Debug("available memory unavailable, tracker pre-render disabled", "error", err)
+		slog.Warn("available memory unavailable, tracker pre-render disabled", "error", err)
 		availableKB = 0
 	}
 	budget := player.AutomaticRenderBudget(availableKB << 10)
@@ -573,6 +628,69 @@ func (a *App) setOnline(online bool) {
 	a.offline.Store(!online)
 }
 
+func (a *App) pollRadio() {
+	if a.radio == nil {
+		return
+	}
+	started := time.Now()
+	// Apply at most one directory result per frame. Network work is already
+	// asynchronous, but rebuilding a large station list and its GL textures is
+	// still main-thread work and must not starve input or visualization.
+	kind, filter, stations, values, err, ok := a.radio.Poll()
+	if ok {
+		if err != nil {
+			slog.Warn("radio directory request failed", "kind", kind, "filter", filter, "error", err)
+			if a.overlay != nil {
+				a.overlay.SetRadioError(kind, filter)
+			}
+		} else if a.overlay != nil {
+			if filter == "" && (kind == radio.BrowseTag || kind == radio.BrowseLanguage || kind == radio.BrowseCountry) {
+				a.overlay.SetRadioValues(kind, values)
+			} else {
+				a.overlay.SetRadioStations(kind, filter, stations)
+			}
+		}
+	}
+	// Metadata and favicon events are lightweight, but keep their per-frame
+	// work bounded as well when a reconnecting stream has queued many events.
+	for processed := 0; processed < 4; processed++ {
+		select {
+		case metadata := <-a.radioMetadata:
+			if a.overlay != nil && a.pl != nil && a.pl.TrackPath() == metadata.path {
+				a.overlay.SetRadioNowPlaying(metadata.path, metadata.title)
+			}
+		case favicon := <-a.radioFavicons:
+			delete(a.radioFaviconRequested, favicon.path)
+			if favicon.err != nil {
+				delete(a.radioFaviconRequested, favicon.path)
+				slog.Warn("radio favicon download failed", "path", favicon.path, "error", favicon.err)
+				continue
+			}
+			if a.overlay != nil {
+				a.overlay.SetRadioFavicon(favicon.path, favicon.data)
+			}
+		default:
+			if elapsed := time.Since(started); elapsed > 50*time.Millisecond {
+				slog.Warn("radio UI update slow", "duration_ms", elapsed.Milliseconds(), "directory_result", ok)
+			}
+			return
+		}
+	}
+	if elapsed := time.Since(started); elapsed > 50*time.Millisecond {
+		slog.Warn("radio UI update slow", "duration_ms", elapsed.Milliseconds(), "directory_result", ok)
+	}
+}
+
+func (a *App) resolveRadioPlayingInfo(snapshot overlayPlaybackSnapshot) overlayPlaybackSnapshot {
+	if a.radio == nil || !player.IsRadio(snapshot.playingTrack) {
+		return snapshot
+	}
+	if station, ok := a.radio.Lookup(snapshot.playingTrack); ok {
+		snapshot.playingAlbum = station.DisplayName()
+	}
+	return snapshot
+}
+
 func (a *App) pruneTrackCache() {
 	if a.trackCache == nil || a.settings == nil {
 		return
@@ -609,7 +727,7 @@ func (a *App) restoreSavedPosition(allowRemote bool) {
 		return
 	}
 	position := a.settings.Playback.LastPosition
-	if !canRestorePosition(position, allowRemote) {
+	if !a.canRestorePosition(position, allowRemote) {
 		if position.Path != "" && !player.IsModland(position.Path) && !player.IsModArchive(position.Path) {
 			a.resumeAttempted = true
 		}
@@ -618,8 +736,26 @@ func (a *App) restoreSavedPosition(allowRemote bool) {
 	a.resumeAttempted = true
 	a.resumePath = position.Path
 	a.resumeSeconds = position.Seconds
+	a.prepareSavedRadioQueue(position.Path)
 	a.prepareSavedCatalogTrack(position.Path)
 	a.playTrack(position.Path, "")
+}
+
+func (a *App) prepareSavedRadioQueue(path string) {
+	if a.radio == nil || !player.IsRadio(path) {
+		return
+	}
+	stations := a.radio.LastQueue(path)
+	if len(stations) == 0 {
+		return
+	}
+	paths := make([]string, len(stations))
+	for i := range stations {
+		paths[i] = stations[i].Path()
+	}
+	if idx := slices.Index(paths, path); idx >= 0 {
+		a.playbackState.setPlaylist(paths, idx, "Radio")
+	}
 }
 
 // prepareSavedCatalogTrack restores the catalog context needed for sequential
@@ -661,6 +797,17 @@ func canRestorePosition(position config.PlaybackPosition, allowRemote bool) bool
 	return err == nil && !info.IsDir()
 }
 
+func (a *App) canRestorePosition(position config.PlaybackPosition, allowRemote bool) bool {
+	if player.IsRadio(position.Path) {
+		if a.radio == nil {
+			return false
+		}
+		station, ok := a.radio.Lookup(position.Path)
+		return ok && station.StreamURL() != ""
+	}
+	return canRestorePosition(position, allowRemote)
+}
+
 func (a *App) savePlaybackPosition() {
 	if a.settings == nil {
 		return
@@ -669,6 +816,9 @@ func (a *App) savePlaybackPosition() {
 	if a.pl != nil && (a.pl.IsValidVoice() || a.pl.Loading()) {
 		position.Path = a.pl.TrackPath()
 		position.Seconds = a.pl.Position()
+	}
+	if player.IsRadio(position.Path) && a.radio != nil {
+		a.radio.RememberQueue(position.Path, a.playbackState.playlist)
 	}
 	a.settings.Playback.LastPosition = position
 	if err := config.SaveSettings(a.settingsPath, *a.settings); err != nil {

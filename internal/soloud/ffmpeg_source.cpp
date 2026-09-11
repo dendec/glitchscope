@@ -208,7 +208,7 @@ int64_t streamDurationUs(const AVFormatContext *format, int streamIndex) {
 namespace SoLoud {
 class FfmpegInstance : public AudioSourceInstance {
 public:
-    explicit FfmpegInstance(FfmpegSource *parent) : mParent(parent) {
+    explicit FfmpegInstance(FfmpegSource *parent) {
         bool opened = false;
         if (parent->mPath) {
             opened = openFileInput(parent->mPath, &mInput);
@@ -364,7 +364,6 @@ private:
         mPendingFrames += static_cast<unsigned int>(converted);
     }
 
-    FfmpegSource *mParent;
     InputContext mInput;
     AVFormatContext *mFormat = nullptr;
     AVCodecContext *mCodec = nullptr;

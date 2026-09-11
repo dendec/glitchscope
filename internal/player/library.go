@@ -375,16 +375,18 @@ func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 const (
 	ModlandPrefix    = "modland:"
 	ModArchivePrefix = "modarchive:"
+	RadioPrefix      = "radio:"
 )
 
 var KnownPrefixes = []string{
 	ModlandPrefix,
 	ModArchivePrefix,
+	RadioPrefix,
 }
 
 // IsVirtual reports provider-browsed albums (modland/modarchive).
 func IsVirtual(a Album) bool {
-	return strings.HasPrefix(a.Path, ModlandPrefix) || strings.HasPrefix(a.Path, ModArchivePrefix)
+	return strings.HasPrefix(a.Path, ModlandPrefix) || strings.HasPrefix(a.Path, ModArchivePrefix) || strings.HasPrefix(a.Path, RadioPrefix)
 }
 
 // RealAlbumsOnly filters virtual provider albums out of a list.
@@ -429,6 +431,9 @@ func IsModland(path string) bool {
 func IsModArchive(path string) bool {
 	return strings.HasPrefix(path, ModArchivePrefix)
 }
+
+// IsRadio reports a Radio provider virtual path.
+func IsRadio(path string) bool { return strings.HasPrefix(path, RadioPrefix) }
 
 func RemotePath(path string) string {
 	return TrimPrefixes(path)

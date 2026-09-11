@@ -363,6 +363,16 @@ func (o *Overlay) rebuildPresetNameTex() {
 }
 
 func (o *Overlay) displayTrackPath(path string) string {
+	if player.IsRadio(path) {
+		station := o.playingAlbum
+		if station == "" {
+			station = strings.TrimPrefix(path, "radio:")
+		}
+		if title := strings.TrimSpace(o.radioNowPlayingTitle); o.radioNowPlayingPath == path && title != "" {
+			return "radio/" + station + "/" + title
+		}
+		return "radio/" + station
+	}
 	if player.IsModArchive(path) {
 		remote := player.RemotePath(path)
 		entryName := ""

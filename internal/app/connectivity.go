@@ -71,7 +71,7 @@ func (c *connectivityCache) probeNetwork(parent context.Context) bool {
 	defer cancel()
 	resp, err := util.Get(ctx, connectivityProbe, nil)
 	if err != nil {
-		slog.Debug("connectivity probe failed", "error", err)
+		slog.Warn("connectivity probe failed", "error", err)
 		return false
 	}
 	defer func() {

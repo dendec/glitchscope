@@ -233,7 +233,7 @@ COPY lib/ffmpeg lib/ffmpeg
 RUN cd lib/ffmpeg \
     && ./configure --prefix=/opt/ffmpeg/amd64 \
         --disable-programs --disable-doc --disable-debug --disable-autodetect \
-        --disable-network --disable-iconv --disable-zlib --disable-bzlib --disable-lzma \
+        --disable-network --disable-openssl --disable-iconv --disable-zlib --disable-bzlib --disable-lzma \
         --disable-avdevice --disable-avfilter --disable-swscale \
         --disable-everything --disable-gpl --disable-nonfree \
         --enable-static --disable-shared \
@@ -271,7 +271,7 @@ RUN cd lib/ffmpeg \
         --cc=aarch64-linux-gnu-gcc --cxx=aarch64-linux-gnu-g++ \
         --ar=aarch64-linux-gnu-ar --ranlib=aarch64-linux-gnu-ranlib \
         --disable-programs --disable-doc --disable-debug --disable-autodetect \
-        --disable-network --disable-iconv --disable-zlib --disable-bzlib --disable-lzma \
+        --disable-network --disable-openssl --disable-iconv --disable-zlib --disable-bzlib --disable-lzma \
         --disable-avdevice --disable-avfilter --disable-swscale \
         --disable-everything --disable-gpl --disable-nonfree \
         --enable-static --disable-shared \

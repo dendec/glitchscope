@@ -336,6 +336,13 @@ func FetchDirectoryCached(baseDir string, targetURL string) ([]DirItem, bool) {
 
 // FetchDirectory retrieves directory items for a URL, using cache if available or performing a synchronous HTTP GET.
 func FetchDirectory(baseDir string, targetURL string) ([]DirItem, error) {
+	return FetchDirectoryContext(context.Background(), baseDir, targetURL)
+}
+
+// FetchDirectoryContext loads a listing with cancellation, including cache misses.
+func FetchDirectoryContext(ctx context.Context, baseDir, targetURL string) ([]DirItem, error) {
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
 	if targetURL == "" {
 		targetURL = BaseURL
 	}
@@ -344,15 +351,13 @@ func FetchDirectory(baseDir string, targetURL string) ([]DirItem, error) {
 		return items, nil
 	}
 	if IsSnapshotArchiveURL(targetURL) {
-		ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
-		defer cancel()
 		return fetchAndCacheArchiveIndex(ctx, baseDir, targetURL)
 	}
 
-	return fetchAndCacheDirectory(baseDir, targetURL)
+	return fetchAndCacheDirectory(ctx, baseDir, targetURL)
 }
 
-func fetchAndCacheDirectory(baseDir string, targetURL string) ([]DirItem, error) {
+func fetchAndCacheDirectory(ctx context.Context, baseDir string, targetURL string) ([]DirItem, error) {
 	indexDir, err := IndexDir(baseDir)
 	if err != nil {
 		return nil, err
@@ -360,8 +365,6 @@ func fetchAndCacheDirectory(baseDir string, targetURL string) ([]DirItem, error)
 
 	cacheFile := filepath.Join(indexDir, urlHash(targetURL)+".json")
 
-	ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
-	defer cancel()
 	resp, err := util.Get(ctx, targetURL, nil)
 	if err != nil {
 		if items, cacheErr := loadCachedIndex(cacheFile); cacheErr == nil && len(items) > 0 {

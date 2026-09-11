@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/draw"
+	_ "image/gif"
 	"image/jpeg"
+	_ "image/png"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -14,6 +17,7 @@ import (
 	"github.com/dendec/glitchscope/internal/filesystem"
 	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/radio"
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 )
@@ -86,10 +90,11 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		// NC, catalog-track, and local-album info panels are static info views.
 		isNCInfo := o.hasNCSelection()
 		isCatalogInfo := o.currentEntry() != nil && o.currentEntry().IsCatalogTrack()
+		isRadioInfo := o.currentEntry() != nil && o.currentEntry().kind == entryRadioStation
 		isLocalInfo := o.infoLines != nil && !isNCInfo && !isCatalogInfo
 
-		// Cover art and metadata share one vertical scroll offset. Clip both to
-		// the complete panel so neither can escape or overlap outside it.
+		// The info image and metadata share one vertical scroll offset. Clip both
+		// to the complete panel so neither can escape or overlap outside it.
 		actionH := float32(0)
 		metadataH := float32(panelH)
 		catalogDelete := isCatalogInfo && o.isTrackCached != nil && o.isTrackCached(o.currentEntry().filePath)
@@ -101,22 +106,15 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 			}
 		}
 		var scrollPx float32
-		if isNCInfo || isLocalInfo || isCatalogInfo {
+		if isNCInfo || isLocalInfo || isCatalogInfo || isRadioInfo {
 			scrollPx = float32(o.ncInfoScroll * lh)
 		}
 		contentY := ty - scrollPx
-		if o.coverArtTex != 0 && o.coverArtTexW > 0 {
-			pad := float32(o.scalePx(4))
-			imgW := float32(o.coverArtTexW)
-			imgH := float32(o.coverArtTexH)
-			imgX := tx + (float32(panelW)-imgW)/2
-			imgY := ty + pad - scrollPx
-			glDrawOverlayImageClipped(o.programImage, o.coverArtTex, 1,
-				imgX, imgY, imgW, imgH, tx, ty, float32(panelW), metadataH,
-				winW, winH, viewW, viewH)
-			contentY = ty + pad + imgH + pad - scrollPx
+		imageTex, imageW, imageH := o.coverArtTex, o.coverArtTexW, o.coverArtTexH
+		if isRadioInfo {
+			imageTex, imageW, imageH = o.radioFaviconTex, o.radioFaviconTexW, o.radioFaviconTexH
 		}
-		isInfoPanel := isNCInfo || isCatalogInfo || isLocalInfo
+		isInfoPanel := isNCInfo || isCatalogInfo || isLocalInfo || isRadioInfo
 		if !isInfoPanel {
 			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
 				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
@@ -127,6 +125,16 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		glDrawOverlayTextClipped(o.programText, o.tracksTex, 1,
 			tx, contentY, float32(o.tracksTexW), float32(o.tracksTexH),
 			tx, ty, float32(panelW), remainH, winW, winH, viewW, viewH)
+		if imageTex != 0 && imageW > 0 {
+			pad := float32(o.scalePx(8))
+			imgW := float32(imageW)
+			imgH := float32(imageH)
+			imgX := tx + (float32(panelW)-imgW)/2
+			imgY := contentY + float32(o.tracksTexH) + pad
+			glDrawOverlayImageClipped(o.programImage, imageTex, 1,
+				imgX, imgY, imgW, imgH, tx, ty, float32(panelW), metadataH,
+				winW, winH, viewW, viewH)
+		}
 		if isLocalInfo || isNCInfo || isCatalogInfo {
 			drawScrollbar(o, tx+float32(panelW)-sbW, ty, remainH, o.ncInfoLines, o.ncInfoVisible, o.ncInfoScroll, winW, winH, viewW, viewH)
 			if isNCInfo || isCatalogInfo {
@@ -232,6 +240,11 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 			if e.IsFavoriteTrack() && e.filePath == o.playingPath {
 				prefix = "▸ "
 			}
+		} else if o.topLevel().ctx == ctxRadio {
+			e := o.albumEntries[i]
+			if e.kind == entryRadioStation && e.radioStation.Path() == o.playingPath {
+				prefix = "▸ "
+			}
 		} else if name == o.playingAlbum {
 			prefix = "▸ "
 		}
@@ -256,6 +269,15 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 		}
 		o.rebuildNCInfoTex(maxW, maxH)
 		o.tracksContentDirty = false
+		return
+	}
+
+	if e := o.currentEntry(); e != nil && e.kind == entryRadioStation {
+		nowPlaying := ""
+		if e.radioStation.Path() == o.radioNowPlayingPath {
+			nowPlaying = o.radioNowPlayingTitle
+		}
+		o.rebuildRadioInfoTex(e.radioStation, nowPlaying, maxW, maxH)
 		return
 	}
 
@@ -289,6 +311,123 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 
 	// Local album track: show right-panel info for the selected track.
 	o.rebuildLocalTrackInfoTex(maxW, maxH)
+}
+
+func (o *Overlay) rebuildRadioInfoTex(station radio.Station, nowPlaying string, maxW, maxH int) {
+	o.tracksContentDirty = false
+	lines := radioInfoLines(o.catalog, station, nowPlaying)
+	o.infoLines = lines
+	o.infoMarquee.invalidate(o)
+	lh := o.face.Metrics().Height.Ceil()
+	logoMaxH := maxH * 32 / 100
+	if logoMaxH < lh*3 {
+		logoMaxH = lh * 3
+	}
+	if logoMaxH > maxH {
+		logoMaxH = maxH
+	}
+	o.ensureRadioFaviconTexture(station.Path(), maxW, logoMaxH)
+	contentRows, visibleRows := o.infoScrollMetrics(len(lines), lh, maxH)
+	o.ncInfoVisible = visibleRows
+	o.ncInfoLines = contentRows
+	o.ncInfoScroll = min(o.ncInfoScroll, max(0, contentRows-visibleRows))
+	rows := make([]listRow, 0, len(lines))
+	for _, line := range lines {
+		rows = append(rows, listRow{text: line})
+	}
+	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, o.availableRowTextWidth(maxW), maxW)
+}
+
+func radioInfoLines(catalog i18n.Catalog, station radio.Station, nowPlaying string) []string {
+	lines := []string{station.DisplayName(), ""}
+	if nowPlaying != "" {
+		lines = append(lines, catalog.Format(i18n.RadioNow, nowPlaying))
+	}
+	if station.Codec != "" {
+		lines = append(lines, catalog.Format(i18n.RadioCodec, station.Codec))
+	}
+	if station.Bitrate > 0 {
+		lines = append(lines, catalog.Format(i18n.RadioBitrate, station.Bitrate))
+	}
+	if station.Tags != "" {
+		lines = append(lines, catalog.Format(i18n.RadioTags, station.Tags))
+	}
+	if station.Language != "" {
+		lines = append(lines, catalog.Format(i18n.RadioLanguage, station.Language))
+	}
+	if station.Country != "" {
+		lines = append(lines, catalog.Format(i18n.RadioCountry, station.Country))
+	}
+	if station.Homepage != "" {
+		lines = append(lines, catalog.Format(i18n.RadioHomepage, station.Homepage))
+	}
+	return lines
+}
+
+func (o *Overlay) ensureRadioFaviconTexture(path string, maxWidth, maxHeight int) {
+	processed := o.radioFavicons[path]
+	if path == o.radioFaviconTexPath && o.radioFaviconTexMaxW == maxWidth && o.radioFaviconTexMaxH == maxHeight && (o.radioFaviconTex != 0 || processed == nil) {
+		return
+	}
+	o.deleteTex(&o.radioFaviconTex)
+	o.radioFaviconTexW = 0
+	o.radioFaviconTexH = 0
+	o.radioFaviconTexPath = path
+	o.radioFaviconTexMaxW = maxWidth
+	o.radioFaviconTexMaxH = maxHeight
+	if path == "" || processed == nil || maxWidth <= 0 || maxHeight <= 0 {
+		return
+	}
+
+	contentMaxW := max(1, maxWidth-2*o.scalePx(8))
+	contentMaxH := max(1, maxHeight)
+	w, h := fitRadioFaviconSize(processed.Bounds().Dx(), processed.Bounds().Dy(), contentMaxW, contentMaxH)
+	scaled := scaleRadioFavicon(processed, w, h)
+	o.radioFaviconTex = glUploadTexture(scaled)
+	o.radioFaviconTexW = w
+	o.radioFaviconTexH = h
+}
+
+func scaleRadioFavicon(src image.Image, width, height int) *image.RGBA {
+	dst := image.NewRGBA(image.Rect(0, 0, width, height))
+	if width == src.Bounds().Dx() && height == src.Bounds().Dy() {
+		draw.Draw(dst, dst.Bounds(), src, src.Bounds().Min, draw.Src)
+		return dst
+	}
+	if width > src.Bounds().Dx() {
+		xdraw.NearestNeighbor.Scale(dst, dst.Bounds(), src, src.Bounds(), xdraw.Src, nil)
+		return dst
+	}
+	xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, src.Bounds(), xdraw.Over, nil)
+	return dst
+}
+
+const radioFaviconMinSize = 128
+
+func fitRadioFaviconSize(srcW, srcH, maxW, maxH int) (w, h int) {
+	if srcW <= 0 || srcH <= 0 || maxW <= 0 || maxH <= 0 {
+		return 0, 0
+	}
+
+	// Keep tiny logos readable by scaling their longest side up to the
+	// minimum size. The scale is capped by the panel bounds below, so a small
+	// logo is never allowed to overflow the right panel.
+	scaleNum, scaleDen := int64(1), int64(1)
+	if longest := max(srcW, srcH); longest < radioFaviconMinSize {
+		scaleNum = radioFaviconMinSize
+		scaleDen = int64(longest)
+	}
+	if int64(maxW)*scaleDen < int64(srcW)*scaleNum {
+		scaleNum = int64(maxW)
+		scaleDen = int64(srcW)
+	}
+	if int64(maxH)*scaleDen < int64(srcH)*scaleNum {
+		scaleNum = int64(maxH)
+		scaleDen = int64(srcH)
+	}
+
+	return max(1, int((int64(srcW)*scaleNum+scaleDen/2)/scaleDen)),
+		max(1, int((int64(srcH)*scaleNum+scaleDen/2)/scaleDen))
 }
 
 // rebuildLocalTrackInfoTex renders the right-panel info for the currently
@@ -327,14 +466,20 @@ func (o *Overlay) rebuildLocalTrackInfoTex(maxW, maxH int) {
 }
 
 // infoScrollMetrics computes total content rows and visible rows for an
-// info panel, accounting for cover art height. contentRows includes the
-// cover art (converted to row units) plus text lines.
+// info panel, accounting for its image height. contentRows includes the
+// image (converted to row units) plus text lines.
 func (o *Overlay) infoScrollMetrics(textLines, lh, panelH int) (contentRows, visibleRows int) {
-	coverArtH := 0
+	imageH := 0
 	if o.coverArtTex != 0 && o.coverArtTexH > 0 {
-		coverArtH = o.coverArtTexH + o.scalePx(8)
+		imageH = o.coverArtTexH
 	}
-	contentRows = (coverArtH + textLines*lh + lh - 1) / lh
+	if e := o.currentEntry(); e != nil && e.kind == entryRadioStation && o.radioFaviconTex != 0 && o.radioFaviconTexH > 0 {
+		imageH = o.radioFaviconTexH
+	}
+	if imageH > 0 {
+		imageH += o.scalePx(8)
+	}
+	contentRows = (imageH + textLines*lh + lh - 1) / lh
 	visibleRows = panelH / lh
 	if visibleRows < 1 {
 		visibleRows = 1
@@ -362,7 +507,7 @@ func (o *Overlay) loadCoverArt(path string, maxWidth int) (uint32, int, int) {
 	}
 	img, err := jpeg.Decode(bytes.NewReader(data))
 	if err != nil {
-		slog.Debug("cover art decode failed", "path", filepath.Base(path), "error", err)
+		slog.Warn("cover art decode failed", "path", filepath.Base(path), "error", err)
 		o.coverArtPath = path
 		return 0, 0, 0
 	}

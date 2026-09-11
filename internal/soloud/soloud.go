@@ -17,6 +17,14 @@ unsigned int Ffmpeg_getChannels(void *source);
 char *Ffmpeg_readTags(const char *path);
 unsigned char *Ffmpeg_readCoverArt(const char *path, unsigned int *out_size);
 unsigned int Ffmpeg_getSampleRate(void *source);
+void *FfmpegStream_create(void);
+void FfmpegStream_destroy(void *source);
+int FfmpegStream_write(void *source, const unsigned char *data, unsigned int length);
+void FfmpegStream_closeInput(void *source);
+void FfmpegStream_abort(void *source);
+int FfmpegStream_status(void *source);
+unsigned int FfmpegStream_bufferedFrames(void *source);
+const char *FfmpegStream_error(void *source);
 unsigned int Wav_getChannels(Wav * aClassPtr);
 void *Gme_create(void);
 void Gme_destroy(void *source);
@@ -64,6 +72,7 @@ import (
 	"fmt"
 	"runtime/cgo"
 	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -120,6 +129,15 @@ type Ym struct {
 // Ffmpeg wraps the FFmpeg audio source adapter.
 type Ffmpeg struct {
 	p unsafe.Pointer
+}
+
+// FfmpegStream is a network-independent FFmpeg decoder fed through a bounded
+// compressed-data buffer. Decoding runs on its own worker; SoLoud only reads
+// already decoded PCM from the source instance.
+type FfmpegStream struct {
+	p         unsafe.Pointer
+	onDestroy func()
+	mu        sync.Mutex
 }
 
 // New creates a SoLoud engine instance.
@@ -387,6 +405,133 @@ func NewFfmpegFile(path string) (*Ffmpeg, error) {
 		return nil, fmt.Errorf("ffmpeg: load file %q failed", path)
 	}
 	return &Ffmpeg{p: p}, nil
+}
+
+// NewFfmpegStream creates a decoder for a byte stream. The caller must feed
+// compressed bytes with Write and call CloseInput or Abort when finished.
+func NewFfmpegStream() (*FfmpegStream, error) {
+	p := C.FfmpegStream_create()
+	if p == nil {
+		return nil, fmt.Errorf("ffmpeg stream: create failed")
+	}
+	return &FfmpegStream{p: p}, nil
+}
+
+// Write appends compressed bytes to the decoder's bounded input buffer.
+func (f *FfmpegStream) Write(data []byte) (int, error) {
+	if f == nil {
+		return 0, fmt.Errorf("ffmpeg stream: closed")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.p == nil {
+		return 0, fmt.Errorf("ffmpeg stream: closed")
+	}
+	if len(data) == 0 {
+		return 0, nil
+	}
+	n := int(C.FfmpegStream_write(f.p, (*C.uchar)(unsafe.Pointer(&data[0])), C.uint(len(data))))
+	if n < 0 {
+		return 0, fmt.Errorf("ffmpeg stream: aborted")
+	}
+	return n, nil
+}
+
+// CloseInput marks the compressed input as complete and lets the decoder drain
+// already buffered data.
+func (f *FfmpegStream) CloseInput() {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.p != nil {
+		C.FfmpegStream_closeInput(f.p)
+	}
+}
+
+// Abort interrupts both input and decoder workers.
+func (f *FfmpegStream) Abort() {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.p != nil {
+		C.FfmpegStream_abort(f.p)
+	}
+}
+
+// StreamStatus returns 0 while initializing, 1 when the decoder is ready, 2
+// when the input ended, and -1 on a decoder error.
+func (f *FfmpegStream) StreamStatus() int {
+	if f == nil {
+		return -1
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.p == nil {
+		return -1
+	}
+	return int(C.FfmpegStream_status(f.p))
+}
+
+// BufferedFrames returns the number of decoded stereo frames ready for audio.
+func (f *FfmpegStream) BufferedFrames() int {
+	if f == nil {
+		return 0
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.p == nil {
+		return 0
+	}
+	return int(C.FfmpegStream_bufferedFrames(f.p))
+}
+
+// StreamError returns the native decoder error, if any.
+func (f *FfmpegStream) StreamError() string {
+	if f == nil {
+		return "ffmpeg stream: closed"
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.p == nil {
+		return "ffmpeg stream: closed"
+	}
+	return C.GoString(C.FfmpegStream_error(f.p))
+}
+
+// SetOnDestroy registers cleanup for the external byte producer. It is used
+// by the player to close the HTTP response before the native decoder joins.
+func (f *FfmpegStream) SetOnDestroy(cleanup func()) {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	f.onDestroy = cleanup
+	f.mu.Unlock()
+}
+
+func (f *FfmpegStream) raw() unsafe.Pointer { return f.p }
+
+// Destroy stops the decoder worker and releases the native stream.
+func (f *FfmpegStream) Destroy() {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	ptr, cleanup := f.p, f.onDestroy
+	f.p, f.onDestroy = nil, nil
+	f.mu.Unlock()
+	if ptr == nil {
+		return
+	}
+	C.FfmpegStream_abort(ptr)
+	if cleanup != nil {
+		cleanup()
+	}
+	C.FfmpegStream_destroy(ptr)
 }
 
 // raw returns the underlying C pointer for generic playback.

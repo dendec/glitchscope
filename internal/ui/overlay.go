@@ -2,10 +2,13 @@
 package ui
 
 import (
+	"context"
+	"image"
 	"image/color"
 	"log/slog"
 	"math"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/dendec/glitchscope/internal/config"
@@ -13,6 +16,7 @@ import (
 	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/modarchive"
 	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/radio"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 )
@@ -94,6 +98,7 @@ const (
 	ctxSourceRoot navCtx = iota // virtual source root
 	ctxNC                       // NC-local filesystem browser (dirPath set)
 	ctxCatalog                  // remote catalog level: formats / albums / modarchive dirs
+	ctxRadio                    // Radio Browser categories, filters, and stations
 	ctxMicrophone               // SDL capture-device selection
 	ctxFavorites                // favorites playlist level
 )
@@ -230,26 +235,30 @@ type Overlay struct {
 	presetNameMarquee marqueeState
 	bottomMarquee     marqueeState
 
-	albumsTex                          uint32
-	albumsTexW, albumsTexH             int
-	tracksTex                          uint32
-	tracksTexW, tracksTexH             int
-	ncActionsTex                       uint32
-	ncActionsTexW, ncActionsTexH       int
-	coverArtTex                        uint32
-	coverArtTexW, coverArtTexH         int
-	coverArtPath                       string // file whose cover art is cached in coverArtTex
-	bottomTex                          uint32
-	bottomTexW, bottomTexH             int
-	bottomPrefixTex                    uint32
-	bottomPrefixTexW, bottomPrefixTexH int
-	bottomSuffixTex                    uint32
-	bottomSuffixTexW, bottomSuffixTexH int
-	bottomTitleX, bottomTitleW         int
-	statsTex                           uint32
-	statsTexW, statsTexH               int
-	presetNameTex                      uint32
-	presetNameTexW, presetNameTexH     int
+	albumsTex                                uint32
+	albumsTexW, albumsTexH                   int
+	tracksTex                                uint32
+	tracksTexW, tracksTexH                   int
+	ncActionsTex                             uint32
+	ncActionsTexW, ncActionsTexH             int
+	coverArtTex                              uint32
+	coverArtTexW, coverArtTexH               int
+	coverArtPath                             string // file whose cover art is cached in coverArtTex
+	radioFaviconTex                          uint32
+	radioFaviconTexW, radioFaviconTexH       int
+	radioFaviconTexPath                      string
+	radioFaviconTexMaxW, radioFaviconTexMaxH int
+	bottomTex                                uint32
+	bottomTexW, bottomTexH                   int
+	bottomPrefixTex                          uint32
+	bottomPrefixTexW, bottomPrefixTexH       int
+	bottomSuffixTex                          uint32
+	bottomSuffixTexW, bottomSuffixTexH       int
+	bottomTitleX, bottomTitleW               int
+	statsTex                                 uint32
+	statsTexW, statsTexH                     int
+	presetNameTex                            uint32
+	presetNameTexW, presetNameTexH           int
 
 	breadcrumbTex                  uint32
 	breadcrumbTexW, breadcrumbTexH int
@@ -270,31 +279,45 @@ type Overlay struct {
 	iconTextureSize    int
 	iconTextureColor   color.RGBA
 
-	albumsDirty         bool
-	albumsContentDirty  bool
-	tracksDirty         bool
-	tracksContentDirty  bool
-	statsDirty          bool
-	bottomDirty         bool
-	presetNameDirty     bool
-	presetsDirty        bool
-	presetCursorDirty   bool
-	presetsDetailDirty  bool
-	presetsRightRows    int // cached right panel row count for thumbnail draw
-	presetPreviewFPSNow int // rounded value currently baked into the detail texture
-	online              bool
-	micActive           bool // microphone capture is running
-	micDevices          []string
-	micMenuRequested    bool   // one-shot: microphone source selected
-	micDeviceSelected   string // one-shot: selected SDL capture device name
-	micStopRequested    bool   // one-shot: stop capture selected
-	closeInjectPending  bool
-	modArchiveItems     map[string][]modarchive.DirItem
-	favoritesView       FavoritesView
-	deviceInfo          *DeviceInfo
-	deviceInfoProvider  func() *DeviceInfo
-	catalogInfoProvider func() CatalogInfo
-	catalogInfo         CatalogInfo
+	albumsDirty          bool
+	albumsContentDirty   bool
+	tracksDirty          bool
+	tracksContentDirty   bool
+	statsDirty           bool
+	bottomDirty          bool
+	presetNameDirty      bool
+	presetsDirty         bool
+	presetCursorDirty    bool
+	presetsDetailDirty   bool
+	presetsRightRows     int // cached right panel row count for thumbnail draw
+	presetPreviewFPSNow  int // rounded value currently baked into the detail texture
+	online               bool
+	micActive            bool // microphone capture is running
+	micDevices           []string
+	micMenuRequested     bool   // one-shot: microphone source selected
+	micDeviceSelected    string // one-shot: selected SDL capture device name
+	micStopRequested     bool   // one-shot: stop capture selected
+	closeInjectPending   bool
+	modArchiveItems      map[string][]modarchive.DirItem
+	modArchiveCancel     context.CancelFunc
+	modArchiveWG         sync.WaitGroup
+	modArchiveResults    chan modArchiveResult
+	modArchiveRequestID  uint64
+	modArchivePendingURL string
+	radioQueries         map[string][]radio.Station
+	radioFavicons        map[string]*image.RGBA
+	radioValues          map[radio.BrowseKind][]string
+	radioBrowseRequested bool
+	radioBrowseKind      radio.BrowseKind
+	radioBrowseFilter    string
+	radioSelected        *radio.Station
+	radioNowPlayingPath  string
+	radioNowPlayingTitle string
+	favoritesView        FavoritesView
+	deviceInfo           *DeviceInfo
+	deviceInfoProvider   func() *DeviceInfo
+	catalogInfoProvider  func() CatalogInfo
+	catalogInfo          CatalogInfo
 }
 
 // New creates an Overlay. The stack always has a virtual source root.
@@ -306,6 +329,9 @@ func New() *Overlay {
 		programImage:    glCreateImageProgram(),
 		programRect:     glCreateRectProgram(),
 		modArchiveItems: make(map[string][]modarchive.DirItem),
+		radioQueries:    make(map[string][]radio.Station),
+		radioFavicons:   make(map[string]*image.RGBA),
+		radioValues:     make(map[radio.BrowseKind][]string),
 	}
 	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
 	o.albumEntries = o.navStack[0].entries
@@ -369,12 +395,17 @@ func (o *Overlay) clampHelpView() {
 func (o *Overlay) Catalog() i18n.Catalog { return o.catalog }
 
 func (o *Overlay) Close() {
+	if o.modArchiveCancel != nil {
+		o.modArchiveCancel()
+	}
+	o.modArchiveWG.Wait()
 	o.deleteTex(&o.menuHint.texture.tex)
 	o.notif.Hide()
 	o.deleteTex(&o.albumsTex)
 	o.deleteTex(&o.tracksTex)
 	o.deleteTex(&o.ncActionsTex)
 	o.deleteTex(&o.coverArtTex)
+	o.deleteTex(&o.radioFaviconTex)
 	o.deleteTex(&o.bottomTex)
 	o.deleteTex(&o.bottomPrefixTex)
 	o.deleteTex(&o.bottomSuffixTex)
@@ -523,7 +554,7 @@ func (o *Overlay) HasPlayableTrack() bool {
 	if e == nil {
 		return false
 	}
-	return e.IsNCFile() || e.IsCatalogTrack() || e.IsLeafAlbum() || e.IsFavoriteTrack()
+	return e.IsNCFile() || e.IsCatalogTrack() || e.IsLeafAlbum() || e.IsFavoriteTrack() || e.kind == entryRadioStation
 }
 
 // SelectedTrackPath returns the file path of the focused entry, or "".
@@ -534,6 +565,9 @@ func (o *Overlay) SelectedTrackPath() string {
 	}
 	if e.IsNCFile() || e.IsFavoriteTrack() || e.IsCatalogTrack() {
 		return e.filePath
+	}
+	if e.kind == entryRadioStation {
+		return e.radioStation.Path()
 	}
 	return ""
 }
@@ -795,6 +829,117 @@ func (o *Overlay) SetOnline(v bool) {
 		return
 	}
 	o.refreshSourceRoot()
+}
+
+// SetRadioValues installs cached filter values and refreshes the open Radio
+// filter level. It is called by the app after a background directory request.
+func (o *Overlay) SetRadioValues(kind radio.BrowseKind, values []string) {
+	o.radioValues[kind] = append([]string(nil), values...)
+	if o.topLevel().ctx == ctxRadio && o.topLevel().radioKind == kind && o.topLevel().radioFilter == "" {
+		o.topLevel().entries = withParentEntry(o.buildRadioFilterEntries(kind))
+		o.refreshAlbumLabels()
+		o.albumCursor = clampCursor(o.albumCursor, len(o.albumEntries))
+		o.syncPanels()
+	}
+}
+
+// SetRadioStations installs a cached station listing and refreshes the open
+// station level when it corresponds to this query.
+func (o *Overlay) SetRadioStations(kind radio.BrowseKind, filter string, stations []radio.Station) {
+	key := radioQueryKey(kind, filter)
+	o.radioQueries[key] = append([]radio.Station(nil), stations...)
+	if o.topLevel().ctx == ctxRadio && o.topLevel().radioKind == kind && o.topLevel().radioFilter == filter {
+		o.topLevel().entries = withParentEntry(o.buildRadioStationEntries(kind, filter))
+		o.refreshAlbumLabels()
+		o.albumCursor = clampCursor(o.albumCursor, len(o.albumEntries))
+		o.syncPanels()
+	}
+}
+
+// SetRadioError replaces an empty loading view with the same unavailable
+// state used elsewhere in the UI. Existing cached rows remain usable.
+func (o *Overlay) SetRadioError(kind radio.BrowseKind, filter string) {
+	if o.topLevel().ctx != ctxRadio || o.topLevel().radioKind != kind || o.topLevel().radioFilter != filter {
+		return
+	}
+	key := radioQueryKey(kind, filter)
+	if filter == "" && (kind == radio.BrowseTag || kind == radio.BrowseLanguage || kind == radio.BrowseCountry) {
+		if len(o.radioValues[kind]) > 0 {
+			return
+		}
+	} else if len(o.radioQueries[key]) > 0 {
+		return
+	}
+	o.topLevel().entries = withParentEntry([]navEntry{{label: o.catalog.Text(i18n.ValueUnavailable), kind: entryInfo}})
+	o.refreshAlbumLabels()
+	o.albumCursor = clampCursor(o.albumCursor, len(o.albumEntries))
+	o.syncPanels()
+}
+
+// SetRadioNowPlaying updates the live ICY title for one station. Keying the
+// title by station prevents it appearing on another selected station.
+func (o *Overlay) SetRadioNowPlaying(path, title string) {
+	if o.radioNowPlayingPath == path && o.radioNowPlayingTitle == title {
+		return
+	}
+	o.radioNowPlayingPath = path
+	o.radioNowPlayingTitle = title
+	if o.playingPath == path {
+		o.bottomDirty = true
+	}
+	if o.source == sourceRadio {
+		o.tracksDirty = true
+		o.tracksContentDirty = true
+	}
+}
+
+// SetRadioFavicon takes ownership of a prepared bitmap; upload stays on the GL thread.
+func (o *Overlay) SetRadioFavicon(path string, data *image.RGBA) {
+	if path == "" || data == nil {
+		return
+	}
+	if o.radioFavicons == nil {
+		o.radioFavicons = make(map[string]*image.RGBA)
+	}
+	if len(o.radioFavicons) >= 32 {
+		for key := range o.radioFavicons {
+			delete(o.radioFavicons, key)
+			break
+		}
+	}
+	o.radioFavicons[path] = data
+	if path == o.radioFaviconTexPath {
+		o.radioFaviconTexPath = ""
+	}
+	o.tracksDirty = true
+	o.tracksContentDirty = true
+}
+
+// ConsumeRadioBrowseRequest returns a one-shot request for a background
+// Radio Browser query.
+func (o *Overlay) ConsumeRadioBrowseRequest() (radio.BrowseKind, string, bool) {
+	if !o.radioBrowseRequested {
+		return "", "", false
+	}
+	kind, filter := o.radioBrowseKind, o.radioBrowseFilter
+	o.radioBrowseRequested = false
+	return kind, filter, true
+}
+
+// ConsumeRadioStationSelection returns a one-shot station chosen by the user
+// together with the visible station listing, which becomes its playback queue.
+func (o *Overlay) ConsumeRadioStationSelection() (radio.Station, []radio.Station, bool) {
+	if o.radioSelected == nil {
+		return radio.Station{}, nil, false
+	}
+	station := *o.radioSelected
+	o.radioSelected = nil
+	level := o.topLevel()
+	stations := append([]radio.Station(nil), o.radioQueries[radioQueryKey(level.radioKind, level.radioFilter)]...)
+	if len(stations) == 0 {
+		stations = []radio.Station{station}
+	}
+	return station, stations, true
 }
 
 // SetTrackCacheLookup supplies the read-only cache projection used by offline navigation.

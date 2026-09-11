@@ -4,6 +4,7 @@ package player
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -31,8 +32,11 @@ const (
 	// than consuming an unbounded amount of RAM on low-power handhelds.
 	// 360s covers essentially all chip tracks (YM/SID etc.) at a worst case of
 	// ~121 MiB for the final stereo float32 PCM buffer.
-	maxRenderSeconds          = 360.0
-	defaultRenderBudget int64 = 256 << 20
+	maxRenderSeconds            = 360.0
+	defaultRenderBudget   int64 = 256 << 20
+	streamPrebufferFrames       = 22050 // 500 ms at the decoder output rate
+	streamStartupTimeout        = 20 * time.Second
+	streamIdleTimeout           = 15 * time.Second
 )
 
 // loadResult holds the outcome of loading a single audio source.
@@ -71,12 +75,17 @@ type Player struct {
 
 	// Downloader optionally fetches a remote file to a local path (e.g. for modland).
 	// The context is cancelled when a new track is requested or playback is stopped.
-	Downloader   func(ctx context.Context, path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
+	Downloader func(ctx context.Context, path string, expectedSize int64, onProgress func(read, total int64)) (string, error)
+	// OpenStream opens a provider-owned byte stream for a virtual path. The
+	// returned body is consumed by the background stream worker and must not be
+	// read from the UI or SoLoud audio callback.
+	OpenStream   func(ctx context.Context, path string) (io.ReadCloser, error)
 	loadFunc     func(localPath string) loadResult // test seam: override native loading
-	loadCancel   context.CancelFunc                // cancels the current in-flight load
-	pendingCh    chan loadResult                   // background load results
-	renderBudget atomic.Int64                      // zero means the default; negative disables pre-render
-	decodeMu     sync.Mutex                        // only one native load/pre-render at a time
+	streamWG     sync.WaitGroup
+	loadCancel   context.CancelFunc // cancels the current in-flight load
+	pendingCh    chan loadResult    // background load results
+	renderBudget atomic.Int64       // zero means the default; negative disables pre-render
+	decodeMu     sync.Mutex         // only one native load/pre-render at a time
 	pendingMu    sync.Mutex
 	requestID    atomic.Uint64
 	loading      atomic.Bool
@@ -142,6 +151,9 @@ func loadSourceContext(ctx context.Context, localPath string, budget int64) load
 		return loadResult{err: err}
 	}
 	ext := strings.ToLower(filepath.Ext(localPath))
+	if strings.HasPrefix(localPath, "http://") || strings.HasPrefix(localPath, "https://") {
+		return loadResult{path: localPath, err: fmt.Errorf("network URL requires stream transport")}
+	}
 
 	if isHvlExt(ext) {
 		return loadFromBytes(localPath, ext, func(data []byte) (soloud.AudioSource, error) {
@@ -203,6 +215,125 @@ func loadSourceContext(ctx context.Context, localPath string, budget int64) load
 		duration:  w.GetLength(),
 		channels:  w.GetChannels(),
 		isTracker: false,
+	}
+}
+
+// loadStreamContext starts the network-to-FFmpeg pipeline and waits for a
+// small PCM prebuffer. All waiting happens in the async load worker; neither
+// the main loop nor the SoLoud audio callback participates in startup I/O.
+func loadStreamContext(ctx context.Context, input io.ReadCloser, openCancel context.CancelFunc) loadResult {
+	decoder, err := soloud.NewFfmpegStream()
+	if err != nil {
+		_ = input.Close()
+		openCancel()
+		return loadResult{err: err}
+	}
+	streamCtx, cancel := context.WithCancel(context.Background())
+	var workers sync.WaitGroup
+	workers.Add(2)
+	decoder.SetOnDestroy(func() {
+		openCancel()
+		cancel()
+		_ = input.Close()
+		workers.Wait()
+	})
+
+	var lastData atomic.Int64
+	lastData.Store(time.Now().UnixNano())
+	go func() {
+		defer workers.Done()
+		defer decoder.CloseInput()
+		buffer := make([]byte, 32*1024)
+		for streamCtx.Err() == nil {
+			count, readErr := input.Read(buffer)
+			if count > 0 {
+				lastData.Store(time.Now().UnixNano())
+			}
+			for written := 0; written < count; {
+				if streamCtx.Err() != nil {
+					return
+				}
+				n, writeErr := decoder.Write(buffer[written:count])
+				if writeErr != nil {
+					return
+				}
+				lastData.Store(time.Now().UnixNano())
+				if n == 0 {
+					time.Sleep(5 * time.Millisecond)
+					continue
+				}
+				written += n
+			}
+			if readErr != nil {
+				if streamCtx.Err() == nil && readErr != io.EOF {
+					slog.Warn("radio stream read failed", "error", readErr)
+				}
+				return
+			}
+		}
+	}()
+	go func() {
+		defer workers.Done()
+		lastPCM := time.Now()
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-streamCtx.Done():
+				return
+			case now := <-ticker.C:
+				if decoder.BufferedFrames() > 0 {
+					lastPCM = now
+				}
+				if now.Sub(time.Unix(0, lastData.Load())) >= streamIdleTimeout || now.Sub(lastPCM) >= streamIdleTimeout {
+					slog.Warn("radio stream stalled", "buffered_frames", decoder.BufferedFrames())
+					openCancel()
+					cancel()
+					_ = input.Close()
+					decoder.Abort()
+					return
+				}
+			}
+		}
+	}()
+
+	cleanup := func() {
+		openCancel()
+		cancel()
+		_ = input.Close()
+		decoder.Abort()
+		decoder.Destroy()
+	}
+	startupAt := time.Now()
+	for {
+		if err := ctx.Err(); err != nil {
+			cleanup()
+			return loadResult{err: err}
+		}
+		if time.Since(startupAt) >= streamStartupTimeout {
+			cleanup()
+			return loadResult{err: fmt.Errorf("radio stream prebuffer timeout")}
+		}
+		switch decoder.StreamStatus() {
+		case -1:
+			err := decoder.StreamError()
+			cleanup()
+			return loadResult{err: fmt.Errorf("radio decoder: %s", err)}
+		case 2:
+			if decoder.BufferedFrames() < streamPrebufferFrames {
+				cleanup()
+				return loadResult{err: fmt.Errorf("radio stream ended before prebuffer")}
+			}
+			fallthrough
+		case 1:
+			if decoder.BufferedFrames() >= streamPrebufferFrames {
+				return loadResult{
+					src:      decoder,
+					channels: 2,
+				}
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -355,7 +486,7 @@ func (p *Player) PlayFileAsync(path string) {
 	select {
 	case old := <-p.pendingCh:
 		if old.src != nil {
-			old.src.Destroy()
+			p.releaseSource(old.src)
 		}
 	default:
 	}
@@ -379,7 +510,33 @@ func (p *Player) PlayFileAsync(path string) {
 		}
 
 		localPath := path
-		if p.Downloader != nil {
+		var stream io.ReadCloser
+		var err error
+		var openCancel context.CancelFunc
+		if p.OpenStream != nil && IsRadio(path) {
+			streamCtx, cancelOpen := context.WithCancel(context.Background())
+			openCancel = cancelOpen
+			stopForward := context.AfterFunc(ctx, cancelOpen)
+			defer stopForward() // detach before the load context is cancelled
+			startupTimer := time.AfterFunc(streamStartupTimeout, cancelOpen)
+			defer startupTimer.Stop()
+			stream, err = p.OpenStream(streamCtx, path)
+			if err != nil {
+				cancelOpen()
+				if ctx.Err() != nil {
+					return
+				}
+				p.publishResult(loadResult{path: path, requestID: requestID, err: err})
+				return
+			}
+			localPath = path
+		} else if IsRadio(path) {
+			err := fmt.Errorf("radio stream transport unavailable")
+			if ctx.Err() == nil {
+				p.publishResult(loadResult{path: path, requestID: requestID, err: err})
+			}
+			return
+		} else if p.Downloader != nil && !strings.HasPrefix(path, "http://") && !strings.HasPrefix(path, "https://") {
 			onProgress := func(read, total int64) {
 				if p.requestID.Load() != requestID {
 					return // stale request — ignore progress
@@ -406,13 +563,21 @@ func (p *Player) PlayFileAsync(path string) {
 			localPath = dlPath
 		}
 		if ctx.Err() != nil {
+			if openCancel != nil {
+				openCancel()
+			}
+			if stream != nil {
+				_ = stream.Close()
+			}
 			return
 		}
 		p.loadPercent.Store(-1) // decode phase: unknown progress
 		p.decodeMu.Lock()
 		decodeStart := time.Now()
 		var r loadResult
-		if ctx.Err() == nil {
+		if stream != nil {
+			r = loadStreamContext(ctx, stream, openCancel)
+		} else if ctx.Err() == nil {
 			if p.loadFunc != nil {
 				r = p.loadFunc(localPath)
 			} else {
@@ -420,7 +585,7 @@ func (p *Player) PlayFileAsync(path string) {
 			}
 		}
 		if ctx.Err() != nil && r.src != nil {
-			r.src.Destroy()
+			p.releaseSource(r.src)
 			r.src = nil
 		}
 		p.decodeMu.Unlock()
@@ -444,7 +609,7 @@ func (p *Player) publishResult(r loadResult) {
 	defer p.pendingMu.Unlock()
 	if r.requestID != p.requestID.Load() {
 		if r.src != nil {
-			r.src.Destroy()
+			p.releaseSource(r.src)
 		}
 		return
 	}
@@ -452,7 +617,7 @@ func (p *Player) publishResult(r loadResult) {
 	select {
 	case old := <-p.pendingCh:
 		if old.src != nil {
-			old.src.Destroy()
+			p.releaseSource(old.src)
 		}
 	default:
 	}
@@ -479,7 +644,7 @@ func (p *Player) CheckPending() (started bool, failed bool) {
 		if r.requestID != p.requestID.Load() {
 			// Stale result — discard.
 			if r.src != nil {
-				r.src.Destroy()
+				p.releaseSource(r.src)
 			}
 			return false, false
 		}
@@ -521,13 +686,27 @@ func (p *Player) applyResult(r loadResult, displayPath string) {
 	}
 }
 
+// releaseSource runs potentially blocking stream teardown away from the UI.
+// StopAll must have detached any active SoLoud voice before this call.
+func (p *Player) releaseSource(src soloud.AudioSource) {
+	if _, ok := src.(*soloud.FfmpegStream); !ok {
+		src.Destroy()
+		return
+	}
+	p.streamWG.Add(1)
+	go func() {
+		defer p.streamWG.Done()
+		src.Destroy()
+	}()
+}
+
 // replaceSource stops current playback and swaps in a new audio source.
 func (p *Player) replaceSource(src soloud.AudioSource) {
 	if p.s != nil {
 		p.s.StopAll()
 	}
 	if p.current != nil {
-		p.current.Destroy()
+		p.releaseSource(p.current)
 		p.current = nil
 	}
 	p.posMu.Lock()
@@ -742,7 +921,7 @@ func (p *Player) Stop() {
 	}
 	p.voice = 0
 	if p.current != nil {
-		p.current.Destroy()
+		p.releaseSource(p.current)
 		p.current = nil
 	}
 	p.posMu.Lock()
@@ -773,12 +952,13 @@ func (p *Player) Close() {
 	select {
 	case r := <-p.pendingCh:
 		if r.src != nil {
-			r.src.Destroy()
+			p.releaseSource(r.src)
 		}
 	default:
 	}
 	p.pendingMu.Unlock()
 
+	p.streamWG.Wait()
 	if p.s != nil {
 		p.s.Destroy()
 	}
@@ -821,6 +1001,9 @@ func advancePositionClock(pos float64, playing bool, dt float64) float64 {
 // Seek moves the current track position in seconds and updates the
 // authoritative clock so Position() reflects the jump immediately.
 func (p *Player) Seek(seconds float64) error {
+	if IsRadio(p.currentPath) {
+		return fmt.Errorf("live radio does not support seeking")
+	}
 	if !p.IsValidVoice() {
 		return fmt.Errorf("no active voice")
 	}
