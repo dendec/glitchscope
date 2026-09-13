@@ -72,6 +72,7 @@
   "sources.local_music": "Local Music",
   "sources.favorites": "Favorites",
   "sources.downloads": "Downloads",
+  "sources.radio": "Radio",
   "actions.delete_download": "Delete download",
   "info.favorites_stay_offline": "Favorites are protected from automatic cleanup and stay available offline.",
   "sources.microphone": "Microphone",

@@ -134,6 +134,7 @@
   "sources.local_music": "Música local",
   "sources.favorites": "Favoritos",
   "sources.downloads": "Descargas",
+  "sources.radio": "Radio",
   "actions.delete_download": "Eliminar descarga",
   "info.favorites_stay_offline": "Los favoritos están protegidos de la limpieza automática y permanecen disponibles sin conexión.",
   "sources.microphone": "Micrófono",

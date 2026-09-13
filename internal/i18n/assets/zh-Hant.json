@@ -134,6 +134,7 @@
   "sources.local_music": "本機音樂",
   "sources.favorites": "收藏",
   "sources.downloads": "下載",
+  "sources.radio": "網路電台",
   "actions.delete_download": "刪除下載",
   "info.favorites_stay_offline": "收藏曲目不會被自動清理，並始終可離線播放。",
   "sources.microphone": "麥克風",

@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -30,7 +31,10 @@ const (
 	radioRequestTimeout   = 12 * time.Second
 	radioDirectoryTimeout = 6 * time.Second
 	lastStationFile       = "last-station.json"
+	radioBrowserAllHost   = "all.api.radio-browser.info"
 )
+
+var radioBrowserFallbackServers = []string{"https://de1.api.radio-browser.info"}
 
 // BrowseKind identifies a Radio Browser station query.
 type BrowseKind string
@@ -535,10 +539,6 @@ func (c *Client) Close() {
 }
 
 func (c *Client) fetchStations(ctx context.Context, kind BrowseKind, filter string) ([]Station, error) {
-	base, err := c.server(ctx, radioDirectoryTimeout)
-	if err != nil {
-		return nil, err
-	}
 	path := ""
 	switch kind {
 	case BrowsePopular:
@@ -555,17 +555,13 @@ func (c *Client) fetchStations(ctx context.Context, kind BrowseKind, filter stri
 		return nil, fmt.Errorf("radio: unknown browse kind %q", kind)
 	}
 	var stations []Station
-	if err := c.getJSONTimeout(ctx, base+path, &stations, radioDirectoryTimeout); err != nil {
+	if err := c.getJSONFromServers(ctx, path, &stations, radioDirectoryTimeout); err != nil {
 		return nil, err
 	}
 	return cleanStations(stations), nil
 }
 
 func (c *Client) fetchValues(ctx context.Context, kind BrowseKind) ([]string, error) {
-	base, err := c.server(ctx, radioDirectoryTimeout)
-	if err != nil {
-		return nil, err
-	}
 	path := map[BrowseKind]string{
 		BrowseTag:      "/json/tags",
 		BrowseLanguage: "/json/languages",
@@ -577,7 +573,7 @@ func (c *Client) fetchValues(ctx context.Context, kind BrowseKind) ([]string, er
 	var rows []struct {
 		Name string `json:"name"`
 	}
-	if err := c.getJSONTimeout(ctx, base+path+"?order=stationcount&reverse=true&limit=250", &rows, radioDirectoryTimeout); err != nil {
+	if err := c.getJSONFromServers(ctx, path+"?order=stationcount&reverse=true&limit=250", &rows, radioDirectoryTimeout); err != nil {
 		return nil, err
 	}
 	values := make([]string, 0, len(rows))
@@ -589,22 +585,51 @@ func (c *Client) fetchValues(ctx context.Context, kind BrowseKind) ([]string, er
 	return values, nil
 }
 
-func (c *Client) getJSON(ctx context.Context, endpoint string, dst any) error {
-	return c.getJSONTimeout(ctx, endpoint, dst, radioRequestTimeout)
-}
-
 func (c *Client) getJSONTimeout(ctx context.Context, endpoint string, dst any, timeout time.Duration) error {
 	requestCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	resp, err := util.Get(requestCtx, endpoint, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("radio browser: GET %s: %w", endpoint, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("radio browser: HTTP %s", resp.Status)
+		return fmt.Errorf("radio browser: GET %s: HTTP %s", endpoint, resp.Status)
 	}
-	return json.NewDecoder(io.LimitReader(resp.Body, 16<<20)).Decode(dst)
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 16<<20)).Decode(dst); err != nil {
+		return fmt.Errorf("radio browser: decode %s: %w", endpoint, err)
+	}
+	return nil
+}
+
+func (c *Client) getJSONFromServers(ctx context.Context, path string, dst any, timeout time.Duration) error {
+	if strings.TrimSpace(path) == "" || !strings.HasPrefix(path, "/") {
+		return fmt.Errorf("radio browser: invalid API path %q", path)
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	servers, err := c.serversForRequest(requestCtx, timeout)
+	if err != nil {
+		return err
+	}
+	order := rand.Perm(len(servers))
+	errs := make([]error, 0, len(order))
+	for _, index := range order {
+		base := strings.TrimRight(servers[index], "/")
+		endpoint := base + path
+		if err := c.getJSONTimeout(requestCtx, endpoint, dst, timeout); err == nil {
+			return nil
+		} else {
+			errs = append(errs, err)
+			if requestCtx.Err() == nil {
+				c.invalidateServer(base)
+			}
+		}
+	}
+	if len(errs) == 0 {
+		return errors.New("radio browser: no API servers available")
+	}
+	return errors.Join(errs...)
 }
 
 // FetchFavicon downloads one station icon. The caller owns the returned bytes;
@@ -630,29 +655,152 @@ func (c *Client) FetchFavicon(ctx context.Context, targetURL string) ([]byte, er
 	return data, nil
 }
 
-func (c *Client) server(ctx context.Context, timeout time.Duration) (string, error) {
+func (c *Client) serversForRequest(ctx context.Context, timeout time.Duration) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	c.mu.RLock()
 	servers := append([]string(nil), c.servers...)
 	c.mu.RUnlock()
+	if len(servers) > 0 {
+		return servers, nil
+	}
+
+	discovered, err := c.discoverServers(ctx, timeout)
+	if len(discovered) == 0 {
+		discovered = append([]string(nil), radioBrowserFallbackServers...)
+		slog.Warn("radio browser server discovery failed; using fallback", "error", err, "servers", discovered)
+	} else if err != nil {
+		slog.Warn("radio browser server discovery partially failed", "error", err, "servers", discovered)
+	}
+	// Keep one known API endpoint in the rotation even when discovery returns
+	// another mirror. A transiently stale DNS/SRV answer must not make the
+	// directory unavailable for the whole request.
+	discovered = append(discovered, radioBrowserFallbackServers...)
+	servers = uniqueServers(discovered)
 	if len(servers) == 0 {
-		var discovered []serverRecord
-		if err := c.getJSONTimeout(ctx, "https://all.api.radio-browser.info/json/servers", &discovered, timeout); err == nil {
-			for _, server := range discovered {
-				if strings.HasPrefix(server.Name, "http://") || strings.HasPrefix(server.Name, "https://") {
-					servers = append(servers, strings.TrimRight(server.Name, "/"))
-				} else if server.Name != "" {
-					servers = append(servers, "https://"+server.Name)
+		return nil, errors.New("radio browser: server discovery returned no usable HTTPS servers")
+	}
+	c.mu.Lock()
+	c.servers = append([]string(nil), servers...)
+	c.mu.Unlock()
+	return servers, nil
+}
+
+func (c *Client) discoverServers(ctx context.Context, timeout time.Duration) ([]string, error) {
+	servers := make([]string, 0, 4)
+	seen := make(map[string]struct{})
+	add := func(raw string) {
+		server, ok := normalizeServerURL(raw)
+		if !ok {
+			return
+		}
+		if _, exists := seen[server]; exists {
+			return
+		}
+		seen[server] = struct{}{}
+		servers = append(servers, server)
+	}
+	errs := make([]error, 0, 3)
+
+	lookupCtx, cancel := context.WithTimeout(ctx, min(timeout, 2*time.Second))
+	ips, err := net.DefaultResolver.LookupHost(lookupCtx, radioBrowserAllHost)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("DNS lookup %s: %w", radioBrowserAllHost, err))
+	} else {
+		for _, ip := range ips {
+			names, lookupErr := net.DefaultResolver.LookupAddr(lookupCtx, ip)
+			if lookupErr != nil {
+				errs = append(errs, fmt.Errorf("reverse DNS lookup %s: %w", ip, lookupErr))
+				continue
+			}
+			for _, name := range names {
+				name = strings.TrimSuffix(strings.TrimSpace(name), ".")
+				if strings.HasSuffix(strings.ToLower(name), ".api.radio-browser.info") {
+					add(name)
 				}
 			}
 		}
-		if len(servers) == 0 {
-			servers = []string{"https://api.radio-browser.info"}
-		}
-		c.mu.Lock()
-		c.servers = append([]string(nil), servers...)
-		c.mu.Unlock()
 	}
-	return servers[rand.Intn(len(servers))], nil
+	cancel()
+
+	if len(servers) == 0 {
+		_, records, srvErr := net.DefaultResolver.LookupSRV(ctx, "api", "tcp", "radio-browser.info")
+		if srvErr != nil {
+			errs = append(errs, fmt.Errorf("SRV lookup _api._tcp.radio-browser.info: %w", srvErr))
+		} else {
+			for _, record := range records {
+				add(strings.TrimSuffix(record.Target, "."))
+			}
+		}
+	}
+
+	if len(servers) == 0 {
+		var records []serverRecord
+		if err := c.getJSONTimeout(ctx, "https://"+radioBrowserAllHost+"/json/servers", &records, timeout); err != nil {
+			errs = append(errs, fmt.Errorf("HTTPS server list: %w", err))
+		} else {
+			for _, record := range records {
+				add(record.Name)
+			}
+		}
+	}
+	if len(errs) == 0 {
+		if len(servers) == 0 {
+			return nil, errors.New("server discovery returned no usable records")
+		}
+		return servers, nil
+	}
+	return servers, errors.Join(errs...)
+}
+
+func normalizeServerURL(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", false
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil ||
+		(parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host != "api.radio-browser.info" && !strings.HasSuffix(host, ".api.radio-browser.info") {
+		return "", false
+	}
+	return strings.TrimRight(parsed.String(), "/"), true
+}
+
+func uniqueServers(servers []string) []string {
+	unique := make([]string, 0, len(servers))
+	seen := make(map[string]struct{}, len(servers))
+	for _, raw := range servers {
+		server, ok := normalizeServerURL(raw)
+		if !ok {
+			continue
+		}
+		if _, exists := seen[server]; exists {
+			continue
+		}
+		seen[server] = struct{}{}
+		unique = append(unique, server)
+	}
+	return unique
+}
+
+func (c *Client) invalidateServer(server string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	filtered := c.servers[:0]
+	for _, candidate := range c.servers {
+		if candidate != server {
+			filtered = append(filtered, candidate)
+		}
+	}
+	c.servers = append([]string(nil), filtered...)
 }
 
 // Click notifies Radio Browser that a station was started. Failure is
@@ -661,15 +809,11 @@ func (c *Client) Click(ctx context.Context, stationUUID string) error {
 	if stationUUID == "" {
 		return errors.New("radio: empty station UUID")
 	}
-	base, err := c.server(ctx, radioRequestTimeout)
-	if err != nil {
-		return err
-	}
 	var response struct {
 		OK      any    `json:"ok"`
 		Message string `json:"message"`
 	}
-	return c.getJSON(ctx, base+"/json/url/"+url.PathEscape(stationUUID), &response)
+	return c.getJSONFromServers(ctx, "/json/url/"+url.PathEscape(stationUUID), &response, radioRequestTimeout)
 }
 
 // OpenStream opens one provider-owned audio stream. HTTP and ICY framing stay

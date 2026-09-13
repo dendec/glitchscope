@@ -150,7 +150,7 @@ func TestSourceEntriesUseLocalizedDisplayNames(t *testing.T) {
 		micDevices: []string{"test microphone"},
 	}
 	entries := o.buildSourceEntries()
-	want := []string{"Локальная музыка/", "Загрузки/", "Микрофон/", "Radio/", "Modland/", "ModArchive/"}
+	want := []string{"Локальная музыка/", "Загрузки/", "Микрофон/", "Радио/", "Modland/", "ModArchive/"}
 	if got := labelsOf(entries); !reflect.DeepEqual(got, want) {
 		t.Fatalf("source labels = %#v, want %#v", got, want)
 	}

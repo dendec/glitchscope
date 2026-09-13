@@ -135,6 +135,7 @@ const (
 	SourceLocalMusic            Key = "sources.local_music"
 	SourceFavorites             Key = "sources.favorites"
 	SourceDownloads             Key = "sources.downloads"
+	SourceRadio                 Key = "sources.radio"
 	InfoFavoritesStayOffline    Key = "info.favorites_stay_offline"
 	SourceMicrophone            Key = "sources.microphone"
 	SourceMicrophoneCapturing   Key = "sources.microphone_capturing"

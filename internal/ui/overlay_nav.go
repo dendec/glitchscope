@@ -165,7 +165,7 @@ func (o *Overlay) buildSourceEntries() []navEntry {
 	}
 	slog.Debug("buildSourceEntries", "online", o.online)
 	entries = append(entries,
-		navEntry{label: "Radio/", kind: entrySource, source: sourceRadio, albumIdx: -1},
+		navEntry{label: o.catalog.Text(i18n.SourceRadio) + "/", kind: entrySource, source: sourceRadio, albumIdx: -1},
 		navEntry{label: "Modland/", kind: entrySource, source: sourceModland, albumIdx: -1},
 		navEntry{label: "ModArchive/", kind: entrySource, source: sourceModArchive, albumIdx: -1},
 	)

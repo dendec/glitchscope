@@ -134,6 +134,7 @@
   "sources.local_music": "Nhạc cục bộ",
   "sources.favorites": "Yêu thích",
   "sources.downloads": "Tệp tải xuống",
+  "sources.radio": "Đài phát thanh",
   "actions.delete_download": "Xóa tệp tải xuống",
   "info.favorites_stay_offline": "Mục yêu thích được bảo vệ khỏi dọn dẹp tự động và luôn khả dụng ngoại tuyến.",
   "sources.microphone": "Micrô",

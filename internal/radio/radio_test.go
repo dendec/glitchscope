@@ -211,6 +211,30 @@ func TestClientLoadsCachedFilterValues(t *testing.T) {
 	}
 }
 
+func TestNormalizeServerURL(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+		ok   bool
+	}{
+		{name: "hostname", raw: "de1.api.radio-browser.info", want: "https://de1.api.radio-browser.info", ok: true},
+		{name: "trailing slash", raw: "https://de1.api.radio-browser.info/", want: "https://de1.api.radio-browser.info", ok: true},
+		{name: "http rejected", raw: "http://de1.api.radio-browser.info", ok: false},
+		{name: "path rejected", raw: "https://de1.api.radio-browser.info/json", ok: false},
+		{name: "foreign host rejected", raw: "https://example.test", ok: false},
+		{name: "userinfo rejected", raw: "https://user:password@de1.api.radio-browser.info", ok: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := normalizeServerURL(test.raw)
+			if ok != test.ok || got != test.want {
+				t.Fatalf("normalizeServerURL(%q) = %q, %v; want %q, %v", test.raw, got, ok, test.want, test.ok)
+			}
+		})
+	}
+}
+
 func TestClientRemembersStationAcrossRestart(t *testing.T) {
 	dir := t.TempDir()
 	station := Station{

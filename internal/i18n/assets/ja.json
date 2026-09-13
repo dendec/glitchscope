@@ -134,6 +134,7 @@
   "sources.local_music": "ローカル音楽",
   "sources.favorites": "お気に入り",
   "sources.downloads": "ダウンロード",
+  "sources.radio": "ラジオ",
   "actions.delete_download": "ダウンロードを削除",
   "info.favorites_stay_offline": "お気に入りは自動削除から保護され、常にオフラインで利用できます。",
   "sources.microphone": "マイク",

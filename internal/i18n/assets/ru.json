@@ -134,6 +134,7 @@
   "sources.local_music": "Локальная музыка",
   "sources.favorites": "Избранное",
   "sources.downloads": "Загрузки",
+  "sources.radio": "Радио",
   "actions.delete_download": "Удалить загрузку",
   "info.favorites_stay_offline": "Избранное защищено от автоматической очистки и всегда доступно офлайн.",
   "sources.microphone": "Микрофон",

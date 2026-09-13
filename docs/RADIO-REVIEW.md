@@ -15,6 +15,7 @@
 | P1 | Освобождался AVIOContext, но не его заменяемый буфер | Буфер освобождается до AVIOContext; teardown проверен ASan/UBSan |
 | P1 | ModArchive при cache miss вызывал HTTP непосредственно из навигации | Отменяемый worker, loading row, request ID и применение результата из UI |
 | P1 | Не было общего предела зависшего чтения HTTP body | 30 с на отдельный Read с отменой запроса; consumer pause не расходует timeout |
+| P1 | Discovery использовал `api.radio-browser.info` как запасной API-хост; на нём возвращается 404 | Discovery выполняется через DNS/reverse DNS и SRV, затем HTTPS-список серверов; используется проверенный `de1` fallback, запросы повторяются на доступных зеркалах |
 | P1 | Favicon decode и обход всех пикселей выполнялись во время render; размеры не проверялись | DecodeConfig/pixel budget, обработка в worker, bounded bitmap/cache/concurrency |
 | P2 | Успевший завершиться decoder с достаточным prebuffer зависал до timeout | Состояние ended с готовым PCM допускается к воспроизведению |
 | P2 | Пауза заполняла compressed buffer и вызывала ложный idle timeout | Ожидание свободного буфера учитывается как backpressure; контролируется также отсутствие PCM |
@@ -49,7 +50,11 @@ Stop при намеренно заблокированном teardown.
 драйвер, GL upload, локальная файловая система и шейдеры могут задерживать кадры.
 Перед выпуском на устройство нужен smoke/soak-прогон с потерей Wi-Fi,
 длительной паузой и переключениями реальных станций; ARM64 runtime здесь
-не проверялся.
+не проверялся. Для диагностики каталога запускать приложение с `-v` и сохранять
+stderr: ошибка содержит способ discovery, URL каждого зеркала и HTTP/TLS/DNS
+причину. На устройстве отдельно проверяются DNS для
+`all.api.radio-browser.info`, TLS к `de1.api.radio-browser.info` и ответ
+`/json/stations/topclick/1`; успешный Modland не проверяет эти хосты.
 
 HLS не заявляется полным: encrypted/byte-range/discontinuity/gap streams и
 смена init segment отклоняются. Выбирается первый master variant; отдельные

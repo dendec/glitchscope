@@ -134,6 +134,7 @@
   "sources.local_music": "로컬 음악",
   "sources.favorites": "즐겨찾기",
   "sources.downloads": "다운로드",
+  "sources.radio": "라디오",
   "actions.delete_download": "다운로드 삭제",
   "info.favorites_stay_offline": "즐겨찾기는 자동 정리에서 보호되며 항상 오프라인에서 사용할 수 있습니다.",
   "sources.microphone": "마이크",

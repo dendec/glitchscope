@@ -134,6 +134,7 @@
   "sources.local_music": "Yerel Müzik",
   "sources.favorites": "Favoriler",
   "sources.downloads": "İndirilenler",
+  "sources.radio": "Radyo",
   "actions.delete_download": "İndirmeyi sil",
   "info.favorites_stay_offline": "Favoriler otomatik temizlemeden korunur ve çevrimdışı kullanılabilir kalır.",
   "sources.microphone": "Mikrofon",

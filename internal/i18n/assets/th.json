@@ -134,6 +134,7 @@
   "sources.local_music": "เพลงในเครื่อง",
   "sources.favorites": "รายการโปรด",
   "sources.downloads": "ดาวน์โหลด",
+  "sources.radio": "วิทยุ",
   "actions.delete_download": "ลบไฟล์ดาวน์โหลด",
   "info.favorites_stay_offline": "รายการโปรดได้รับการป้องกันจากการล้างอัตโนมัติและพร้อมใช้งานแบบออฟไลน์เสมอ",
   "sources.microphone": "ไมโครโฟน",
