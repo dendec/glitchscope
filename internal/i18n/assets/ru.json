@@ -115,7 +115,7 @@
   "info.bpm": "BPM: %.0f",
   "info.comment": "Комментарий:",
   "radio.popular": "Популярные",
-  "radio.random": "Случайные",
+  "radio.random": "Случайная станция",
   "radio.by_tag": "По тегу",
   "radio.by_language": "По языку",
   "radio.by_country": "По стране",

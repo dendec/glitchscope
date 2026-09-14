@@ -52,7 +52,7 @@ const (
 	HelpPlayback
 	HelpQuality
 	HelpTroubleshooting
-	HelpCatalogs
+	HelpSources
 	HelpFormats
 	HelpDevice
 	HelpAbout
@@ -210,6 +210,8 @@ type Overlay struct {
 	scrollLeft  scrollHold
 	scrollRight scrollHold
 
+	lastInteraction time.Time
+
 	albumsScroll int
 	tracksScroll int
 
@@ -305,9 +307,14 @@ type Overlay struct {
 	modArchiveRequestID  uint64
 	modArchivePendingURL string
 	radioQueries         map[string][]radio.Station
+	radioQueryMore       map[string]bool
 	radioFavicons        map[string]*image.RGBA
 	radioValues          map[radio.BrowseKind][]string
+	radioValueCounts     map[radio.BrowseKind]map[string]int
 	radioBrowseRequested bool
+	radioPageRequested   bool
+	radioPageKind        radio.BrowseKind
+	radioPageFilter      string
 	radioBrowseKind      radio.BrowseKind
 	radioBrowseFilter    string
 	radioSelected        *radio.Station
@@ -323,15 +330,17 @@ type Overlay struct {
 // New creates an Overlay. The stack always has a virtual source root.
 func New() *Overlay {
 	o := &Overlay{
-		catalog:         i18n.MustLoad(i18n.English),
-		helpTopics:      helpTopics,
-		programText:     glCreateTextProgram(),
-		programImage:    glCreateImageProgram(),
-		programRect:     glCreateRectProgram(),
-		modArchiveItems: make(map[string][]modarchive.DirItem),
-		radioQueries:    make(map[string][]radio.Station),
-		radioFavicons:   make(map[string]*image.RGBA),
-		radioValues:     make(map[radio.BrowseKind][]string),
+		catalog:          i18n.MustLoad(i18n.English),
+		helpTopics:       helpTopics,
+		programText:      glCreateTextProgram(),
+		programImage:     glCreateImageProgram(),
+		programRect:      glCreateRectProgram(),
+		modArchiveItems:  make(map[string][]modarchive.DirItem),
+		radioQueries:     make(map[string][]radio.Station),
+		radioQueryMore:   make(map[string]bool),
+		radioFavicons:    make(map[string]*image.RGBA),
+		radioValues:      make(map[radio.BrowseKind][]string),
+		radioValueCounts: make(map[radio.BrowseKind]map[string]int),
 	}
 	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
 	o.albumEntries = o.navStack[0].entries
@@ -833,8 +842,15 @@ func (o *Overlay) SetOnline(v bool) {
 
 // SetRadioValues installs cached filter values and refreshes the open Radio
 // filter level. It is called by the app after a background directory request.
-func (o *Overlay) SetRadioValues(kind radio.BrowseKind, values []string) {
+func (o *Overlay) SetRadioValues(kind radio.BrowseKind, values []string, counts map[string]int) {
+	if o.radioValues == nil {
+		o.radioValues = make(map[radio.BrowseKind][]string)
+	}
+	if o.radioValueCounts == nil {
+		o.radioValueCounts = make(map[radio.BrowseKind]map[string]int)
+	}
 	o.radioValues[kind] = append([]string(nil), values...)
+	o.radioValueCounts[kind] = copyRadioCounts(counts)
 	if o.topLevel().ctx == ctxRadio && o.topLevel().radioKind == kind && o.topLevel().radioFilter == "" {
 		o.topLevel().entries = withParentEntry(o.buildRadioFilterEntries(kind))
 		o.refreshAlbumLabels()
@@ -845,9 +861,16 @@ func (o *Overlay) SetRadioValues(kind radio.BrowseKind, values []string) {
 
 // SetRadioStations installs a cached station listing and refreshes the open
 // station level when it corresponds to this query.
-func (o *Overlay) SetRadioStations(kind radio.BrowseKind, filter string, stations []radio.Station) {
+func (o *Overlay) SetRadioStations(kind radio.BrowseKind, filter string, stations []radio.Station, hasMore bool) {
+	if o.radioQueries == nil {
+		o.radioQueries = make(map[string][]radio.Station)
+	}
+	if o.radioQueryMore == nil {
+		o.radioQueryMore = make(map[string]bool)
+	}
 	key := radioQueryKey(kind, filter)
 	o.radioQueries[key] = append([]radio.Station(nil), stations...)
+	o.radioQueryMore[key] = hasMore
 	if o.topLevel().ctx == ctxRadio && o.topLevel().radioKind == kind && o.topLevel().radioFilter == filter {
 		o.topLevel().entries = withParentEntry(o.buildRadioStationEntries(kind, filter))
 		o.refreshAlbumLabels()
@@ -926,11 +949,36 @@ func (o *Overlay) ConsumeRadioBrowseRequest() (radio.BrowseKind, string, bool) {
 	return kind, filter, true
 }
 
-// ConsumeRadioStationSelection returns a one-shot station chosen by the user
-// together with the visible station listing, which becomes its playback queue.
-func (o *Overlay) ConsumeRadioStationSelection() (radio.Station, []radio.Station, bool) {
+// ConsumeRadioPageRequest returns a one-shot request for the next station page.
+func (o *Overlay) ConsumeRadioPageRequest() (radio.BrowseKind, string, bool) {
+	if !o.radioPageRequested {
+		return "", "", false
+	}
+	kind, filter := o.radioPageKind, o.radioPageFilter
+	o.radioPageRequested = false
+	o.radioPageKind, o.radioPageFilter = "", ""
+	if len(o.navStack) == 0 || o.topLevel().ctx != ctxRadio || o.topLevel().radioKind != kind || o.topLevel().radioFilter != filter {
+		return "", "", false
+	}
+	return kind, filter, true
+}
+
+func copyRadioCounts(counts map[string]int) map[string]int {
+	if len(counts) == 0 {
+		return nil
+	}
+	copy := make(map[string]int, len(counts))
+	for key, value := range counts {
+		copy[key] = value
+	}
+	return copy
+}
+
+// ConsumeRadioStationSelection returns a one-shot station chosen by the user,
+// its visible listing, and the browse context that owns that listing.
+func (o *Overlay) ConsumeRadioStationSelection() (radio.Station, []radio.Station, radio.BrowseKind, string, bool) {
 	if o.radioSelected == nil {
-		return radio.Station{}, nil, false
+		return radio.Station{}, nil, "", "", false
 	}
 	station := *o.radioSelected
 	o.radioSelected = nil
@@ -939,7 +987,7 @@ func (o *Overlay) ConsumeRadioStationSelection() (radio.Station, []radio.Station
 	if len(stations) == 0 {
 		stations = []radio.Station{station}
 	}
-	return station, stations, true
+	return station, stations, level.radioKind, level.radioFilter, true
 }
 
 // SetTrackCacheLookup supplies the read-only cache projection used by offline navigation.

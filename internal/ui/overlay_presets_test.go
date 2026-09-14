@@ -225,11 +225,31 @@ func TestPresetPreviewWaitsForNavigationToSettle(t *testing.T) {
 	}
 }
 
-func TestScrollHoldMovesAtMostOncePerFrame(t *testing.T) {
+func TestScrollHoldCatchesUpDueSteps(t *testing.T) {
 	now := time.Unix(100, 0)
 	o := &Overlay{uiPage: PagePresets}
 	hold := scrollHold{
-		holdStart:  now.Add(-3 * time.Second),
+		holdStart:  now.Add(-10 * time.Second),
+		lastStep:   now.Add(-100 * time.Millisecond),
+		active:     true,
+		uiPage:     PagePresets,
+		focusPanel: 0,
+	}
+	steps := 0
+
+	o.updateScrollHold(&hold, true, now, func() { steps++ })
+
+	want := 12 // 100 ms at the 120 steps/sec cap.
+	if steps != want {
+		t.Fatalf("steps in one delayed frame = %d, want %d", steps, want)
+	}
+}
+
+func TestScrollHoldCatchUpIsBounded(t *testing.T) {
+	now := time.Unix(100, 0)
+	o := &Overlay{uiPage: PagePresets}
+	hold := scrollHold{
+		holdStart:  now.Add(-10 * time.Second),
 		lastStep:   now.Add(-time.Second),
 		active:     true,
 		uiPage:     PagePresets,
@@ -239,8 +259,79 @@ func TestScrollHoldMovesAtMostOncePerFrame(t *testing.T) {
 
 	o.updateScrollHold(&hold, true, now, func() { steps++ })
 
-	if steps != 1 {
-		t.Fatalf("steps in one frame = %d, want 1", steps)
+	if steps != maxScrollCatchUpSteps {
+		t.Fatalf("steps after long stall = %d, want cap %d", steps, maxScrollCatchUpSteps)
+	}
+}
+
+func TestScrollHoldRateIsSmoothAndCapped(t *testing.T) {
+	if got := scrollHoldRate(scrollHoldStartDelay - time.Nanosecond); got != 0 {
+		t.Fatalf("rate before delay = %v, want 0", got)
+	}
+	if got := scrollHoldRate(scrollHoldStartDelay); got != scrollHoldInitialRate {
+		t.Fatalf("rate at delay = %v, want %v", got, scrollHoldInitialRate)
+	}
+	if got := scrollHoldRate(scrollHoldStartDelay + time.Second); got != 10 {
+		t.Fatalf("rate after one second = %v, want 10", got)
+	}
+	if got := scrollHoldRate(scrollHoldStartDelay + 10*time.Second); got != scrollHoldMaxRate {
+		t.Fatalf("rate after long hold = %v, want cap %v", got, scrollHoldMaxRate)
+	}
+}
+
+func TestScrollHoldResetsOnNavigationDepthChange(t *testing.T) {
+	now := time.Unix(100, 0)
+	o := &Overlay{
+		uiPage:   PageLibrary,
+		navStack: []navLevel{{}, {}},
+	}
+	hold := scrollHold{
+		holdStart:  now.Add(-3 * time.Second),
+		lastStep:   now.Add(-time.Second),
+		active:     true,
+		uiPage:     PageLibrary,
+		focusPanel: 0,
+		navDepth:   1,
+	}
+	steps := 0
+
+	o.updateScrollHold(&hold, true, now, func() { steps++ })
+
+	if steps != 0 {
+		t.Fatalf("steps after navigation depth change = %d, want 0", steps)
+	}
+	if !hold.active || !hold.holdStart.Equal(now) || hold.navDepth != len(o.navStack) {
+		t.Fatalf("hold was not restarted: %#v", hold)
+	}
+}
+
+func TestResetScrollHoldsDeactivatesAllDirections(t *testing.T) {
+	o := &Overlay{
+		scrollUp:    scrollHold{active: true},
+		scrollDown:  scrollHold{active: true},
+		scrollLeft:  scrollHold{active: true},
+		scrollRight: scrollHold{active: true},
+	}
+
+	o.resetScrollHolds()
+
+	if o.scrollUp.active || o.scrollDown.active || o.scrollLeft.active || o.scrollRight.active {
+		t.Fatal("resetScrollHolds left an active direction")
+	}
+}
+
+func TestInteractionActiveGracePeriod(t *testing.T) {
+	now := time.Unix(100, 0)
+	o := &Overlay{uiVisible: true, lastInteraction: now}
+	if !o.InteractionActive(now.Add(uiInteractionGrace - time.Nanosecond)) {
+		t.Fatal("interaction should remain active during the grace period")
+	}
+	if o.InteractionActive(now.Add(uiInteractionGrace)) {
+		t.Fatal("interaction should expire at the grace-period boundary")
+	}
+	o.uiVisible = false
+	if o.InteractionActive(now) {
+		t.Fatal("hidden UI should not report active interaction")
 	}
 }
 

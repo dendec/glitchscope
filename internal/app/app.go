@@ -20,6 +20,7 @@ import (
 	"github.com/dendec/glitchscope/internal/catalog"
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/mic"
 	"github.com/dendec/glitchscope/internal/modarchive"
@@ -95,16 +96,18 @@ type App struct {
 	appCtx    context.Context
 	appCancel context.CancelFunc
 
-	pending          pendingPreset // pending preset name + scheduled load time
-	adaptiveResumeAt time.Time
-	presetTicker     *time.Ticker
-	resumePath       string
-	resumeSeconds    float64
-	resumeAttempted  bool
-	online           atomic.Bool
-	quit             atomic.Bool
-	presetSwitch     atomic.Bool
-	trackCacheReady  atomic.Bool
+	pending           pendingPreset // pending preset name + scheduled load time
+	adaptiveResumeAt  time.Time
+	presetTicker      *time.Ticker
+	resumePath        string
+	resumeSeconds     float64
+	resumeAttempted   bool
+	radioBrowseKind   radio.BrowseKind
+	radioBrowseFilter string
+	online            atomic.Bool
+	quit              atomic.Bool
+	presetSwitch      atomic.Bool
+	trackCacheReady   atomic.Bool
 
 	deleteSvc  *deleteService
 	trackCache *player.TrackCache
@@ -632,22 +635,38 @@ func (a *App) pollRadio() {
 	if a.radio == nil {
 		return
 	}
+	if a.overlay != nil {
+		if kind, filter, ok := a.overlay.ConsumeRadioPageRequest(); ok {
+			a.requestMoreRadio(kind, filter)
+		}
+	}
 	started := time.Now()
 	// Apply at most one directory result per frame. Network work is already
 	// asynchronous, but rebuilding a large station list and its GL textures is
 	// still main-thread work and must not starve input or visualization.
-	kind, filter, stations, values, err, ok := a.radio.Poll()
+	kind, filter, stations, values, hasMore, err, ok := a.radio.Poll()
 	if ok {
 		if err != nil {
 			slog.Warn("radio directory request failed", "kind", kind, "filter", filter, "error", err)
-			if a.overlay != nil {
+			if kind == radio.BrowseRandom && a.overlay != nil {
+				a.overlay.ShowTrack(a.overlay.Catalog().Text(i18n.ValueUnavailable))
+			} else if a.overlay != nil {
 				a.overlay.SetRadioError(kind, filter)
+			}
+		} else if kind == radio.BrowseRandom {
+			if len(stations) == 0 {
+				if a.overlay != nil {
+					a.overlay.ShowTrack(a.overlay.Catalog().Text(i18n.RadioEmpty))
+				}
+			} else {
+				a.radioBrowseKind, a.radioBrowseFilter = "", ""
+				a.startRadioStation(stations[0])
 			}
 		} else if a.overlay != nil {
 			if filter == "" && (kind == radio.BrowseTag || kind == radio.BrowseLanguage || kind == radio.BrowseCountry) {
-				a.overlay.SetRadioValues(kind, values)
+				a.overlay.SetRadioValues(kind, values, a.radio.ValueCounts(kind))
 			} else {
-				a.overlay.SetRadioStations(kind, filter, stations)
+				a.overlay.SetRadioStations(kind, filter, stations, hasMore)
 			}
 		}
 	}
@@ -745,6 +764,10 @@ func (a *App) prepareSavedRadioQueue(path string) {
 	if a.radio == nil || !player.IsRadio(path) {
 		return
 	}
+	a.radioBrowseKind, a.radioBrowseFilter = "", ""
+	if kind, filter, ok := a.radio.LastBrowse(path); ok {
+		a.radioBrowseKind, a.radioBrowseFilter = kind, filter
+	}
 	stations := a.radio.LastQueue(path)
 	if len(stations) == 0 {
 		return
@@ -818,7 +841,7 @@ func (a *App) savePlaybackPosition() {
 		position.Seconds = a.pl.Position()
 	}
 	if player.IsRadio(position.Path) && a.radio != nil {
-		a.radio.RememberQueue(position.Path, a.playbackState.playlist)
+		a.radio.RememberQueueInBrowse(position.Path, a.playbackState.playlist, a.radioBrowseKind, a.radioBrowseFilter)
 	}
 	a.settings.Playback.LastPosition = position
 	if err := config.SaveSettings(a.settingsPath, *a.settings); err != nil {

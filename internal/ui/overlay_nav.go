@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -816,7 +817,7 @@ func (o *Overlay) switchToProvider(source sourceKind) {
 	case sourceDownloads:
 		o.switchToDownloads()
 	case sourceRadio:
-		o.pushLevel(navLevel{ctx: ctxRadio, label: "Radio", entries: o.buildRadioCategoryEntries()})
+		o.pushLevel(navLevel{ctx: ctxRadio, label: o.catalog.Text(i18n.SourceRadio), entries: o.buildRadioCategoryEntries()})
 	case sourceModland:
 		entries := o.buildFormatEntries()
 		slog.Debug("switchToProvider modland", "formats", len(entries))
@@ -838,9 +839,14 @@ func (o *Overlay) buildRadioCategoryEntries() []navEntry {
 
 func (o *Overlay) buildRadioFilterEntries(kind radio.BrowseKind) []navEntry {
 	values, loaded := o.radioValues[kind]
+	counts := o.radioValueCounts[kind]
 	entries := make([]navEntry, 0, len(values)+1)
 	for _, value := range values {
-		entries = append(entries, navEntry{label: value, kind: entryRadioFilter, radioKind: kind, radioFilter: value})
+		label := value
+		if count := counts[value]; count > 0 {
+			label = fmt.Sprintf("%s (%d)", value, count)
+		}
+		entries = append(entries, navEntry{label: label, kind: entryRadioFilter, radioKind: kind, radioFilter: value})
 	}
 	if len(entries) == 0 {
 		key := i18n.ValueLoading
@@ -988,7 +994,7 @@ func (o *Overlay) NavigateToTrack(path string) {
 // It creates a small station view even when the station came from a playlist
 // and is not present in a cached Radio Browser query.
 func (o *Overlay) NavigateToRadioStation(station radio.Station) {
-	if station.Path() == "" {
+	if strings.TrimSpace(station.StationUUID) == "" {
 		return
 	}
 	// Prefer the station listing that is already open. This keeps the user's
@@ -1016,6 +1022,108 @@ func (o *Overlay) NavigateToRadioStation(station radio.Station) {
 	o.albumsScroll = 0
 	o.focusPanel = 0
 	o.syncPanels()
+}
+
+// NavigateToRadioStationInBrowse restores the category/filter path used to
+// select a station. Cached rows are shown immediately; the app may refresh a
+// stale query in the background through the normal browse request path.
+func (o *Overlay) NavigateToRadioStationInBrowse(station radio.Station, kind radio.BrowseKind, filter string) {
+	if strings.TrimSpace(station.StationUUID) == "" || !validRadioBrowseContext(kind, filter) {
+		o.NavigateToRadioStation(station)
+		return
+	}
+	o.radioBrowseKind, o.radioBrowseFilter = kind, filter
+	o.radioBrowseRequested = true
+	if len(o.navStack) > 0 && o.topLevel().ctx == ctxRadio && o.topLevel().radioKind == kind && o.topLevel().radioFilter == filter {
+		if o.selectRadioStationCursor(station) {
+			return
+		}
+	}
+
+	o.switchToProvider(sourceRadio)
+	categoryLabel := o.radioCategoryLabel(kind)
+	if kind == radio.BrowsePopular {
+		o.pushLevel(navLevel{
+			ctx:         ctxRadio,
+			label:       categoryLabel,
+			entries:     o.radioEntriesWithStation(kind, filter, station),
+			radioKind:   kind,
+			radioFilter: filter,
+		})
+		o.selectRadioStationCursor(station)
+		return
+	}
+
+	filterEntries := o.buildRadioFilterEntries(kind)
+	filterIndex := -1
+	for i, entry := range filterEntries {
+		if entry.kind == entryRadioFilter && entry.radioFilter == filter {
+			filterIndex = i
+			break
+		}
+	}
+	if filterIndex < 0 {
+		filterEntries = append(filterEntries, navEntry{label: filter, kind: entryRadioFilter, radioKind: kind, radioFilter: filter})
+		filterIndex = len(filterEntries) - 1
+	}
+	o.pushLevel(navLevel{
+		ctx:       ctxRadio,
+		label:     categoryLabel,
+		entries:   filterEntries,
+		radioKind: kind,
+		cursor:    filterIndex + 1, // account for the parent entry
+	})
+	o.pushLevel(navLevel{
+		ctx:         ctxRadio,
+		label:       filter,
+		entries:     o.radioEntriesWithStation(kind, filter, station),
+		radioKind:   kind,
+		radioFilter: filter,
+	})
+	o.selectRadioStationCursor(station)
+}
+
+func validRadioBrowseContext(kind radio.BrowseKind, filter string) bool {
+	switch kind {
+	case radio.BrowsePopular:
+		return filter == ""
+	case radio.BrowseTag, radio.BrowseLanguage, radio.BrowseCountry:
+		return filter != ""
+	default:
+		return false
+	}
+}
+
+func (o *Overlay) radioCategoryLabel(kind radio.BrowseKind) string {
+	for _, entry := range o.buildRadioCategoryEntries() {
+		if entry.radioKind == kind {
+			return entry.label
+		}
+	}
+	return string(kind)
+}
+
+func (o *Overlay) radioEntriesWithStation(kind radio.BrowseKind, filter string, station radio.Station) []navEntry {
+	key := radioQueryKey(kind, filter)
+	stations := o.radioQueries[key]
+	if !slices.ContainsFunc(stations, func(candidate radio.Station) bool { return candidate.Path() == station.Path() }) {
+		stations = append(append([]radio.Station(nil), stations...), station)
+		o.radioQueries[key] = stations
+	}
+	return o.buildRadioStationEntries(kind, filter)
+}
+
+func (o *Overlay) selectRadioStationCursor(station radio.Station) bool {
+	for index, entry := range o.topLevel().entries {
+		if entry.kind == entryRadioStation && entry.radioStation.Path() == station.Path() {
+			o.albumCursor = index
+			o.albumsScroll = 0
+			o.focusPanel = 0
+			o.syncPanels()
+			return true
+		}
+	}
+	return false
 }
 
 // navigateToLocalTrack enters the parent directory of a local file and

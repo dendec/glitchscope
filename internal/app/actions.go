@@ -147,9 +147,12 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 				a.startMicCapture(device)
 			} else if a.overlay.ConsumeMicStopRequest() {
 				a.stopMicCapture()
+			} else if kind, filter, ok := a.overlay.ConsumeRadioPageRequest(); ok {
+				a.requestMoreRadio(kind, filter)
 			} else if kind, filter, ok := a.overlay.ConsumeRadioBrowseRequest(); ok {
 				a.requestRadio(kind, filter)
-			} else if station, stations, ok := a.overlay.ConsumeRadioStationSelection(); ok {
+			} else if station, stations, kind, filter, ok := a.overlay.ConsumeRadioStationSelection(); ok {
+				a.radioBrowseKind, a.radioBrowseFilter = kind, filter
 				a.startRadioStation(station, stations)
 			} else if selected && a.lib != nil && a.pl != nil {
 				if a.overlay.IsCatalogMode() {
@@ -299,7 +302,7 @@ func (a *App) navigateOverlayToPlayingTrack() {
 	if player.IsRadio(path) && a.radio != nil {
 		if station, ok := a.radio.Lookup(path); ok {
 			a.overlay.SetPlayingInfo(station.DisplayName(), path)
-			a.overlay.NavigateToRadioStation(station)
+			a.navigateOverlayToRadioStation(station)
 			return
 		}
 	}
@@ -313,11 +316,19 @@ func (a *App) navigateOverlayToTrack(path string) {
 	}
 	if player.IsRadio(path) && a.radio != nil {
 		if station, ok := a.radio.Lookup(path); ok {
-			a.overlay.NavigateToRadioStation(station)
+			a.navigateOverlayToRadioStation(station)
 			return
 		}
 	}
 	a.overlay.NavigateToTrack(path)
+}
+
+func (a *App) navigateOverlayToRadioStation(station radio.Station) {
+	if a.radioBrowseKind != "" {
+		a.overlay.NavigateToRadioStationInBrowse(station, a.radioBrowseKind, a.radioBrowseFilter)
+		return
+	}
+	a.overlay.NavigateToRadioStation(station)
 }
 
 // currentPresetName returns the name of the current preset, or "" if none.
@@ -575,23 +586,28 @@ func (a *App) requestRadio(kind radio.BrowseKind, filter string) {
 	if a.radio == nil {
 		return
 	}
+	if kind == radio.BrowseRandom {
+		a.requestConnectivity()
+		a.radio.Begin(a.appCtx, kind, filter)
+		return
+	}
 	if kind == radio.BrowseTag || kind == radio.BrowseLanguage || kind == radio.BrowseCountry {
 		if filter == "" {
 			values, stale := a.radio.Values(kind)
 			if values != nil {
-				a.overlay.SetRadioValues(kind, values)
+				a.overlay.SetRadioValues(kind, values, a.radio.ValueCounts(kind))
 			}
 			if !stale {
 				return
 			}
 		} else if stations, stale := a.radio.Snapshot(kind, filter); stations != nil {
-			a.overlay.SetRadioStations(kind, filter, stations)
+			a.overlay.SetRadioStations(kind, filter, stations, a.radio.HasMore(kind, filter))
 			if !stale {
 				return
 			}
 		}
 	} else if stations, stale := a.radio.Snapshot(kind, filter); stations != nil {
-		a.overlay.SetRadioStations(kind, filter, stations)
+		a.overlay.SetRadioStations(kind, filter, stations, a.radio.HasMore(kind, filter))
 		if !stale {
 			return
 		}
@@ -599,10 +615,22 @@ func (a *App) requestRadio(kind radio.BrowseKind, filter string) {
 	a.radio.Begin(a.appCtx, kind, filter)
 }
 
-func (a *App) startRadioStation(station radio.Station, queue ...[]radio.Station) {
-	if a.radio == nil || station.StreamURL() == "" {
+func (a *App) requestMoreRadio(kind radio.BrowseKind, filter string) {
+	if a.radio == nil {
 		return
 	}
+	offset, ok := a.radio.NextPage(kind, filter)
+	if !ok {
+		return
+	}
+	a.radio.BeginPage(a.appCtx, kind, filter, offset)
+}
+
+func (a *App) startRadioStation(station radio.Station, queue ...[]radio.Station) {
+	if a.radio == nil || strings.TrimSpace(station.StationUUID) == "" || station.StreamURL() == "" {
+		return
+	}
+	a.requestConnectivity()
 	stations := []radio.Station{station}
 	if len(queue) > 0 && len(queue[0]) > 0 {
 		stations = append([]radio.Station(nil), queue[0]...)
@@ -610,7 +638,7 @@ func (a *App) startRadioStation(station radio.Station, queue ...[]radio.Station)
 			stations = append(stations, station)
 		}
 	}
-	a.radio.AddStations(stations)
+	a.radio.AddTransientStations(stations)
 	paths := make([]string, len(stations))
 	for i := range stations {
 		paths[i] = stations[i].Path()
@@ -671,10 +699,11 @@ func (a *App) playRadioPlaylist(path string) {
 			slog.Warn("radio playlist", "path", path, "error", err)
 		}
 		if a.overlay != nil {
-			a.overlay.ShowTrack("radio playlist is empty")
+			a.overlay.ShowTrack(a.overlay.Catalog().Text(i18n.RadioEmpty))
 		}
 		return
 	}
+	a.radioBrowseKind, a.radioBrowseFilter = "", ""
 	a.radio.AddStations(stations)
 	a.startRadioStation(stations[0], stations)
 	a.playbackState.playlistAlbum = filepath.Base(path)
@@ -793,6 +822,7 @@ func (a *App) playFavoriteFile(path string) {
 	}
 	if player.IsRadio(path) && a.radio != nil {
 		if station, ok := a.radio.Lookup(path); ok {
+			a.radioBrowseKind, a.radioBrowseFilter = "", ""
 			a.startRadioStation(station)
 			return
 		}
@@ -968,6 +998,14 @@ func (a *App) handleFavorite() {
 	if err != nil {
 		slog.Warn("favorites: cycle failed", "path", path, "error", err)
 		return
+	}
+	// A transient Radio Browser/random station is intentionally absent from
+	// query-imported.json. Once the user explicitly favorites it, persist its
+	// descriptor so the Favorites view can resolve it after a restart.
+	if playlist != "" && player.IsRadio(path) && a.radio != nil {
+		if station, ok := a.radio.Lookup(path); ok {
+			a.radio.AddStations([]radio.Station{station})
+		}
 	}
 	slog.Info("favorites: track updated", "path", path, "playlist", playlist)
 	if a.overlay != nil {

@@ -53,7 +53,7 @@
   "info.bpm": "BPM: %.0f",
   "info.comment": "Comment:",
   "radio.popular": "Popular",
-  "radio.random": "Random",
+  "radio.random": "Random station",
   "radio.by_tag": "By tag",
   "radio.by_language": "By language",
   "radio.by_country": "By country",

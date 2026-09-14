@@ -177,8 +177,49 @@
   },
   {
     "id": 5,
-    "title": "Catalogs",
+    "title": "Sources",
     "children": [
+      {
+        "title": "Local Music",
+        "lines": [
+          "**Play local files**",
+          "Browse folders on the device and play supported audio and tracker files.",
+          "Playback works without a network connection."
+        ]
+      },
+      {
+        "title": "Favorites",
+        "lines": [
+          "**Keep tracks close**",
+          "Add tracks to Star, Heart or Note playlists.",
+          "Favorites are available from Library and protect downloaded tracks from cleanup."
+        ]
+      },
+      {
+        "title": "Downloads",
+        "lines": [
+          "**Offline copies**",
+          "Browse tracks downloaded from remote sources.",
+          "Downloaded tracks play without internet and can be removed from the Downloads view."
+        ]
+      },
+      {
+        "title": "Microphone",
+        "lines": [
+          "**Live input**",
+          "Select a system microphone to feed live audio into the visualizer.",
+          "Microphone capture stops track playback and is not sent to the speakers."
+        ]
+      },
+      {
+        "title": "Radio",
+        "lines": [
+          "**Internet radio**",
+          "Browse popular stations or filter by tag, language or country.",
+          "Station lists are cached for 30 days and load more rows as you scroll.",
+          "Radio needs a network connection; a stream can fail even when the directory is online."
+        ]
+      },
       {
         "title": "Modland",
         "lines": [

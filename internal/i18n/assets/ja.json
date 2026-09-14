@@ -115,7 +115,7 @@
   "info.bpm": "BPM：%.0f",
   "info.comment": "コメント：",
   "radio.popular": "人気",
-  "radio.random": "ランダム",
+  "radio.random": "ランダムなラジオ局",
   "radio.by_tag": "タグ別",
   "radio.by_language": "言語別",
   "radio.by_country": "国別",

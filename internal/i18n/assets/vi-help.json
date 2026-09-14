@@ -177,8 +177,49 @@
   },
   {
     "id": 5,
-    "title": "Các danh mục",
+    "title": "Nguồn",
     "children": [
+      {
+        "title": "Nhạc cục bộ",
+        "lines": [
+          "**Phát tệp cục bộ**",
+          "Duyệt thư mục trên thiết bị và phát các tệp âm thanh, tracker được hỗ trợ.",
+          "Phát nhạc hoạt động khi không có mạng."
+        ]
+      },
+      {
+        "title": "Yêu thích",
+        "lines": [
+          "**Giữ bài hát yêu thích**",
+          "Thêm bài hát vào danh sách Star, Heart hoặc Note.",
+          "Mục yêu thích có trong Library và bảo vệ tệp đã tải khỏi việc dọn dẹp."
+        ]
+      },
+      {
+        "title": "Tải xuống",
+        "lines": [
+          "**Bản sao ngoại tuyến**",
+          "Duyệt các bài hát đã tải từ nguồn từ xa.",
+          "Bài đã tải có thể phát khi không có internet và xóa trong Downloads."
+        ]
+      },
+      {
+        "title": "Micrô",
+        "lines": [
+          "**Đầu vào trực tiếp**",
+          "Chọn micrô hệ thống để đưa âm thanh trực tiếp vào trình trực quan hóa.",
+          "Thu âm bằng micrô sẽ dừng phát nhạc và không gửi âm thanh ra loa."
+        ]
+      },
+      {
+        "title": "Radio",
+        "lines": [
+          "**Radio internet**",
+          "Duyệt đài phổ biến hoặc lọc theo thẻ, ngôn ngữ hay quốc gia.",
+          "Danh sách đài được lưu 30 ngày và tải thêm khi cuộn.",
+          "Radio cần mạng; luồng có thể lỗi dù thư mục vẫn trực tuyến."
+        ]
+      },
       {
         "title": "Modland",
         "lines": [

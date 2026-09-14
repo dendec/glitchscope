@@ -21,7 +21,7 @@
 | P2 | Пауза заполняла compressed buffer и вызывала ложный idle timeout | Ожидание свободного буфера учитывается как backpressure; контролируется также отсутствие PCM |
 | P2 | Worker'ы потока и click requests не были полностью учтены при shutdown | WaitGroup, отмена и определённый порядок teardown; click только после успешного старта |
 | P2 | Runtime EOF радио попадал в обычный Repeat One; seek пытался перезапустить live source | Ошибка идёт в bounded recovery; live seek/restore-offset отключены |
-| P2 | Ошибка станции удаляла URL, делая ручной retry/Favorites невозможными | Descriptor сохраняется; imported descriptors сохраняются независимо от текущего source |
+| P2 | Ошибка станции могла удалить её из списка из-за временного отсутствия сети | При подтверждённом online удаляется весь локальный descriptor/query cache станции; при offline кэш сохраняется для повторной попытки |
 | P2 | HLS dedup по URL терял сегменты с повторяющимися URL; относительные пути ломались после redirect | Media sequence и URL конечного playlist response |
 | P2 | HLS частично передавал сегмент, затем повторял его; unsupported tags молча игнорировались | Частичная ошибка завершает источник; неподдерживаемые варианты явно отклоняются |
 | P2 | HLS variant cycle мог бесконечно перезапрашиваться; init-map рос без лимита | Глубина master ограничена; init-map заменён одним состоянием |

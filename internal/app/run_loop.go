@@ -349,29 +349,41 @@ func (a *App) updateFramePlayback(now time.Time) {
 
 func (a *App) renderFrame(now time.Time, w, h int) {
 	a.trackCacheOnce.Do(a.startTrackCacheCleanup)
+	uiVisible := a.overlay != nil && a.overlay.UIVisible()
+	uiOpaque := uiVisible && a.settings.UI.Transparency == 0
+	uiInteracting := uiVisible && a.overlay != nil && a.overlay.InteractionActive(now)
 	if a.overlay != nil {
 		if a.trackCacheReady.Swap(false) {
 			a.overlay.RefreshTrackCache()
 		}
 		a.overlay.SetControllerConnected(a.inp.HasController())
 		a.overlay.Update(a.inp.DPadUpHeld(), a.inp.DPadDownHeld())
+		uiInteracting = uiVisible && a.overlay.InteractionActive(time.Now())
+		if uiInteracting {
+			a.presentRequested = true
+		}
 	}
 	rendered := false
 	if a.onPresetsPage {
 		// Presets page: one preview render at thumbnail size. The thumb
-		// texture is stretched full-screen as background by the overlay.
-		if wave := a.readAudio(); len(wave) > 0 {
-			a.previewFeedPCM(wave)
-		} else if a.preview != nil && a.preview.isReady() {
-			a.previewFeedPCM(a.testSignal())
-		}
+		// texture is used both for the page background and for the selected
+		// preset details, so it must keep running even with an opaque UI.
+		// During active navigation keep the last result and give the cursor
+		// the whole frame; rendering resumes as soon as navigation settles.
+		if !uiInteracting {
+			if wave := a.readAudio(); len(wave) > 0 {
+				a.previewFeedPCM(wave)
+			} else if a.preview != nil && a.preview.isReady() {
+				a.previewFeedPCM(a.testSignal())
+			}
 
-		if a.preview != nil && a.preview.isReady() {
-			tW, tH := ui.PresetPreviewSize(w, h)
-			a.preview.Resize(tW, tH)
-			rendered = a.preview.ProcessNext()
-			tex, _ := a.preview.Result()
-			a.overlay.SetPreviewBackground(tex)
+			if a.preview != nil && a.preview.isReady() {
+				tW, tH := ui.PresetPreviewSize(w, h)
+				a.preview.Resize(tW, tH)
+				rendered = a.preview.ProcessNext()
+				tex, _ := a.preview.Result()
+				a.overlay.SetPreviewBackground(tex)
+			}
 		}
 	} else {
 		// Normal mode: clear preview background, restore thumbnail size.
@@ -386,7 +398,8 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 		// Schedule projectM independently from input/UI outside Ultra. GL
 		// work remains on this thread; between visualizer frames, keep
 		// presenting the last captured texture.
-		if !a.settings.Graphics.VisualizerOff && (a.settings.Graphics.PerformanceMode == config.PerfModeUltra || a.vizClock.Due(now)) {
+		if !a.settings.Graphics.VisualizerOff && !uiOpaque && !uiInteracting &&
+			(a.settings.Graphics.PerformanceMode == config.PerfModeUltra || a.vizClock.Due(now)) {
 			fps := int32(time.Second / a.vizClock.framePeriod)
 			a.pm.SetFPS(fps)
 			a.pm.RenderFrame()
@@ -402,7 +415,6 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 		}
 
 	}
-	uiVisible := a.overlay != nil && a.overlay.UIVisible()
 	audioOnly := a.settings.Graphics.VisualizerOff && !a.onPresetsPage
 	due := presentationDue(a.settings.Graphics.PerformanceMode, now, a.nextPresent, rendered, a.presentRequested, uiVisible)
 	if audioOnly {
@@ -416,7 +428,7 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 	// Preview rendering and feedback injection may leave a different FBO
 	// bound. Every presets-page presentation starts on a clean screen,
 	// including iterations where the preview renderer is throttled.
-	if a.onPresetsPage {
+	if a.onPresetsPage || uiOpaque {
 		ui.ClearBackground(w, h)
 	} else if audioOnly {
 		ui.ClearBackground(w, h)
@@ -429,7 +441,7 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 	if a.overlay != nil {
 		rw, rh := a.rt.Size()
 		a.overlay.Draw(w, h)
-		if !audioOnly && !a.onPresetsPage {
+		if !audioOnly && !a.onPresetsPage && !uiOpaque {
 			a.pm.BindFeedbackFramebuffer()
 			a.overlay.Inject(rw, rh)
 		}
@@ -592,8 +604,12 @@ func (a *App) displayRefreshRate() int32 {
 // recoverPlaybackFailure also handles a live stream ending after startup;
 // Repeat One must not trap the listener on a failed radio source.
 func (a *App) recoverPlaybackFailure(path string) {
-	if player.IsRadio(path) && a.radio != nil {
+	if player.IsRadio(path) && a.radio != nil && a.online.Load() {
 		a.radio.MarkDead(path)
+	} else if player.IsRadio(path) {
+		// A failed connection while offline is not evidence that the station is
+		// dead. Keep its descriptor and cached listing for the next retry.
+		slog.Debug("radio failure kept in cache while offline", "path", path)
 	}
 	if !player.IsRadio(path) {
 		a.pruneTrackCache()

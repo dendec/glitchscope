@@ -15,6 +15,14 @@ import (
 // Navigation-tree construction lives in overlay_nav.go; rendering in
 // overlay_render.go; struct fields in overlay.go.
 
+const (
+	scrollHoldStartDelay  = 200 * time.Millisecond
+	scrollHoldInitialRate = 5.0   // steps per second once repeating starts
+	scrollHoldMaxRate     = 120.0 // keep long holds useful on large lists
+	maxScrollCatchUpSteps = 16    // bound work after a delayed frame
+	uiInteractionGrace    = 200 * time.Millisecond
+)
+
 // scrollHold tracks key-hold timing for scroll acceleration.
 type scrollHold struct {
 	holdStart  time.Time
@@ -22,6 +30,7 @@ type scrollHold struct {
 	active     bool
 	uiPage     UIPage
 	focusPanel int
+	navDepth   int
 }
 
 // Update advances animations and handles scroll acceleration. Call every frame.
@@ -42,6 +51,7 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	}
 
 	if !o.uiVisible || !o.panelEntered {
+		o.resetScrollHolds()
 		return
 	}
 
@@ -60,35 +70,76 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	o.updateMarquee(now)
 }
 
-// updateScrollHold drives held-key scroll acceleration: after held for 0.2s,
-// steps at a rate that doubles every second (starting at 5 steps/sec).
+// InteractionActive reports whether the user has interacted with the visible
+// UI recently enough that the next visualizer frame should yield to it.
+func (o *Overlay) InteractionActive(now time.Time) bool {
+	return o.uiVisible && !o.lastInteraction.IsZero() && now.Sub(o.lastInteraction) < uiInteractionGrace
+}
+
+func (o *Overlay) markInteraction() {
+	o.lastInteraction = time.Now()
+}
+
+// resetScrollHolds stops all repeat state when the UI is inactive. Without
+// this, reopening the UI while a key is still held could resume a stale hold
+// at its previous (possibly maximum) speed.
+func (o *Overlay) resetScrollHolds() {
+	o.scrollUp.active = false
+	o.scrollDown.active = false
+	o.scrollLeft.active = false
+	o.scrollRight.active = false
+}
+
+// scrollHoldRate returns the repeat rate for a hold. Acceleration is smooth so
+// it does not jump at whole-second boundaries, and it is capped to avoid
+// turning a long hold into an unmanageable stream of navigation events.
+func scrollHoldRate(elapsed time.Duration) float64 {
+	if elapsed < scrollHoldStartDelay {
+		return 0
+	}
+	rate := scrollHoldInitialRate * math.Exp2((elapsed - scrollHoldStartDelay).Seconds())
+	return min(rate, scrollHoldMaxRate)
+}
+
+// updateScrollHold drives held-key scroll acceleration.
 func (o *Overlay) updateScrollHold(h *scrollHold, held bool, now time.Time, step func()) {
 	if !held {
 		h.active = false
 		return
 	}
-	if !h.active || h.uiPage != o.uiPage || h.focusPanel != o.focusPanel {
+	if !h.active || h.uiPage != o.uiPage || h.focusPanel != o.focusPanel || h.navDepth != len(o.navStack) {
 		// New hold — start tracking.
-		*h = scrollHold{holdStart: now, lastStep: now, active: true, uiPage: o.uiPage, focusPanel: o.focusPanel}
+		*h = scrollHold{
+			holdStart:  now,
+			lastStep:   now,
+			active:     true,
+			uiPage:     o.uiPage,
+			focusPanel: o.focusPanel,
+			navDepth:   len(o.navStack),
+		}
 		return
 	}
-	elapsed := now.Sub(h.holdStart).Seconds()
-	if elapsed < 0.2 {
+	rate := scrollHoldRate(now.Sub(h.holdStart))
+	if rate == 0 {
 		return
 	}
-	rate := 5.0 * math.Pow(2, math.Floor(elapsed))
 	stepInterval := 1.0 / rate
 	sinceLast := now.Sub(h.lastStep).Seconds()
 	if sinceLast < stepInterval {
 		return
 	}
-	// A delayed frame must not catch up with several cursor moves before the
-	// next swap; those intermediate selections could never be displayed.
-	step()
+	// Cursor speed is based on elapsed time rather than frame count. A delayed
+	// frame may therefore consume several due steps, but the bound keeps a
+	// long stall from monopolizing the main loop.
+	steps := min(int(sinceLast/stepInterval), maxScrollCatchUpSteps)
+	for range steps {
+		step()
+	}
 	h.lastStep = now
 }
 
 func (o *Overlay) ToggleUI() {
+	o.markInteraction()
 	if o.uiVisible {
 		o.closeInjectPending = true
 	}
@@ -111,6 +162,7 @@ func (o *Overlay) ToggleUI() {
 
 // NextScreen cycles Library → Presets → Settings → Help → Library.
 func (o *Overlay) NextScreen() {
+	o.markInteraction()
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
@@ -133,6 +185,7 @@ func (o *Overlay) NextScreen() {
 
 // PrevScreen cycles Library → Help → Settings → Presets → Library.
 func (o *Overlay) PrevScreen() {
+	o.markInteraction()
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
@@ -182,6 +235,7 @@ func (o *Overlay) scrollNCInfo(dir int) bool {
 // current page and focused panel. Shared by CursorUp/CursorDown so the two
 // directions can't drift out of sync.
 func (o *Overlay) moveCursor(dir int) {
+	o.markInteraction()
 	o.invalidateActiveMarquee()
 	if o.uiPage == PageHelp {
 		if o.focusPanel == 0 {
@@ -292,12 +346,33 @@ func (o *Overlay) moveCursor(dir int) {
 			o.trackCursor = 0
 			o.tracksDirty = true
 			o.albumsDirty = true
+			o.maybeRequestRadioPage()
 		}
 	case 1:
 		if next := o.trackCursor + dir; next >= 0 && next < len(o.trackInfos) {
 			o.trackCursor = next
 			o.tracksDirty = true
 		}
+	}
+}
+
+func (o *Overlay) maybeRequestRadioPage() {
+	if o.focusPanel != 0 || len(o.navStack) == 0 || o.topLevel().ctx != ctxRadio {
+		return
+	}
+	level := o.topLevel()
+	if level.radioKind == radio.BrowseRandom {
+		return
+	}
+	key := radioQueryKey(level.radioKind, level.radioFilter)
+	if !o.radioQueryMore[key] || len(o.albums) == 0 {
+		return
+	}
+	const prefetchRows = 5
+	if o.albumCursor >= len(o.albums)-prefetchRows {
+		o.radioPageRequested = true
+		o.radioPageKind = level.radioKind
+		o.radioPageFilter = level.radioFilter
 	}
 }
 
@@ -352,6 +427,7 @@ func (o *Overlay) infoPanelFocused() bool {
 }
 
 func (o *Overlay) FocusLeft() {
+	o.markInteraction()
 	switch o.uiPage {
 	case PageHelp:
 		if o.focusPanel == 1 {
@@ -404,6 +480,7 @@ func (o *Overlay) FocusLeft() {
 }
 
 func (o *Overlay) FocusRight() {
+	o.markInteraction()
 	switch o.uiPage {
 	case PageHelp:
 		if o.focusPanel == 0 {
@@ -478,6 +555,7 @@ func (o *Overlay) backToLeftPanel(markDirty func()) bool {
 // Select enters the focused panel or confirms item selection.
 // Returns true when an item was selected.
 func (o *Overlay) Select() bool {
+	o.markInteraction()
 	if o.uiPage == PageHelp {
 		if !o.panelEntered {
 			o.panelEntered = true
@@ -590,6 +668,9 @@ func (o *Overlay) Select() bool {
 				o.radioBrowseKind = e.radioKind
 				o.radioBrowseFilter = ""
 				o.radioBrowseRequested = true
+				if e.radioKind == radio.BrowseRandom {
+					return false
+				}
 				if e.radioKind == radio.BrowseTag || e.radioKind == radio.BrowseLanguage || e.radioKind == radio.BrowseCountry {
 					o.pushLevel(navLevel{ctx: ctxRadio, label: e.label, entries: o.buildRadioFilterEntries(e.radioKind), radioKind: e.radioKind})
 				} else {
@@ -676,6 +757,7 @@ func (o *Overlay) Select() bool {
 }
 
 func (o *Overlay) Back() {
+	o.markInteraction()
 	if o.uiPage == PageHelp {
 		if o.panelEntered && o.focusPanel == 1 {
 			o.focusPanel = 0

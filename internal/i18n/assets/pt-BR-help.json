@@ -177,8 +177,49 @@
   },
   {
     "id": 5,
-    "title": "Catálogos",
+    "title": "Fontes",
     "children": [
+      {
+        "title": "Música local",
+        "lines": [
+          "**Reproduzir arquivos locais**",
+          "Navegue pelas pastas do dispositivo e reproduza arquivos de áudio e tracker compatíveis.",
+          "A reprodução funciona sem conexão de rede."
+        ]
+      },
+      {
+        "title": "Favoritos",
+        "lines": [
+          "**Manter faixas por perto**",
+          "Adicione faixas às listas Estrela, Coração ou Nota.",
+          "Favoritos ficam disponíveis na Biblioteca e protegem downloads da limpeza automática."
+        ]
+      },
+      {
+        "title": "Downloads",
+        "lines": [
+          "**Cópias offline**",
+          "Navegue pelas faixas baixadas de fontes remotas.",
+          "Downloads podem ser reproduzidos sem internet e removidos em Downloads."
+        ]
+      },
+      {
+        "title": "Microfone",
+        "lines": [
+          "**Entrada ao vivo**",
+          "Selecione um microfone do sistema para enviar áudio ao vivo ao visualizador.",
+          "A captura do microfone interrompe a reprodução e não é enviada aos alto-falantes."
+        ]
+      },
+      {
+        "title": "Rádio",
+        "lines": [
+          "**Rádio pela internet**",
+          "Navegue por estações populares ou filtre por tag, idioma ou país.",
+          "As listas ficam em cache por 30 dias e carregam mais linhas ao rolar.",
+          "O rádio precisa de rede; um fluxo pode falhar mesmo quando o diretório está online."
+        ]
+      },
       {
         "title": "Modland",
         "lines": [

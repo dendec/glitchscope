@@ -113,6 +113,17 @@ main thread; между кадрами визуализации выводитс
 Показатель `FPS` и adaptive resolution используют частоту завершённых кадров
 визуализации, а не частоту итераций UI.
 
+Удержание клавиши навигации рассчитывает шаги по монотонному времени, а не по
+числу кадров. Если projectM задержал основной цикл, следующий проход может
+обработать несколько накопившихся шагов с ограниченным бюджетом работы.
+Вне активного взаимодействия расписание и качество фонового визуализатора не
+меняются. Во время активного взаимодействия UI пропускает очередной кадр projectM и
+освобождает главный поток для обработки ввода; после короткого idle-интервала
+обычный рендеринг возобновляется. При `Transparency=0` визуализатор, blit
+фоновой текстуры и feedback-инъекция полностью пропускаются, пока UI открыт;
+исключение — страница пресетов: её thumbnail-preview продолжает работать, чтобы
+просмотр выбранного пресета оставался доступным при непрозрачном меню.
+
 Во время плавной смены пресета adaptive resolution приостанавливается на
 длительность projectM soft cut. При запуске перехода история adaptive policy
 очищается; после перехода решение снова принимается только по новым завершённым
@@ -204,7 +215,7 @@ read-only fallback по известным CFW-файлам, device tree, `/proc
 Результат кешируется до завершения процесса; shell-команды и периодический опрос
 не используются. App добавляет к снимку сведения активного аудиобэкенда.
 
-Числа треков и директорий на странице Catalogs являются только UI-проекцией
+Числа треков и директорий на странице Sources являются только UI-проекцией
 immutable metadata provider-specific shuffle indexes. Открытие темы лениво
 запускает обычную сборку индекса, если shuffle был выключен при старте; Help не
 обходит каталоги и не владеет их данными.
@@ -229,6 +240,16 @@ read. The body deadline excludes consumer pauses and imposes no maximum stream
 lifetime. Closing a response cancels its request, including reconnect work.
 Directory requests have tighter operation deadlines.
 
+Списки Radio Browser кэшируются на 30 дней. В кэше хранится только запрошенная
+часть каталога: первая страница загружается сразу, следующие страницы
+автоматически дозагружаются в фоне, когда курсор подходит к концу списка, и
+объединяются по UUID. Запросы
+`random` выполняются с `limit=1`, сразу запускают найденную станцию и никогда
+не сохраняются в directory cache.
+Последний выбранный каталог и фильтр сохраняются вместе с очередью текущей
+станции, поэтому после перезапуска меню восстанавливает полный путь до её
+списка; если каталог недоступен, показывается сама станция как fallback.
+
 Radio loading owns a cancellable stream context, forwarded from the load request
 until prebuffer completes. It is then owned by the source, not the completed load
 worker. Stop/switch detaches the SoLoud voice and queues stream destruction off
@@ -247,9 +268,10 @@ navigation renders a loading entry and never calls the synchronous network API.
 
 A radio stream ending after startup enters bounded failure recovery, including
 under Repeat One. Live sources cannot seek or use the tracker restart fallback.
-Failed station descriptors remain available for manual retries and Favorites;
-imported playlist descriptors are persisted independently of the last source.
-Cache writes execute in submission order without waiting on disk from the UI.
+When connectivity is confirmed, a failed station is removed from its query,
+imported descriptor and last-queue caches; when the device is offline, the
+descriptor remains available for a later retry. Cache writes execute in
+submission order without waiting on disk from the UI.
 
 Basic HLS supports master/media playlists, sequence-based deduplication, redirects,
 and TS/fMP4 segment transport. Encrypted streams, byte ranges, gaps,

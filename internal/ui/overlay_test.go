@@ -88,6 +88,42 @@ func TestRadioNavigationUsesCachedRowsAndLocalizedLoading(t *testing.T) {
 	}
 }
 
+func TestRadioFilterShowsStationCountWhenAvailable(t *testing.T) {
+	o := &Overlay{
+		catalog:          i18n.MustLoad(i18n.English),
+		radioValues:      map[radio.BrowseKind][]string{radio.BrowseTag: {"rock", "jazz"}},
+		radioValueCounts: map[radio.BrowseKind]map[string]int{radio.BrowseTag: {"rock": 123}},
+	}
+	entries := o.buildRadioFilterEntries(radio.BrowseTag)
+	if entries[0].label != "rock (123)" || entries[1].label != "jazz" {
+		t.Fatalf("radio filter labels = %#v", labelsOf(entries))
+	}
+}
+
+func TestRadioPrefetchStartsNearEndOfListing(t *testing.T) {
+	stations := []navEntry{
+		{label: "One", kind: entryRadioStation},
+		{label: "Two", kind: entryRadioStation},
+		{label: "Three", kind: entryRadioStation},
+		{label: "Four", kind: entryRadioStation},
+		{label: "Five", kind: entryRadioStation},
+		{label: "Six", kind: entryRadioStation},
+	}
+	entries := withParentEntry(stations)
+	o := &Overlay{
+		navStack:       []navLevel{{ctx: ctxRadio, radioKind: radio.BrowsePopular, entries: entries}},
+		albumEntries:   entries,
+		albums:         labelsOf(entries),
+		radioQueryMore: map[string]bool{radioQueryKey(radio.BrowsePopular, ""): true},
+		focusPanel:     0,
+		albumCursor:    1,
+	}
+	o.moveCursor(1)
+	if !o.radioPageRequested {
+		t.Fatal("radio page prefetch was not requested near the end")
+	}
+}
+
 func TestNavigateToRadioStationOpensRadioView(t *testing.T) {
 	o := &Overlay{catalog: i18n.MustLoad(i18n.English), online: true}
 	station := radio.Station{StationUUID: "station-1", Name: "Station One", URL: "https://example.test/stream"}
@@ -98,6 +134,14 @@ func TestNavigateToRadioStationOpensRadioView(t *testing.T) {
 	entry := o.currentEntry()
 	if entry == nil || entry.kind != entryRadioStation || entry.radioStation.Path() != station.Path() {
 		t.Fatalf("radio navigation entry = %#v", entry)
+	}
+}
+
+func TestRadioProviderBreadcrumbUsesLocalizedLabel(t *testing.T) {
+	o := &Overlay{catalog: i18n.MustLoad(i18n.Russian)}
+	o.switchToProvider(sourceRadio)
+	if got, want := o.navStack[1].label, o.catalog.Text(i18n.SourceRadio); got != want {
+		t.Fatalf("radio breadcrumb = %q, want %q", got, want)
 	}
 }
 
@@ -127,6 +171,33 @@ func TestNavigateToRadioStationMovesCursorInOpenListing(t *testing.T) {
 	}
 	if entry := o.currentEntry(); entry == nil || entry.radioStation.Path() != second.Path() {
 		t.Fatalf("current radio entry = %#v, want second station", entry)
+	}
+}
+
+func TestNavigateToRadioStationRestoresBrowsePath(t *testing.T) {
+	station := radio.Station{StationUUID: "station-1", Name: "Station One", URL: "https://example.test/stream"}
+	other := radio.Station{StationUUID: "station-2", Name: "Station Two", URL: "https://example.test/other"}
+	o := &Overlay{
+		catalog:          i18n.MustLoad(i18n.English),
+		online:           true,
+		radioQueries:     map[string][]radio.Station{radioQueryKey(radio.BrowseTag, "rock"): {station, other}},
+		radioValues:      map[radio.BrowseKind][]string{radio.BrowseTag: {"rock", "jazz"}},
+		radioValueCounts: map[radio.BrowseKind]map[string]int{radio.BrowseTag: {"rock": 2, "jazz": 1}},
+	}
+	o.NavigateToRadioStationInBrowse(station, radio.BrowseTag, "rock")
+
+	if len(o.navStack) != 4 {
+		t.Fatalf("navigation levels = %d, want source/radio/filter/stations", len(o.navStack))
+	}
+	level := o.topLevel()
+	if level.ctx != ctxRadio || level.radioKind != radio.BrowseTag || level.radioFilter != "rock" {
+		t.Fatalf("station level = %#v", level)
+	}
+	if entry := o.currentEntry(); entry == nil || entry.radioStation.Path() != station.Path() {
+		t.Fatalf("current entry = %#v, want restored station", entry)
+	}
+	if o.navStack[2].cursor != 1 || o.navStack[2].entries[o.navStack[2].cursor].radioFilter != "rock" {
+		t.Fatalf("filter cursor = %d, want rock", o.navStack[2].cursor)
 	}
 }
 

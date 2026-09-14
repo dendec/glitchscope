@@ -177,8 +177,49 @@
   },
   {
     "id": 5,
-    "title": "Kataloge",
+    "title": "Quellen",
     "children": [
+      {
+        "title": "Lokale Musik",
+        "lines": [
+          "**Lokale Dateien abspielen**",
+          "Durchsuchen Sie Ordner auf dem Gerät und spielen Sie unterstützte Audio- und Tracker-Dateien ab.",
+          "Die Wiedergabe funktioniert ohne Netzwerkverbindung."
+        ]
+      },
+      {
+        "title": "Favoriten",
+        "lines": [
+          "**Titel griffbereit halten**",
+          "Fügen Sie Titel den Wiedergabelisten Stern, Herz oder Note hinzu.",
+          "Favoriten sind in der Bibliothek verfügbar und schützen heruntergeladene Titel vor der Bereinigung."
+        ]
+      },
+      {
+        "title": "Downloads",
+        "lines": [
+          "**Offline-Kopien**",
+          "Durchsuchen Sie Titel, die aus entfernten Quellen heruntergeladen wurden.",
+          "Heruntergeladene Titel funktionieren ohne Internet und können in Downloads gelöscht werden."
+        ]
+      },
+      {
+        "title": "Mikrofon",
+        "lines": [
+          "**Live-Eingang**",
+          "Wählen Sie ein Systemmikrofon, um Live-Audio in den Visualizer zu leiten.",
+          "Die Mikrofonaufnahme stoppt die Wiedergabe und wird nicht an die Lautsprecher gesendet."
+        ]
+      },
+      {
+        "title": "Radio",
+        "lines": [
+          "**Internetradio**",
+          "Durchsuchen Sie beliebte Sender oder filtern Sie nach Tag, Sprache oder Land.",
+          "Senderlisten werden 30 Tage zwischengespeichert und beim Scrollen erweitert.",
+          "Radio benötigt eine Netzwerkverbindung; ein Stream kann trotz erreichbarem Verzeichnis ausfallen."
+        ]
+      },
       {
         "title": "Modland",
         "lines": [

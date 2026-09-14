@@ -177,8 +177,49 @@
   },
   {
     "id": 5,
-    "title": "Katalog",
+    "title": "Sumber",
     "children": [
+      {
+        "title": "Musik lokal",
+        "lines": [
+          "**Putar file lokal**",
+          "Jelajahi folder di perangkat dan putar file audio serta tracker yang didukung.",
+          "Pemutaran tetap berfungsi tanpa jaringan."
+        ]
+      },
+      {
+        "title": "Favorit",
+        "lines": [
+          "**Simpan trek pilihan**",
+          "Tambahkan trek ke daftar Star, Heart, atau Note.",
+          "Favorit tersedia di Library dan melindungi unduhan dari pembersihan otomatis."
+        ]
+      },
+      {
+        "title": "Unduhan",
+        "lines": [
+          "**Salinan offline**",
+          "Jelajahi trek yang diunduh dari sumber jarak jauh.",
+          "Trek yang diunduh dapat diputar tanpa internet dan dihapus dari Downloads."
+        ]
+      },
+      {
+        "title": "Mikrofon",
+        "lines": [
+          "**Input langsung**",
+          "Pilih mikrofon sistem untuk mengirim audio langsung ke visualizer.",
+          "Pengambilan mikrofon menghentikan pemutaran dan tidak dikirim ke speaker."
+        ]
+      },
+      {
+        "title": "Radio",
+        "lines": [
+          "**Radio internet**",
+          "Jelajahi stasiun populer atau filter berdasarkan tag, bahasa, atau negara.",
+          "Daftar stasiun disimpan selama 30 hari dan memuat baris berikutnya saat digulir.",
+          "Radio memerlukan jaringan; siaran dapat gagal meski direktorinya online."
+        ]
+      },
       {
         "title": "Modland",
         "lines": [

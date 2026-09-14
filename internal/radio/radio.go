@@ -26,8 +26,9 @@ import (
 )
 
 const (
-	cacheVersion          = 2
-	cacheTTL              = 24 * time.Hour
+	cacheVersion          = 3
+	cacheTTL              = 30 * 24 * time.Hour
+	radioPageSize         = 100
 	radioRequestTimeout   = 12 * time.Second
 	radioDirectoryTimeout = 6 * time.Second
 	lastStationFile       = "last-station.json"
@@ -87,21 +88,26 @@ func (s Station) DisplayName() string {
 }
 
 type queryCache struct {
-	Version   int       `json:"version"`
-	FetchedAt time.Time `json:"fetched_at"`
-	Stations  []Station `json:"stations"`
+	Version    int       `json:"version"`
+	FetchedAt  time.Time `json:"fetched_at"`
+	Stations   []Station `json:"stations"`
+	NextOffset int       `json:"next_offset,omitempty"`
+	HasMore    bool      `json:"has_more,omitempty"`
 }
 
 type valueCache struct {
-	Version   int       `json:"version"`
-	FetchedAt time.Time `json:"fetched_at"`
-	Values    []string  `json:"values"`
+	Version   int            `json:"version"`
+	FetchedAt time.Time      `json:"fetched_at"`
+	Values    []string       `json:"values"`
+	Counts    map[string]int `json:"counts,omitempty"`
 }
 
 type stationCache struct {
-	Version  int       `json:"version"`
-	Station  Station   `json:"station"`
-	Stations []Station `json:"stations,omitempty"`
+	Version      int        `json:"version"`
+	Station      Station    `json:"station"`
+	Stations     []Station  `json:"stations,omitempty"`
+	BrowseKind   BrowseKind `json:"browse_kind,omitempty"`
+	BrowseFilter string     `json:"browse_filter,omitempty"`
 }
 
 type serverRecord struct {
@@ -111,24 +117,30 @@ type serverRecord struct {
 // Client is a cached Radio Browser client. Network work is always started by
 // Begin; Snapshot and Values are cheap and safe to call from the UI thread.
 type Client struct {
-	baseDir  string
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
-	ioMu     sync.Mutex
-	saveMu   sync.Mutex
-	saveTail chan struct{}
+	baseDir    string
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+	ioMu       sync.Mutex
+	saveMu     sync.Mutex
+	saveTail   chan struct{}
+	saveClosed bool
 
-	mu        sync.RWMutex
-	servers   []string
-	queries   map[string]queryCache
-	stations  map[string]Station
-	values    map[BrowseKind]valueCache
-	pending   map[string]pendingRequest
-	results   chan result
-	lastQueue []Station
-	requestID uint64
-	activeID  uint64
+	mu               sync.RWMutex
+	closed           bool
+	servers          []string
+	queries          map[string]queryCache
+	stations         map[string]Station
+	imported         map[string]struct{}
+	values           map[BrowseKind]valueCache
+	pending          map[string]pendingRequest
+	results          chan result
+	lastQueue        []Station
+	lastBrowseKind   BrowseKind
+	lastBrowseFilter string
+	lastStationID    string
+	requestID        uint64
+	activeID         uint64
 }
 
 type pendingRequest struct {
@@ -137,13 +149,23 @@ type pendingRequest struct {
 }
 
 type result struct {
-	id       uint64
-	key      string
-	kind     BrowseKind
-	filter   string
-	stations []Station
-	values   []string
-	err      error
+	id         uint64
+	key        string
+	kind       BrowseKind
+	filter     string
+	offset     int
+	nextOffset int
+	stations   []Station
+	values     []string
+	counts     map[string]int
+	hasMore    bool
+	err        error
+}
+
+type stationPage struct {
+	stations   []Station
+	nextOffset int
+	hasMore    bool
 }
 
 // New creates a client and loads only local metadata. It never performs a
@@ -154,6 +176,7 @@ func New(baseDir string) *Client {
 		baseDir:  baseDir,
 		queries:  make(map[string]queryCache),
 		stations: make(map[string]Station),
+		imported: make(map[string]struct{}),
 		values:   make(map[BrowseKind]valueCache),
 		pending:  make(map[string]pendingRequest),
 		results:  make(chan result, 8),
@@ -182,8 +205,11 @@ func (c *Client) loadCache() {
 			}
 			var cache stationCache
 			if json.Unmarshal(data, &cache) == nil && cache.Version == cacheVersion {
+				c.lastBrowseKind = cache.BrowseKind
+				c.lastBrowseFilter = strings.TrimSpace(cache.BrowseFilter)
 				station := cleanStation(cache.Station)
 				if station.StationUUID != "" && station.StreamURL() != "" {
+					c.lastStationID = station.StationUUID
 					c.stations[station.StationUUID] = station
 				}
 				queue := cleanQueueStations(append([]Station{station}, cache.Stations...))
@@ -230,6 +256,9 @@ func (c *Client) loadCache() {
 		}
 		for _, station := range cache.Stations {
 			c.stations[station.StationUUID] = station
+			if key == "imported" {
+				c.imported[station.StationUUID] = struct{}{}
+			}
 		}
 	}
 }
@@ -265,8 +294,27 @@ func (c *Client) saveJSON(name string, value any) {
 	}
 }
 
+func (c *Client) removeJSON(name string) {
+	c.ioMu.Lock()
+	defer c.ioMu.Unlock()
+	if err := os.Remove(filepath.Join(c.cacheDir(), name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		slog.Warn("radio cache remove failed", "name", name, "error", err)
+	}
+}
+
 func queryKey(kind BrowseKind, filter string) string {
 	return string(kind) + "-" + url.PathEscape(strings.ToLower(strings.TrimSpace(filter)))
+}
+
+func validBrowseContext(kind BrowseKind, filter string) bool {
+	switch kind {
+	case BrowsePopular:
+		return filter == ""
+	case BrowseTag, BrowseLanguage, BrowseCountry:
+		return filter != ""
+	default:
+		return false
+	}
 }
 
 // Snapshot returns cached stations for a query and whether that snapshot is
@@ -282,6 +330,31 @@ func (c *Client) Snapshot(kind BrowseKind, filter string) (stations []Station, s
 	return append([]Station{}, cache.Stations...), time.Since(cache.FetchedAt) > cacheTTL
 }
 
+// NextPage returns the offset for the next cached station page. It is false
+// when the query has no cached page or the server reported that it is complete.
+func (c *Client) NextPage(kind BrowseKind, filter string) (offset int, ok bool) {
+	if kind == BrowseRandom {
+		return 0, false
+	}
+	key := queryKey(kind, filter)
+	c.mu.RLock()
+	cache, exists := c.queries[key]
+	c.mu.RUnlock()
+	if !exists || !cache.HasMore {
+		return 0, false
+	}
+	if cache.NextOffset > 0 {
+		return cache.NextOffset, true
+	}
+	return len(cache.Stations), true
+}
+
+// HasMore reports whether a cached query has another station page.
+func (c *Client) HasMore(kind BrowseKind, filter string) bool {
+	_, ok := c.NextPage(kind, filter)
+	return ok
+}
+
 // Values returns cached tag/language/country filters and whether they are stale.
 func (c *Client) Values(kind BrowseKind) (values []string, stale bool) {
 	c.mu.RLock()
@@ -291,8 +364,22 @@ func (c *Client) Values(kind BrowseKind) (values []string, stale bool) {
 		return nil, true
 	}
 	values = append([]string{}, cache.Values...)
-	sort.Strings(values)
+	sort.SliceStable(values, func(i, j int) bool {
+		left, right := cache.Counts[values[i]], cache.Counts[values[j]]
+		if left != right {
+			return left > right
+		}
+		return strings.ToLower(values[i]) < strings.ToLower(values[j])
+	})
 	return values, time.Since(cache.FetchedAt) > cacheTTL
+}
+
+// ValueCounts returns the station counts reported for cached filter values.
+func (c *Client) ValueCounts(kind BrowseKind) map[string]int {
+	c.mu.RLock()
+	counts := c.values[kind].Counts
+	c.mu.RUnlock()
+	return copyCounts(counts)
 }
 
 // Lookup resolves a radio virtual path to its cached stream URL.
@@ -304,9 +391,7 @@ func (c *Client) Lookup(path string) (Station, bool) {
 	return station, ok
 }
 
-// AddStations adds stations from a user playlist to the local lookup table.
-func (c *Client) AddStations(stations []Station) {
-	c.mu.Lock()
+func (c *Client) addStationsLocked(stations []Station) {
 	for _, station := range stations {
 		station = cleanStation(station)
 		if station.StreamURL() == "" {
@@ -317,11 +402,42 @@ func (c *Client) AddStations(stations []Station) {
 		}
 		c.stations[station.StationUUID] = station
 	}
+}
+
+// AddTransientStations adds stations to the in-memory lookup table without
+// writing a directory or imported-playlist cache. Radio Browser selections and
+// one-shot random playback use this path; their query/last-position caches are
+// managed independently.
+func (c *Client) AddTransientStations(stations []Station) {
+	c.mu.Lock()
+	c.addStationsLocked(stations)
+	c.mu.Unlock()
+}
+
+// AddStations adds stations from a user playlist to the local lookup table and
+// persists the imported descriptors for later playback.
+func (c *Client) AddStations(stations []Station) {
+	c.mu.Lock()
+	c.addStationsLocked(stations)
 	// Persist descriptors independently of the last playing source: favorites
 	// from imported playlists must still resolve after exiting on a local track.
-	saved := make([]Station, 0, len(c.stations))
-	for _, station := range c.stations {
-		saved = append(saved, station)
+	// Keep the provenance explicit so transient Radio Browser/random stations do
+	// not leak into the imported cache on a later playlist import.
+	for _, station := range stations {
+		station = cleanStation(station)
+		if station.StreamURL() == "" {
+			continue
+		}
+		if station.StationUUID == "" {
+			station.StationUUID = playlistUUID(station.StreamURL())
+		}
+		c.imported[station.StationUUID] = struct{}{}
+	}
+	saved := make([]Station, 0, len(c.imported))
+	for id := range c.imported {
+		if station, ok := c.stations[id]; ok {
+			saved = append(saved, station)
+		}
 	}
 	c.mu.Unlock()
 	c.saveAsync(func() {
@@ -340,7 +456,17 @@ func (c *Client) RememberStation(path string) {
 // station, so a failed restored stream can continue with the same next/random
 // station semantics after a restart.
 func (c *Client) RememberQueue(path string, paths []string) {
+	c.RememberQueueInBrowse(path, paths, "", "")
+}
+
+// RememberQueueInBrowse persists the active radio queue and the directory
+// context from which its current station was selected.
+func (c *Client) RememberQueueInBrowse(path string, paths []string, kind BrowseKind, filter string) {
 	id := strings.TrimPrefix(path, "radio:")
+	filter = strings.TrimSpace(filter)
+	if !validBrowseContext(kind, filter) {
+		kind, filter = "", ""
+	}
 	c.mu.RLock()
 	station, ok := c.stations[id]
 	queue := make([]Station, 0, len(paths))
@@ -362,8 +488,17 @@ func (c *Client) RememberQueue(path string, paths []string) {
 	}
 	c.mu.Lock()
 	c.lastQueue = append([]Station(nil), queue...)
+	c.lastStationID = station.StationUUID
+	c.lastBrowseKind = kind
+	c.lastBrowseFilter = filter
 	c.mu.Unlock()
-	c.saveJSON(lastStationFile, stationCache{Version: cacheVersion, Station: station, Stations: queue})
+	c.saveJSON(lastStationFile, stationCache{
+		Version:      cacheVersion,
+		Station:      station,
+		Stations:     queue,
+		BrowseKind:   kind,
+		BrowseFilter: filter,
+	})
 }
 
 // LastQueue returns the queue saved with the requested current station.
@@ -382,12 +517,31 @@ func (c *Client) LastQueue(path string) []Station {
 	return nil
 }
 
-// MarkDead removes a failed station from cached listings while retaining its
-// descriptor for favorites and manual retries. The next
+// LastBrowse returns the Radio Browser category and filter used for the saved
+// station, when that context is known and can be restored from the directory.
+func (c *Client) LastBrowse(path string) (BrowseKind, string, bool) {
+	id := strings.TrimPrefix(path, "radio:")
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if id == "" || c.lastStationID != id {
+		return "", "", false
+	}
+	if !validBrowseContext(c.lastBrowseKind, c.lastBrowseFilter) {
+		return "", "", false
+	}
+	return c.lastBrowseKind, c.lastBrowseFilter, true
+}
+
+// MarkDead removes a failed station from all local radio caches. The next
 // directory refresh can reintroduce it if Radio Browser reports it healthy.
 func (c *Client) MarkDead(path string) {
 	id := strings.TrimPrefix(path, "radio:")
+	if id == "" {
+		return
+	}
 	c.mu.Lock()
+	delete(c.stations, id)
+	delete(c.imported, id)
 	for key, cache := range c.queries {
 		filtered := make([]Station, 0, len(cache.Stations))
 		changed := false
@@ -402,22 +556,79 @@ func (c *Client) MarkDead(path string) {
 			cache.Stations = append([]Station(nil), filtered...)
 			cache.FetchedAt = time.Time{}
 			c.queries[key] = cache
-			c.saveAsync(func() { c.saveQuery(key, cache) })
+			cacheKey, cacheCopy := key, cache
+			c.saveAsync(func() { c.saveQuery(cacheKey, cacheCopy) })
+		}
+	}
+	filteredQueue := c.lastQueue[:0]
+	for _, station := range c.lastQueue {
+		if station.StationUUID != id {
+			filteredQueue = append(filteredQueue, station)
+		}
+	}
+	c.lastQueue = append([]Station(nil), filteredQueue...)
+	queueCopy := append([]Station(nil), filteredQueue...)
+	browseKind, browseFilter := c.lastBrowseKind, c.lastBrowseFilter
+	if len(queueCopy) == 0 {
+		c.lastStationID = ""
+		c.lastBrowseKind, c.lastBrowseFilter = "", ""
+	} else {
+		c.lastStationID = queueCopy[0].StationUUID
+	}
+	remaining := make([]Station, 0, len(c.imported))
+	for importedID := range c.imported {
+		if station, ok := c.stations[importedID]; ok {
+			remaining = append(remaining, station)
 		}
 	}
 	c.mu.Unlock()
+	c.saveAsync(func() {
+		c.saveQuery("imported", queryCache{Version: cacheVersion, FetchedAt: time.Now(), Stations: remaining})
+		if len(queueCopy) == 0 {
+			c.removeJSON(lastStationFile)
+			return
+		}
+		c.saveJSON(lastStationFile, stationCache{
+			Version:      cacheVersion,
+			Station:      queueCopy[0],
+			Stations:     queueCopy,
+			BrowseKind:   browseKind,
+			BrowseFilter: browseFilter,
+		})
+	})
 }
 
 // Begin starts an asynchronous station query. Cached data is available from
 // Snapshot immediately; callers should Poll results once per frame.
 func (c *Client) Begin(ctx context.Context, kind BrowseKind, filter string) {
+	c.BeginPage(ctx, kind, filter, 0)
+}
+
+// BeginPage starts an asynchronous station query for one page. Offset zero
+// refreshes the visible page; later offsets append to its cached listing.
+func (c *Client) BeginPage(ctx context.Context, kind BrowseKind, filter string, offset int) {
+	if kind == BrowseRandom {
+		offset = 0
+	}
 	key := queryKey(kind, filter)
 	requestCtx, cancel := context.WithCancel(ctx)
 	c.mu.Lock()
-	if _, ok := c.pending[key]; ok {
+	if c.closed {
 		cancel()
 		c.mu.Unlock()
 		return
+	}
+	if pending, ok := c.pending[key]; ok {
+		if kind != BrowseRandom {
+			cancel()
+			c.mu.Unlock()
+			return
+		}
+		// Random is an action rather than a cacheable query. Replace an
+		// in-flight action so a quick second press cannot replay or wait for
+		// the first station.
+		pending.cancel()
+		delete(c.pending, key)
 	}
 	// Only the currently visible query is useful to the UI. Cancel work for
 	// the previous view so a slow server cannot accumulate stale requests.
@@ -432,8 +643,11 @@ func (c *Client) Begin(ctx context.Context, kind BrowseKind, filter string) {
 	id := c.requestID
 	c.activeID = id
 	c.pending[key] = pendingRequest{id: id, cancel: cancel}
-	c.mu.Unlock()
+	// Register the worker before releasing mu. Close also takes mu before
+	// waiting on the group, so it can never observe a zero counter and race a
+	// concurrent BeginPage Add.
 	c.wg.Add(1)
+	c.mu.Unlock()
 	go func() {
 		defer c.wg.Done()
 		defer cancel()
@@ -449,23 +663,24 @@ func (c *Client) Begin(ctx context.Context, kind BrowseKind, filter string) {
 		}()
 		stop := context.AfterFunc(c.ctx, cancel)
 		defer stop()
-		var stations []Station
+		var page stationPage
 		var values []string
+		var counts map[string]int
 		var err error
 		if kind == BrowseTag || kind == BrowseLanguage || kind == BrowseCountry {
 			if filter == "" {
-				values, err = c.fetchValues(requestCtx, kind)
+				values, counts, err = c.fetchValuesWithCounts(requestCtx, kind)
 			} else {
-				stations, err = c.fetchStations(requestCtx, kind, filter)
+				page, err = c.fetchStationPage(requestCtx, kind, filter, offset)
 			}
 		} else {
-			stations, err = c.fetchStations(requestCtx, kind, filter)
+			page, err = c.fetchStationPage(requestCtx, kind, filter, offset)
 		}
 		if requestCtx.Err() != nil {
 			return
 		}
 		select {
-		case c.results <- result{id: id, key: key, kind: kind, filter: filter, stations: stations, values: values, err: err}:
+		case c.results <- result{id: id, key: key, kind: kind, filter: filter, offset: offset, nextOffset: page.nextOffset, stations: page.stations, values: values, counts: counts, hasMore: page.hasMore, err: err}:
 		case <-c.ctx.Done():
 		case <-requestCtx.Done():
 		}
@@ -474,7 +689,7 @@ func (c *Client) Begin(ctx context.Context, kind BrowseKind, filter string) {
 
 // Poll applies one completed background request. It returns the query that
 // changed so the app can rebuild only that navigation level.
-func (c *Client) Poll() (kind BrowseKind, filter string, stations []Station, values []string, err error, ok bool) {
+func (c *Client) Poll() (kind BrowseKind, filter string, stations []Station, values []string, hasMore bool, err error, ok bool) {
 	for {
 		select {
 		case result := <-c.results:
@@ -486,14 +701,25 @@ func (c *Client) Poll() (kind BrowseKind, filter string, stations []Station, val
 			if pending, exists := c.pending[result.key]; exists && pending.id == result.id {
 				delete(c.pending, result.key)
 			}
-			if result.err == nil {
+			if result.err == nil && result.kind != BrowseRandom {
 				isValueQuery := result.filter == "" && (result.kind == BrowseTag || result.kind == BrowseLanguage || result.kind == BrowseCountry)
 				if isValueQuery {
-					cache := valueCache{Version: cacheVersion, FetchedAt: time.Now(), Values: append([]string(nil), result.values...)}
+					cache := valueCache{Version: cacheVersion, FetchedAt: time.Now(), Values: append([]string(nil), result.values...), Counts: copyCounts(result.counts)}
 					c.values[result.kind] = cache
 					c.saveAsync(func() { c.saveValues(result.kind, cache) })
 				} else {
-					cache := queryCache{Version: cacheVersion, FetchedAt: time.Now(), Stations: append([]Station(nil), result.stations...)}
+					cache := c.queries[result.key]
+					if result.offset == 0 {
+						cache.Stations = nil
+					}
+					cache.Version = cacheVersion
+					cache.FetchedAt = time.Now()
+					cache.Stations = appendStations(cache.Stations, result.stations)
+					cache.NextOffset = result.nextOffset
+					if result.offset == 0 && len(result.stations) == 0 {
+						cache.NextOffset = 0
+					}
+					cache.HasMore = result.hasMore
 					c.queries[result.key] = cache
 					for _, station := range result.stations {
 						c.stations[station.StationUUID] = station
@@ -502,9 +728,18 @@ func (c *Client) Poll() (kind BrowseKind, filter string, stations []Station, val
 				}
 			}
 			c.mu.Unlock()
-			return result.kind, result.filter, result.stations, result.values, result.err, true
+			stations = append([]Station(nil), result.stations...)
+			isValueQuery := result.filter == "" && (result.kind == BrowseTag || result.kind == BrowseLanguage || result.kind == BrowseCountry)
+			if result.err == nil && result.kind != BrowseRandom && !isValueQuery {
+				c.mu.RLock()
+				if cache, exists := c.queries[result.key]; exists {
+					stations = append([]Station(nil), cache.Stations...)
+				}
+				c.mu.RUnlock()
+			}
+			return result.kind, result.filter, stations, result.values, result.hasMore, result.err, true
 		default:
-			return "", "", nil, nil, nil, false
+			return "", "", nil, nil, false, nil, false
 		}
 	}
 }
@@ -512,6 +747,10 @@ func (c *Client) Poll() (kind BrowseKind, filter string, stations []Station, val
 func (c *Client) saveAsync(save func()) {
 	// Serialize in submission order without making the UI wait for disk I/O.
 	c.saveMu.Lock()
+	if c.saveClosed {
+		c.saveMu.Unlock()
+		return
+	}
 	previous, done := c.saveTail, make(chan struct{})
 	c.saveTail = done
 	c.wg.Add(1)
@@ -530,59 +769,127 @@ func (c *Client) saveAsync(save func()) {
 func (c *Client) Close() {
 	c.cancel()
 	c.mu.Lock()
+	c.closed = true
 	for key, pending := range c.pending {
 		pending.cancel()
 		delete(c.pending, key)
 	}
 	c.mu.Unlock()
+	c.saveMu.Lock()
+	c.saveClosed = true
+	c.saveMu.Unlock()
 	c.wg.Wait()
 }
 
 func (c *Client) fetchStations(ctx context.Context, kind BrowseKind, filter string) ([]Station, error) {
+	page, err := c.fetchStationPage(ctx, kind, filter, 0)
+	return page.stations, err
+}
+
+func (c *Client) fetchStationPage(ctx context.Context, kind BrowseKind, filter string, offset int) (stationPage, error) {
+	if offset < 0 {
+		return stationPage{}, fmt.Errorf("radio: invalid station offset %d", offset)
+	}
 	path := ""
 	switch kind {
 	case BrowsePopular:
-		path = "/json/stations/topclick/100"
+		path = fmt.Sprintf("/json/stations/search?order=clickcount&reverse=true&offset=%d&limit=%d&hidebroken=true", offset, radioPageSize)
 	case BrowseRandom:
-		path = "/json/stations/search?order=random&limit=100&hidebroken=true"
+		// Some API mirrors/CDNs cache GET responses by URL. A unique query
+		// value keeps successive random actions from replaying the same station.
+		path = fmt.Sprintf("/json/stations/search?order=random&limit=1&hidebroken=true&cachebust=%d", time.Now().UnixNano())
 	case BrowseTag:
-		path = "/json/stations/bytagexact/" + url.PathEscape(filter) + "?limit=100&hidebroken=true"
+		path = fmt.Sprintf("/json/stations/bytagexact/%s?order=clickcount&reverse=true&offset=%d&limit=%d&hidebroken=true", url.PathEscape(filter), offset, radioPageSize)
 	case BrowseLanguage:
-		path = "/json/stations/bylanguageexact/" + url.PathEscape(filter) + "?limit=100&hidebroken=true"
+		path = fmt.Sprintf("/json/stations/bylanguageexact/%s?order=clickcount&reverse=true&offset=%d&limit=%d&hidebroken=true", url.PathEscape(filter), offset, radioPageSize)
 	case BrowseCountry:
-		path = "/json/stations/bycountryexact/" + url.PathEscape(filter) + "?limit=100&hidebroken=true"
+		path = fmt.Sprintf("/json/stations/bycountryexact/%s?order=clickcount&reverse=true&offset=%d&limit=%d&hidebroken=true", url.PathEscape(filter), offset, radioPageSize)
 	default:
-		return nil, fmt.Errorf("radio: unknown browse kind %q", kind)
+		return stationPage{}, fmt.Errorf("radio: unknown browse kind %q", kind)
 	}
-	var stations []Station
-	if err := c.getJSONFromServers(ctx, path, &stations, radioDirectoryTimeout); err != nil {
-		return nil, err
+	var raw []Station
+	if err := c.getJSONFromServers(ctx, path, &raw, radioDirectoryTimeout); err != nil {
+		return stationPage{}, err
 	}
-	return cleanStations(stations), nil
+	stations := cleanStations(raw)
+	return stationPage{stations: stations, nextOffset: offset + len(raw), hasMore: kind != BrowseRandom && len(raw) >= radioPageSize}, nil
 }
 
-func (c *Client) fetchValues(ctx context.Context, kind BrowseKind) ([]string, error) {
+func appendStations(existing, incoming []Station) []Station {
+	seen := make(map[string]struct{}, len(existing)+len(incoming))
+	result := make([]Station, 0, len(existing)+len(incoming))
+	appendStation := func(station Station) {
+		key := station.StationUUID
+		if key == "" {
+			key = station.StreamURL()
+		}
+		if key == "" {
+			return
+		}
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		result = append(result, station)
+	}
+	for _, station := range existing {
+		appendStation(station)
+	}
+	for _, station := range incoming {
+		appendStation(station)
+	}
+	sortStationsByPopularity(result)
+	return result
+}
+
+func (c *Client) fetchValuesWithCounts(ctx context.Context, kind BrowseKind) ([]string, map[string]int, error) {
 	path := map[BrowseKind]string{
 		BrowseTag:      "/json/tags",
 		BrowseLanguage: "/json/languages",
 		BrowseCountry:  "/json/countries",
 	}[kind]
 	if path == "" {
-		return nil, fmt.Errorf("radio: %s has no filter values", kind)
+		return nil, nil, fmt.Errorf("radio: %s has no filter values", kind)
 	}
 	var rows []struct {
-		Name string `json:"name"`
+		Name         string          `json:"name"`
+		StationCount json.RawMessage `json:"stationcount"`
 	}
 	if err := c.getJSONFromServers(ctx, path+"?order=stationcount&reverse=true&limit=250", &rows, radioDirectoryTimeout); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	values := make([]string, 0, len(rows))
+	counts := make(map[string]int, len(rows))
 	for _, row := range rows {
-		if strings.TrimSpace(row.Name) != "" {
-			values = append(values, row.Name)
+		name := strings.TrimSpace(row.Name)
+		if name != "" {
+			values = append(values, name)
+			if count := parseStationCount(row.StationCount); count > 0 {
+				counts[name] = count
+			}
 		}
 	}
-	return values, nil
+	return values, counts, nil
+}
+
+func parseStationCount(raw json.RawMessage) int {
+	value := strings.Trim(strings.TrimSpace(string(raw)), `"`)
+	count, err := strconv.Atoi(value)
+	if err != nil || count < 0 {
+		return 0
+	}
+	return count
+}
+
+func copyCounts(counts map[string]int) map[string]int {
+	if len(counts) == 0 {
+		return nil
+	}
+	copy := make(map[string]int, len(counts))
+	for key, value := range counts {
+		copy[key] = value
+	}
+	return copy
 }
 
 func (c *Client) getJSONTimeout(ctx context.Context, endpoint string, dst any, timeout time.Duration) error {
@@ -666,7 +973,12 @@ func (c *Client) serversForRequest(ctx context.Context, timeout time.Duration) (
 		return servers, nil
 	}
 
-	discovered, err := c.discoverServers(ctx, timeout)
+	// Discovery is best-effort. Keep it short so a slow reverse-DNS/SRV
+	// resolver cannot consume the whole directory request and leave no time for
+	// the known fallback mirror.
+	discoveryCtx, cancel := context.WithTimeout(ctx, min(timeout, 2*time.Second))
+	discovered, err := c.discoverServers(discoveryCtx, min(timeout, 2*time.Second))
+	cancel()
 	if len(discovered) == 0 {
 		discovered = append([]string(nil), radioBrowserFallbackServers...)
 		slog.Warn("radio browser server discovery failed; using fallback", "error", err, "servers", discovered)
@@ -1285,7 +1597,24 @@ func cleanStations(stations []Station) []Station {
 		seen[station.StationUUID] = struct{}{}
 		result = append(result, station)
 	}
+	sortStationsByPopularity(result)
 	return result
+}
+
+func sortStationsByPopularity(stations []Station) {
+	sort.SliceStable(stations, func(i, j int) bool {
+		if stations[i].ClickCount != stations[j].ClickCount {
+			return stations[i].ClickCount > stations[j].ClickCount
+		}
+		if stations[i].Votes != stations[j].Votes {
+			return stations[i].Votes > stations[j].Votes
+		}
+		left, right := strings.ToLower(stations[i].DisplayName()), strings.ToLower(stations[j].DisplayName())
+		if left != right {
+			return left < right
+		}
+		return stations[i].StationUUID < stations[j].StationUUID
+	})
 }
 
 func cleanStation(station Station) Station {

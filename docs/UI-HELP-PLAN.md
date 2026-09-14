@@ -373,7 +373,7 @@ Library <- Settings <- Presets <- Help <- Library
 5. `Settings` — выбор и применение параметров;
 6. `Presets` — выбор и применение визуальных пресетов;
 7. `Formats` — поддерживаемые аудио и tracker-форматы;
-8. `Catalogs` — Modland и ModArchive;
+8. `Sources` — Local Music, Favorites, Downloads, Microphone, Radio, Modland и ModArchive;
 9. `Device` — PortMaster, desktop, разрешение и подключенный контроллер;
 10. `About` — проект и автор.
 
@@ -713,7 +713,7 @@ Footer должен иметь собственную вычисляемую в�
 значение false. При смене подключения контроллера отображаемая кнопка меняется.
 
 Help: Getting Started → Controls → Playback → Quality and Battery → Troubleshooting
-→ Catalogs → Formats → Device → About → Licenses. Getting Started объясняет
+→ Sources → Formats → Device → About → Licenses. Getting Started объясняет
 первый сценарий без повторения подробного mapping из Controls. Положение темы относится
 только к текущему сеансу; HelpTopicID соответствует индексу в embedded JSON.
 
@@ -732,5 +732,11 @@ Settings показывает пояснения выбранного значе
 
 Device info собирается только при первом открытии темы и кешируется. Источники
 по приоритету: PortMaster environment, известные CFW/device-tree файлы, затем
-существующие SDL/OpenGL/runtime probes. Catalogs показывает числа playable
-tracks и folders непосредственно из metadata лениво открытых shuffle indexes.
+существующие SDL/OpenGL/runtime probes. Sources показывает доступные способы
+получения звука: локальные файлы, избранное, загрузки, микрофон, радио, Modland
+и ModArchive. Для Modland и ModArchive числа playable tracks и folders
+берутся непосредственно из metadata лениво открытых shuffle indexes.
+
+`Sources` объединяет пользовательские точки входа в звук в одной теме. `Formats`
+остаётся отдельной темой: она отвечает на вопрос, какие типы файлов и трекерные
+форматы умеет проигрывать приложение, а `Sources` — откуда берётся звук.

@@ -6,7 +6,7 @@ import "strings"
 func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY, panelH, lh int) {
 	maxTextW := o.availableRowTextWidth(panelW)
 	topic := o.helpTopic(HelpTopicID(o.helpView.TopicCursor))
-	if topic.ID == HelpCatalogs && o.catalogInfoProvider != nil {
+	if topic.ID == HelpSources && o.catalogInfoProvider != nil {
 		if info := o.catalogInfoProvider(); info != o.catalogInfo {
 			o.catalogInfo = info
 			o.helpDirty = true

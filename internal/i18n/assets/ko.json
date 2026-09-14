@@ -115,7 +115,7 @@
   "info.bpm": "BPM: %.0f",
   "info.comment": "설명:",
   "radio.popular": "인기",
-  "radio.random": "무작위",
+  "radio.random": "무작위 라디오 방송국",
   "radio.by_tag": "태그별",
   "radio.by_language": "언어별",
   "radio.by_country": "국가별",

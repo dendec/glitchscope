@@ -115,7 +115,7 @@
   "info.bpm": "BPM: %.0f",
   "info.comment": "ความคิดเห็น:",
   "radio.popular": "ยอดนิยม",
-  "radio.random": "สุ่ม",
+  "radio.random": "สถานีวิทยุแบบสุ่ม",
   "radio.by_tag": "ตามแท็ก",
   "radio.by_language": "ตามภาษา",
   "radio.by_country": "ตามประเทศ",

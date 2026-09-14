@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -184,8 +186,8 @@ func TestClientMarkDeadRemovesCachedStation(t *testing.T) {
 		Stations: []Station{station},
 	}
 	client.MarkDead(station.Path())
-	if _, ok := client.Lookup(station.Path()); !ok {
-		t.Fatal("failed station metadata must remain available for manual retry and favorites")
+	if _, ok := client.Lookup(station.Path()); ok {
+		t.Fatal("failed station metadata remains in cache")
 	}
 	stations, stale := client.Snapshot(BrowsePopular, "")
 	if len(stations) != 0 {
@@ -199,15 +201,35 @@ func TestClientMarkDeadRemovesCachedStation(t *testing.T) {
 func TestClientLoadsCachedFilterValues(t *testing.T) {
 	dir := t.TempDir()
 	client := New(dir)
-	cache := valueCache{Version: cacheVersion, FetchedAt: time.Now(), Values: []string{"rock", "jazz"}}
+	cache := valueCache{Version: cacheVersion, FetchedAt: time.Now(), Values: []string{"rock", "jazz"}, Counts: map[string]int{"rock": 123}}
 	client.saveValues(BrowseTag, cache)
 	client.Close()
 
 	reloaded := New(dir)
 	t.Cleanup(reloaded.Close)
 	values, stale := reloaded.Values(BrowseTag)
-	if stale || !reflect.DeepEqual(values, []string{"jazz", "rock"}) {
+	if stale || !reflect.DeepEqual(values, []string{"rock", "jazz"}) {
 		t.Fatalf("cached values = %#v, stale=%v", values, stale)
+	}
+	if counts := reloaded.ValueCounts(BrowseTag); counts["rock"] != 123 || counts["jazz"] != 0 {
+		t.Fatalf("cached value counts = %#v", counts)
+	}
+}
+
+func TestFetchValueCountsAcceptsStringAndNumber(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/json/tags" || r.URL.Query().Get("limit") != "250" {
+			t.Fatalf("value request = %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = io.WriteString(w, `[{"name":"rock","stationcount":"123"},{"name":"jazz","stationcount":7}]`)
+	}))
+	defer server.Close()
+	client := New(t.TempDir())
+	client.servers = []string{server.URL}
+	t.Cleanup(client.Close)
+	values, counts, err := client.fetchValuesWithCounts(context.Background(), BrowseTag)
+	if err != nil || !reflect.DeepEqual(values, []string{"rock", "jazz"}) || counts["rock"] != 123 || counts["jazz"] != 7 {
+		t.Fatalf("values = %#v, counts = %#v, err = %v", values, counts, err)
 	}
 }
 
@@ -268,7 +290,7 @@ func TestClientRemembersRadioQueueAcrossRestart(t *testing.T) {
 
 	client := New(dir)
 	client.AddStations(stations)
-	client.RememberQueue(stations[0].Path(), []string{stations[0].Path(), stations[1].Path()})
+	client.RememberQueueInBrowse(stations[0].Path(), []string{stations[0].Path(), stations[1].Path()}, BrowseTag, "rock")
 	client.Close()
 
 	reloaded := New(dir)
@@ -276,6 +298,9 @@ func TestClientRemembersRadioQueueAcrossRestart(t *testing.T) {
 	queue := reloaded.LastQueue(stations[0].Path())
 	if len(queue) != len(stations) || queue[1].Path() != stations[1].Path() {
 		t.Fatalf("remembered queue = %#v, want %#v", queue, stations)
+	}
+	if kind, filter, ok := reloaded.LastBrowse(stations[0].Path()); !ok || kind != BrowseTag || filter != "rock" {
+		t.Fatalf("remembered browse context = %q/%q/%v, want tag/rock/true", kind, filter, ok)
 	}
 }
 
@@ -299,6 +324,77 @@ func TestBeginDoesNotWaitForSlowServer(t *testing.T) {
 	close(release)
 }
 
+func TestPopularQueryHidesBrokenStations(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/json/stations/search" || r.URL.Query().Get("order") != "clickcount" || r.URL.Query().Get("reverse") != "true" || r.URL.Query().Get("offset") != "0" || r.URL.Query().Get("limit") != "100" || r.URL.Query().Get("hidebroken") != "true" {
+			t.Fatalf("popular request = %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = io.WriteString(w, "[]")
+	}))
+	defer server.Close()
+
+	client := New(t.TempDir())
+	client.servers = []string{server.URL}
+	t.Cleanup(client.Close)
+	if stations, err := client.fetchStations(context.Background(), BrowsePopular, ""); err != nil || len(stations) != 0 {
+		t.Fatalf("fetchStations = %#v, %v; want empty result", stations, err)
+	}
+}
+
+func TestRandomQueryUsesCacheBuster(t *testing.T) {
+	var query string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query = r.URL.RawQuery
+		_, _ = io.WriteString(w, `[{"stationuuid":"random","url":"https://random.example","lastcheckok":1}]`)
+	}))
+	defer server.Close()
+
+	client := New(t.TempDir())
+	client.servers = []string{server.URL}
+	t.Cleanup(client.Close)
+	if _, err := client.fetchStations(context.Background(), BrowseRandom, ""); err != nil {
+		t.Fatal(err)
+	}
+	values := strings.Split(query, "&")
+	if !slices.ContainsFunc(values, func(value string) bool { return strings.HasPrefix(value, "cachebust=") }) {
+		t.Fatalf("random query = %q, missing cachebust", query)
+	}
+}
+
+func TestRandomBeginReplacesPendingAction(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "[]")
+	}))
+	defer server.Close()
+
+	client := New(t.TempDir())
+	client.servers = []string{server.URL}
+	defer client.Close()
+	key := queryKey(BrowseRandom, "")
+	oldCtx, oldCancel := context.WithCancel(context.Background())
+	defer oldCancel()
+	var canceled atomic.Bool
+	client.pending[key] = pendingRequest{id: 1, cancel: func() {
+		canceled.Store(true)
+		oldCancel()
+	}}
+	client.Begin(context.Background(), BrowseRandom, "")
+	if !canceled.Load() || oldCtx.Err() == nil {
+		t.Fatal("new random action did not cancel the pending action")
+	}
+}
+
+func TestStationListsSortByPopularity(t *testing.T) {
+	stations := cleanStations([]Station{
+		{StationUUID: "low", Name: "Low", URL: "https://low.example", ClickCount: 2, LastCheckOK: 1},
+		{StationUUID: "high", Name: "High", URL: "https://high.example", ClickCount: 20, LastCheckOK: 1},
+		{StationUUID: "middle", Name: "Middle", URL: "https://middle.example", ClickCount: 10, LastCheckOK: 1},
+	})
+	if got := []string{stations[0].StationUUID, stations[1].StationUUID, stations[2].StationUUID}; !reflect.DeepEqual(got, []string{"high", "middle", "low"}) {
+		t.Fatalf("station order = %#v, want high-to-low popularity", got)
+	}
+}
+
 func TestPollDiscardsStaleRadioResult(t *testing.T) {
 	client := New(t.TempDir())
 	t.Cleanup(client.Close)
@@ -306,9 +402,56 @@ func TestPollDiscardsStaleRadioResult(t *testing.T) {
 	client.results <- result{id: 1, kind: BrowsePopular}
 	client.results <- result{id: 2, kind: BrowsePopular, err: errors.New("current request failed")}
 
-	kind, _, _, _, err, ok := client.Poll()
+	kind, _, _, _, _, err, ok := client.Poll()
 	if !ok || kind != BrowsePopular || err == nil {
 		t.Fatalf("Poll returned kind=%q err=%v ok=%v, want current error result", kind, err, ok)
+	}
+}
+
+func TestStationPaginationAppendsAndPersistsCursor(t *testing.T) {
+	client := New(t.TempDir())
+	t.Cleanup(client.Close)
+	key := queryKey(BrowsePopular, "")
+	client.queries[key] = queryCache{
+		Version:    cacheVersion,
+		Stations:   []Station{{StationUUID: "one", URL: "https://one.example"}},
+		NextOffset: 100,
+		HasMore:    true,
+	}
+	if offset, ok := client.NextPage(BrowsePopular, ""); !ok || offset != 100 {
+		t.Fatalf("NextPage = %d, %v; want 100, true", offset, ok)
+	}
+	client.activeID = 1
+	client.results <- result{
+		id:         1,
+		key:        key,
+		kind:       BrowsePopular,
+		offset:     100,
+		nextOffset: 200,
+		stations:   []Station{{StationUUID: "two", URL: "https://two.example"}},
+	}
+	_, _, stations, _, _, err, ok := client.Poll()
+	if !ok || err != nil || len(stations) != 2 || stations[1].StationUUID != "two" {
+		t.Fatalf("appended stations = %#v, err=%v, ok=%v", stations, err, ok)
+	}
+	if offset, ok := client.NextPage(BrowsePopular, ""); ok || offset != 0 {
+		t.Fatalf("NextPage after page without hasMore = %d, %v; want 0, false", offset, ok)
+	}
+}
+
+func TestRandomResultIsNotCached(t *testing.T) {
+	client := New(t.TempDir())
+	t.Cleanup(client.Close)
+	key := queryKey(BrowseRandom, "")
+	client.activeID = 1
+	station := Station{StationUUID: "random", URL: "https://random.example"}
+	client.results <- result{id: 1, key: key, kind: BrowseRandom, stations: []Station{station}}
+	_, _, stations, _, _, err, ok := client.Poll()
+	if !ok || err != nil || len(stations) != 1 || stations[0].StationUUID != station.StationUUID {
+		t.Fatalf("random result = %#v, err=%v, ok=%v", stations, err, ok)
+	}
+	if stations, _ := client.Snapshot(BrowseRandom, ""); stations != nil {
+		t.Fatal("random result was written to query cache")
 	}
 }
 
@@ -430,6 +573,39 @@ func TestImportedStationsSurviveExitOnAnotherSource(t *testing.T) {
 		if _, ok := restored.Lookup("radio:" + id); !ok {
 			t.Fatalf("lost imported favorite %s", id)
 		}
+	}
+}
+
+func TestTransientStationsAreNotPersistedAsImported(t *testing.T) {
+	dir := t.TempDir()
+	client := New(dir)
+	station := Station{StationUUID: "random", URL: "https://random.example/stream"}
+	client.AddTransientStations([]Station{station})
+	client.Close()
+
+	reloaded := New(dir)
+	t.Cleanup(reloaded.Close)
+	if _, ok := reloaded.Lookup(station.Path()); ok {
+		t.Fatal("transient station was persisted")
+	}
+}
+
+func TestTransientStationsDoNotLeakIntoLaterImportedCache(t *testing.T) {
+	dir := t.TempDir()
+	client := New(dir)
+	transient := Station{StationUUID: "random", URL: "https://random.example/stream"}
+	imported := Station{StationUUID: "playlist", URL: "https://playlist.example/stream"}
+	client.AddTransientStations([]Station{transient})
+	client.AddStations([]Station{imported})
+	client.Close()
+
+	reloaded := New(dir)
+	t.Cleanup(reloaded.Close)
+	if _, ok := reloaded.Lookup(transient.Path()); ok {
+		t.Fatal("transient station leaked into imported cache")
+	}
+	if _, ok := reloaded.Lookup(imported.Path()); !ok {
+		t.Fatal("imported station was not persisted")
 	}
 }
 

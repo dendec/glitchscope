@@ -177,8 +177,49 @@
   },
   {
     "id": 5,
-    "title": "Kataloglar",
+    "title": "Kaynaklar",
     "children": [
+      {
+        "title": "Yerel müzik",
+        "lines": [
+          "**Yerel dosyaları çal**",
+          "Cihazdaki klasörleri açın ve desteklenen ses ile tracker dosyalarını çalın.",
+          "Oynatma ağ bağlantısı olmadan çalışır."
+        ]
+      },
+      {
+        "title": "Favoriler",
+        "lines": [
+          "**Parçaları sakla**",
+          "Parçaları Yıldız, Kalp veya Nota listelerine ekleyin.",
+          "Favoriler Library'de bulunur ve indirilen parçaları otomatik temizlemeden korur."
+        ]
+      },
+      {
+        "title": "İndirilenler",
+        "lines": [
+          "**Çevrimdışı kopyalar**",
+          "Uzak kaynaklardan indirilen parçaları açın.",
+          "İndirilen parçalar internetsiz çalınabilir ve Downloads'tan silinebilir."
+        ]
+      },
+      {
+        "title": "Mikrofon",
+        "lines": [
+          "**Canlı giriş**",
+          "Canlı sesi görselleştiriciye göndermek için sistem mikrofonu seçin.",
+          "Mikrofon yakalama oynatmayı durdurur ve sesi hoparlörlere göndermez."
+        ]
+      },
+      {
+        "title": "Radyo",
+        "lines": [
+          "**İnternet radyosu**",
+          "Popüler istasyonları açın veya etiket, dil ve ülkeye göre filtreleyin.",
+          "İstasyon listeleri 30 gün önbelleğe alınır ve kaydırdıkça yeni satırlar yüklenir.",
+          "Radyo ağ bağlantısı ister; dizin çevrimiçi olsa bile akış başarısız olabilir."
+        ]
+      },
       {
         "title": "Modland",
         "lines": [

@@ -115,7 +115,7 @@
   "info.bpm": "BPM : %.0f",
   "info.comment": "Commentaire :",
   "radio.popular": "Populaires",
-  "radio.random": "Aléatoires",
+  "radio.random": "Station aléatoire",
   "radio.by_tag": "Par mot-clé",
   "radio.by_language": "Par langue",
   "radio.by_country": "Par pays",

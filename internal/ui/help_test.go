@@ -21,8 +21,14 @@ func TestHelpTopicsLoadFromAsset(t *testing.T) {
 	if helpTopics[HelpQuickStart].Title != "Getting Started" || len(helpTopics[HelpQuickStart].Lines) == 0 {
 		t.Fatalf("Getting Started topic was not loaded from asset: %+v", helpTopics[HelpQuickStart])
 	}
-	if len(helpTopics[HelpFormats].Children) != 3 || len(helpTopics[HelpCatalogs].Children) != 2 {
-		t.Fatalf("hierarchical Help entries were not loaded: formats=%d catalogs=%d", len(helpTopics[HelpFormats].Children), len(helpTopics[HelpCatalogs].Children))
+	if len(helpTopics[HelpFormats].Children) != 3 || len(helpTopics[HelpSources].Children) != 7 {
+		t.Fatalf("hierarchical Help entries were not loaded: formats=%d sources=%d", len(helpTopics[HelpFormats].Children), len(helpTopics[HelpSources].Children))
+	}
+	wantSources := []string{"Local Music", "Favorites", "Downloads", "Microphone", "Radio", "Modland", "ModArchive"}
+	for i, want := range wantSources {
+		if got := helpTopics[HelpSources].Children[i].Title; got != want {
+			t.Fatalf("source Help entry %d = %q, want %q", i, got, want)
+		}
 	}
 	if len(helpTopics[HelpLicenses].Children) != 23 {
 		t.Fatalf(" Licenses children = %d, want 23", len(helpTopics[HelpLicenses].Children))
@@ -232,14 +238,14 @@ func TestHelpBackReturnsToLibrary(t *testing.T) {
 	}
 }
 
-func TestCatalogHelpUsesRuntimeCounts(t *testing.T) {
+func TestSourcesHelpUsesRuntimeCounts(t *testing.T) {
 	o := &Overlay{catalogInfo: CatalogInfo{
 		ModlandTracks:         123456,
 		ModlandDirectories:    789,
 		ModArchiveTracks:      4567,
 		ModArchiveDirectories: 89,
 	}}
-	text := strings.Join(o.helpLines(HelpTopic{Lines: helpTopic(HelpCatalogs).Children[0].Lines}), "\n")
+	text := strings.Join(o.helpLines(HelpTopic{Lines: helpTopic(HelpSources).Children[5].Lines}), "\n")
 	if !strings.Contains(text, "123,456") || !strings.Contains(text, "789") {
 		t.Fatalf("runtime catalog counts missing from %q", text)
 	}

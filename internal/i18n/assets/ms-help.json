@@ -177,8 +177,49 @@
   },
   {
     "id": 5,
-    "title": "Katalog",
+    "title": "Sumber",
     "children": [
+      {
+        "title": "Muzik tempatan",
+        "lines": [
+          "**Mainkan fail tempatan**",
+          "Semak folder pada peranti dan mainkan fail audio serta tracker yang disokong.",
+          "Main balik berfungsi tanpa sambungan rangkaian."
+        ]
+      },
+      {
+        "title": "Kegemaran",
+        "lines": [
+          "**Simpan trek pilihan**",
+          "Tambah trek ke senarai Star, Heart atau Note.",
+          "Kegemaran tersedia dalam Library dan melindungi muat turun daripada pembersihan."
+        ]
+      },
+      {
+        "title": "Muat turun",
+        "lines": [
+          "**Salinan luar talian**",
+          "Semak trek yang dimuat turun daripada sumber jauh.",
+          "Trek yang dimuat turun boleh dimainkan tanpa internet dan dipadam dari Downloads."
+        ]
+      },
+      {
+        "title": "Mikrofon",
+        "lines": [
+          "**Input langsung**",
+          "Pilih mikrofon sistem untuk menghantar audio langsung ke visualizer.",
+          "Rakaman mikrofon menghentikan main balik dan tidak dihantar ke pembesar suara."
+        ]
+      },
+      {
+        "title": "Radio",
+        "lines": [
+          "**Radio internet**",
+          "Semak stesen popular atau tapis mengikut tag, bahasa atau negara.",
+          "Senarai stesen dicache selama 30 hari dan memuatkan baris seterusnya semasa menatal.",
+          "Radio memerlukan rangkaian; aliran boleh gagal walaupun direktori dalam talian."
+        ]
+      },
       {
         "title": "Modland",
         "lines": [
