@@ -445,6 +445,7 @@ func (a *App) applySettings(winW, winH int) {
 	if filterIndex >= 0 && filterIndex < len(filters) {
 		a.settings.Graphics.UpscaleFilter = filters[filterIndex]
 		a.rt.SetNearest(a.settings.Graphics.UpscaleFilter.IsNearest())
+		a.pm.SetTransitionFilter(a.settings.Graphics.UpscaleFilter.IsNearest())
 	}
 
 	refreshRate := a.displayRefreshRate()

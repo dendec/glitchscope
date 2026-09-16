@@ -39,6 +39,7 @@ COPY patches/projectm-feedback.patch /build/patches/projectm-feedback.patch
 COPY patches/projectm-beat-sensitivity.patch /build/patches/projectm-beat-sensitivity.patch
 COPY patches/projectm-transition-shaders.patch /build/patches/projectm-transition-shaders.patch
 COPY patches/projectm-transition-framebuffer.patch /build/patches/projectm-transition-framebuffer.patch
+COPY patches/projectm-transition-filter.patch /build/patches/projectm-transition-filter.patch
 RUN cd lib/projectm \
     && if git apply --check /build/patches/projectm-feedback.patch >/dev/null 2>&1; then \
            git apply /build/patches/projectm-feedback.patch; \
@@ -67,6 +68,13 @@ RUN cd lib/projectm \
            :; \
        else \
            echo 'projectm-transition-framebuffer.patch does not apply' >&2; exit 1; \
+       fi \
+    && if git apply --check /build/patches/projectm-transition-filter.patch >/dev/null 2>&1; then \
+           git apply /build/patches/projectm-transition-filter.patch; \
+       elif git apply --reverse --check /build/patches/projectm-transition-filter.patch >/dev/null 2>&1; then \
+           :; \
+       else \
+           echo 'projectm-transition-filter.patch does not apply' >&2; exit 1; \
        fi \
     && sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
         config.h.cmake.in

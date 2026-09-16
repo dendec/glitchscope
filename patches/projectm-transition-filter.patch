@@ -1,0 +1,131 @@
+diff --git a/src/api/include/projectM-4/parameters.h b/src/api/include/projectM-4/parameters.h
+--- a/src/api/include/projectM-4/parameters.h
++++ b/src/api/include/projectM-4/parameters.h
+@@ -135,6 +135,14 @@ PROJECTM_EXPORT void projectm_set_soft_cut_duration(projectm_handle instance, do
+  */
+ PROJECTM_EXPORT double projectm_get_soft_cut_duration(projectm_handle instance);
+ 
++/**
++ * @brief Sets the texture filtering used while blending presets during a soft transition.
++ *
++ * @param instance The projectM instance handle.
++ * @param nearest If true, use nearest-neighbour filtering; otherwise use bilinear filtering.
++ */
++PROJECTM_EXPORT void projectm_set_preset_transition_filter(projectm_handle instance, bool nearest);
++
+ /**
+  * @brief Sets the preset display duration before switching to the next using a soft cut.
+  *
+diff --git a/src/libprojectM/ProjectM.cpp b/src/libprojectM/ProjectM.cpp
+--- a/src/libprojectM/ProjectM.cpp
++++ b/src/libprojectM/ProjectM.cpp
+@@ -272,7 +272,7 @@ void ProjectM::StartPresetTransition(std::unique_ptr<Preset>&& preset, bool hard
+     {
+         m_transitioningPreset = std::move(preset);
+         m_timeKeeper->StartSmoothing();
+-        m_transition = std::make_unique<Renderer::PresetTransition>(m_transitionShaderManager->RandomTransition(), m_softCutDuration);
++        m_transition = std::make_unique<Renderer::PresetTransition>(m_transitionShaderManager->RandomTransition(), m_softCutDuration, m_presetTransitionNearest);
+     }
+ }
+ 
+@@ -320,6 +320,15 @@ void ProjectM::SetSoftCutDuration(double seconds)
+     m_timeKeeper->ChangeSoftCutDuration(seconds);
+ }
+ 
++void ProjectM::SetPresetTransitionFilter(bool nearest)
++{
++    m_presetTransitionNearest = nearest;
++    if (m_transition)
++    {
++        m_transition->SetNearest(nearest);
++    }
++}
++
+ auto ProjectM::HardCutDuration() const -> double
+ {
+     return m_hardCutDuration;
+diff --git a/src/libprojectM/ProjectM.hpp b/src/libprojectM/ProjectM.hpp
+--- a/src/libprojectM/ProjectM.hpp
++++ b/src/libprojectM/ProjectM.hpp
+@@ -113,6 +113,8 @@ public:
+ 
+     void SetSoftCutDuration(double seconds);
+ 
++    void SetPresetTransitionFilter(bool nearest);
++
+     auto HardCutDuration() const -> double;
+ 
+     void SetHardCutDuration(double seconds);
+@@ -196,6 +198,7 @@ private:
+     double m_hardCutDuration{20.0};  //!< Time after which a hard cut can happen at the earliest.
+     bool m_hardCutEnabled{false};    //!< If true, hard cuts based on beat detection are enabled.
+     float m_hardCutSensitivity{2.0}; //!< Loudness sensitivity value for hard cuts.
++    bool m_presetTransitionNearest{false}; //!< If true, soft transitions use nearest-neighbour filtering.
+     float m_beatSensitivity{1.0};    //!< General beat sensitivity modifier for presets.
+     bool m_aspectCorrection{true};   //!< If true, corrects aspect ratio for non-rectangular windows.
+     float m_easterEgg{1.0};          //!< Random preset duration modifier. See TimeKeeper class.
+diff --git a/src/libprojectM/ProjectMCWrapper.cpp b/src/libprojectM/ProjectMCWrapper.cpp
+--- a/src/libprojectM/ProjectMCWrapper.cpp
++++ b/src/libprojectM/ProjectMCWrapper.cpp
+@@ -237,6 +237,12 @@ void projectm_set_soft_cut_duration(projectm_handle instance, double seconds)
+     projectMInstance->SetSoftCutDuration(seconds);
+ }
+ 
++void projectm_set_preset_transition_filter(projectm_handle instance, bool nearest)
++{
++    auto projectMInstance = handle_to_instance(instance);
++    projectMInstance->SetPresetTransitionFilter(nearest);
++}
++
+ double projectm_get_preset_duration(projectm_handle instance)
+ {
+     auto projectMInstance = handle_to_instance(instance);
+diff --git a/src/libprojectM/Renderer/PresetTransition.cpp b/src/libprojectM/Renderer/PresetTransition.cpp
+--- a/src/libprojectM/Renderer/PresetTransition.cpp
++++ b/src/libprojectM/Renderer/PresetTransition.cpp
+@@ -11,8 +11,9 @@ namespace Renderer {
+ 
+ constexpr double PI = 3.14159265358979323846;
+ 
+-PresetTransition::PresetTransition(const std::shared_ptr<Shader>& transitionShader, double durationSeconds)
++PresetTransition::PresetTransition(const std::shared_ptr<Shader>& transitionShader, double durationSeconds, bool nearest)
+     : m_transitionShader(transitionShader)
++    , m_presetSampler(std::make_shared<Sampler>(GL_CLAMP_TO_EDGE, nearest ? GL_NEAREST : GL_LINEAR))
+     , m_durationSeconds(durationSeconds)
+ {
+     std::mt19937 rand32(m_randomDevice());
+@@ -21,6 +22,11 @@ PresetTransition::PresetTransition(const std::shared_ptr<Shader>& transitionShad
+     RenderItem::Init();
+ }
+ 
++void PresetTransition::SetNearest(bool nearest)
++{
++    m_presetSampler->FilterMode(nearest ? GL_NEAREST : GL_LINEAR);
++}
++
+ void PresetTransition::InitVertexAttrib()
+ {
+     static const std::array<RenderItem::Point, 4> points{{{-1.0f, 1.0f},
+diff --git a/src/libprojectM/Renderer/PresetTransition.hpp b/src/libprojectM/Renderer/PresetTransition.hpp
+--- a/src/libprojectM/Renderer/PresetTransition.hpp
++++ b/src/libprojectM/Renderer/PresetTransition.hpp
+@@ -22,7 +22,9 @@ class PresetTransition : public RenderItem
+ public:
+     PresetTransition() = delete;
+ 
+-    explicit PresetTransition(const std::shared_ptr<Shader>& transitionShader, double durationSeconds);
++    explicit PresetTransition(const std::shared_ptr<Shader>& transitionShader, double durationSeconds, bool nearest);
++
++    void SetNearest(bool nearest);
+ 
+     void InitVertexAttrib() override;
+ 
+@@ -57,7 +59,7 @@ private:
+                                                  "pw_noisevol_hq"}; //!< Names of noise textures to retrieve from TextureManager.
+ 
+     std::shared_ptr<Shader> m_transitionShader;                                                       //!< The compiled shader used for this transition.
+-    std::shared_ptr<Sampler> m_presetSampler{std::make_shared<Sampler>(GL_CLAMP_TO_EDGE, GL_LINEAR)}; //!< Sampler for preset textures. Uses bilinear interpolation and no repeat.
++    std::shared_ptr<Sampler> m_presetSampler;                                                          //!< Sampler for preset textures. Uses the configured filter and no repeat.
+ 
+     double m_durationSeconds{3.0};                                                                              //!< Transition duration in seconds.
+     std::chrono::time_point<std::chrono::system_clock> m_transitionStartTime{std::chrono::system_clock::now()}; //!< Start time of this transition. Duration is measured from this point.

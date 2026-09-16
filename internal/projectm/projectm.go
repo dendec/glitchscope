@@ -9,6 +9,7 @@ package projectm
 
 extern void pmvProjectMPresetSwitchRequested(bool isHardCut);
 extern void projectm_opengl_bind_feedback_framebuffer(projectm_handle instance);
+extern void projectm_set_preset_transition_filter(projectm_handle instance, bool nearest);
 
 static void pmvPresetSwitchRequested(bool isHardCut, void* userData) {
 	(void)userData;
@@ -118,6 +119,11 @@ func (h *Handle) BindFeedbackFramebuffer() {
 // SetSoftCutDuration sets the transition duration for smooth preset cuts.
 func (h *Handle) SetSoftCutDuration(seconds float64) {
 	C.projectm_set_soft_cut_duration(h.p, C.double(seconds))
+}
+
+// SetTransitionFilter controls interpolation while projectM blends presets.
+func (h *Handle) SetTransitionFilter(nearest bool) {
+	C.projectm_set_preset_transition_filter(h.p, C.bool(nearest))
 }
 
 // SetHardCutEnabled enables or disables beat-driven preset switch requests.

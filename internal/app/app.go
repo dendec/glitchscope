@@ -233,6 +233,7 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	pm.SetWindowSize(renderW, renderH)
 	rt := projectm.NewRenderTarget(renderW, renderH)
 	rt.SetNearest(gs.Graphics.UpscaleFilter.IsNearest())
+	pm.SetTransitionFilter(gs.Graphics.UpscaleFilter.IsNearest())
 	a.rt = rt
 	a.settings = &gs
 	a.setVisualizerFPS(gs.Graphics.FrameRate.Target(refreshRate))
