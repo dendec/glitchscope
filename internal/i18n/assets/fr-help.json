@@ -101,17 +101,16 @@
     "id": 2
   },
   {
-    "title": "Qualité et batterie",
+    "title": "Fréquence d’images et résolution",
     "children": [
       {
-        "title": "Qualité",
+        "title": "Réglages du visualiseur",
         "lines": [
-          "Ultra : utilise directement la résolution choisie sans limite artificielle de FPS ; le taux de rafraîchissement est la limite supérieure.",
-          "Performance : rendu détaillé à 30 images/s ; la résolution peut baisser automatiquement sous charge.",
-          "Équilibré : équilibre entre qualité et autonomie à 25 images/s ; la résolution peut baisser automatiquement sous charge.",
-          "Éco : cible de 20 images/s pour économiser l’énergie ; la résolution peut baisser automatiquement sous charge.",
-          "La résolution choisie est le plafond adaptatif dans les modes Performance, Équilibré et Éco. Ultra l’utilise directement.",
-          "Priorité aux FPS : réduire d’abord la résolution (moitié par dimension en Performance/Équilibré, quart en Éco). Sans amélioration, restaurer la résolution et réduire les FPS. Les FPS ne baissent que si la cadence prévue ne peut être maintenue ; dépasser le budget d’économie seul ne réduit pas les FPS."
+          "La fréquence d’images choisit une limite fixe inférieure au rafraîchissement actif, ou Max (le rafraîchissement actif).",
+          "La résolution adaptative réduit ou restaure la taille de l’image pour se rapprocher de cette cible.",
+          "La résolution est la taille maximale lorsque l’adaptation est activée et la taille fixe lorsqu’elle est désactivée.",
+          "Max affiche le rafraîchissement actif ; une limite numérique identique est masquée pour éviter les doublons.",
+          "Si le préréglage est trop complexe même au niveau minimal, les FPS réels peuvent rester inférieurs à la cible."
         ]
       },
       {
@@ -952,7 +951,7 @@
       "Reproduisez des fichiers audio locaux, des modules tracker ainsi que des formats de musique de jeux classiques, ou explorez les catalogues Modland et ModArchive.",
       "Les effets visuels sont générés par projectM. La lecture audio est décodée par des moteurs open source spécialisés choisis en fonction de chaque format.",
       "",
-      "Les modes Performance, Équilibré et Éco adaptent la qualité visuelle en fonction du dispositif. Le visualiseur peut également être désactivé pour une lecture uniquement audio.",
+      "Choisissez une cible de fréquence d’images et une limite de résolution adaptative indépendante. Le visualiseur peut aussi être désactivé pour écouter uniquement la musique.",
       "",
       "**Projet**",
       "https://github.com/dendec/glitchscope",

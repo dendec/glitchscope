@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,6 +12,76 @@ func TestDefaultGraphicsValid(t *testing.T) {
 	d := DefaultGraphics()
 	if err := d.Validate(); err != nil {
 		t.Fatal("default validation:", err)
+	}
+	if d.FrameRate != FrameRateMax || !d.Adaptive {
+		t.Fatalf("defaults = frame rate %v adaptive=%v, want Max and enabled", d.FrameRate, d.Adaptive)
+	}
+}
+
+func TestFrameRateChoicesAndEncoding(t *testing.T) {
+	want := []FrameRate{FrameRate15, FrameRate20, FrameRate25, FrameRate30, FrameRate40, FrameRate50, FrameRate60, FrameRateMax}
+	got := AllFrameRates()
+	if len(got) != len(want) {
+		t.Fatalf("frame-rate choices = %v, want %v", got, want)
+	}
+	for i, rate := range want {
+		if got[i] != rate || got[i].Validate() != nil {
+			t.Fatalf("choice %d = %v", i, got[i])
+		}
+		data, err := json.Marshal(rate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var decoded FrameRate
+		if err := json.Unmarshal(data, &decoded); err != nil || decoded != rate {
+			t.Fatalf("round trip %v: data=%s decoded=%v err=%v", rate, data, decoded, err)
+		}
+	}
+	if FrameRateMax.Target(120) != 120 || FrameRateMax.Target(0) != 60 || FrameRate30.Target(120) != 30 {
+		t.Fatal("frame-rate target resolution is incorrect")
+	}
+}
+
+func TestDynamicFrameRateChoices(t *testing.T) {
+	tests := []struct {
+		refresh int32
+		want    []FrameRate
+	}{
+		{refresh: 60, want: []FrameRate{FrameRate15, FrameRate20, FrameRate25, FrameRate30, FrameRate40, FrameRate50, FrameRateMax}},
+		{refresh: 75, want: []FrameRate{FrameRate15, FrameRate20, FrameRate25, FrameRate30, FrameRate40, FrameRate50, FrameRate60, FrameRateMax}},
+		{refresh: 120, want: []FrameRate{FrameRate15, FrameRate20, FrameRate25, FrameRate30, FrameRate40, FrameRate50, FrameRate60, FrameRateMax}},
+		{refresh: 0, want: []FrameRate{FrameRate15, FrameRate20, FrameRate25, FrameRate30, FrameRate40, FrameRate50, FrameRateMax}},
+		{refresh: -1, want: []FrameRate{FrameRate15, FrameRate20, FrameRate25, FrameRate30, FrameRate40, FrameRate50, FrameRateMax}},
+	}
+	for _, tt := range tests {
+		got := FrameRateChoices(tt.refresh)
+		if len(got) != len(tt.want) {
+			t.Fatalf("refresh %d: choices=%v, want %v", tt.refresh, got, tt.want)
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Fatalf("refresh %d: choice %d=%v, want %v", tt.refresh, i, got[i], tt.want[i])
+			}
+		}
+	}
+}
+
+func TestNormalizeFrameRateForDisplay(t *testing.T) {
+	tests := []struct {
+		name    string
+		rate    FrameRate
+		refresh int32
+		want    FrameRate
+	}{
+		{name: "equal refresh", rate: FrameRate60, refresh: 60, want: FrameRate60},
+		{name: "above refresh", rate: FrameRate60, refresh: 50, want: FrameRateMax},
+		{name: "below refresh", rate: FrameRate50, refresh: 60, want: FrameRate50},
+		{name: "max", rate: FrameRateMax, refresh: 60, want: FrameRateMax},
+	}
+	for _, tt := range tests {
+		if got := NormalizeFrameRate(tt.rate, tt.refresh); got != tt.want {
+			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
+		}
 	}
 }
 
@@ -24,6 +95,7 @@ func TestGraphicsValidate(t *testing.T) {
 		{"zero width", GraphicsSettings{RenderWidth: 0, RenderHeight: 240, UpscaleFilter: FilterPixel}, false},
 		{"zero height", GraphicsSettings{RenderWidth: 320, RenderHeight: 0, UpscaleFilter: FilterPixel}, false},
 		{"bad filter", GraphicsSettings{RenderWidth: 320, RenderHeight: 240, UpscaleFilter: 99}, false},
+		{"bad frame rate", GraphicsSettings{RenderWidth: 320, RenderHeight: 240, UpscaleFilter: FilterPixel, FrameRate: 27}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -346,6 +418,45 @@ func TestLoadSettingsAdaptiveFalseOmitted(t *testing.T) {
 	}
 }
 
+func TestLoadSettingsMigratesLegacyPerformanceMode(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	data := `{"graphics":{"performance_mode":"Eco","render_width":640,"render_height":360}}`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := LoadSettings(path)
+	if err != nil {
+		t.Fatal("load:", err)
+	}
+	if settings.Graphics.FrameRate != FrameRate20 || !settings.Graphics.Adaptive {
+		t.Fatalf("legacy Eco migration = frame rate %v adaptive=%v", settings.Graphics.FrameRate, settings.Graphics.Adaptive)
+	}
+
+	data = `{"graphics":{"performance_mode":"Ultra","render_width":640,"render_height":360}}`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	settings, err = LoadSettings(path)
+	if err != nil {
+		t.Fatal("load Ultra:", err)
+	}
+	if settings.Graphics.FrameRate != FrameRateMax || settings.Graphics.Adaptive {
+		t.Fatalf("legacy Ultra migration = frame rate %v adaptive=%v", settings.Graphics.FrameRate, settings.Graphics.Adaptive)
+	}
+}
+
+func TestLoadSettingsRejectsUnknownLegacyPerformanceMode(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	if err := os.WriteFile(path, []byte(`{"graphics":{"performance_mode":"Turbo"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadSettings(path); err == nil {
+		t.Fatal("unknown legacy performance mode was accepted")
+	}
+}
+
 func TestLoadSettingsPartial(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "settings.json")
@@ -393,55 +504,38 @@ func TestSaveAtomic(t *testing.T) {
 	}
 }
 
-func TestPerformanceModeRoundTrip(t *testing.T) {
-	for _, m := range AllPerformanceModes() {
-		b, err := json.Marshal(m)
-		if err != nil {
-			t.Fatalf("marshal %v: %v", m, err)
-		}
-		var got PerformanceMode
-		if err := json.Unmarshal(b, &got); err != nil {
-			t.Fatalf("unmarshal %s: %v", b, err)
-		}
-		if got != m {
-			t.Fatalf("round trip: got %v, want %v", got, m)
-		}
-	}
-}
-
-func TestPerformanceModeInvalid(t *testing.T) {
-	var m PerformanceMode
-	if err := json.Unmarshal([]byte(`"Turbo"`), &m); err == nil {
-		t.Fatal("expected error for invalid mode")
-	}
-}
-
-func TestPerformanceModeParams(t *testing.T) {
-	for _, m := range AllPerformanceModes() {
-		p := m.Params()
-		if p.VisualizerFPS <= 0 {
-			t.Fatalf("%v: VisualizerFPS = %d, want > 0", m, p.VisualizerFPS)
-		}
-		if m != PerfModeUltra && (p.UtilizationLow <= 0 || p.UtilizationLow >= p.UtilizationHigh || p.UtilizationHigh >= 1) {
-			t.Fatalf("%v: invalid utilization band %v..%v", m, p.UtilizationLow, p.UtilizationHigh)
-		}
-	}
-}
-
-func TestPerformanceModeJSONInSettings(t *testing.T) {
+func TestFrameRateJSONInSettings(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "settings.json")
 	s := DefaultSettings()
-	s.Graphics.PerformanceMode = PerfModeEco
+	s.Graphics.FrameRate = FrameRate20
+	s.Graphics.Adaptive = true
 	if err := SaveSettings(p, s); err != nil {
 		t.Fatal(err)
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) == "" || !json.Valid(data) || !bytes.Contains(data, []byte(`"frame_rate":"20"`)) {
+		t.Fatalf("settings did not use frame_rate schema: %s", data)
+	}
+	if bytes.Contains(data, []byte(`performance_mode`)) {
+		t.Fatalf("legacy performance_mode leaked into new settings: %s", data)
 	}
 	got, err := LoadSettings(p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Graphics.PerformanceMode != PerfModeEco {
-		t.Fatalf("got %v, want Eco", got.Graphics.PerformanceMode)
+	if got.Graphics.FrameRate != FrameRate20 || !got.Graphics.Adaptive {
+		t.Fatalf("got frame rate %v adaptive=%v", got.Graphics.FrameRate, got.Graphics.Adaptive)
+	}
+	if err := os.WriteFile(p, []byte(`{"graphics":{"frame_rate":60}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err = LoadSettings(p)
+	if err != nil || got.Graphics.FrameRate != FrameRate60 {
+		t.Fatalf("numeric frame-rate compatibility: got=%v err=%v", got.Graphics.FrameRate, err)
 	}
 }
 

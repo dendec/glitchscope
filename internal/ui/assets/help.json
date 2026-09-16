@@ -8,7 +8,7 @@
       "",
       "**Enjoy the visualizer**",
       "Close the menu after playback starts.",
-      "Use Presets to choose a visual style and Settings to balance quality, speed and battery life.",
+      "Use Presets to choose a visual style and Settings to choose frame rate and resolution behavior.",
       "",
       "The footer always shows the actions available for the current selection."
     ],
@@ -101,17 +101,16 @@
     "id": 2
   },
   {
-    "title": "Quality and Battery",
+    "title": "Frame rate and resolution",
     "children": [
       {
-        "title": "Quality",
+        "title": "Visualizer settings",
         "lines": [
-          "Ultra: Uses the selected resolution directly, with no artificial FPS cap; the display refresh rate is the upper limit.",
-          "High: Rich visual detail at a target of 30 FPS; resolution may lower automatically under load.",
-          "Balanced: A balance of detail and battery life, targeting 25 FPS; resolution may lower automatically under load.",
-          "Eco: A 20 FPS target to save power; resolution may lower automatically under load.",
-          "The selected resolution is the adaptive ceiling in High, Balanced and Eco. Ultra uses it directly.",
-          "FPS has priority: try lowering resolution first (half per dimension in High/Balanced, one quarter in Eco). If this does not help, restore resolution and lower FPS. FPS is lowered only when the scheduled cadence cannot be sustained; exceeding the power-saving budget alone does not lower FPS."
+          "Frame rate selects a fixed cap below the active display refresh, or Max (the active refresh rate).",
+          "Adaptive resolution lowers or restores the image size to approach that target.",
+          "Resolution is the maximum size when adaptation is on, and the fixed size when it is off.",
+          "Max is shown with the active refresh rate, and an equal numeric cap is hidden to avoid duplication.",
+          "If the preset is too complex even at the smallest step, the actual FPS may remain below the target."
         ]
       },
       {
@@ -952,7 +951,7 @@
       "Play local audio, tracker modules and classic game-music formats, or explore the Modland and ModArchive catalogs.",
       "Visuals are rendered by projectM. Audio is decoded by specialized open-source engines selected for each format.",
       "",
-      "High, Balanced and Eco modes adapt visual quality to the device. The visualizer can also be disabled for music-only playback.",
+      "Choose a frame-rate target and an independent adaptive-resolution limit. The visualizer can also be disabled for music-only playback.",
       "",
       "**Project**",
       "https://github.com/dendec/glitchscope",

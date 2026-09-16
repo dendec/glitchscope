@@ -71,7 +71,7 @@ func ClosestResolution(list []RenderResolution, target RenderResolution) RenderR
 
 // ResolutionAtMost returns the largest available resolution whose area does
 // not exceed target. The list is sorted from largest to smallest, so the
-// first matching entry is the configured quality ceiling. If every available
+// first matching entry is the configured resolution ceiling. If every available
 // entry is larger than target, the smallest entry is returned.
 func ResolutionAtMost(list []RenderResolution, target RenderResolution) RenderResolution {
 	if len(list) == 0 {

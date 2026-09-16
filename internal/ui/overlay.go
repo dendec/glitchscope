@@ -50,7 +50,7 @@ const (
 	HelpQuickStart HelpTopicID = iota
 	HelpControls
 	HelpPlayback
-	HelpQuality
+	HelpFrameRate
 	HelpTroubleshooting
 	HelpSources
 	HelpFormats
@@ -529,6 +529,22 @@ func (o *Overlay) SetMusicDir(dir string) {
 }
 
 func (o *Overlay) SetSettingsRows(rows []SettingRow, cursor int) {
+	oldCursor := o.settingsCursor
+	oldValueCursor := o.settingsValueCursor
+	oldEditing := o.settingsEditing
+	var oldValue string
+	oldValuesLen := 0
+	if oldCursor >= 0 && oldCursor < len(o.settingsRows) {
+		oldRow := o.settingsRows[oldCursor]
+		oldValuesLen = len(oldRow.Values)
+		valueCursor := oldRow.Index
+		if oldEditing {
+			valueCursor = oldValueCursor
+		}
+		if valueCursor >= 0 && valueCursor < len(oldRow.Values) {
+			oldValue = oldRow.Values[valueCursor]
+		}
+	}
 	o.settingsRows = rows
 	// Skip header rows to land on the first selectable setting.
 	for cursor < len(rows) && rows[cursor].Header {
@@ -541,6 +557,28 @@ func (o *Overlay) SetSettingsRows(rows []SettingRow, cursor int) {
 		}
 	}
 	o.settingsCursor = cursor
+	if oldEditing && oldCursor == cursor && cursor >= 0 && cursor < len(rows) && oldValue != "" {
+		valueCursor := -1
+		for i, value := range rows[cursor].Values {
+			if value == oldValue {
+				valueCursor = i
+				break
+			}
+		}
+		// Max carries the active refresh in its label, so its text changes
+		// when the window moves between displays. It remains the last choice.
+		if cursor == SettingFrameRate && oldValueCursor == oldValuesLen-1 {
+			valueCursor = len(rows[cursor].Values) - 1
+		}
+		if cursor == SettingFrameRate && valueCursor < 0 && oldValueCursor >= len(rows[cursor].Values) {
+			// A fixed cap that disappeared below a slower refresh now maps to
+			// the display-bound Max choice.
+			valueCursor = len(rows[cursor].Values) - 1
+		}
+		if valueCursor >= 0 && valueCursor < len(rows[cursor].Values) {
+			o.settingsValueCursor = valueCursor
+		}
+	}
 	o.settingsDirty = true
 }
 

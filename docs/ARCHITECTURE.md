@@ -107,54 +107,51 @@ NC сохраняет статус listing для явного отображе�
 систему. Playback и индекс обновляются только после успешного удаления;
 ошибка rescan явно показывается как частично неизвестное состояние.
 
-Основной цикл обрабатывает ввод и UI с частотой до 60 Гц, а главный projectM
-планируется независимо. В Ultra он работает на выбранной resolution без
-искусственного ограничения частоты (верхняя граница — частота дисплея); в
-Performance, Balanced и Eco целевая частота равна 30, 25 и 20 FPS соответственно.
+Основной цикл обрабатывает ввод и UI с частотой до 60 Гц (или с частотой дисплея
+для `Max`), а главный projectM планируется независимо. Настройка `FrameRate` задаёт
+фиксированный cap из доступных значений ниже частоты дисплея либо `Max`, равный
+активной частоте дисплея; числовой cap, совпадающий с `Max`, в UI не показывается.
 GL-операции остаются на закреплённом main thread; между кадрами визуализации
 выводится последняя захваченная текстура. Показатель `FPS` остаётся телеметрией,
-а quality policy учитывает wall-clock стоимость полного кадра и фактические
+а adaptive policy учитывает wall-clock стоимость полного кадра и фактические
 интервалы его вывода, исключая намеренные паузы адаптации.
 
-В режимах Performance/Balanced/Eco выбранная в настройках resolution является
-верхним пределом. Adaptive может временно уменьшать её, но никогда не поднимается
-выше сохранённого значения. В Ultra adaptive полностью отключён, и выбранная
-resolution используется напрямую.
+При `Adaptive=true` выбранная в настройках resolution является верхним пределом.
+Разрешение временно уменьшается или повышается по результатам cadence, но никогда
+не поднимается выше сохранённого значения. При `Adaptive=false` выбранная resolution
+используется напрямую.
 В верхней строке overlay показывается фактическая высота текущего render target,
 поэтому это значение может быть ниже выбранного верхнего предела во время adaptive.
 
-Каждый режим задаёт мягкую цель доли бюджета visualizer-цикла:
-Performance — 70–90%, Balanced — 50–70%, Eco — 30–50%. Активная стоимость
-кадра включает render/capture и последующий blit/overlay/swap. Ожидание
+Adaptive использует целевую частоту как единственный критерий качества кадра.
+Активная стоимость кадра включает render/capture и последующий blit/overlay/swap. Ожидание
 планировщика между кадрами не входит в стоимость. Swap может ждать vsync и
 отложенную GPU-работу; измерение wall-clock не выдаётся за GPU execution time.
 Отдельное окно измеряет интервалы между выводами кадров. Обе метрики содержат
 10 измерений; после сброса нужны 11 кадров для 10 полных интервалов.
-Бюджет равен периоду текущей назначенной частоты. Превышение мягкой цели
-разрешает пробу снижения resolution, но само по себе не снижает FPS.
-FPS снижается только при устойчивом среднем интервале больше 110% назначенного
-периода, когда снижение resolution исчерпано или неэффективно.
+Бюджет равен периоду текущей назначенной частоты. Устойчивый средний интервал
+больше 110% назначенного периода разрешает пробу снижения resolution, но сама
+адаптация никогда не меняет выбранную частоту кадров.
 После пробного снижения новое полное окно проверяет выигрыш: достаточно
 уменьшения полной стоимости либо интервала на 8%, либо восстановления cadence
 в пределах 110% периода. Если первое окно не доказывает пользу, запрашивается
 второе независимое окно без изменения FPS/resolution. Только повторное отсутствие
 пользы возвращает resolution и запрещает дальнейшее снижение до нового пресета.
-Предел снижения каждой стороны от выбранного ceiling: Performance/Balanced —
-вдвое, Eco — вчетверо, Ultra — без снижения. Глобальная сетка: 1, 3/4, 5/8, 1/2, 3/8, 1/4, 3/16, 1/8
+Пределом является нижняя ступень общей сетки. Глобальная сетка: 1, 3/4, 5/8, 1/2, 3/8, 1/4, 3/16, 1/8
 размера экрана (720, 540, 450, 360, 270, 180, 135, 90p на экране 720p).
 Близкие ступени 2/5 и 1/5 убраны, чтобы проба давала измеримый выигрыш. Используются только
 целочисленные размеры; граница округляется к большей доступной ступени.
-После достижения предела resolution при реальной потере cadence снижается FPS
-(шаг 5; минимумы 15/10/10).
-На обоих минимумах дальнейшее ухудшение прекращается даже при превышении бюджета.
-Восстановление сначала повышает FPS: прогноз следующей ступени должен быть ниже
-90% полного периода следующей частоты, а текущая cadence — в пределах 110%.
-Это восстановление разрешено и выше мягкой цели режима.
+После достижения нижней ступени фактический FPS может быть ниже цели на тяжёлом
+пресете, но сохранённая настройка частоты не изменяется. Восстановление разрешения
+разрешено после устойчивой cadence в пределах 110% при стоимости кадра не выше
+полного бюджета и всегда ограничено исходным ceiling.
 Повышение resolution требует нижнего порога; неудачная
 проба откатывается и блокируется до нового пресета. Снижение требует секунды
-перегрузки, восстановление — 3 секунды (Eco: 4). Между изменениями собираются
-свежие измерения. Неизвестный пресет сразу получает ceiling и target FPS;
-известный восстанавливает устойчивую пару resolution/FPS из session cache.
+устойчивого отставания, восстановление — 3 секунды. Между изменениями собираются
+свежие измерения. Новый или неизвестный пресет сохраняет текущую эффективную
+ступень; известный может выбрать только такую же или более низкую ступень из
+session cache. Повышение выполняется последующими измерениями adaptive policy.
+Выбранная пользователем частота кадров всегда сохраняется.
 Измерения перехода не попадают в policy. Взаимодействие с UI не сбрасывает
 изученную чувствительность пресета к resolution.
 
@@ -165,7 +162,7 @@ FPS снижается только при устойчивом среднем �
 меняются. Во время взаимодействия сначала показывается обновлённый UI поверх
 последней текстуры, затем планируется следующий кадр projectM на том же GL-потоке.
 `internal/app.interactionBudget` владеет временным ограничением частоты: период
-равен максимуму периода режима и четырёх оценочных стоимостей кадра, с потолком
+равен максимуму периода выбранной частоты и четырёх оценочных стоимостей кадра, с потолком
 125 мс для добавленного ограничения. Это оставляет примерно 75% времени остальному
 циклу, пока стоимость кадра позволяет. Оценка учитывает render/capture и превышение
 бюджета UI при blit/draw/swap; растёт сразу, снижается постепенно. Основной фон и
@@ -183,9 +180,10 @@ preview имеют независимые оценки. Непрерывный �
 
 Во время плавной смены пресета adaptive resolution приостанавливается на
 длительность projectM soft cut. При запуске перехода история adaptive policy
-очищается; после перехода решение снова принимается только по новым завершённым
-кадрам визуализации. Так временная стоимость смешивания двух пресетов не
-понижает постоянное render resolution.
+очищается, но текущий render target сохраняется; после перехода решение снова
+принимается только по новым завершённым кадрам визуализации. Так временная
+стоимость смешивания двух пресетов не повышает разрешение перед измерением и не
+понижает постоянное render resolution из-за самого перехода.
 
 Если пробный upscale превышает 95% верхнего utilization-порога или нарушает
 cadence (средний интервал больше 110% назначенного периода) и требует возврата,
@@ -226,35 +224,36 @@ Modland/ModArchive видимы всегда. Пока сеть неизвест
 Успешный запуск или новый ручной выбор очищает серию ошибок.
 
 Adaptive resolution применяет выбранный пользователем ceiling при сбросе, resize
-и повышении; режим задаёт частоту, нижнюю границу resolution и границы utilization.
-Целевая частота Performance —
-30 FPS, Balanced — 25 FPS, Eco — 20 FPS. Hysteresis измеряется wall-clock
-временем; решения учитывают utilization и измеренную cadence. Пробные
-изменения проверяются по независимым полным окнам кадров.
+и повышении. `FrameRate` задаёт фиксированный cap ниже активной частоты дисплея
+или `Max` (активная частота дисплея), а `Adaptive` отдельно разрешает изменение
+resolution. Hysteresis
+измеряется wall-clock временем; пробные изменения проверяются по независимым
+полным окнам кадров.
 
 
 ## Handheld rendering and memory budgets
 
 `internal/prof` reads available device memory, `internal/player` selects a
 bounded tracker pre-render budget, and app wires the result at audio startup.
-Settings owns the persisted visualizer toggle, performance mode and configured
-resolution ceiling. The app derives the effective frequency and resolution from
-those values; the player serializes native loads and owns the PCM budget
+Settings owns the persisted visualizer toggle, frame rate, adaptive-resolution
+toggle, and configured resolution ceiling. The app derives the effective
+frequency and resolution from those independent values; the player serializes native loads and owns the PCM budget
 calculation described in SEEK-DESIGN.md.
 
-Performance retains 60 Hz presentation. Balanced/Eco process input at 60 Hz but
-skip duplicate blits and swaps between visualizer frames; visible UI animation
-has a mode-rate deadline and actions request immediate presentation. Visualizer
+The UI loop remains responsive while the visualizer follows the selected frame
+rate and skips duplicate blits and swaps between visualizer frames. Visible UI
+animation has its own deadline and actions request immediate presentation. Visualizer
 Off stops the main projectM and preset timers, presents a solid background, and
 updates hidden-UI output at 4 Hz. The presets page can still render previews.
 
-Preview creates its projectM instance lazily, throttles to the smaller of 25 FPS
-and the selected mode's FPS, and reuses the UI-owned 120 ms selection delay before loading
+Preview creates its projectM instance lazily, follows the selected frame rate
+up to its 25 FPS preview cap, and reuses the UI-owned 120 ms selection delay before loading
 its shader. Resize preserves pending selections. The instance remains allocated
 until shutdown to avoid repeated driver initialization when reopening the page.
 
 App owns a bounded, session-only cache of 256 preset profiles, separated by name,
-mode and drawable size, and validated against the loaded preset's SHA-256 digest.
+frame rate, resolved target FPS, adaptive toggle and drawable size, and validated
+against the loaded preset's SHA-256 digest.
 Thirty consecutive stable visualization frames establish a reusable resolution.
 Soft-cut frames do not count. Automatic skipping of a preset that remains too
 heavy at the minimum resolution is temporarily disabled; reaching the minimum
@@ -282,12 +281,13 @@ immutable metadata provider-specific shuffle indexes. Открытие темы 
 запускает обычную сборку индекса, если shuffle был выключен при старте; Help не
 обходит каталоги и не владеет их данными.
 
-Ultra renders at the current SDL display refresh rate (60 Hz fallback), checked
-once per second for display moves/mode changes. It uses the configured resolution,
-does not run adaptive quality reduction, and does not apply a software FPS cap.
-GPU overload reduces achieved FPS without lowering the configured resolution.
-Performance/Balanced/Eco use the configured resolution as their quality ceiling
-and try bounded resolution reductions before lowering effective FPS.
+`FrameRate=Max` follows the current SDL display refresh rate (60 Hz fallback),
+checked once per second for display moves/display-mode changes. The settings list
+is rebuilt from that active refresh and preserves a numeric 60 FPS choice on
+displays above 60 Hz. A refresh change resets adaptive measurements while retaining
+the current effective render step. With adaptive resolution disabled the configured
+resolution is fixed; when enabled it is the ceiling for bounded reductions.
+Adaptive changes the image size only and never changes the user's selected frame-rate target.
 
 На странице Presets каждый вывод UI начинается с привязки и очистки экранного
 framebuffer, даже если превью пропустило кадр по таймеру. Привязка и инъекция

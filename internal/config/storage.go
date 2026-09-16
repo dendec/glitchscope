@@ -6,7 +6,25 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+// migrateLegacyPerformanceMode translates the removed combined setting while
+// loading an older settings file. The new schema never writes this field.
+func migrateLegacyPerformanceMode(value string) (FrameRate, bool, error) {
+	switch strings.TrimSpace(value) {
+	case "", "Performance":
+		return FrameRate30, true, nil
+	case "Balanced":
+		return FrameRate25, true, nil
+	case "Eco":
+		return FrameRate20, true, nil
+	case "Ultra":
+		return FrameRateMax, false, nil
+	default:
+		return 0, false, fmt.Errorf("unknown performance mode: %s", value)
+	}
+}
 
 // SettingsPath returns the settings file location.
 // On PortMaster, XDG_DATA_HOME points to /roms/ports/glitchscope/conf/.
@@ -38,13 +56,14 @@ func LoadSettings(path string) (Settings, error) {
 
 	var raw struct {
 		Graphics *struct {
-			VisualizerOff   *bool            `json:"visualizer_off"`
-			RenderWidth     *int             `json:"render_width"`
-			RenderHeight    *int             `json:"render_height"`
-			UpscaleFilter   *UpscaleFilter   `json:"upscale_filter"`
-			Adaptive        *bool            `json:"adaptive"`
-			BeatSensitivity *float64         `json:"beat_sensitivity"`
-			PerformanceMode *PerformanceMode `json:"performance_mode"`
+			VisualizerOff         *bool          `json:"visualizer_off"`
+			RenderWidth           *int           `json:"render_width"`
+			RenderHeight          *int           `json:"render_height"`
+			UpscaleFilter         *UpscaleFilter `json:"upscale_filter"`
+			Adaptive              *bool          `json:"adaptive"`
+			FrameRate             *FrameRate     `json:"frame_rate"`
+			BeatSensitivity       *float64       `json:"beat_sensitivity"`
+			LegacyPerformanceMode *string        `json:"performance_mode"`
 		} `json:"graphics"`
 		Playback *struct {
 			ShuffleMode  *ShuffleMode `json:"shuffle_mode"`
@@ -74,6 +93,7 @@ func LoadSettings(path string) (Settings, error) {
 
 	s := DefaultSettings()
 
+	frameRatePresent := false
 	if raw.Graphics != nil {
 		if raw.Graphics.VisualizerOff != nil {
 			s.Graphics.VisualizerOff = *raw.Graphics.VisualizerOff
@@ -90,11 +110,24 @@ func LoadSettings(path string) (Settings, error) {
 		if raw.Graphics.Adaptive != nil {
 			s.Graphics.Adaptive = *raw.Graphics.Adaptive
 		}
+		if raw.Graphics.FrameRate != nil {
+			s.Graphics.FrameRate = *raw.Graphics.FrameRate
+			frameRatePresent = true
+		}
 		if raw.Graphics.BeatSensitivity != nil {
 			s.Graphics.BeatSensitivity = *raw.Graphics.BeatSensitivity
 		}
-		if raw.Graphics.PerformanceMode != nil {
-			s.Graphics.PerformanceMode = *raw.Graphics.PerformanceMode
+		if raw.Graphics.LegacyPerformanceMode != nil {
+			// Validate the legacy field even when a new frame_rate is present;
+			// unknown persisted values must never be silently ignored.
+			frameRate, adaptive, err := migrateLegacyPerformanceMode(*raw.Graphics.LegacyPerformanceMode)
+			if err != nil {
+				return DefaultSettings(), fmt.Errorf("settings validate: %w", err)
+			}
+			if !frameRatePresent {
+				s.Graphics.FrameRate = frameRate
+				s.Graphics.Adaptive = adaptive
+			}
 		}
 	}
 	if raw.Playback != nil {

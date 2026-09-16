@@ -34,7 +34,7 @@ func TestFrameCostDetectsDeferredPresentationWork(t *testing.T) {
 		meter.AddFrame(30*time.Millisecond, 60*time.Millisecond, now.Add(time.Duration(i)*90*time.Millisecond))
 	}
 	if meter.Average() != 90*time.Millisecond || math.Abs(meter.Cadence(20)-1.8) > 0.001 {
-		t.Fatal("slow presentation was hidden from quality policy")
+		t.Fatal("slow presentation was hidden from adaptive policy")
 	}
 	meter.Reset()
 	for i := range renderCostWindow + 1 {

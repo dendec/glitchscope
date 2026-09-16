@@ -101,17 +101,16 @@
     "id": 2
   },
   {
-    "title": "Qualität und Akkulaufzeit",
+    "title": "Bildrate und Auflösung",
     "children": [
       {
-        "title": "Qualität",
+        "title": "Visualizer-Einstellungen",
         "lines": [
-          "Ultra: Verwendet die ausgewählte Auflösung direkt ohne künstliche FPS-Begrenzung; die Bildwiederholrate des Displays ist die Obergrenze.",
-          "Leistung: Hohe Detailqualität mit einem Ziel von 30 FPS; die Auflösung kann sich bei hoher Last automatisch verringern.",
-          "Ausgewogen: Ausgewogene Bildqualität und Akkulaufzeit mit 25 FPS; die Auflösung kann sich bei hoher Last automatisch verringern.",
-          "Energiesparen: Ein Ziel von 20 FPS spart Energie; die Auflösung kann sich bei hoher Last automatisch verringern.",
-          "Die ausgewählte Auflösung ist in den Modi Leistung, Ausgewogen und Energiesparen die adaptive Obergrenze. Ultra verwendet sie direkt.",
-          "FPS hat Vorrang: zuerst die Auflösung reduzieren (je Dimension bis zur Hälfte in Leistung/Ausgewogen, auf ein Viertel in Energiesparen). Hilft das nicht, Auflösung wiederherstellen und FPS senken. FPS wird nur gesenkt, wenn die vorgesehene Bildrate nicht gehalten werden kann; das Überschreiten des Energiesparbudgets allein senkt FPS nicht."
+          "Die Bildrate wählt ein festes Limit unterhalb der aktiven Bildschirmfrequenz oder Max (die aktive Bildwiederholrate).",
+          "Die adaptive Auflösung senkt die Bildgröße oder stellt sie wieder her, um dieses Ziel zu erreichen.",
+          "Die Auflösung ist bei aktivierter Anpassung die maximale Größe und bei deaktivierter Anpassung fest.",
+          "Max wird mit der aktiven Bildwiederholrate angezeigt; ein gleiches numerisches Limit wird nicht doppelt aufgeführt.",
+          "Ist das Preset selbst auf der kleinsten Stufe zu komplex, kann die tatsächliche FPS unter dem Ziel bleiben."
         ]
       },
       {
@@ -952,7 +951,7 @@
       "Wählen Sie lokale Audiodateien, Tracker-Module sowie klassische Spielmusikformate aus oder erkunden Sie die Kataloge von Modland und ModArchive.",
       "Die Visualisierung wird durch projectM bereitgestellt. Die Audio-Decodierung erfolgt durch speziell für jedes Format ausgewählte Open-Source-Engines.",
       "",
-      "Die Modi Performance, Balanced und Eco passen die Visualqualität an das Gerät an. Der Visualizer kann auch deaktiviert werden, um ausschließlich Musik abzuspielen.",
+      "Wählen Sie ein Bildratenziel und ein unabhängiges Limit für die adaptive Auflösung. Für reine Musikwiedergabe kann der Visualizer deaktiviert werden.",
       "",
       "**Projekt**",
       "https://github.com/dendec/glitchscope",

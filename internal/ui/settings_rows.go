@@ -12,18 +12,19 @@ import (
 const (
 	SettingShuffle         = 1
 	SettingRepeat          = 2
-	SettingPerformanceMode = 4
-	SettingVisualizer      = 5
-	SettingRotation        = 6
+	SettingVisualizer      = 4
+	SettingFrameRate       = 5
+	SettingAdaptive        = 6
 	SettingResolution      = 7
 	SettingFilter          = 8
 	SettingBeatSensitivity = 9
-	SettingLanguage        = 11
-	SettingTheme           = 12
-	SettingTransparency    = 13
-	SettingShowStats       = 14
-	SettingCacheSize       = 16
-	SettingCacheRetention  = 17
+	SettingRotation        = 10
+	SettingLanguage        = 12
+	SettingTheme           = 13
+	SettingTransparency    = 14
+	SettingShowStats       = 15
+	SettingCacheSize       = 17
+	SettingCacheRetention  = 18
 )
 
 // settingOpt is a setting whose String() produces a display label.
@@ -48,11 +49,23 @@ func optionPair[T settingOpt](all []T, current T) (values []string, index int) {
 
 // BuildSettingsRows creates SettingRow entries from the current config.
 func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
-	return BuildSettingsRowsWithCatalog(s, winW, winH, i18n.MustLoad(i18n.English))
+	return BuildSettingsRowsWithCatalogForRefresh(s, winW, winH, 60, i18n.MustLoad(i18n.English))
 }
 
 // BuildSettingsRowsWithCatalog creates localized rows while preserving enum indices.
 func BuildSettingsRowsWithCatalog(s config.Settings, winW, winH int, catalog i18n.Catalog) []SettingRow {
+	return BuildSettingsRowsWithCatalogForRefresh(s, winW, winH, 60, catalog)
+}
+
+// BuildSettingsRowsForRefresh creates settings rows using the active display
+// refresh rate for the dynamic frame-rate choices.
+func BuildSettingsRowsForRefresh(s config.Settings, winW, winH int, refreshRate int32) []SettingRow {
+	return BuildSettingsRowsWithCatalogForRefresh(s, winW, winH, refreshRate, i18n.MustLoad(i18n.English))
+}
+
+// BuildSettingsRowsWithCatalogForRefresh creates localized settings rows for
+// a specific active display refresh rate.
+func BuildSettingsRowsWithCatalogForRefresh(s config.Settings, winW, winH int, refreshRate int32, catalog i18n.Catalog) []SettingRow {
 	resolutions := config.ComputeResolutions(winW, winH)
 	resValues, resIndex := buildResolutionValuesWithLabels(s, resolutions, catalog.Text(i18n.ValueUnavailable))
 
@@ -65,13 +78,24 @@ func BuildSettingsRowsWithCatalog(s config.Settings, winW, winH int, catalog i18
 	shuffleIndex := comparableIndex(config.AllShuffleModes(), s.Playback.ShuffleMode)
 	themeValues, themeIndex := optionPair(config.AllThemes(), s.UI.Theme)
 	transValues, transIndex := optionPair(config.AllTransparencies(), s.UI.Transparency)
-	perfModes := config.AllPerformanceModes()
-	perfValues := make([]string, len(perfModes))
-	for i, mode := range perfModes {
-		label, _ := performanceTextKeys(mode)
-		perfValues[i] = catalog.Text(label)
+	refreshRate = config.NormalizeRefreshRate(refreshRate)
+	frameRates := config.FrameRateChoices(refreshRate)
+	frameValues := make([]string, len(frameRates))
+	for i, rate := range frameRates {
+		if rate.IsMax() {
+			frameValues[i] = fmt.Sprintf("%s (%d FPS)", catalog.Text(i18n.ValueMax), rate.Target(refreshRate))
+		} else {
+			frameValues[i] = rate.String()
+		}
 	}
-	perfIndex := comparableIndex(config.AllPerformanceModes(), s.Graphics.PerformanceMode)
+	// A fixed cap equal to the current refresh is hidden from the values list,
+	// so select the equivalent Max row while preserving the persisted cap until
+	// the user confirms the settings.
+	selectedFrameRate := s.Graphics.FrameRate
+	if !selectedFrameRate.IsMax() && int32(selectedFrameRate) >= refreshRate {
+		selectedFrameRate = config.FrameRateMax
+	}
+	frameIndex := comparableIndex(frameRates, selectedFrameRate)
 	cacheRetentionValues, cacheRetentionIndex := localizedCacheRetentions(catalog, s.TrackCache.Retention)
 	cacheSizes := config.AllCacheSizeLimits()
 	cacheSizeValues, cacheSizeIndex := optionPair(cacheSizes, s.TrackCache.MaxBytes)
@@ -107,12 +131,13 @@ func BuildSettingsRowsWithCatalog(s config.Settings, winW, winH int, catalog i18
 		{Label: catalog.Text(i18n.SettingsRepeat), Values: repeatValues, Index: repeatIndex},
 		// Visualization
 		{Header: true, Label: "── " + catalog.Text(i18n.SettingsVisualization) + " ──"},
-		{Label: catalog.Text(i18n.SettingsPerformance), Values: perfValues, Index: perfIndex},
 		{Label: catalog.Text(i18n.SettingsVisualizer), Values: []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueOn)}, Index: boolIndex(!s.Graphics.VisualizerOff)},
-		{Label: catalog.Text(i18n.SettingsRotation), Values: presetValues, Index: presetIndex},
+		{Label: catalog.Text(i18n.SettingsFrameRate), Values: frameValues, Index: frameIndex},
+		{Label: catalog.Text(i18n.SettingsAdaptiveResolution), Values: []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueOn)}, Index: boolIndex(s.Graphics.Adaptive)},
 		{Label: catalog.Text(i18n.SettingsResolution), Values: resValues, Index: resIndex},
 		{Label: catalog.Text(i18n.SettingsFilter), Values: filterValues, Index: filterIndex},
 		{Label: catalog.Text(i18n.SettingsSensitivity), Values: beatValues, Index: beatIndex},
+		{Label: catalog.Text(i18n.SettingsRotation), Values: presetValues, Index: presetIndex},
 		// Appearance
 		{Header: true, Label: "── " + catalog.Text(i18n.SettingsAppearance) + " ───"},
 		{Label: catalog.Text(i18n.SettingsLanguage), Values: languageValues, Index: languageIndex},
@@ -151,7 +176,7 @@ func localizedPresetIntervals(catalog i18n.Catalog, current config.PresetInterva
 }
 
 // buildResolutionValues produces the configured resolution list and selection.
-// In non-Ultra modes the selected value is the adaptive quality ceiling.
+// The selected value is always the user's fixed resolution or adaptive ceiling.
 func buildResolutionValuesWithLabels(s config.Settings, resolutions []config.RenderResolution, unavailable string) ([]string, int) {
 	values := renderResolutionStrings(resolutions)
 	if len(resolutions) == 0 {
@@ -183,12 +208,6 @@ func boolIndex(v bool) int {
 // settingDescription explains the selected value without exposing implementation details.
 func settingDescription(catalog i18n.Catalog, setting, value int) string {
 	switch setting {
-	case SettingPerformanceMode:
-		modes := config.AllPerformanceModes()
-		if value >= 0 && value < len(modes) {
-			_, description := performanceTextKeys(modes[value])
-			return catalog.Text(description)
-		}
 	case SettingVisualizer:
 		if value == 0 {
 			return catalog.Text(i18n.DescriptionVisualizerOff)
@@ -203,7 +222,14 @@ func settingDescription(catalog i18n.Catalog, setting, value int) string {
 		}
 		return catalog.Text(i18n.DescriptionRotationInterval)
 	case SettingResolution:
-		return catalog.Text(i18n.DescriptionResolutionFixed)
+		return catalog.Text(i18n.DescriptionResolution)
+	case SettingFrameRate:
+		return catalog.Text(i18n.DescriptionFrameRate)
+	case SettingAdaptive:
+		if value == 0 {
+			return catalog.Text(i18n.DescriptionAdaptiveOff)
+		}
+		return catalog.Text(i18n.DescriptionAdaptiveOn)
 	case SettingShuffle:
 		switch value {
 		case 0:
@@ -230,25 +256,9 @@ func downloadsDescription(catalog i18n.Catalog, policyKey i18n.Key) string {
 	return catalog.Text(policyKey) + " " + catalog.Text(i18n.InfoFavoritesStayOffline)
 }
 
-func performanceTextKeys(mode config.PerformanceMode) (i18n.Key, i18n.Key) {
-	switch mode {
-	case config.PerfModeUltra:
-		return i18n.ValueUltra, i18n.DescriptionUltra
-	case config.PerfModeBalanced:
-		return i18n.ValueBalanced, i18n.DescriptionBalanced
-	case config.PerfModeEco:
-		return i18n.ValueEco, i18n.DescriptionEco
-	default:
-		return i18n.ValuePerformance, i18n.DescriptionPerformance
-	}
-}
-
-// The resolution row has one fixed choice in Ultra; its description must not
-// suggest that the adaptive setting can lower the resolution.
+// selectedSettingDescription keeps all visualizer controls independent: the
+// resolution explanation describes the adaptive toggle separately.
 func (o *Overlay) selectedSettingDescription(setting, value int) string {
-	if setting == SettingResolution && len(o.settingsRows[SettingResolution].Values) == 1 {
-		return o.catalog.Text(i18n.DescriptionUltra)
-	}
 	return settingDescription(o.catalog, setting, value)
 }
 

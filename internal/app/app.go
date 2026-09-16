@@ -84,22 +84,21 @@ type App struct {
 
 	startupFile string
 
-	albumMetadata          *metadataLoader
-	fileMetadata           *metadataLoader
-	metadataAlbum          int
-	metadataFile           string
-	adaptive               resolutionState
-	configuredResolution   config.RenderResolution
-	presetTuning           presetTuning
-	presentRequested       bool
-	nextPresent            time.Time
-	vizClock               visualizerClock // visualizer frame clock, promoted from runState
-	vizBudget              interactionBudget
-	previewBudget          interactionBudget
-	uiFramePeriod          time.Duration
-	targetVisualizerFPS    int32
-	effectiveVisualizerFPS int32
-	renderCost             frameCostMeter
+	albumMetadata        *metadataLoader
+	fileMetadata         *metadataLoader
+	metadataAlbum        int
+	metadataFile         string
+	adaptive             resolutionState
+	configuredResolution config.RenderResolution
+	presetTuning         presetTuning
+	presentRequested     bool
+	nextPresent          time.Time
+	vizClock             visualizerClock // visualizer frame clock, promoted from runState
+	vizBudget            interactionBudget
+	previewBudget        interactionBudget
+	uiFramePeriod        time.Duration
+	targetVisualizerFPS  int32
+	renderCost           frameCostMeter
 
 	// appCtx/appCancel govern background work tied to the app lifetime.
 	// Cancelled in Close() so in-flight goroutines (e.g. connectivity check)
@@ -213,6 +212,8 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		slog.Warn("settings load", "error", err)
 		gs = config.DefaultSettings()
 	}
+	refreshRate := a.displayRefreshRate()
+	gs.Graphics.FrameRate = config.NormalizeFrameRate(gs.Graphics.FrameRate, refreshRate)
 
 	resolutions := config.ComputeResolutions(int(w), int(h))
 	savedRes := config.RenderResolution{Width: gs.Graphics.RenderWidth, Height: gs.Graphics.RenderHeight}
@@ -221,10 +222,10 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		slog.Warn("resolution list empty at startup", "window", fmt.Sprintf("%dx%d", int(w), int(h)))
 	}
 	var renderW, renderH int
-	if gs.Graphics.PerformanceMode == config.PerfModeUltra || len(resolutions) == 0 {
+	if !gs.Graphics.Adaptive || len(resolutions) == 0 {
 		renderW, renderH = a.configuredResolution.Width, a.configuredResolution.Height
 	} else {
-		a.adaptive.Reset(int(w), int(h), a.configuredResolution, gs.Graphics.PerformanceMode.Params())
+		a.adaptive.Reset(int(w), int(h), a.configuredResolution, defaultAdaptiveParams())
 		renderW, renderH = a.adaptive.resolutions[a.adaptive.index].Width, a.adaptive.resolutions[a.adaptive.index].Height
 	}
 	gs.Graphics.RenderWidth, gs.Graphics.RenderHeight = a.configuredResolution.Width, a.configuredResolution.Height
@@ -234,6 +235,7 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	rt.SetNearest(gs.Graphics.UpscaleFilter.IsNearest())
 	a.rt = rt
 	a.settings = &gs
+	a.setVisualizerFPS(gs.Graphics.FrameRate.Target(refreshRate))
 	a.pm.SetBeatSensitivity(gs.Graphics.BeatSensitivity)
 	a.pm.SetHardCutEnabled(!gs.Graphics.VisualizerOff && gs.PresetInterval == config.PresetAuto)
 	a.pm.SetPresetSwitchRequestedHandler(func(bool) {
@@ -995,7 +997,7 @@ func (a *App) initPreset() {
 		a.overlay.SetPresetPreviewRequest(func(key string) {
 			if a.preview == nil {
 				a.preview = newPreviewRenderer()
-				a.preview.SetFPS(a.settings.Graphics.PerformanceMode.Params().VisualizerFPS)
+				a.preview.SetFPS(a.targetVisualizerFPS)
 			}
 			data, err := presets.Read(key)
 			if err != nil {

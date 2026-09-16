@@ -101,17 +101,16 @@
     "id": 2
   },
   {
-    "title": "Calidad y batería",
+    "title": "Frecuencia de fotogramas y resolución",
     "children": [
       {
-        "title": "Calidad",
+        "title": "Ajustes del visualizador",
         "lines": [
-          "Ultra: Usa directamente la resolución seleccionada sin límite artificial de FPS; la frecuencia de actualización es el límite superior.",
-          "Rendimiento: Gran nivel de detalle, con un objetivo de 30 FPS; la resolución puede reducirse automáticamente bajo carga.",
-          "Equilibrado: Equilibrio entre calidad y autonomía a 25 FPS; la resolución puede reducirse automáticamente bajo carga.",
-          "Eco: Un objetivo de 20 FPS ahorra batería; la resolución puede reducirse automáticamente bajo carga.",
-          "La resolución seleccionada es el límite adaptativo en Rendimiento, Equilibrado y Eco. Ultra la usa directamente.",
-          "Prioridad a los FPS: primero se reduce la resolución (hasta la mitad por dimensión en Rendimiento/Equilibrado, un cuarto en Eco). Si no ayuda, se restaura la resolución y se reducen los FPS. Los FPS solo se reducen si no se puede mantener la frecuencia prevista; superar el presupuesto de ahorro por sí solo no reduce los FPS."
+          "La frecuencia de fotogramas selecciona un límite fijo inferior a la frecuencia de actualización activa, o Max (la frecuencia activa).",
+          "La resolución adaptativa reduce o restaura el tamaño de la imagen para acercarse a ese objetivo.",
+          "La resolución es el tamaño máximo con la adaptación activada y el tamaño fijo cuando está desactivada.",
+          "Max muestra la frecuencia de actualización activa; se oculta un límite numérico igual para evitar duplicados.",
+          "Si el preajuste es demasiado complejo incluso en el nivel mínimo, los FPS reales pueden quedar por debajo del objetivo."
         ]
       },
       {
@@ -952,7 +951,7 @@
       "Reproduce audio local, módulos de tracker y formatos clásicos de música de juegos, o explora los catálogos Modland y ModArchive.",
       "Las visualizaciones se generan con projectM. El audio se decodifica mediante motores de código abierto especializados seleccionados para cada formato.",
       "",
-      "Los modos Rendimiento, Equilibrado y Ecológico adaptan la calidad visual al dispositivo. También es posible desactivar el visualizador para reproducciones exclusivas de música.",
+      "Elija un objetivo de frecuencia de fotogramas y un límite de resolución adaptativa independiente. También puede desactivar el visualizador para reproducir solo música.",
       "",
       "**Proyecto**",
       "https://github.com/dendec/glitchscope",

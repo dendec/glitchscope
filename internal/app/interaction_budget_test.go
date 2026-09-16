@@ -14,7 +14,7 @@ func TestInteractionBudgetFastAndSlowFrames(t *testing.T) {
 			t.Fatalf("fast frame: got %v, want %v", got, base)
 		}
 		if !b.Due(now.Add(base), base, true) {
-			t.Fatal("fast frame lost its mode cadence")
+			t.Fatal("fast frame lost its selected cadence")
 		}
 		b.Complete(now, now.Add(25*time.Millisecond))
 		if got := b.Period(base, true); got != 100*time.Millisecond {

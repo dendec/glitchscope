@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"time"
+	"strconv"
+	"strings"
 )
 
 // RenderResolution represents a fixed render size.
@@ -70,126 +71,126 @@ func (f *UpscaleFilter) UnmarshalJSON(data []byte) error {
 
 func AllFilters() []UpscaleFilter { return []UpscaleFilter{FilterSmooth, FilterPixel} }
 
-// PerformanceMode selects a visualizer quality preset that trades frame rate
-// for power consumption.
-type PerformanceMode int
+// FrameRate is the user-selected visualizer cadence. Max follows the display
+// refresh rate; every numeric value is an explicit upper bound in frames per
+// second.
+type FrameRate int32
 
 const (
-	PerfModePerformance PerformanceMode = iota // 30 FPS visualizer, default
-	PerfModeBalanced                           // 25 FPS visualizer, moderate savings
-	PerfModeEco                                // 20 FPS visualizer, lower power use
-	PerfModeUltra                              // selected resolution at display refresh rate
+	FrameRateMax FrameRate = 0
+	FrameRate15  FrameRate = 15
+	FrameRate20  FrameRate = 20
+	FrameRate25  FrameRate = 25
+	FrameRate30  FrameRate = 30
+	FrameRate40  FrameRate = 40
+	FrameRate50  FrameRate = 50
+	FrameRate60  FrameRate = 60
 )
 
-// ModeParams holds the tuning knobs for one performance mode.
-type ModeParams struct {
-	// ResolutionDivisor bounds each dimension relative to the configured ceiling.
-	ResolutionDivisor int
-	// VisualizerFPS is the target (upper-bound) visualizer cadence.
-	VisualizerFPS int32
-	// MinVisualizerFPS bounds cadence when resolution reduction is exhausted or ineffective.
-	MinVisualizerFPS int32
-	// UtilizationLow/High define soft full-frame work targets. FPS loss, not
-	// exceeding this band alone, permits reducing cadence.
-	UtilizationLow  float64
-	UtilizationHigh float64
-	FrequencyStep   int32
-	DownshiftAfter  time.Duration
-	UpshiftAfter    time.Duration
-}
+func (r FrameRate) IsMax() bool { return r == FrameRateMax }
 
-// Params returns the tuning parameters for mode m.
-func (m PerformanceMode) Params() ModeParams {
-	switch m {
-	case PerfModeUltra:
-		return ModeParams{VisualizerFPS: 60, MinVisualizerFPS: 60, ResolutionDivisor: 1}
-	case PerfModeBalanced:
-		return ModeParams{
-			ResolutionDivisor: 2,
-			VisualizerFPS:     25,
-			MinVisualizerFPS:  10,
-			UtilizationLow:    0.50,
-			UtilizationHigh:   0.70,
-			FrequencyStep:     5,
-			DownshiftAfter:    time.Second,
-			UpshiftAfter:      3 * time.Second,
-		}
-	case PerfModeEco:
-		return ModeParams{
-			ResolutionDivisor: 4,
-			VisualizerFPS:     20,
-			MinVisualizerFPS:  10,
-			UtilizationLow:    0.30,
-			UtilizationHigh:   0.50,
-			FrequencyStep:     5,
-			DownshiftAfter:    time.Second,
-			UpshiftAfter:      4 * time.Second,
-		}
-	default: // PerfModePerformance
-		return ModeParams{
-			ResolutionDivisor: 2,
-			VisualizerFPS:     30,
-			MinVisualizerFPS:  15,
-			UtilizationLow:    0.70,
-			UtilizationHigh:   0.90,
-			FrequencyStep:     5,
-			DownshiftAfter:    time.Second,
-			UpshiftAfter:      3 * time.Second,
-		}
+func (r FrameRate) Target(refreshRate int32) int32 {
+	if r.IsMax() {
+		return NormalizeRefreshRate(refreshRate)
 	}
+	return int32(r)
 }
 
-func (m PerformanceMode) String() string {
-	switch m {
-	case PerfModeUltra:
-		return "Ultra"
-	case PerfModePerformance:
-		return "Performance"
-	case PerfModeBalanced:
-		return "Balanced"
-	case PerfModeEco:
-		return "Eco"
-	default:
+// NormalizeRefreshRate returns a usable display refresh rate.
+func NormalizeRefreshRate(refreshRate int32) int32 {
+	if refreshRate <= 0 {
+		return 60
+	}
+	return refreshRate
+}
+
+// NormalizeFrameRate maps a fixed cap above the active display refresh to the
+// display-bound Max choice. A cap equal to refresh remains persisted so it can
+// become a distinct fixed choice when the window moves to a faster display.
+func NormalizeFrameRate(rate FrameRate, refreshRate int32) FrameRate {
+	refreshRate = NormalizeRefreshRate(refreshRate)
+	if !rate.IsMax() && int32(rate) > refreshRate {
+		return FrameRateMax
+	}
+	return rate
+}
+
+func (r FrameRate) String() string {
+	if r.IsMax() {
+		return "Max"
+	}
+	if r.Validate() != nil {
 		return "Unknown"
 	}
+	return strconv.Itoa(int(r)) + " FPS"
 }
 
-func (m PerformanceMode) MarshalJSON() ([]byte, error) {
-	return json.Marshal(m.String())
+func (r FrameRate) MarshalJSON() ([]byte, error) {
+	if err := r.Validate(); err != nil {
+		return nil, err
+	}
+	if r.IsMax() {
+		return json.Marshal("max")
+	}
+	return json.Marshal(strconv.Itoa(int(r)))
 }
 
-func (m *PerformanceMode) UnmarshalJSON(data []byte) error {
+func (r *FrameRate) UnmarshalJSON(data []byte) error {
 	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "max", "maximum", "unlimited":
+			*r = FrameRateMax
+			return nil
+		default:
+			value := strings.TrimSpace(strings.ToLower(s))
+			value = strings.TrimSpace(strings.TrimSuffix(value, "fps"))
+			n, err := strconv.Atoi(value)
+			if err != nil {
+				return fmt.Errorf("invalid frame rate %q", s)
+			}
+			*r = FrameRate(n)
+			return r.Validate()
+		}
 	}
-	switch s {
-	case "Performance", "":
-		*m = PerfModePerformance
-	case "Balanced":
-		*m = PerfModeBalanced
-	case "Ultra":
-		*m = PerfModeUltra
-	case "Eco":
-		*m = PerfModeEco
-	default:
-		return fmt.Errorf("unknown performance mode: %s", s)
+	var n int
+	if err := json.Unmarshal(data, &n); err != nil {
+		return fmt.Errorf("invalid frame rate: %w", err)
 	}
-	return nil
+	*r = FrameRate(n)
+	return r.Validate()
 }
 
-func (m PerformanceMode) Validate() error {
-	switch m {
-	case PerfModePerformance, PerfModeBalanced, PerfModeEco, PerfModeUltra:
+func (r FrameRate) Validate() error {
+	switch r {
+	case FrameRateMax, FrameRate15, FrameRate20, FrameRate25, FrameRate30,
+		FrameRate40, FrameRate50, FrameRate60:
 		return nil
 	default:
-		return fmt.Errorf("invalid performance mode %d", m)
+		return fmt.Errorf("invalid frame rate %d", r)
 	}
 }
 
-// AllPerformanceModes returns all valid performance modes.
-func AllPerformanceModes() []PerformanceMode {
-	return []PerformanceMode{PerfModeUltra, PerfModePerformance, PerfModeBalanced, PerfModeEco}
+// AllFrameRates returns every persisted frame-rate value.
+func AllFrameRates() []FrameRate {
+	return []FrameRate{FrameRate15, FrameRate20, FrameRate25, FrameRate30, FrameRate40, FrameRate50, FrameRate60, FrameRateMax}
+}
+
+// FrameRateChoices returns the settings values supported by the active
+// display. Max is display-bound; a numeric cap equal to the refresh rate is
+// omitted because it would have the same target.
+func FrameRateChoices(refreshRate int32) []FrameRate {
+	refreshRate = NormalizeRefreshRate(refreshRate)
+	choices := make([]FrameRate, 0, len(AllFrameRates()))
+	for _, rate := range AllFrameRates() {
+		if rate.IsMax() {
+			continue
+		}
+		if int32(rate) < refreshRate {
+			choices = append(choices, rate)
+		}
+	}
+	return append(choices, FrameRateMax)
 }
 
 // GraphicsSettings is the persisted user-tunable graphics parameters.
@@ -198,22 +199,25 @@ type GraphicsSettings struct {
 	RenderWidth   int           `json:"render_width"`
 	RenderHeight  int           `json:"render_height"`
 	UpscaleFilter UpscaleFilter `json:"upscale_filter"`
-	// Adaptive is retained for settings-file compatibility. Runtime resolution
-	// policy is derived from PerformanceMode and ignores this legacy flag.
-	Adaptive        bool            `json:"adaptive"`
-	BeatSensitivity float64         `json:"beat_sensitivity"`
-	PerformanceMode PerformanceMode `json:"performance_mode"`
+	// Adaptive enables dynamic resolution while keeping RenderWidth/Height as
+	// the user-selected ceiling.
+	Adaptive        bool      `json:"adaptive"`
+	FrameRate       FrameRate `json:"frame_rate"`
+	BeatSensitivity float64   `json:"beat_sensitivity"`
 }
 
 // DefaultGraphics returns sensible defaults.
 func DefaultGraphics() GraphicsSettings {
 	return GraphicsSettings{
-		RenderWidth:     320,
-		RenderHeight:    240,
+		// The oversized value is a startup sentinel. App.New clamps it to
+		// the largest resolution available on the current display, making
+		// the first-run choice effectively "maximum" on any normal screen.
+		RenderWidth:     8192,
+		RenderHeight:    8192,
 		UpscaleFilter:   FilterPixel,
 		Adaptive:        true,
+		FrameRate:       FrameRateMax,
 		BeatSensitivity: 1,
-		PerformanceMode: PerfModePerformance,
 	}
 }
 
@@ -224,11 +228,11 @@ func (g *GraphicsSettings) Validate() error {
 	if g.UpscaleFilter < FilterSmooth || g.UpscaleFilter > FilterPixel {
 		return fmt.Errorf("invalid upscale filter %d", g.UpscaleFilter)
 	}
+	if err := g.FrameRate.Validate(); err != nil {
+		return fmt.Errorf("frame rate: %w", err)
+	}
 	if math.IsNaN(g.BeatSensitivity) || math.IsInf(g.BeatSensitivity, 0) || g.BeatSensitivity < 0 || g.BeatSensitivity > 2 {
 		return fmt.Errorf("beat sensitivity must be 0..2, got %v", g.BeatSensitivity)
-	}
-	if err := g.PerformanceMode.Validate(); err != nil {
-		return fmt.Errorf("performance mode: %w", err)
 	}
 	return nil
 }

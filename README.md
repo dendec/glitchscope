@@ -9,7 +9,7 @@ Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing 
 - **Audio Playback** — Plays WAV, MP3, FLAC, Ogg Vorbis, Opus, AAC, WMA, APE, WavPack, Musepack, Speex, and more via FFmpeg & SoLoud
 - **Tracker & Chip Music** — Full support for MOD, XM, IT, S3M (libopenmpt / libxmp), PT3 (pt3player), VTX (ayumi), YM (StSound), SID (cRSID), and console audio formats (libgme)
 - **MilkDrop Visualizations** — Real-time rendering powered by projectM 4.x with 100+ embedded `.milk` presets and compressed `.gsa` preset archives
-- **Graphics Settings** — Custom render resolution scaling (e.g., 320x240, 480x360, 640x480) and upscale filters (Smooth/Pixel)
+- **Graphics Settings** — Independent frame-rate cap (including display-bound Max), adaptive-resolution toggle, render-resolution ceiling and upscale filter (Smooth/Pixel)
 - **Playback Modes** — Shuffle (Album, Source, All) and Repeat (Off, Repeat One, Repeat All). Manual Next honors shuffle. Offline Shuffle All selects local music and already-downloaded remote tracks; Shuffle Source is restricted to the cached subset of the selected remote source. Connectivity is rechecked every 30 seconds. Failed loads are skipped, with bounded recovery to avoid an endless loop of broken tracks.
 - **Online Module Catalogs** — Browse Modland, yearly ModArchive additions, the 2007 official addendum, and the 1987-2007 ModArchive snapshot; bundled `1980-2007.gsa` and `2007-addendum.gsa` indexes provide offline navigation, while selected tracks are fetched individually with HTTP Range requests
 - **Internet Radio** — Browse Radio Browser stations by popularity, random selection, tag, language, or country; station listings are cached locally, MP3/AAC streams use the existing FFmpeg/SoLoud pipeline, and ICY track titles appear in the station panel. Local `.m3u`, `.m3u8`, and `.pls` station playlists are also supported. Basic unencrypted HLS is supported; byte ranges, gaps, discontinuities and changing init segments are rejected explicitly (see [radio review](docs/RADIO-REVIEW.md))
@@ -97,10 +97,12 @@ GPL-2.0+ (See [portmaster/licenses/THIRD_PARTY_LICENSES.md](portmaster/licenses/
   depends on the decoder.
 - **Visualizer → Off** plays music without running the main visualizer. The
   presets page still provides previews when opened.
-- Balanced/Eco avoid presenting duplicate visualization frames. Input continues
-  at 60 Hz. Preset previews load after a short cursor pause.
+- The visualizer follows the selected frame-rate limit while input remains
+  responsive. Adaptive resolution is independent and never exceeds the selected
+  resolution ceiling. Preset previews load after a short cursor pause.
 - Stable preset resolutions are remembered during the current run (up to 256
-  profiles). Mode changes, window size and changed preset content are isolated.
+  profiles). Frame-rate/adaptive setting changes, window size and changed preset
+  content are isolated.
 
 For a device benchmark, run `./glitchscope -benchmark -benchmark-frames=120 -benchmark-out=benchmark-handheld.csv`. CSV contains preset startup
 and load time, mean/p95/p99/max frame times and process-lifetime peak RSS. Use a
@@ -114,19 +116,15 @@ performance. `-v` logs audio decoding time and process peak RSS.
 
 On first use, **START — Open menu** (or **TAB** with a keyboard) appears for ten
 seconds. Opening the menu dismisses it permanently; missing the hint lets it
-reappear next time. Help begins with Quick Start, Controls, Playback, Quality and
+reappear next time. Help begins with Quick Start, Controls, Playback, Frame rate and
 Battery, and Troubleshooting. Button names match the context hints at the bottom
 of the menu. Settings includes short explanations of the selected options.
 
-Режим **Ultra / Ультра** использует выбранное разрешение без автоматического
-снижения и без искусственного ограничения FPS; фактическая частота зависит от
-GPU, сложности пресета и частоты дисплея. В режимах Performance, Balanced и Eco
-выбранное разрешение является верхним пределом: при нагрузке сначала снижается
-разрешение с проверкой выигрыша, затем частота визуализатора.
-Настройка «Качество» ограничивает снижение каждой стороны: Высокое и Баланс —
-вдвое, Eco — вчетверо от выбранного разрешения, но не ниже 1/8 экрана.
-Польза снижения разрешения проверяется по времени полного кадра, включая вывод,
-и фактической частоте; сомнительный результат проверяется повторно. Если пользы
-нет, снижение отменяется. FPS уменьшается только при устойчивом отставании от
-назначенной частоты; превышение желаемого бюджета Eco не снижает стабильные 20 FPS. Новый пресет получает
-выбранное разрешение и целевой FPS либо проверенные параметры из кэша сессии.
+В настройках визуализации частота кадров, адаптивное разрешение и разрешение
+выбираются независимо. Частота предлагает фиксированные значения до частоты
+дисплея и пункт «Макс.» с текущей частотой обновления; одинаковые значения не
+дублируются. При включённом адаптивном разрешении выбранный размер является
+верхним пределом: приложение может понижать и восстанавливать его, чтобы
+приблизиться к целевой частоте, но не меняет саму настройку FPS. При выключенной
+адаптации разрешение фиксировано. По умолчанию используются «Макс.»,
+адаптивное разрешение и максимальный размер экрана.

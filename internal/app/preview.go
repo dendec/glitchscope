@@ -242,7 +242,7 @@ func previewFrameDue(now, nextFrame time.Time) bool {
 	return nextFrame.IsZero() || !now.Before(nextFrame)
 }
 
-// SetFPS keeps preview within the selected mode's visualizer budget.
+// SetFPS keeps preview within the selected frame-rate budget.
 func (r *previewRenderer) SetFPS(fps int32) {
 	fps = min(previewTargetFPS, max(1, fps))
 	r.framePeriod = time.Second / time.Duration(fps)

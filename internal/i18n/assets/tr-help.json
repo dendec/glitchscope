@@ -101,17 +101,16 @@
     "id": 2
   },
   {
-    "title": "Kalite ve Batarya",
+    "title": "Kare hızı ve çözünürlük",
     "children": [
       {
-        "title": "Kalite",
+        "title": "Görselleştirici ayarları",
         "lines": [
-          "Ultra: Seçilen çözünürlüğü doğrudan kullanır, yapay FPS sınırı yoktur; ekran yenileme hızı üst sınırdır.",
-          "Performans: 30 FPS hedefiyle yüksek ayrıntı; yük altında çözünürlük otomatik olarak düşebilir.",
-          "Dengeli: 25 FPS ile kalite ve pil ömrü arasında denge; yük altında çözünürlük otomatik olarak düşebilir.",
-          "Tasarruf: Güç tasarrufu için 20 FPS hedefi; yük altında çözünürlük otomatik olarak düşebilir.",
-          "Seçilen çözünürlük diğer modlarda uyarlamalı üst sınır, Ultra'da doğrudan kullanılan değerdir.",
-          "Öncelik FPS: önce çözünürlüğü azaltın (Performans/Dengeli için her boyutta yarıya, Tasarruf için dörtte bire kadar). Fayda sağlamazsa çözünürlüğü geri yükleyip FPS değerini azaltın. FPS yalnızca planlanan kare hızı sürdürülemediğinde düşürülür; yalnızca tasarruf bütçesinin aşılması FPS değerini düşürmez."
+          "Kare hızı, etkin ekran yenileme hızının altında sabit bir sınır veya Max (etkin yenileme hızı) seçer.",
+          "Uyarlanabilir çözünürlük, hedefe yaklaşmak için görüntü boyutunu düşürür veya geri yükler.",
+          "Uyarlama açıkken çözünürlük en yüksek boyuttur; kapalıyken sabit boyut kullanılır.",
+          "Max etkin yenileme hızını gösterir; aynı sayısal sınır tekrar oluşmaması için gizlenir.",
+          "Önayar en düşük düzeyde bile fazla karmaşıksa gerçek FPS hedefin altında kalabilir."
         ]
       },
       {
@@ -952,7 +951,7 @@
       "Yerel ses dosyalarını, tracker modüllerini ve klasik oyun müziği formatlarını çalın veya Modland ve ModArchive kataloglarını inceleyin.",
       "Görseller projectM tarafından oluşturulur. Sesler ise her format için özel olarak seçilen açık kaynaklı motorlar tarafından çözümlenir.",
       "",
-      "Performans, Dengeli ve Ekonomi modları, cihaza göre görsel kaliteyi ayarlar. Sadece müzik çalma modunda görselleştirici de devre dışı bırakılabilir.",
+      "Kare hızı hedefini ve bağımsız uyarlanabilir çözünürlük sınırını seçin. Yalnızca müzik çalmak için görselleştiriciyi de kapatabilirsiniz.",
       "",
       "**Proje**",
       "https://github.com/dendec/glitchscope",

@@ -101,17 +101,16 @@
     "id": 2
   },
   {
-    "title": "Chất lượng âm thanh và pin",
+    "title": "Tốc độ khung hình và độ phân giải",
     "children": [
       {
-        "title": "Chất lượng",
+        "title": "Cài đặt trình hiển thị",
         "lines": [
-          "Ultra: Dùng trực tiếp độ phân giải đã chọn, không có giới hạn FPS nhân tạo; tần số quét màn hình là giới hạn trên.",
-          "Hiệu năng: Mục tiêu 30 FPS; độ phân giải có thể tự động giảm khi tải cao.",
-          "Cân bằng: Mục tiêu 25 FPS; độ phân giải có thể tự động giảm khi tải cao.",
-          "Tiết kiệm: Mục tiêu 20 FPS để tiết kiệm điện; độ phân giải có thể tự động giảm khi tải cao.",
-          "Độ phân giải đã chọn là giới hạn thích ứng ở các chế độ khác và được dùng trực tiếp trong Ultra.",
-          "Ưu tiên FPS: thử giảm độ phân giải trước (mỗi chiều còn một nửa ở Hiệu năng/Cân bằng, một phần tư ở Tiết kiệm). Nếu không hiệu quả, khôi phục độ phân giải rồi giảm FPS. Chỉ giảm FPS khi không duy trì được tốc độ khung hình đã đặt; chỉ vượt ngân sách tiết kiệm điện sẽ không làm giảm FPS."
+          "Tốc độ khung hình chọn giới hạn cố định thấp hơn tần số quét màn hình hiện tại hoặc Max (tần số quét hiện tại).",
+          "Độ phân giải thích ứng giảm hoặc khôi phục kích thước hình ảnh để tiến gần mục tiêu đó.",
+          "Độ phân giải là kích thước tối đa khi bật thích ứng và là kích thước cố định khi tắt.",
+          "Max hiển thị tần số quét hiện tại; giới hạn số trùng khớp sẽ được ẩn để tránh lặp.",
+          "Nếu preset quá phức tạp ngay cả ở mức thấp nhất, FPS thực tế có thể vẫn thấp hơn mục tiêu."
         ]
       },
       {
@@ -952,7 +951,7 @@
       "Phát nhạc từ tập tin địa phương, các mô-đun tracker và các định dạng nhạc game cổ điển, hoặc khám phá các danh mục Modland và ModArchive.",
       "Hình ảnh được hiển thị nhờ projectM. Âm thanh được giải mã bằng các công cụ mã nguồn mở chuyên dụng được chọn phù hợp với từng định dạng.",
       "",
-      "Các chế độ Hiệu năng, Cân bằng và Tiết kiệm sẽ điều chỉnh chất lượng hình ảnh tùy theo thiết bị. Bạn cũng có thể tắt bộ hiển thị biểu đồ khi chỉ phát nhạc.",
+      "Hãy chọn mục tiêu tốc độ khung hình và giới hạn độ phân giải thích ứng độc lập. Bạn cũng có thể tắt trình hiển thị khi chỉ phát nhạc.",
       "",
       "**Dự án**",
       "https://github.com/dendec/glitchscope",

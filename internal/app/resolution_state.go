@@ -22,7 +22,7 @@ type resolutionState struct {
 }
 
 // Configure sets the resolution list and starts at the configured ceiling.
-func (s *resolutionState) Configure(winW, winH int, ceiling config.RenderResolution, params config.ModeParams) bool {
+func (s *resolutionState) Configure(winW, winH int, ceiling config.RenderResolution, params adaptiveParams) bool {
 	s.resolutions = config.ComputeResolutions(winW, winH)
 	s.policy.params = params
 	if len(s.resolutions) == 0 {
@@ -31,16 +31,9 @@ func (s *resolutionState) Configure(winW, winH int, ceiling config.RenderResolut
 		return false
 	}
 	s.ceilingIndex = config.ClosestResolutionIndex(s.resolutions, ceiling)
-	s.floorIndex = s.ceilingIndex
-	limit := s.resolutions[s.ceilingIndex]
-	divisor := max(params.ResolutionDivisor, 1)
-	for i := s.ceilingIndex + 1; i < len(s.resolutions); i++ {
-		r := s.resolutions[i]
-		if r.Width*divisor < limit.Width || r.Height*divisor < limit.Height {
-			break
-		}
-		s.floorIndex = i
-	}
+	// Adaptive resolution uses the complete grid. The selected resolution is
+	// always the ceiling; the smallest available step is the lower bound.
+	s.floorIndex = len(s.resolutions) - 1
 	s.index = s.ceilingIndex
 	s.upscaleFloor = s.ceilingIndex
 	s.restartPolicy()
@@ -48,8 +41,21 @@ func (s *resolutionState) Configure(winW, winH int, ceiling config.RenderResolut
 }
 
 // Reset starts a new adaptive session at the configured resolution ceiling.
-func (s *resolutionState) Reset(winW, winH int, ceiling config.RenderResolution, params config.ModeParams) bool {
+func (s *resolutionState) Reset(winW, winH int, ceiling config.RenderResolution, params adaptiveParams) bool {
 	return s.Configure(winW, winH, ceiling, params)
+}
+
+// Reconfigure rebuilds the resolution grid while retaining the current
+// effective render size when it still fits the new ceiling.
+func (s *resolutionState) Reconfigure(winW, winH int, ceiling, warm config.RenderResolution, params adaptiveParams) bool {
+	if !s.Configure(winW, winH, ceiling, params) {
+		return false
+	}
+	if warm.Width <= 0 || warm.Height <= 0 {
+		return true
+	}
+	s.index = min(max(config.ClosestResolutionIndex(s.resolutions, warm), s.ceilingIndex), s.floorIndex)
+	return true
 }
 
 func (s *resolutionState) restartPolicy() {
@@ -64,9 +70,9 @@ func (s *resolutionState) RestartForPreset() {
 	s.restartPolicy()
 }
 
-func (s *resolutionState) Decide(utilization, cadence float64, now time.Time, currentFPS int32) (config.RenderResolution, int32, adaptiveAction) {
+func (s *resolutionState) Decide(utilization, cadence float64, now time.Time) (config.RenderResolution, adaptiveAction) {
 	// The caller supplies a fresh full measurement window after every change.
-	cost := utilization / float64(max(currentFPS, 1))
+	cost := utilization
 	if s.trialAction != adaptiveNone {
 		trial := s.trialAction
 		cadenceImproved := cadence <= s.trialCadence*0.92 ||
@@ -74,11 +80,11 @@ func (s *resolutionState) Decide(utilization, cadence float64, now time.Time, cu
 		ineffective := trial == adaptiveResolutionDown && cost > s.trialCost*0.92 && !cadenceImproved
 		if ineffective && !s.trialConfirm {
 			s.trialConfirm = true
-			return config.RenderResolution{}, currentFPS, adaptiveResample
+			return config.RenderResolution{}, adaptiveResample
 		}
 		s.trialAction = adaptiveNone
 		s.trialConfirm = false
-		tooExpensive := trial == adaptiveResolutionUp && (utilization > s.policy.params.UtilizationHigh*0.95 || cadence > cadenceTolerance)
+		tooExpensive := trial == adaptiveResolutionUp && (utilization > s.policy.params.utilizationHigh*0.95 || cadence > cadenceTolerance)
 		if ineffective || tooExpensive {
 			if ineffective {
 				s.downBlocked = true
@@ -88,35 +94,31 @@ func (s *resolutionState) Decide(utilization, cadence float64, now time.Time, cu
 			s.index = s.trialIndex
 			s.policy.Restart()
 			if ineffective {
-				return s.resolutions[s.index], currentFPS, adaptiveResolutionUp
+				return s.resolutions[s.index], adaptiveResolutionUp
 			}
-			return s.resolutions[s.index], currentFPS, adaptiveResolutionDown
+			return s.resolutions[s.index], adaptiveResolutionDown
 		}
 	}
 	count := s.floorIndex + 1
 	if s.downBlocked {
 		count = s.index + 1
 	}
-	action := s.policy.Decide(utilization, cadence, now, int(currentFPS), s.index, max(s.ceilingIndex, s.upscaleFloor), count)
+	action := s.policy.Decide(utilization, cadence, now, s.index, max(s.ceilingIndex, s.upscaleFloor), count)
 	switch action {
-	case adaptiveFrequencyDown:
-		return config.RenderResolution{}, max(s.policy.params.MinVisualizerFPS, currentFPS-s.policy.params.FrequencyStep), action
-	case adaptiveFrequencyUp:
-		return config.RenderResolution{}, min(s.policy.params.VisualizerFPS, currentFPS+s.policy.params.FrequencyStep), action
 	case adaptiveResolutionDown:
 		if s.index < s.floorIndex {
 			s.trialAction, s.trialIndex, s.trialCost = action, s.index, cost
 			s.trialCadence, s.trialConfirm = cadence, false
 			s.index++
-			return s.resolutions[s.index], currentFPS, action
+			return s.resolutions[s.index], action
 		}
 	case adaptiveResolutionUp:
 		if s.index > s.ceilingIndex && s.index-1 >= s.upscaleFloor {
 			s.trialAction, s.trialIndex, s.trialCost = action, s.index, cost
 			s.trialCadence, s.trialConfirm = cadence, false
 			s.index--
-			return s.resolutions[s.index], currentFPS, action
+			return s.resolutions[s.index], action
 		}
 	}
-	return config.RenderResolution{}, currentFPS, adaptiveNone
+	return config.RenderResolution{}, adaptiveNone
 }

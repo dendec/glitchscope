@@ -2,38 +2,47 @@ package app
 
 import (
 	"time"
-
-	"github.com/dendec/glitchscope/internal/config"
 )
 
 type adaptiveAction uint8
 
 const (
 	adaptiveNone adaptiveAction = iota
-	adaptiveFrequencyDown
-	adaptiveFrequencyUp
 	adaptiveResolutionDown
 	adaptiveResolutionUp
-	// adaptiveResample requests a disjoint measurement window without changing quality.
+	// adaptiveResample requests a disjoint measurement window without changing resolution.
 	adaptiveResample
 )
 
 // Allow small scheduling jitter without treating it as sustained overload.
 const cadenceTolerance = 1.10
 
+// adaptiveParams is runtime policy, not persisted user configuration.
+type adaptiveParams struct {
+	utilizationHigh float64
+	downshiftAfter  time.Duration
+	upshiftAfter    time.Duration
+}
+
+func defaultAdaptiveParams() adaptiveParams {
+	return adaptiveParams{
+		utilizationHigh: 1,
+		downshiftAfter:  time.Second,
+		upshiftAfter:    3 * time.Second,
+	}
+}
+
 // adaptivePolicy preserves cadence before optimizing the soft work budget.
 // The state bounds and validates resolution trials.
 type adaptivePolicy struct {
-	params        config.ModeParams
+	params        adaptiveParams
 	highSince     time.Time
-	upSince       time.Time
 	lowSince      time.Time
 	cooldownUntil time.Time
 }
 
 func (p *adaptivePolicy) Reset() {
 	p.highSince = time.Time{}
-	p.upSince = time.Time{}
 	p.lowSince = time.Time{}
 }
 
@@ -41,59 +50,32 @@ func (p *adaptivePolicy) Restart() {
 	*p = adaptivePolicy{params: p.params}
 }
 
-func (p *adaptivePolicy) Decide(utilization, cadence float64, now time.Time, currentFPS, currentIndex, ceilingIndex, resolutionCount int) adaptiveAction {
+func (p *adaptivePolicy) Decide(utilization, cadence float64, now time.Time, currentIndex, ceilingIndex, resolutionCount int) adaptiveAction {
 	if !p.cooldownUntil.IsZero() && now.Before(p.cooldownUntil) {
 		return adaptiveNone
 	}
 
-	// Frequency recovery uses the whole frame period, not the soft energy band.
-	nextFPS := min(currentFPS+int(p.params.FrequencyStep), int(p.params.VisualizerFPS))
-	if currentFPS < nextFPS && cadence <= cadenceTolerance &&
-		utilization*float64(nextFPS)/float64(max(currentFPS, 1)) <= 0.90 {
-		p.highSince = time.Time{}
-		p.lowSince = time.Time{}
-		if p.upSince.IsZero() {
-			p.upSince = now
-			return adaptiveNone
-		}
-		if now.Sub(p.upSince) >= p.params.UpshiftAfter {
-			p.resetAfterChange(now)
-			return adaptiveFrequencyUp
-		}
-		return adaptiveNone
-	}
-	p.upSince = time.Time{}
-
 	switch {
-	case utilization > p.params.UtilizationHigh || cadence > cadenceTolerance:
+	case utilization > p.params.utilizationHigh || cadence > cadenceTolerance:
 		p.lowSince = time.Time{}
 		if p.highSince.IsZero() {
 			p.highSince = now
 			return adaptiveNone
 		}
-		if now.Sub(p.highSince) < p.params.DownshiftAfter {
+		if now.Sub(p.highSince) < p.params.downshiftAfter {
 			return adaptiveNone
 		}
 		p.resetAfterChange(now)
 		if currentIndex+1 < resolutionCount {
 			return adaptiveResolutionDown
 		}
-		// Exceeding an energy target alone must never sacrifice sustained FPS.
-		if cadence > cadenceTolerance && currentFPS > int(p.params.MinVisualizerFPS) {
-			return adaptiveFrequencyDown
-		}
-	case utilization < p.params.UtilizationHigh:
+	case utilization <= p.params.utilizationHigh:
 		p.highSince = time.Time{}
-		p.upSince = time.Time{}
-		if utilization >= p.params.UtilizationLow {
-			p.lowSince = time.Time{}
-			return adaptiveNone
-		}
 		if p.lowSince.IsZero() {
 			p.lowSince = now
 			return adaptiveNone
 		}
-		if now.Sub(p.lowSince) < p.params.UpshiftAfter {
+		if now.Sub(p.lowSince) < p.params.upshiftAfter {
 			return adaptiveNone
 		}
 		p.resetAfterChange(now)

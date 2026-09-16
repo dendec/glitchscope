@@ -41,6 +41,16 @@ type runState struct {
 	lowFPSPreset  string
 }
 
+// displaySnapshot identifies the active display mode used by the window.
+// Display identity and mode dimensions matter even when the refresh rate does
+// not change: adaptive measurements are tied to the active display.
+type displaySnapshot struct {
+	index         int
+	width, height int32
+	refreshRate   int32
+	format        uint32
+}
+
 func (c *visualizerClock) Due(now time.Time) bool {
 	return c.nextFrame.IsZero() || !now.Before(c.nextFrame)
 }
@@ -91,34 +101,49 @@ func (a *App) Run() {
 
 	state := runState{lastLoop: time.Now()}
 	var nextDisplayCheck time.Time
-	refreshRate := int32(60)
+	display := a.displaySnapshot()
+	refreshRate := display.refreshRate
 	loopPeriod := mainFramePeriod
 	for range ticker.C {
 		if a.quit.Load() {
 			return
 		}
 		now := time.Now()
+		displayChanged := false
 		if !now.Before(nextDisplayCheck) {
-			refreshRate = a.displayRefreshRate()
+			newDisplay := a.displaySnapshot()
+			displayChanged = newDisplay != display
+			display = newDisplay
+			refreshRate = display.refreshRate
 			nextDisplayCheck = now.Add(time.Second)
 		}
-		period, fps := frameTiming(a.settings.Graphics.PerformanceMode, refreshRate)
+		w32, h32 := a.window.GLGetDrawableSize()
+		w, h := int(w32), int(h32)
+		period, fps := frameTiming(a.settings.Graphics.FrameRate, refreshRate)
 		if period != loopPeriod {
 			ticker.Reset(period)
 			loopPeriod = period
 		}
 		if a.targetVisualizerFPS != fps {
-			a.targetVisualizerFPS = fps
-			a.setEffectiveVisualizerFPS(fps)
+			a.setVisualizerFPS(fps)
+			if a.settings.Graphics.Adaptive && a.rt != nil {
+				a.resetAdaptiveState(int(w32), int(h32))
+				a.renderCost.Reset()
+			}
+		} else if displayChanged && a.settings.Graphics.Adaptive && a.rt != nil {
+			a.resetAdaptiveState(int(w32), int(h32))
+			a.renderCost.Reset()
+		}
+		if displayChanged && a.overlay != nil && a.overlay.IsSettingsPage() {
+			rows := ui.BuildSettingsRowsWithCatalogForRefresh(*a.settings, w, h, refreshRate, a.overlay.Catalog())
+			a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 		}
 		a.uiFramePeriod = period
 		dt := now.Sub(state.lastLoop).Seconds()
 		state.lastLoop = now
 		fpsAvg := a.vizClock.meter.Average()
 
-		w32, h32 := a.window.GLGetDrawableSize()
-		w, h := int(w32), int(h32)
-		a.prepareFrame(&state, now, w, h, fpsAvg)
+		a.prepareFrame(&state, now, w, h, fpsAvg, refreshRate)
 		if !a.handleFrameInput(&state, now, dt, w, h) {
 			return
 		}
@@ -127,25 +152,25 @@ func (a *App) Run() {
 	}
 }
 
-func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg float64) {
+func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg float64, refreshRate int32) {
 	newVisualizerFrame := state.consumeAdaptiveFrame(&a.vizClock)
 	adaptiveReady := !a.vizClock.adaptivePaused && a.renderCost.Full()
-	params := a.settings.Graphics.PerformanceMode.Params()
+	params := defaultAdaptiveParams()
 	// Use the scheduled cadence so fewer renders actually release budget.
-	utilization := a.renderCost.Utilization(a.effectiveVisualizerFPS)
-	cadence := a.renderCost.Cadence(a.effectiveVisualizerFPS)
-	if adaptiveReady && utilization > params.UtilizationHigh && !a.onPresetsPage {
+	utilization := a.renderCost.Utilization(a.targetVisualizerFPS)
+	cadence := a.renderCost.Cadence(a.targetVisualizerFPS)
+	if adaptiveReady && utilization > params.utilizationHigh && !a.onPresetsPage {
 		presetName := ""
 		if a.presetIdx >= 0 && a.presetIdx < len(a.presetNames) {
 			presetName = a.presetNames[a.presetIdx]
 		}
 		if presetName != state.lowFPSPreset {
 			renderW, renderH := a.rt.Size()
-			slog.Debug("soft frame budget exceeded", "utilization", utilization, "threshold", params.UtilizationHigh, "preset", presetName, "resolution", fmt.Sprintf("%dx%d", renderW, renderH))
+			slog.Debug("soft frame budget exceeded", "utilization", utilization, "threshold", params.utilizationHigh, "preset", presetName, "resolution", fmt.Sprintf("%dx%d", renderW, renderH))
 			state.lowFPSPreset = presetName
 		}
 	}
-	if adaptiveReady && utilization <= params.UtilizationHigh {
+	if adaptiveReady && utilization <= params.utilizationHigh {
 		state.lowFPSPreset = "" // reset so next drop on same preset logs again
 	}
 	winChanged := w != state.prevW || h != state.prevH
@@ -159,33 +184,29 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 
 	if winChanged && state.prevW > 0 && state.prevH > 0 {
 		ceiling := config.ResolutionAtMost(config.ComputeResolutions(w, h), a.configuredResolution)
-		if a.settings.Graphics.PerformanceMode == config.PerfModeUltra {
+		if !a.settings.Graphics.Adaptive {
 			a.applyRenderResolution(ceiling)
 		} else {
-			if a.adaptive.Configure(w, h, ceiling, params) {
+			warm := currentRenderResolution(a.rt)
+			if a.adaptive.Reconfigure(w, h, ceiling, warm, params) {
 				a.applyRenderResolution(a.adaptive.resolutions[a.adaptive.index])
 			} else {
 				slog.Warn("adaptive: empty resolution list on resize", "window", fmt.Sprintf("%dx%d", w, h))
 			}
-			a.resetAdaptiveCounters()
 			if a.overlay != nil && a.overlay.IsSettingsPage() {
-				rows := ui.BuildSettingsRowsWithCatalog(*a.settings, w, h, a.overlay.Catalog())
+				rows := ui.BuildSettingsRowsWithCatalogForRefresh(*a.settings, w, h, refreshRate, a.overlay.Catalog())
 				a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 			}
 		}
 	}
 	state.prevW, state.prevH = w, h
 
-	if a.settings.Graphics.PerformanceMode != config.PerfModeUltra && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage &&
+	if a.settings.Graphics.Adaptive && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage &&
 		adaptiveReady && newVisualizerFrame && !a.adaptiveSuspended(now) {
 		renderW, renderH := a.rt.Size()
 		highFor := time.Duration(0)
 		if !a.adaptive.policy.highSince.IsZero() {
 			highFor = now.Sub(a.adaptive.policy.highSince)
-		}
-		upFor := time.Duration(0)
-		if !a.adaptive.policy.upSince.IsZero() {
-			upFor = now.Sub(a.adaptive.policy.upSince)
 		}
 		lowFor := time.Duration(0)
 		if !a.adaptive.policy.lowSince.IsZero() {
@@ -196,27 +217,24 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 			cooldownFor = a.adaptive.policy.cooldownUntil.Sub(now)
 		}
 		slog.Debug("adaptive render sample",
-			"mode", a.settings.Graphics.PerformanceMode,
+			"frame_rate", a.settings.Graphics.FrameRate,
+			"adaptive_resolution", a.settings.Graphics.Adaptive,
 			"frame_work_avg_ms", a.renderCost.Average().Seconds()*1000,
 			"cadence_ratio", cadence,
 			"present_interval_avg_ms", a.renderCost.intervals.Average().Seconds()*1000,
 			"budget_utilization_pct", utilization*100,
-			"target_budget_utilization_pct", a.renderCost.Utilization(params.VisualizerFPS)*100,
-			"effective_fps", a.effectiveVisualizerFPS,
-			"target_fps", params.VisualizerFPS,
-			"min_fps", params.MinVisualizerFPS,
+			"target_fps", a.targetVisualizerFPS,
 			"resolution", fmt.Sprintf("%dx%d", renderW, renderH),
 			"resolution_index", a.adaptive.index,
 			"ceiling_index", a.adaptive.ceilingIndex,
 			"resolution_count", len(a.adaptive.resolutions),
 			"samples", a.renderCost.Count(),
 			"high_for_ms", highFor.Milliseconds(),
-			"up_for_ms", upFor.Milliseconds(),
 			"resolution_up_for_ms", lowFor.Milliseconds(),
 			"cooldown_for_ms", cooldownFor.Milliseconds())
-		// Reconfigure the active profile after mode/window changes without
+		// Reconfigure the active profile after setting/window changes without
 		// reusing an incompatible measurement.
-		key := presetProfileKey{name: a.currentPresetName(), mode: a.settings.Graphics.PerformanceMode, width: w, height: h, ceilingIndex: a.adaptive.ceilingIndex}
+		key := a.presetProfileKeyAt(a.currentPresetName(), w, h)
 		if key != a.presetTuning.active {
 			if data, err := presets.Read(key.name); err == nil {
 				a.presetTuning.activate(key, data)
@@ -224,15 +242,12 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 				slog.Debug("preset profile read", "error", err)
 			}
 		}
-		a.presetTuning.observe(a.adaptive.index, a.adaptive.upscaleFloor, a.effectiveVisualizerFPS, a.adaptive.trialAction == adaptiveNone && cadence <= cadenceTolerance)
-		if resolution, fps, action := a.adaptive.Decide(utilization, cadence, now, a.effectiveVisualizerFPS); action != adaptiveNone {
+		a.presetTuning.observe(a.adaptive.index, a.adaptive.upscaleFloor, a.adaptive.trialAction == adaptiveNone && cadence <= cadenceTolerance)
+		if resolution, action := a.adaptive.Decide(utilization, cadence, now); action != adaptiveNone {
 			a.renderCost.Reset()
 			switch action {
 			case adaptiveResample:
 				slog.Debug("adaptive: confirming resolution trial", "cadence_ratio", cadence)
-			case adaptiveFrequencyDown, adaptiveFrequencyUp:
-				a.setEffectiveVisualizerFPS(fps)
-				slog.Info("adaptive: frequency step", "fps", fps, "utilization", utilization, "cadence_ratio", cadence)
 			case adaptiveResolutionDown, adaptiveResolutionUp:
 				a.applyRenderResolution(resolution)
 				slog.Info("adaptive: resolution step", "resolution", resolution, "utilization", utilization, "cadence_ratio", cadence)
@@ -262,7 +277,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 		a.updateMetadata(&playback, trackAlbumIdx, refresh)
 		playback = a.resolveRadioPlayingInfo(playback)
 		_, effectiveRenderHeight := a.rt.Size()
-		a.presenter.Update(fpsAvg, a.settings.Graphics.PerformanceMode != config.PerfModeUltra,
+		a.presenter.Update(fpsAvg, a.settings.Graphics.Adaptive,
 			effectiveRenderHeight, a.prof.ReadStats(), playback)
 	}
 }
@@ -451,19 +466,18 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 		if !paused && !a.adaptiveSuspended(presented) {
 			a.renderCost.AddFrame(renderCost, presentationCost, presented)
 		}
-		params := a.settings.Graphics.PerformanceMode.Params()
 		renderW, renderH := a.rt.Size()
 		slog.Debug("visualizer frame",
-			"mode", a.settings.Graphics.PerformanceMode,
+			"frame_rate", a.settings.Graphics.FrameRate,
+			"adaptive_resolution", a.settings.Graphics.Adaptive,
 			"render_ms", renderCost.Seconds()*1000,
 			"presentation_ms", presentationCost.Seconds()*1000,
 			"frame_work_ms", (renderCost+presentationCost).Seconds()*1000,
-			"budget_ms", 1000/float64(max(a.effectiveVisualizerFPS, 1)),
-			"rolling_budget_utilization_pct", a.renderCost.Utilization(a.effectiveVisualizerFPS)*100,
-			"cadence_ratio", a.renderCost.Cadence(a.effectiveVisualizerFPS),
+			"budget_ms", 1000/float64(max(a.targetVisualizerFPS, 1)),
+			"rolling_budget_utilization_pct", a.renderCost.Utilization(a.targetVisualizerFPS)*100,
+			"cadence_ratio", a.renderCost.Cadence(a.targetVisualizerFPS),
 			"present_interval_avg_ms", a.renderCost.intervals.Average().Seconds()*1000,
-			"effective_fps", a.effectiveVisualizerFPS,
-			"target_fps", params.VisualizerFPS,
+			"target_fps", a.targetVisualizerFPS,
 			"resolution", fmt.Sprintf("%dx%d", renderW, renderH),
 			"samples", a.renderCost.Count(),
 			"adaptive_paused", paused || a.adaptiveSuspended(presented))
@@ -494,7 +508,7 @@ func (a *App) renderVisualization(now time.Time, w, h int, opaque, interacting b
 	}
 	if a.settings.Graphics.VisualizerOff || opaque ||
 		!budget.Due(now, a.vizClock.framePeriod, interacting) ||
-		(a.settings.Graphics.PerformanceMode != config.PerfModeUltra && !a.vizClock.Due(now)) {
+		!a.vizClock.Due(now) {
 		return false
 	}
 	a.pm.SetFPS(int32(time.Second / budget.Period(a.vizClock.framePeriod, interacting)))
@@ -509,7 +523,7 @@ func (a *App) renderVisualization(now time.Time, w, h int, opaque, interacting b
 
 func (a *App) presentFrame(now time.Time, w, h int, rendered, uiVisible, uiOpaque bool) time.Duration {
 	audioOnly := a.settings.Graphics.VisualizerOff && !a.onPresetsPage
-	due := presentationDue(a.settings.Graphics.PerformanceMode, now, a.nextPresent, rendered, a.presentRequested, uiVisible)
+	due := presentationDue(a.settings.Graphics.FrameRate, now, a.nextPresent, rendered, a.presentRequested, uiVisible)
 	if audioOnly {
 		due = a.presentRequested || !now.Before(a.nextPresent)
 	}
@@ -633,6 +647,14 @@ func (a *App) applyRenderResolution(r config.RenderResolution) {
 	a.resizeRenderTarget(r)
 }
 
+func currentRenderResolution(rt *projectm.RenderTarget) config.RenderResolution {
+	if rt == nil {
+		return config.RenderResolution{}
+	}
+	w, h := rt.Size()
+	return config.RenderResolution{Width: w, Height: h}
+}
+
 func (a *App) resizeRenderTarget(r config.RenderResolution) {
 	if currentW, currentH := a.rt.Size(); currentW == r.Width && currentH == r.Height {
 		return
@@ -658,54 +680,65 @@ func (a *App) resetAdaptiveCounters() {
 }
 
 func (a *App) resetAdaptiveState(winW, winH int) {
-	if !a.adaptive.Reset(winW, winH, a.configuredResolution, a.settings.Graphics.PerformanceMode.Params()) {
+	if !a.adaptive.Reconfigure(winW, winH, a.configuredResolution, currentRenderResolution(a.rt), defaultAdaptiveParams()) {
 		slog.Warn("adaptive: empty resolution list", "window", fmt.Sprintf("%dx%d", winW, winH))
 		return
 	}
 	a.applyRenderResolution(a.adaptive.resolutions[a.adaptive.index])
 }
 
-func (a *App) setEffectiveVisualizerFPS(fps int32) {
+func (a *App) setVisualizerFPS(fps int32) {
 	if fps <= 0 {
 		return
 	}
-	a.effectiveVisualizerFPS = fps
+	a.targetVisualizerFPS = fps
 	a.vizClock.framePeriod = time.Second / time.Duration(fps)
 	a.vizClock.nextFrame = time.Time{}
 }
 
-// Energy-saving modes avoid swapping duplicate backgrounds;
-// UI animation has its own deadline and input can request immediate presentation.
-func presentationDue(mode config.PerformanceMode, now, deadline time.Time, rendered, requested, uiVisible bool) bool {
-	return mode == config.PerfModeUltra || mode == config.PerfModePerformance || rendered || requested || (uiVisible && !now.Before(deadline))
+// Numeric frame-rate limits avoid swapping duplicate backgrounds; UI animation
+// has its own deadline and input can request immediate presentation.
+func presentationDue(rate config.FrameRate, now, deadline time.Time, rendered, requested, uiVisible bool) bool {
+	// A newly rendered frame or explicit input is always presented. Max also
+	// requests every display tick, matching the display-refresh setting.
+	return rate.IsMax() || rendered || requested || (uiVisible && !now.Before(deadline))
 }
 
-// frameTiming keeps existing modes at 60 Hz and lets Ultra follow the display.
-func frameTiming(mode config.PerformanceMode, refreshRate int32) (time.Duration, int32) {
-	if mode != config.PerfModeUltra {
-		return mainFramePeriod, mode.Params().VisualizerFPS
+// frameTiming keeps the UI ticker responsive while the visualizer cadence is
+// controlled independently by the selected frame-rate setting.
+func frameTiming(rate config.FrameRate, refreshRate int32) (time.Duration, int32) {
+	refreshRate = config.NormalizeRefreshRate(refreshRate)
+	rate = config.NormalizeFrameRate(rate, refreshRate)
+	if rate.IsMax() {
+		return time.Second / time.Duration(refreshRate), refreshRate
 	}
-	if refreshRate <= 0 {
-		refreshRate = 60
-	}
-	return time.Second / time.Duration(refreshRate), refreshRate
+	return mainFramePeriod, rate.Target(refreshRate)
 }
 
-func (a *App) displayRefreshRate() int32 {
+func (a *App) displaySnapshot() displaySnapshot {
+	snapshot := displaySnapshot{index: -1, refreshRate: 60}
+	if a.window == nil {
+		return snapshot
+	}
 	index, err := a.window.GetDisplayIndex()
 	if err != nil {
 		slog.Debug("display index unavailable", "error", err)
-		return 60
+		return snapshot
 	}
+	snapshot.index = index
 	mode, err := sdl.GetCurrentDisplayMode(index)
 	if err != nil {
 		slog.Debug("display mode unavailable", "error", err)
-		return 60
+		return snapshot
 	}
-	if mode.RefreshRate <= 0 {
-		return 60
-	}
-	return mode.RefreshRate
+	snapshot.width, snapshot.height = mode.W, mode.H
+	snapshot.refreshRate = config.NormalizeRefreshRate(mode.RefreshRate)
+	snapshot.format = mode.Format
+	return snapshot
+}
+
+func (a *App) displayRefreshRate() int32 {
+	return a.displaySnapshot().refreshRate
 }
 
 // recoverPlaybackFailure also handles a live stream ending after startup;

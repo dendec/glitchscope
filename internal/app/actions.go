@@ -243,7 +243,7 @@ func (a *App) switchScreen(winW, winH int, forward bool) {
 		a.overlay.PrevScreen()
 	}
 	if a.overlay.IsSettingsPage() {
-		rows := ui.BuildSettingsRowsWithCatalog(*a.settings, winW, winH, a.overlay.Catalog())
+		rows := ui.BuildSettingsRowsWithCatalogForRefresh(*a.settings, winW, winH, a.displayRefreshRate(), a.overlay.Catalog())
 		a.overlay.SetSettingsRows(rows, 0)
 	}
 	if a.overlay.IsLibraryPage() {
@@ -447,20 +447,23 @@ func (a *App) applySettings(winW, winH int) {
 		a.rt.SetNearest(a.settings.Graphics.UpscaleFilter.IsNearest())
 	}
 
-	perfModes := config.AllPerformanceModes()
-	if idx := rows[ui.SettingPerformanceMode].Index; idx >= 0 && idx < len(perfModes) {
-		newMode := perfModes[idx]
-		if newMode != a.settings.Graphics.PerformanceMode {
-			a.settings.Graphics.PerformanceMode = newMode
-			params := newMode.Params()
-			a.targetVisualizerFPS = params.VisualizerFPS
-			a.setEffectiveVisualizerFPS(params.VisualizerFPS)
-			if a.preview != nil {
-				a.preview.SetFPS(params.VisualizerFPS)
-			}
-		}
+	refreshRate := a.displayRefreshRate()
+	frameRates := config.FrameRateChoices(refreshRate)
+	if idx := rows[ui.SettingFrameRate].Index; idx >= 0 && idx < len(frameRates) {
+		a.settings.Graphics.FrameRate = frameRates[idx]
 	}
-	if a.settings.Graphics.PerformanceMode == config.PerfModeUltra {
+	a.settings.Graphics.Adaptive = rows[ui.SettingAdaptive].Index == 1
+	a.settings.Graphics.FrameRate = config.NormalizeFrameRate(a.settings.Graphics.FrameRate, refreshRate)
+	targetFPS := a.settings.Graphics.FrameRate.Target(refreshRate)
+	a.setVisualizerFPS(targetFPS)
+	if a.preview != nil {
+		a.preview.SetFPS(targetFPS)
+	}
+	// FPS, adaptive mode and the configured ceiling all change the meaning of
+	// the rolling frame-cost window. Keep the current render step, but require a
+	// fresh full window before adaptive policy can decide again.
+	a.renderCost.Reset()
+	if !a.settings.Graphics.Adaptive {
 		a.applyRenderResolution(a.configuredResolution)
 	} else {
 		a.resetAdaptiveState(winW, winH)
@@ -541,7 +544,7 @@ func (a *App) applySettings(winW, winH int) {
 		slog.Debug("settings saved", "path", a.settingsPath)
 	}
 
-	rows = ui.BuildSettingsRowsWithCatalog(*a.settings, winW, winH, a.overlay.Catalog())
+	rows = ui.BuildSettingsRowsWithCatalogForRefresh(*a.settings, winW, winH, refreshRate, a.overlay.Catalog())
 	a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
 }
 

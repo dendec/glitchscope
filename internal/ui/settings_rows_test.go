@@ -12,7 +12,7 @@ func TestSettingsRowsUseCompactSectionsAndLabels(t *testing.T) {
 	rows := BuildSettingsRows(config.DefaultSettings(), 640, 480)
 	want := []string{
 		"── Playback ────", "Shuffle", "Repeat",
-		"── Visualization ──", "Quality", "Visualizer", "Rotation", "Resolution", "Filter", "Sensitivity",
+		"── Visualization ──", "Visualizer", "Frame rate", "Adaptive resolution", "Resolution", "Filter", "Sensitivity", "Rotation",
 		"── Appearance ───", "Language", "Theme", "Transparency", "Stats",
 		"── Downloads ───────", "Size", "Keep for",
 	}
@@ -70,39 +70,106 @@ func TestLanguageSwitchPreservesUIStateAndInvalidatesText(t *testing.T) {
 	}
 }
 
-func TestUltraSettingsRows(t *testing.T) {
+func TestMaxFrameRateSettingsRows(t *testing.T) {
 	s := config.DefaultSettings()
-	s.Graphics.PerformanceMode = config.PerfModeUltra
+	s.Graphics.FrameRate = config.FrameRateMax
+	s.Graphics.Adaptive = false
 	s.Graphics.RenderWidth, s.Graphics.RenderHeight = 1920, 1080
 	rows := BuildSettingsRows(s, 1920, 1080)
-	perf := rows[SettingPerformanceMode]
-	if perf.Values[perf.Index] != "Ultra" {
-		t.Fatalf("performance row: %+v", perf)
+	rate := rows[SettingFrameRate]
+	if rate.Values[rate.Index] != "Max (60 FPS)" {
+		t.Fatalf("frame rate row: %+v", rate)
 	}
 	resolution := rows[SettingResolution]
 	if len(resolution.Values) <= 1 || resolution.Values[resolution.Index] != "1920x1080" {
-		t.Fatalf("Ultra resolution: %+v", resolution)
+		t.Fatalf("fixed resolution: %+v", resolution)
 	}
 }
 
-func TestPerformanceChoicesDescendAndKeepDescriptions(t *testing.T) {
-	modes := []config.PerformanceMode{config.PerfModeUltra, config.PerfModePerformance, config.PerfModeBalanced, config.PerfModeEco}
-	labels := []i18n.Key{i18n.ValueUltra, i18n.ValuePerformance, i18n.ValueBalanced, i18n.ValueEco}
-	descriptions := []i18n.Key{i18n.DescriptionUltra, i18n.DescriptionPerformance, i18n.DescriptionBalanced, i18n.DescriptionEco}
+func TestFrameRateChoicesAndDescriptions(t *testing.T) {
+	rates := config.AllFrameRates()
 	for _, language := range config.AllLanguages() {
 		catalog := i18n.MustLoad(i18n.Language(language))
-		for index, mode := range modes {
+		for index, rate := range rates {
 			settings := config.DefaultSettings()
-			settings.Graphics.PerformanceMode = mode
-			row := BuildSettingsRowsWithCatalog(settings, 640, 480, catalog)[SettingPerformanceMode]
-			if len(row.Values) != len(modes) || row.Index != index || row.Values[index] != catalog.Text(labels[index]) {
-				t.Fatalf("%v %v: %+v", language, mode, row)
+			settings.Graphics.FrameRate = rate
+			row := BuildSettingsRowsWithCatalogForRefresh(settings, 640, 480, 120, catalog)[SettingFrameRate]
+			if len(row.Values) != len(rates) || row.Index != index {
+				t.Fatalf("%v %v: %+v", language, rate, row)
 			}
-			if got := settingDescription(catalog, SettingPerformanceMode, index); got != catalog.Text(descriptions[index]) {
-				t.Fatalf("%v %v: mismatched description %q", language, mode, got)
+			if got := settingDescription(catalog, SettingFrameRate, index); got != catalog.Text(i18n.DescriptionFrameRate) {
+				t.Fatalf("%v %v: mismatched description %q", language, rate, got)
 			}
 		}
 	}
+}
+
+func TestDynamicFrameRateRowsFollowDisplayRefresh(t *testing.T) {
+	settings := config.DefaultSettings()
+	settings.Graphics.FrameRate = config.FrameRateMax
+
+	rows60 := BuildSettingsRowsForRefresh(settings, 640, 480, 60)
+	rate60 := rows60[SettingFrameRate]
+	if got, want := rate60.Values, []string{"15 FPS", "20 FPS", "25 FPS", "30 FPS", "40 FPS", "50 FPS", "Max (60 FPS)"}; !equalStrings(got, want) {
+		t.Fatalf("60 Hz values=%v, want %v", got, want)
+	}
+	if rate60.Index != len(rate60.Values)-1 {
+		t.Fatalf("60 Hz index=%d, want Max index %d", rate60.Index, len(rate60.Values)-1)
+	}
+	settings.Graphics.FrameRate = config.FrameRate60
+	rate60 = BuildSettingsRowsForRefresh(settings, 640, 480, 60)[SettingFrameRate]
+	if rate60.Index != len(rate60.Values)-1 {
+		t.Fatalf("equal fixed cap selected index=%d, want Max index %d", rate60.Index, len(rate60.Values)-1)
+	}
+
+	rows120 := BuildSettingsRowsForRefresh(settings, 640, 480, 120)
+	rate120 := rows120[SettingFrameRate]
+	if got, want := rate120.Values, []string{"15 FPS", "20 FPS", "25 FPS", "30 FPS", "40 FPS", "50 FPS", "60 FPS", "Max (120 FPS)"}; !equalStrings(got, want) {
+		t.Fatalf("120 Hz values=%v, want %v", got, want)
+	}
+	if rate120.Index != 6 {
+		t.Fatalf("120 Hz index=%d, want fixed 60 index 6", rate120.Index)
+	}
+}
+
+func TestSettingsRowsPreserveEditingValueWhenRefreshChanges(t *testing.T) {
+	settings := config.DefaultSettings()
+	settings.Graphics.FrameRate = config.FrameRateMax
+	o := &Overlay{
+		settingsRows:    BuildSettingsRowsForRefresh(settings, 640, 480, 60),
+		settingsCursor:  SettingFrameRate,
+		settingsEditing: true,
+	}
+	o.settingsValueCursor = len(o.settingsRows[SettingFrameRate].Values) - 1
+	o.SetSettingsRows(BuildSettingsRowsForRefresh(settings, 640, 480, 120), SettingFrameRate)
+	row := o.settingsRows[SettingFrameRate]
+	if o.settingsCursor != SettingFrameRate || o.settingsValueCursor != len(row.Values)-1 || row.Values[o.settingsValueCursor] != "Max (120 FPS)" {
+		t.Fatalf("refresh change lost Max selection: cursor=%d value=%d row=%+v", o.settingsCursor, o.settingsValueCursor, row)
+	}
+	settings.Graphics.FrameRate = config.FrameRate60
+	o = &Overlay{
+		settingsRows:    BuildSettingsRowsForRefresh(settings, 640, 480, 120),
+		settingsCursor:  SettingFrameRate,
+		settingsEditing: true,
+	}
+	o.settingsValueCursor = 6 // fixed 60 FPS on a 120 Hz display
+	o.SetSettingsRows(BuildSettingsRowsForRefresh(settings, 640, 480, 50), SettingFrameRate)
+	row = o.settingsRows[SettingFrameRate]
+	if o.settingsValueCursor != len(row.Values)-1 || row.Values[o.settingsValueCursor] != "Max (50 FPS)" {
+		t.Fatalf("slower refresh did not map fixed cap to Max: cursor=%d row=%+v", o.settingsValueCursor, row)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestLocalizedCacheChoicesPreserveSelection(t *testing.T) {
@@ -117,14 +184,15 @@ func TestLocalizedCacheChoicesPreserveSelection(t *testing.T) {
 	}
 }
 
-func TestUltraResolutionDescriptionIsFixed(t *testing.T) {
+func TestResolutionDescriptionReflectsIndependentControls(t *testing.T) {
 	settings := config.DefaultSettings()
-	settings.Graphics.PerformanceMode = config.PerfModeUltra
+	settings.Graphics.FrameRate = config.FrameRateMax
+	settings.Graphics.Adaptive = false
 	o := &Overlay{
 		catalog:      i18n.MustLoad(i18n.English),
 		settingsRows: BuildSettingsRows(settings, 640, 480),
 	}
-	if got := o.selectedSettingDescription(SettingResolution, 0); got != o.catalog.Text(i18n.DescriptionResolutionFixed) {
-		t.Fatalf("Ultra resolution description = %q", got)
+	if got := o.selectedSettingDescription(SettingResolution, 0); got != o.catalog.Text(i18n.DescriptionResolution) {
+		t.Fatalf("resolution description = %q", got)
 	}
 }

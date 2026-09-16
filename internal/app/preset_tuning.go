@@ -10,22 +10,24 @@ const maxPresetProfiles = 256
 
 type presetProfileKey struct {
 	name          string
-	mode          config.PerformanceMode
+	frameRate     config.FrameRate
+	targetFPS     int32
+	adaptive      bool
 	width, height int
 	ceilingIndex  int
 }
 
 type presetProfile struct {
-	digest            [sha256.Size]byte
-	index, floor      int
-	fps, candidateFPS int32
-	stableFrames      int
-	candidate         int
-	ready, heavy      bool
+	digest       [sha256.Size]byte
+	index, floor int
+	stableFrames int
+	candidate    int
+	ready, heavy bool
 }
 
-// Session-local profiles cannot outlive a driver or device change. Mode,
-// drawable size and preset contents isolate incompatible measurements.
+// Session-local profiles cannot outlive a driver or device change. Frame rate,
+// resolved target FPS, adaptive mode, drawable size and preset contents isolate
+// incompatible measurements.
 type presetTuning struct {
 	profiles map[presetProfileKey]presetProfile
 	active   presetProfileKey
@@ -52,21 +54,20 @@ func (t *presetTuning) activate(key presetProfileKey, data []byte) presetProfile
 	return profile
 }
 
-func (t *presetTuning) observe(index, floor int, fps int32, stable bool) {
+func (t *presetTuning) observe(index, floor int, stable bool) {
 	profile, ok := t.profiles[t.active]
 	if !ok {
 		return
 	}
-	if !stable || profile.candidate != index || profile.candidateFPS != fps {
+	if !stable || profile.candidate != index {
 		profile.stableFrames = 0
 	}
 	profile.candidate = index
-	profile.candidateFPS = fps
 	if stable {
 		profile.stableFrames++
 	}
 	if profile.stableFrames >= 30 {
-		profile.index, profile.floor, profile.fps = index, floor, fps
+		profile.index, profile.floor = index, floor
 		profile.ready, profile.heavy = true, false
 		profile.stableFrames = 30
 	}
@@ -84,33 +85,60 @@ func (t *presetTuning) markHeavy() {
 
 func (a *App) presetProfileKey(name string) presetProfileKey {
 	w, h := a.window.GLGetDrawableSize()
-	return presetProfileKey{name: name, mode: a.settings.Graphics.PerformanceMode, width: int(w), height: int(h), ceilingIndex: a.adaptive.ceilingIndex}
+	return a.presetProfileKeyAt(name, int(w), int(h))
+}
+
+func (a *App) presetProfileKeyAt(name string, width, height int) presetProfileKey {
+	return presetProfileKey{
+		name:         name,
+		frameRate:    a.settings.Graphics.FrameRate,
+		targetFPS:    a.profileTargetFPS(),
+		adaptive:     a.settings.Graphics.Adaptive,
+		width:        width,
+		height:       height,
+		ceilingIndex: a.adaptive.ceilingIndex,
+	}
 }
 
 func (a *App) activatePresetProfile(name string, data []byte) {
 	profile := a.presetTuning.activate(a.presetProfileKey(name), data)
-	if a.settings.Graphics.PerformanceMode == config.PerfModeUltra {
+	if !a.settings.Graphics.Adaptive {
 		return
 	}
+	warmIndex := a.adaptive.index
 	a.renderCost.Reset()
-	fps := a.adaptive.startPreset(profile)
-	a.setEffectiveVisualizerFPS(fps)
+	a.adaptive.startPreset(profile, warmIndex)
 	if len(a.adaptive.resolutions) > 0 {
 		a.applyRenderResolution(a.adaptive.resolutions[a.adaptive.index])
 	}
 }
 
-// startPreset prevents a new preset from inheriting the previous preset's
-// degraded image. Known presets restore a measured resolution/cadence pair.
-func (s *resolutionState) startPreset(profile presetProfile) int32 {
-	s.RestartForPreset()
-	s.index = s.ceilingIndex
-	params := s.policy.params
-	fps := params.VisualizerFPS
-	if profile.ready {
-		s.index = min(max(profile.index, s.ceilingIndex), s.floorIndex)
-		s.upscaleFloor = min(max(profile.floor, s.ceilingIndex), s.index)
-		fps = min(max(profile.fps, params.MinVisualizerFPS), params.VisualizerFPS)
+// profileTargetFPS returns the resolved target used by the active profile key.
+// The fallback keeps profile construction safe before the first loop tick.
+func (a *App) profileTargetFPS() int32 {
+	if a.targetVisualizerFPS > 0 {
+		return a.targetVisualizerFPS
 	}
-	return fps
+	refreshRate := a.displayRefreshRate()
+	return config.NormalizeFrameRate(a.settings.Graphics.FrameRate, refreshRate).Target(refreshRate)
+}
+
+// startPreset keeps a new preset at the current effective quality. A learned
+// profile may choose a lower resolution, but never causes an immediate upscale.
+func (s *resolutionState) startPreset(profile presetProfile, warmIndex int) {
+	s.RestartForPreset()
+	if len(s.resolutions) == 0 {
+		return
+	}
+	warmIndex = min(max(warmIndex, s.ceilingIndex), s.floorIndex)
+	s.index = warmIndex
+	if profile.ready {
+		profileIndex := min(max(profile.index, s.ceilingIndex), s.floorIndex)
+		if profileIndex >= s.index {
+			if profileIndex > s.index {
+				s.index = profileIndex
+			}
+			s.upscaleFloor = min(max(profile.floor, s.ceilingIndex), s.index)
+		}
+	}
 }

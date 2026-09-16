@@ -101,17 +101,16 @@
     "id": 2
   },
   {
-    "title": "Qualidade e Bateria",
+    "title": "Taxa de quadros e resolução",
     "children": [
       {
-        "title": "Qualidade",
+        "title": "Configurações do visualizador",
         "lines": [
-          "Ultra: Usa diretamente a resolução escolhida sem limite artificial de FPS; a taxa de atualização da tela é o limite superior.",
-          "Desempenho: Alto nível de detalhe, com meta de 30 FPS; a resolução pode diminuir automaticamente sob carga.",
-          "Equilibrado: Equilíbrio entre qualidade e autonomia a 25 FPS; a resolução pode diminuir automaticamente sob carga.",
-          "Econômico: Meta de 20 FPS para economizar energia; a resolução pode diminuir automaticamente sob carga.",
-          "A resolução escolhida é o limite adaptativo em Desempenho, Equilibrado e Econômico. Ultra a usa diretamente.",
-          "Prioridade ao FPS: primeiro reduzir a resolução (metade por dimensão em Desempenho/Equilibrado, um quarto em Econômico). Se não ajudar, restaurar a resolução e reduzir o FPS. O FPS só é reduzido quando a frequência prevista não pode ser mantida; ultrapassar apenas o orçamento de economia não reduz o FPS."
+          "A taxa de quadros define um limite fixo abaixo da taxa de atualização ativa ou Max (a taxa ativa).",
+          "A resolução adaptativa reduz ou restaura o tamanho da imagem para se aproximar dessa meta.",
+          "A resolução é o tamanho máximo quando a adaptação está ligada e o tamanho fixo quando está desligada.",
+          "Max mostra a taxa de atualização ativa; um limite numérico igual fica oculto para evitar duplicidade.",
+          "Se o preset for complexo demais mesmo no menor nível, os FPS reais podem ficar abaixo da meta."
         ]
       },
       {
@@ -952,7 +951,7 @@
       "Reproduza áudio local, módulos de tracker e formatos clássicos de música de jogos, ou explore os catálogos Modland e ModArchive.",
       "As imagens são geradas pelo projectM. O áudio é decodificado por mecanismos open-source especializados, escolhidos para cada formato.",
       "",
-      "Os modos Desempenho, Equilibrado e Ecológico ajustam a qualidade visual de acordo com o dispositivo. O visualizador também pode ser desativado para reprodução apenas de música.",
+      "Escolha uma meta de taxa de quadros e um limite independente para a resolução adaptativa. O visualizador também pode ser desativado para reproduzir apenas música.",
       "",
       "**Projeto**",
       "https://github.com/dendec/glitchscope",

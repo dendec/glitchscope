@@ -101,17 +101,16 @@
     "id": 2
   },
   {
-    "title": "Kualitas dan Baterai",
+    "title": "Laju frame dan resolusi",
     "children": [
       {
-        "title": "Kualitas",
+        "title": "Pengaturan visualizer",
         "lines": [
-          "Ultra: Menggunakan resolusi yang dipilih secara langsung tanpa batas FPS buatan; laju penyegaran layar menjadi batas atas.",
-          "Kinerja: Detail visual tinggi dengan target 30 FPS; resolusi dapat diturunkan otomatis saat beban tinggi.",
-          "Seimbang: Keseimbangan kualitas dan daya tahan baterai pada 25 FPS; resolusi dapat diturunkan otomatis saat beban tinggi.",
-          "Hemat daya: Target 20 FPS menghemat daya; resolusi dapat diturunkan otomatis saat beban tinggi.",
-          "Resolusi yang dipilih menjadi batas adaptif pada Kinerja, Seimbang, dan Hemat daya. Ultra menggunakannya secara langsung.",
-          "FPS diutamakan: coba turunkan resolusi dahulu (setengah tiap dimensi di Kinerja/Seimbang, seperempat di Hemat daya). Jika tidak membantu, pulihkan resolusi dan turunkan FPS. FPS hanya diturunkan jika laju yang dijadwalkan tidak dapat dipertahankan; melampaui anggaran penghematan saja tidak menurunkan FPS."
+          "Laju frame memilih batas tetap di bawah refresh layar aktif, atau Max (refresh aktif).",
+          "Resolusi adaptif menurunkan atau mengembalikan ukuran gambar untuk mendekati target tersebut.",
+          "Resolusi menjadi ukuran maksimum saat adaptasi aktif, dan ukuran tetap saat adaptasi nonaktif.",
+          "Max menampilkan refresh aktif; batas numerik yang sama disembunyikan agar tidak menjadi duplikat.",
+          "Jika preset terlalu kompleks bahkan pada tingkat terendah, FPS aktual dapat tetap di bawah target."
         ]
       },
       {
@@ -952,7 +951,7 @@
       "Putar audio lokal, modul tracker, serta format musik game klasik, atau jelajahi katalog Modland dan ModArchive.",
       "Tampilan visual dihasilkan oleh projectM. Audio didekode menggunakan mesin sumber terbuka khusus yang dipilih sesuai formatnya.",
       "",
-      "Mode Performa, Seimbang, dan Ekonomis menyesuaikan kualitas visual sesuai perangkat. Visualizer juga dapat dinonaktifkan untuk pemutaran musik saja.",
+      "Pilih target laju frame dan batas resolusi adaptif yang terpisah. Visualizer juga dapat dinonaktifkan untuk pemutaran musik saja.",
       "",
       "**Proyek**",
       "https://github.com/dendec/glitchscope",

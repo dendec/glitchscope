@@ -8,8 +8,9 @@ const interactionMaxPeriod = 125 * time.Millisecond
 
 // interactionBudget is main-thread scheduling policy, independent of GL and UI.
 // During input, reserve roughly three quarters of time for the rest of the loop.
-// Fast presets retain their mode cadence. Slow presets back off immediately and
-// recover gradually, avoiding oscillation after a single inexpensive frame.
+// The selected frame-rate cadence remains the base; an expensive render backs
+// off immediately and recovers gradually, avoiding oscillation after one cheap
+// frame.
 type interactionBudget struct {
 	lastStart   time.Time
 	lastEnd     time.Time

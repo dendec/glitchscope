@@ -328,17 +328,21 @@ Presets-страница: справа скриншот пресета + инф�
 
 ## Handheld power options (ПРИНЯТО)
 
-Settings exposes **Visualizer** next to **Quality**. The tracker seeking
+Settings exposes **Visualizer**, **Frame rate**, **Adaptive resolution**, and
+**Resolution** as independent controls. The tracker seeking
 budget is selected automatically from available device memory. Over-budget
 tracks keep playing through their native decoder, with that decoder's seek
 limitations. Visualizer Off keeps playback and navigation
 working against a solid background. Opening Presets still enables live preview.
-Performance has a target of 30 FPS, Balanced 25 FPS, and Eco 20 FPS. The
-selected Resolution is always the configured ceiling: these three modes may
-lower it automatically when the render budget is exceeded, but never raise it
-above the selected value. Ultra uses the selected Resolution directly and has
-no adaptive resolution or artificial FPS cap. Mode descriptions explain this
-automatic lowering without adding a separate Auto resolution choice.
+Frame rate offers fixed caps up to the active display refresh and a display-bound
+Max value; a numeric cap equal to the refresh is omitted to avoid duplication.
+Adaptive resolution is independently enabled or disabled. When enabled, the
+selected Resolution is a ceiling: the visualizer may lower or restore it to
+approach the selected frame rate, never exceeding that ceiling. When disabled,
+the selected resolution is fixed. Preview rendering remains capped at 25 FPS so
+browsing presets does not consume the full main visualizer budget. First-run
+defaults are Max (the active display refresh), adaptive on, and the largest
+resolution available on the display.
 
 Настройка интервала смены визуальных пресетов называется **Rotation**: `Off`
 оставляет текущий пресет до ручной смены, `Auto` делегирует момент смены
@@ -362,27 +366,14 @@ days, 6 months, `Forever`) и лимит размера (128/256/512 MB, 1/2/4 G
 фоновой полосой без изменения начертания текста, включая бегущую строку.
 Жирное начертание сохраняется у заголовков и разделителей групп.
 
-Режим **Ultra / Ультра** использует выбранное в настройке Resolution значение
-без автоматического снижения. Внутреннего ограничения FPS нет; фактическая
-частота зависит от GPU, сложности пресета и частоты дисплея.
-
-В режимах Performance/Balanced/Eco Resolution задаёт верхний предел. При
-нагрузке сначала пробуется снижение resolution с проверкой выигрыша по полной
-стоимости кадра и интервалам вывода. FPS снижается только при устойчивом
-отставании от назначенной частоты, если resolution больше снижать нельзя или
-бесполезно. Превышение мягкого бюджета Eco не снижает стабильные 20 FPS.
-Предел снижения каждой стороны: High/Balanced — вдвое, Eco — вчетверо.
-Настройка называется Quality / Качество; JSON-идентификаторы сохранены.
-Performance целится в 30 FPS с мягкой целью 70–90% бюджета полного кадра, Balanced — в
-25 FPS и 50–70%, Eco — в 20 FPS и 30–50%. Эти проценты не показываются в меню;
-они нужны quality policy для выбора ступени. В описании каждого режима явно
-указано, что resolution может быть снижена автоматически.
-
-Режимы производительности показаны по убыванию: Ultra → Performance → Balanced → Eco.
-Порядок задаётся в config.AllPerformanceModes; UI связывает подписи и пояснения
-с самим режимом, а не с числовым индексом. В Ultra пояснение разрешения описывает
-фиксированное полное разрешение. Значения срока хранения и Unlimited локализованы
-в UI, строковые значения сохранённых настроек остаются стабильными.
+Настройки визуализации разделены: `Frame rate` выбирает целевую частоту,
+`Adaptive resolution` включает или выключает подстройку, а `Resolution` задаёт
+фиксированный размер либо верхний предел. Адаптация проверяет устойчивую cadence,
+перебирает общую сетку до минимальной ступени и никогда не изменяет выбранную
+частоту кадров. Пункт `Max` показывает частоту активного режима дисплея; равный
+ему числовой cap скрывается. После смены пресета текущая эффективная ступень
+сохраняется, а повышение качества выполняется постепенно. Значения срока хранения
+и Unlimited локализованы в UI, строковые значения сохранённых настроек остаются стабильными.
 
 Тексты интерфейса используют короткие названия и естественные пояснения.
 Действия обозначаются глаголами, одинаковые функции называются одинаково в меню
