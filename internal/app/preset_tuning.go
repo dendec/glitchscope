@@ -12,14 +12,16 @@ type presetProfileKey struct {
 	name          string
 	mode          config.PerformanceMode
 	width, height int
+	ceilingIndex  int
 }
 
 type presetProfile struct {
-	digest       [sha256.Size]byte
-	index, floor int
-	stableFrames int
-	candidate    int
-	ready, heavy bool
+	digest            [sha256.Size]byte
+	index, floor      int
+	fps, candidateFPS int32
+	stableFrames      int
+	candidate         int
+	ready, heavy      bool
 }
 
 // Session-local profiles cannot outlive a driver or device change. Mode,
@@ -50,20 +52,21 @@ func (t *presetTuning) activate(key presetProfileKey, data []byte) presetProfile
 	return profile
 }
 
-func (t *presetTuning) observe(index, floor int, stable bool) {
+func (t *presetTuning) observe(index, floor int, fps int32, stable bool) {
 	profile, ok := t.profiles[t.active]
 	if !ok {
 		return
 	}
-	if !stable || profile.candidate != index {
+	if !stable || profile.candidate != index || profile.candidateFPS != fps {
 		profile.stableFrames = 0
 	}
 	profile.candidate = index
+	profile.candidateFPS = fps
 	if stable {
 		profile.stableFrames++
 	}
 	if profile.stableFrames >= 30 {
-		profile.index, profile.floor = index, floor
+		profile.index, profile.floor, profile.fps = index, floor, fps
 		profile.ready, profile.heavy = true, false
 		profile.stableFrames = 30
 	}
@@ -81,19 +84,33 @@ func (t *presetTuning) markHeavy() {
 
 func (a *App) presetProfileKey(name string) presetProfileKey {
 	w, h := a.window.GLGetDrawableSize()
-	return presetProfileKey{name: name, mode: a.settings.Graphics.PerformanceMode, width: int(w), height: int(h)}
+	return presetProfileKey{name: name, mode: a.settings.Graphics.PerformanceMode, width: int(w), height: int(h), ceilingIndex: a.adaptive.ceilingIndex}
 }
 
 func (a *App) activatePresetProfile(name string, data []byte) {
 	profile := a.presetTuning.activate(a.presetProfileKey(name), data)
-	if a.settings.Graphics.PerformanceMode == config.PerfModeUltra || !a.settings.Graphics.Adaptive || !profile.ready {
+	if a.settings.Graphics.PerformanceMode == config.PerfModeUltra {
 		return
 	}
-	index := max(profile.index, a.settings.Graphics.PerformanceMode.Params().AdaptiveMaxIndex)
-	if index < 0 || index >= len(a.adaptive.resolutions) {
-		return
+	a.renderCost.Reset()
+	fps := a.adaptive.startPreset(profile)
+	a.setEffectiveVisualizerFPS(fps)
+	if len(a.adaptive.resolutions) > 0 {
+		a.applyRenderResolution(a.adaptive.resolutions[a.adaptive.index])
 	}
-	a.adaptive.index = index
-	a.adaptive.upscaleFloor = profile.floor
-	a.applyRenderResolution(a.adaptive.resolutions[index])
+}
+
+// startPreset prevents a new preset from inheriting the previous preset's
+// degraded image. Known presets restore a measured resolution/cadence pair.
+func (s *resolutionState) startPreset(profile presetProfile) int32 {
+	s.RestartForPreset()
+	s.index = s.ceilingIndex
+	params := s.policy.params
+	fps := params.VisualizerFPS
+	if profile.ready {
+		s.index = min(max(profile.index, s.ceilingIndex), s.floorIndex)
+		s.upscaleFloor = min(max(profile.floor, s.ceilingIndex), s.index)
+		fps = min(max(profile.fps, params.MinVisualizerFPS), params.VisualizerFPS)
+	}
+	return fps
 }

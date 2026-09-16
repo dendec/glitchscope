@@ -1,15 +1,11 @@
 package ui
 
 import (
-	"bytes"
 	"fmt"
 	"image"
 	"image/draw"
 	_ "image/gif"
-	"image/jpeg"
 	_ "image/png"
-	"log/slog"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -439,6 +435,9 @@ func (o *Overlay) rebuildLocalTrackInfoTex(maxW, maxH int) {
 		return
 	}
 	ti := &o.trackInfos[o.trackCursor]
+	if ti.Path == o.fileMetadataPath {
+		ti = &o.fileMetadata
+	}
 	// Load cover art for the selected track.
 	o.loadCoverArt(ti.Path, o.availableRowTextWidth(maxW))
 	lines := trackInfoLines(o.catalog, player.TrackTitle(ti.Path), ti)
@@ -495,20 +494,17 @@ func (o *Overlay) loadCoverArt(path string, maxWidth int) (uint32, int, int) {
 		return 0, 0, 0
 	}
 	// Don't re-extract if we already have this file's cover art.
-	if o.coverArtTex != 0 && o.coverArtPath == path {
+	if o.coverArtPath == path {
 		return o.coverArtTex, o.coverArtTexW, o.coverArtTexH
 	}
 	o.deleteTex(&o.coverArtTex)
-	data := player.ExtractCoverArt(path)
-	if len(data) == 0 {
-		o.coverArtPath = path
-		o.coverArtTexW, o.coverArtTexH = 0, 0
+	if o.fileMetadataPath != path {
 		return 0, 0, 0
 	}
-	img, err := jpeg.Decode(bytes.NewReader(data))
-	if err != nil {
-		slog.Warn("cover art decode failed", "path", filepath.Base(path), "error", err)
+	img := o.fileCover
+	if img == nil {
 		o.coverArtPath = path
+		o.coverArtTexW, o.coverArtTexH = 0, 0
 		return 0, 0, 0
 	}
 	// Scale to fit within maxWidth, preserving aspect ratio.
@@ -574,11 +570,14 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		// Load cover art first (before text) so the texture is ready for rendering.
 		o.loadCoverArt(o.ncInfoFile, o.availableRowTextWidth(maxW))
 		// File info.
-		if info, err := os.Stat(o.ncInfoFile); err == nil {
-			lines = append(lines, fmt.Sprintf("  %s", formatSize(info.Size())))
+		if o.fileMetadataPath == o.ncInfoFile {
+			lines = append(lines, fmt.Sprintf("  %s", formatSize(o.fileMetadata.Size)))
 		}
 		// Read audio metadata for the file.
-		meta := player.ReadFileMeta(o.ncInfoFile)
+		meta := player.TrackInfo{}
+		if o.fileMetadataPath == o.ncInfoFile {
+			meta = o.fileMetadata
+		}
 		if meta.Title != "" {
 			lines = append(lines, "", "  "+o.catalog.Format(i18n.InfoTitle, meta.Title))
 		}
@@ -835,7 +834,11 @@ func catalogTrackInfoLines(catalog i18n.Catalog, e *navEntry, albums []player.Al
 func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 	o.tracksContentDirty = false
 
-	lines := catalogTrackInfoLines(o.catalog, e, o.currentAlbums(), o.trackInfos)
+	infos := o.trackInfos
+	if o.fileMetadataPath != "" && o.fileMetadataPath == o.MetadataFilePath() {
+		infos = []player.TrackInfo{o.fileMetadata}
+	}
+	lines := catalogTrackInfoLines(o.catalog, e, o.currentAlbums(), infos)
 	if len(lines) == 0 {
 		return
 	}

@@ -10,6 +10,7 @@ import (
 type fakeOverlayView struct {
 	visible        bool
 	cursor         int
+	stats          string
 	rescanCalls    int
 	trackInfoCalls int
 	lastTrackInfos []player.TrackInfo
@@ -19,7 +20,7 @@ type fakeOverlayView struct {
 	loadPercent    int64
 }
 
-func (f *fakeOverlayView) SetStats(string) {}
+func (f *fakeOverlayView) SetStats(stats string) { f.stats = stats }
 
 func (f *fakeOverlayView) SetPlayback(float64, float64, float32, float64, float64, int, bool, bool) {}
 
@@ -102,6 +103,17 @@ func TestOverlayPresenterInitializesAndCachesAlbumTracks(t *testing.T) {
 	// Panel data from first frame must be preserved.
 	if len(view.lastTrackInfos) != 1 || view.lastTrackInfos[0].Path != "track" {
 		t.Fatalf("panel data corrupted after second frame: %#v", view.lastTrackInfos)
+	}
+}
+
+func TestOverlayPresenterShowsEffectiveRenderHeight(t *testing.T) {
+	view := &fakeOverlayView{}
+	presenter := newOverlayPresenter(view)
+
+	presenter.Update(10, true, 540, prof.Stats{}, overlayPlaybackSnapshot{})
+
+	if view.stats != "FPS:10 MEM:0M CPU:0% 540p" {
+		t.Fatalf("stats = %q, want effective render height", view.stats)
 	}
 }
 

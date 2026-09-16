@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -48,6 +47,7 @@ type TrackInfo struct {
 // delegated to Resolver.
 type Library struct {
 	Albums   []Album
+	metadata *MetadataReader
 	resolver *Resolver // maps virtual track paths to local cache files
 	albumIdx int       // -1 = no album loaded
 	trackIdx int       // -1 = no track loaded, 0+ = index within current album
@@ -85,6 +85,7 @@ func NewEmptyLibrary() *Library {
 // paths (modland/modarchive downloaded files).
 func (l *Library) SetBaseDir(dir string) {
 	l.resolver.SetBaseDir(dir)
+	l.metadata = nil
 }
 
 // ScanLibraryAlbums walks rootDir and returns sorted Albums from the
@@ -243,132 +244,16 @@ func (l *Library) SelectTrack(idx int) string {
 	return l.Albums[l.albumIdx].Tracks[idx]
 }
 
-// GetAlbumTracks returns TrackInfo for each track. Reads cache first;
-// computes missing entries on demand. Virtual paths (modland/modarchive)
-// are resolved to local cache paths before metadata extraction.
+// GetAlbumTracks synchronously reads metadata for non-UI callers.
+// The application UI uses MetadataReader through its cancellable worker.
 func (l *Library) GetAlbumTracks(idx int) []TrackInfo {
 	if idx < 0 || idx >= len(l.Albums) {
 		return nil
 	}
-	album := l.Albums[idx]
-	var cache *albumMeta
-	if !IsVirtual(album) {
-		cache = readMetaCache(album.Path)
+	if l.metadata == nil {
+		l.metadata = NewMetadataReader(l.resolver.baseDir)
 	}
-	if cache == nil {
-		cache = &albumMeta{Tracks: map[string]TrackMeta{}}
-	}
-
-	infos := make([]TrackInfo, len(album.Tracks))
-	dirty := false
-	for i, tp := range album.Tracks {
-		fname := filepath.Base(TrimPrefixes(tp))
-		info := TrackInfo{Path: tp, Cached: l.resolver.ResolveLocalPath(tp) != ""}
-		if localPath := l.resolver.ResolveLocalPath(tp); localPath != "" {
-			if fi, err := os.Stat(localPath); err == nil {
-				info.Size = fi.Size()
-			}
-		}
-		if m, ok := cache.Tracks[fname]; ok {
-			info.Duration = m.Duration
-			info.BPM = m.BPM
-			info.Channels = m.Channels
-			info.Comment = m.Comment
-			info.Title = m.Title
-			info.Artist = m.Artist
-			info.Album = m.Album
-			info.AlbumArtist = m.AlbumArtist
-			info.Genre = m.Genre
-			info.Date = m.Date
-			info.Track = m.Track
-			info.Composer = m.Composer
-			info.Disc = m.Disc
-			info.Extra = m.Extra
-		} else {
-			// Compute metadata on demand from the local cache file (virtual
-			// paths resolved first). extractMetaFromFile is pure — no side
-			// effects — and reused by the comment refresh below.
-			m := TrackMeta{}
-			if localPath := l.resolver.ResolveLocalPath(tp); localPath != "" {
-				m = extractMetaFromFile(localPath)
-			}
-			cache.Tracks[fname] = m
-			info.Duration = m.Duration
-			info.BPM = m.BPM
-			info.Channels = m.Channels
-			info.Comment = m.Comment
-			info.Title = m.Title
-			info.Artist = m.Artist
-			info.Album = m.Album
-			info.AlbumArtist = m.AlbumArtist
-			info.Genre = m.Genre
-			info.Date = m.Date
-			info.Track = m.Track
-			info.Composer = m.Composer
-			info.Disc = m.Disc
-			info.Extra = m.Extra
-			dirty = true
-		}
-		// Always refresh the comment for tracker files, even when the rest of
-		// the metadata came from cache (the cache may predate the comment).
-		if info.Comment == "" {
-			if localPath := l.resolver.ResolveLocalPath(tp); localPath != "" {
-				if m := extractMetaFromFile(localPath); m.Comment != "" {
-					info.Comment = m.Comment
-					if cm, ok := cache.Tracks[fname]; ok {
-						cm.Comment = m.Comment
-						cache.Tracks[fname] = cm
-						dirty = true
-					}
-					slog.Debug("tracker comment", "file", filepath.Base(tp), "comment", m.Comment)
-				}
-			}
-		}
-		// Re-read audio tags when the cache has empty tag fields. This handles
-		// the case where the cache was populated before a bug fix (e.g. M4A
-		// tags not being read from stream-level metadata) and now needs to be
-		// refreshed. extractMetaFromFile is cheap (no allocation per call).
-		if info.Title == "" && info.Artist == "" && info.Album == "" &&
-			info.Genre == "" && info.Date == "" && info.Track == "" {
-			if localPath := l.resolver.ResolveLocalPath(tp); localPath != "" {
-				if m := extractMetaFromFile(localPath); m.Title != "" || m.Artist != "" || m.Album != "" {
-					info.Title = m.Title
-					info.Artist = m.Artist
-					info.Album = m.Album
-					info.AlbumArtist = m.AlbumArtist
-					info.Genre = m.Genre
-					info.Date = m.Date
-					info.Track = m.Track
-					info.Composer = m.Composer
-					info.Disc = m.Disc
-					info.Extra = m.Extra
-					if cm, ok := cache.Tracks[fname]; ok {
-						cm.Title = m.Title
-						cm.Artist = m.Artist
-						cm.Album = m.Album
-						cm.AlbumArtist = m.AlbumArtist
-						cm.Genre = m.Genre
-						cm.Date = m.Date
-						cm.Track = m.Track
-						cm.Composer = m.Composer
-						cm.Disc = m.Disc
-						cache.Tracks[fname] = cm
-						dirty = true
-					}
-					slog.Debug("refreshed tags from file", "file", filepath.Base(tp), "title", m.Title, "artist", m.Artist)
-				} else {
-					slog.Debug("tags still empty after re-read", "file", filepath.Base(tp))
-				}
-			}
-		}
-		infos[i] = info
-	}
-	if dirty && !IsVirtual(album) {
-		if err := writeMetaCache(album.Path, cache); err != nil {
-			slog.Warn("write meta cache", "album", album.Name, "error", err)
-		}
-	}
-	return infos
+	return l.metadata.Load(context.Background(), l.Albums[idx])
 }
 
 // TrackTitle returns a display-friendly name for a track path.
@@ -376,6 +261,7 @@ const (
 	ModlandPrefix    = "modland:"
 	ModArchivePrefix = "modarchive:"
 	RadioPrefix      = "radio:"
+	DownloadsPrefix  = "downloads:"
 )
 
 var KnownPrefixes = []string{
@@ -386,7 +272,7 @@ var KnownPrefixes = []string{
 
 // IsVirtual reports provider-browsed albums (modland/modarchive).
 func IsVirtual(a Album) bool {
-	return strings.HasPrefix(a.Path, ModlandPrefix) || strings.HasPrefix(a.Path, ModArchivePrefix) || strings.HasPrefix(a.Path, RadioPrefix)
+	return strings.HasPrefix(a.Path, ModlandPrefix) || strings.HasPrefix(a.Path, ModArchivePrefix) || strings.HasPrefix(a.Path, RadioPrefix) || a.Path == DownloadsPrefix
 }
 
 // RealAlbumsOnly filters virtual provider albums out of a list.

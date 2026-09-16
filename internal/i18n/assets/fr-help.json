@@ -104,14 +104,14 @@
     "title": "Qualité et batterie",
     "children": [
       {
-        "title": "Performance",
+        "title": "Qualité",
         "lines": [
-          "Ultra: Pleine résolution, jusqu’à la fréquence de rafraîchissement de l’écran, sans réduction de qualité.",
-          "Performance: Un rendu détaillé, avec une cible de 30 images/s.",
-          "Équilibré: Un équilibre entre qualité et autonomie, avec une cible de 24 images/s.",
-          "Éco: Une résolution réduite et une cible de 24 images/s pour prolonger l’autonomie.",
-          "La résolution automatique s’adapte à la préférence actuelle. Une résolution fixe désactive cet ajustement.",
-          "Un preset lourd peut être ignoré si la résolution la plus basse reste trop lente."
+          "Ultra : utilise directement la résolution choisie sans limite artificielle de FPS ; le taux de rafraîchissement est la limite supérieure.",
+          "Performance : rendu détaillé à 30 images/s ; la résolution peut baisser automatiquement sous charge.",
+          "Équilibré : équilibre entre qualité et autonomie à 25 images/s ; la résolution peut baisser automatiquement sous charge.",
+          "Éco : cible de 20 images/s pour économiser l’énergie ; la résolution peut baisser automatiquement sous charge.",
+          "La résolution choisie est le plafond adaptatif dans les modes Performance, Équilibré et Éco. Ultra l’utilise directement.",
+          "Priorité aux FPS : réduire d’abord la résolution (moitié par dimension en Performance/Équilibré, quart en Éco). Sans amélioration, restaurer la résolution et réduire les FPS. Les FPS ne baissent que si la cadence prévue ne peut être maintenue ; dépasser le budget d’économie seul ne réduit pas les FPS."
         ]
       },
       {

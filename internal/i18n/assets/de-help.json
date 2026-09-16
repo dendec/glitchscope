@@ -104,14 +104,14 @@
     "title": "Qualität und Akkulaufzeit",
     "children": [
       {
-        "title": "Leistung",
+        "title": "Qualität",
         "lines": [
-          "Ultra: Volle Auflösung und eine Bildrate bis zur Bildwiederholrate des Displays, bei durchgehend höchster Qualität.",
-          "Leistung: Hohe Detailqualität mit einem Ziel von 30 FPS.",
-          "Ausgewogen: Ausgewogene Bildqualität und Akkulaufzeit mit einem Ziel von 24 FPS.",
-          "Energiesparen: Niedrigere Auflösung und ein Ziel von 24 FPS für längere Akkulaufzeit.",
-          "Die automatische Auflösung passt sich der aktuellen Einstellung an. Bei einer festen Auflösung wird diese Anpassung deaktiviert.",
-          "Wenn selbst bei der niedrigsten Auflösung die Geschwindigkeit immer noch zu langsam ist, kann auf eine ressourcenintensive Einstellung verzichtet werden."
+          "Ultra: Verwendet die ausgewählte Auflösung direkt ohne künstliche FPS-Begrenzung; die Bildwiederholrate des Displays ist die Obergrenze.",
+          "Leistung: Hohe Detailqualität mit einem Ziel von 30 FPS; die Auflösung kann sich bei hoher Last automatisch verringern.",
+          "Ausgewogen: Ausgewogene Bildqualität und Akkulaufzeit mit 25 FPS; die Auflösung kann sich bei hoher Last automatisch verringern.",
+          "Energiesparen: Ein Ziel von 20 FPS spart Energie; die Auflösung kann sich bei hoher Last automatisch verringern.",
+          "Die ausgewählte Auflösung ist in den Modi Leistung, Ausgewogen und Energiesparen die adaptive Obergrenze. Ultra verwendet sie direkt.",
+          "FPS hat Vorrang: zuerst die Auflösung reduzieren (je Dimension bis zur Hälfte in Leistung/Ausgewogen, auf ein Viertel in Energiesparen). Hilft das nicht, Auflösung wiederherstellen und FPS senken. FPS wird nur gesenkt, wenn die vorgesehene Bildrate nicht gehalten werden kann; das Überschreiten des Energiesparbudgets allein senkt FPS nicht."
         ]
       },
       {

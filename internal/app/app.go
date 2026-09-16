@@ -84,11 +84,22 @@ type App struct {
 
 	startupFile string
 
-	adaptive         resolutionState
-	presetTuning     presetTuning
-	presentRequested bool
-	nextPresent      time.Time
-	vizClock         visualizerClock // visualizer frame clock, promoted from runState
+	albumMetadata          *metadataLoader
+	fileMetadata           *metadataLoader
+	metadataAlbum          int
+	metadataFile           string
+	adaptive               resolutionState
+	configuredResolution   config.RenderResolution
+	presetTuning           presetTuning
+	presentRequested       bool
+	nextPresent            time.Time
+	vizClock               visualizerClock // visualizer frame clock, promoted from runState
+	vizBudget              interactionBudget
+	previewBudget          interactionBudget
+	uiFramePeriod          time.Duration
+	targetVisualizerFPS    int32
+	effectiveVisualizerFPS int32
+	renderCost             frameCostMeter
 
 	// appCtx/appCancel govern background work tied to the app lifetime.
 	// Cancelled in Close() so in-flight goroutines (e.g. connectivity check)
@@ -204,25 +215,19 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	}
 
 	resolutions := config.ComputeResolutions(int(w), int(h))
-	var renderW, renderH int
-	switch {
-	case gs.Graphics.PerformanceMode == config.PerfModeUltra:
-		renderW, renderH = int(w), int(h)
-	case gs.Graphics.Adaptive && len(resolutions) > 0:
-		a.adaptive.Reset(int(w), int(h), gs.Graphics.PerformanceMode.Params())
-		renderW, renderH = a.adaptive.resolutions[a.adaptive.index].Width, a.adaptive.resolutions[a.adaptive.index].Height
-	case gs.Graphics.Adaptive:
-		slog.Warn("adaptive: empty resolution list at startup, using saved size",
-			"window", fmt.Sprintf("%dx%d", int(w), int(h)))
-		savedRes := config.RenderResolution{Width: gs.Graphics.RenderWidth, Height: gs.Graphics.RenderHeight}
-		target := config.ClosestResolution(resolutions, savedRes)
-		renderW, renderH = target.Width, target.Height
-	default:
-		savedRes := config.RenderResolution{Width: gs.Graphics.RenderWidth, Height: gs.Graphics.RenderHeight}
-		target := config.ClosestResolution(resolutions, savedRes)
-		renderW, renderH = target.Width, target.Height
+	savedRes := config.RenderResolution{Width: gs.Graphics.RenderWidth, Height: gs.Graphics.RenderHeight}
+	a.configuredResolution = config.ResolutionAtMost(resolutions, savedRes)
+	if len(resolutions) == 0 {
+		slog.Warn("resolution list empty at startup", "window", fmt.Sprintf("%dx%d", int(w), int(h)))
 	}
-	gs.Graphics.RenderWidth, gs.Graphics.RenderHeight = renderW, renderH
+	var renderW, renderH int
+	if gs.Graphics.PerformanceMode == config.PerfModeUltra || len(resolutions) == 0 {
+		renderW, renderH = a.configuredResolution.Width, a.configuredResolution.Height
+	} else {
+		a.adaptive.Reset(int(w), int(h), a.configuredResolution, gs.Graphics.PerformanceMode.Params())
+		renderW, renderH = a.adaptive.resolutions[a.adaptive.index].Width, a.adaptive.resolutions[a.adaptive.index].Height
+	}
+	gs.Graphics.RenderWidth, gs.Graphics.RenderHeight = a.configuredResolution.Width, a.configuredResolution.Height
 
 	pm.SetWindowSize(renderW, renderH)
 	rt := projectm.NewRenderTarget(renderW, renderH)
@@ -255,6 +260,12 @@ func (a *App) Close() {
 	// resources it may observe, so no in-flight goroutine touches a freed overlay.
 	if a.appCancel != nil {
 		a.appCancel()
+	}
+	if a.albumMetadata != nil {
+		a.albumMetadata.close()
+	}
+	if a.fileMetadata != nil {
+		a.fileMetadata.close()
 	}
 	a.shuffleWg.Wait()
 	a.connectivityWg.Wait()

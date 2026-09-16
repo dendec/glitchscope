@@ -1449,3 +1449,15 @@ func TestRadioCompletedEmptyQueryDoesNotRemainLoading(t *testing.T) {
 		t.Fatalf("empty query = %#v", entries)
 	}
 }
+
+func TestFileMetadataRejectsStaleSelection(t *testing.T) {
+	o := &Overlay{uiVisible: true, trackInfos: []player.TrackInfo{{Path: "new.mod"}}, trackCursor: 0}
+	o.SetFileMetadata("old.mod", player.TrackInfo{Path: "old.mod", Title: "stale"}, nil)
+	if o.fileMetadataPath != "" {
+		t.Fatal("stale file metadata accepted")
+	}
+	o.SetFileMetadata("new.mod", player.TrackInfo{Path: "new.mod", Title: "current"}, nil)
+	if o.fileMetadata.Title != "current" || !o.tracksContentDirty {
+		t.Fatal("current metadata did not invalidate panel")
+	}
+}

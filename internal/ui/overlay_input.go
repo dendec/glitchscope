@@ -71,7 +71,7 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 }
 
 // InteractionActive reports whether the user has interacted with the visible
-// UI recently enough that the next visualizer frame should yield to it.
+// UI recently enough to prioritize presentation and budget visualizer work.
 func (o *Overlay) InteractionActive(now time.Time) bool {
 	return o.uiVisible && !o.lastInteraction.IsZero() && now.Sub(o.lastInteraction) < uiInteractionGrace
 }

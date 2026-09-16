@@ -884,7 +884,7 @@ func (o *Overlay) switchToDownloads() {
 	}
 	tracks := o.cachedTracks()
 	albumName := o.catalog.Text(i18n.SourceDownloads)
-	albumIdx := o.addCatalogAlbum(player.Album{Name: albumName, Path: "downloads:", Tracks: tracks})
+	albumIdx := o.addCatalogAlbum(player.Album{Name: albumName, Path: player.DownloadsPrefix, Tracks: tracks})
 	o.pushLevel(navLevel{ctx: ctxCatalog, label: albumName, entries: o.buildCatalogTrackEntries(albumIdx)})
 }
 

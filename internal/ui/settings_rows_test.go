@@ -12,7 +12,7 @@ func TestSettingsRowsUseCompactSectionsAndLabels(t *testing.T) {
 	rows := BuildSettingsRows(config.DefaultSettings(), 640, 480)
 	want := []string{
 		"── Playback ────", "Shuffle", "Repeat",
-		"── Visualization ──", "Performance", "Visualizer", "Rotation", "Resolution", "Filter", "Sensitivity",
+		"── Visualization ──", "Quality", "Visualizer", "Rotation", "Resolution", "Filter", "Sensitivity",
 		"── Appearance ───", "Language", "Theme", "Transparency", "Stats",
 		"── Downloads ───────", "Size", "Keep for",
 	}
@@ -73,13 +73,14 @@ func TestLanguageSwitchPreservesUIStateAndInvalidatesText(t *testing.T) {
 func TestUltraSettingsRows(t *testing.T) {
 	s := config.DefaultSettings()
 	s.Graphics.PerformanceMode = config.PerfModeUltra
+	s.Graphics.RenderWidth, s.Graphics.RenderHeight = 1920, 1080
 	rows := BuildSettingsRows(s, 1920, 1080)
 	perf := rows[SettingPerformanceMode]
 	if perf.Values[perf.Index] != "Ultra" {
 		t.Fatalf("performance row: %+v", perf)
 	}
 	resolution := rows[SettingResolution]
-	if len(resolution.Values) != 1 || resolution.Values[resolution.Index] != "1920x1080" {
+	if len(resolution.Values) <= 1 || resolution.Values[resolution.Index] != "1920x1080" {
 		t.Fatalf("Ultra resolution: %+v", resolution)
 	}
 }
@@ -123,7 +124,7 @@ func TestUltraResolutionDescriptionIsFixed(t *testing.T) {
 		catalog:      i18n.MustLoad(i18n.English),
 		settingsRows: BuildSettingsRows(settings, 640, 480),
 	}
-	if got := o.selectedSettingDescription(SettingResolution, 0); got != o.catalog.Text(i18n.DescriptionUltra) {
-		t.Fatalf("Ultra resolution suggests adaptive behavior: %q", got)
+	if got := o.selectedSettingDescription(SettingResolution, 0); got != o.catalog.Text(i18n.DescriptionResolutionFixed) {
+		t.Fatalf("Ultra resolution description = %q", got)
 	}
 }

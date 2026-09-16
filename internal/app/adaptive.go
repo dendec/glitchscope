@@ -1,145 +1,113 @@
 package app
 
-import "github.com/dendec/glitchscope/internal/config"
+import (
+	"time"
 
-const (
-	fpsWindow = 10
+	"github.com/dendec/glitchscope/internal/config"
 )
 
-// fpsRing is a fixed-size ring buffer of FPS samples for stability checks.
-type fpsRing struct {
-	data [fpsWindow]float64
-	pos  int
-	full bool
-}
+type adaptiveAction uint8
 
-func (r *fpsRing) Add(v float64) {
-	r.data[r.pos] = v
-	r.pos++
-	if r.pos >= fpsWindow {
-		r.pos = 0
-		r.full = true
-	}
-}
+const (
+	adaptiveNone adaptiveAction = iota
+	adaptiveFrequencyDown
+	adaptiveFrequencyUp
+	adaptiveResolutionDown
+	adaptiveResolutionUp
+	// adaptiveResample requests a disjoint measurement window without changing quality.
+	adaptiveResample
+)
 
-// min/max return the extremum over valid samples.
-func (r *fpsRing) min() float64 {
-	n := fpsWindow
-	if !r.full {
-		n = r.pos
-	}
-	if n == 0 {
-		return 1e9
-	}
-	m := r.data[0]
-	for i := 1; i < n; i++ {
-		if r.data[i] < m {
-			m = r.data[i]
-		}
-	}
-	return m
-}
+// Allow small scheduling jitter without treating it as sustained overload.
+const cadenceTolerance = 1.10
 
-func (r *fpsRing) max() float64 {
-	n := fpsWindow
-	if !r.full {
-		n = r.pos
-	}
-	if n == 0 {
-		return -1
-	}
-	m := r.data[0]
-	for i := 1; i < n; i++ {
-		if r.data[i] > m {
-			m = r.data[i]
-		}
-	}
-	return m
-}
-
+// adaptivePolicy preserves cadence before optimizing the soft work budget.
+// The state bounds and validates resolution trials.
 type adaptivePolicy struct {
-	fpsRing     fpsRing
-	lowFrames   int     // consecutive frames below threshold
-	highFrames  int     // consecutive frames above threshold
-	lowElapsed  float64 // seconds below threshold
-	highElapsed float64 // seconds above threshold
-	cooldown    int     // frames until next change allowed
-	params      config.ModeParams
+	params        config.ModeParams
+	highSince     time.Time
+	upSince       time.Time
+	lowSince      time.Time
+	cooldownUntil time.Time
 }
 
 func (p *adaptivePolicy) Reset() {
-	p.lowFrames = 0
-	p.highFrames = 0
-	p.lowElapsed = 0
-	p.highElapsed = 0
+	p.highSince = time.Time{}
+	p.upSince = time.Time{}
+	p.lowSince = time.Time{}
 }
 
 func (p *adaptivePolicy) Restart() {
 	*p = adaptivePolicy{params: p.params}
 }
 
-func (p *adaptivePolicy) triggerDown(current, resolutionCount int) (int, bool, bool) {
-	p.Reset()
-	p.cooldown = p.params.AdaptiveCooldown
-	if current+1 < resolutionCount {
-		return current + 1, true, false
-	}
-	return current, false, true
-}
-
-func (p *adaptivePolicy) triggerUp(current int) (int, bool, bool) {
-	p.Reset()
-	p.cooldown = p.params.AdaptiveCooldown
-	return current - 1, true, false
-}
-
-// Decide evaluates whether to change render resolution.
-//
-// Two trigger modes (whichever fires first):
-//   - Frame mode: N consecutive frames + ring buffer stability check
-//   - Time mode: elapsed time at ultra-low fps (bypasses ring buffer)
-//
-// Stability: frame mode requires all fpsWindow samples on the same side of
-// the threshold. This prevents oscillation when fps hovers near the boundary.
-func (p *adaptivePolicy) Decide(fps float64, current, resolutionCount int) (next int, changed bool, minReached bool) {
-	if p.cooldown > 0 {
-		p.cooldown--
-		p.fpsRing.Add(fps)
-		return current, false, false
+func (p *adaptivePolicy) Decide(utilization, cadence float64, now time.Time, currentFPS, currentIndex, ceilingIndex, resolutionCount int) adaptiveAction {
+	if !p.cooldownUntil.IsZero() && now.Before(p.cooldownUntil) {
+		return adaptiveNone
 	}
 
-	p.fpsRing.Add(fps)
+	// Frequency recovery uses the whole frame period, not the soft energy band.
+	nextFPS := min(currentFPS+int(p.params.FrequencyStep), int(p.params.VisualizerFPS))
+	if currentFPS < nextFPS && cadence <= cadenceTolerance &&
+		utilization*float64(nextFPS)/float64(max(currentFPS, 1)) <= 0.90 {
+		p.highSince = time.Time{}
+		p.lowSince = time.Time{}
+		if p.upSince.IsZero() {
+			p.upSince = now
+			return adaptiveNone
+		}
+		if now.Sub(p.upSince) >= p.params.UpshiftAfter {
+			p.resetAfterChange(now)
+			return adaptiveFrequencyUp
+		}
+		return adaptiveNone
+	}
+	p.upSince = time.Time{}
 
 	switch {
-	case fps < p.params.AdaptiveThreshLow:
-		p.lowFrames++
-		p.lowElapsed += 1.0 / max(fps, 0.1)
-		p.highFrames = 0
-		p.highElapsed = 0
-
-		if p.lowFrames >= p.params.AdaptiveLowFrames && p.fpsRing.full && p.fpsRing.max() < p.params.AdaptiveThreshLow {
-			return p.triggerDown(current, resolutionCount)
+	case utilization > p.params.UtilizationHigh || cadence > cadenceTolerance:
+		p.lowSince = time.Time{}
+		if p.highSince.IsZero() {
+			p.highSince = now
+			return adaptiveNone
 		}
-		if p.lowElapsed >= p.params.AdaptiveLowSec {
-			return p.triggerDown(current, resolutionCount)
+		if now.Sub(p.highSince) < p.params.DownshiftAfter {
+			return adaptiveNone
 		}
-
-	case fps > p.params.AdaptiveThreshHigh:
-		p.highFrames++
-		p.highElapsed += 1.0 / max(fps, 0.1)
-		p.lowFrames = 0
-		p.lowElapsed = 0
-
-		if p.highFrames >= p.params.AdaptiveHighFrames && p.fpsRing.full && p.fpsRing.min() > p.params.AdaptiveThreshHigh && current > 0 {
-			return p.triggerUp(current)
+		p.resetAfterChange(now)
+		if currentIndex+1 < resolutionCount {
+			return adaptiveResolutionDown
 		}
-		if p.highElapsed >= p.params.AdaptiveHighSec && current > 0 {
-			return p.triggerUp(current)
+		// Exceeding an energy target alone must never sacrifice sustained FPS.
+		if cadence > cadenceTolerance && currentFPS > int(p.params.MinVisualizerFPS) {
+			return adaptiveFrequencyDown
 		}
-
+	case utilization < p.params.UtilizationHigh:
+		p.highSince = time.Time{}
+		p.upSince = time.Time{}
+		if utilization >= p.params.UtilizationLow {
+			p.lowSince = time.Time{}
+			return adaptiveNone
+		}
+		if p.lowSince.IsZero() {
+			p.lowSince = now
+			return adaptiveNone
+		}
+		if now.Sub(p.lowSince) < p.params.UpshiftAfter {
+			return adaptiveNone
+		}
+		p.resetAfterChange(now)
+		if currentIndex > ceilingIndex {
+			return adaptiveResolutionUp
+		}
 	default:
 		p.Reset()
 	}
 
-	return current, false, false
+	return adaptiveNone
+}
+
+func (p *adaptivePolicy) resetAfterChange(now time.Time) {
+	p.Reset()
+	p.cooldownUntil = now.Add(250 * time.Millisecond)
 }

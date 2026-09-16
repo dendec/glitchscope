@@ -104,14 +104,14 @@
     "title": "Calidad y batería",
     "children": [
       {
-        "title": "Rendimiento",
+        "title": "Calidad",
         "lines": [
-          "Ultra: Resolución completa y hasta la frecuencia de actualización de la pantalla, sin reducir la calidad.",
-          "Rendimiento: Gran nivel de detalle, con un objetivo de 30 FPS.",
-          "Equilibrado: Equilibrio entre calidad y autonomía, con un objetivo de 24 FPS.",
-          "Eco: Menor resolución y un objetivo de 24 FPS para prolongar la autonomía.",
-          "La resolución automática se ajusta según la configuración preestablecida actual. Una resolución fija desactiva este ajuste.",
-          "Se puede omitir una configuración de alto rendimiento si la resolución más baja sigue siendo demasiado lenta."
+          "Ultra: Usa directamente la resolución seleccionada sin límite artificial de FPS; la frecuencia de actualización es el límite superior.",
+          "Rendimiento: Gran nivel de detalle, con un objetivo de 30 FPS; la resolución puede reducirse automáticamente bajo carga.",
+          "Equilibrado: Equilibrio entre calidad y autonomía a 25 FPS; la resolución puede reducirse automáticamente bajo carga.",
+          "Eco: Un objetivo de 20 FPS ahorra batería; la resolución puede reducirse automáticamente bajo carga.",
+          "La resolución seleccionada es el límite adaptativo en Rendimiento, Equilibrado y Eco. Ultra la usa directamente.",
+          "Prioridad a los FPS: primero se reduce la resolución (hasta la mitad por dimensión en Rendimiento/Equilibrado, un cuarto en Eco). Si no ayuda, se restaura la resolución y se reducen los FPS. Los FPS solo se reducen si no se puede mantener la frecuencia prevista; superar el presupuesto de ahorro por sí solo no reduce los FPS."
         ]
       },
       {

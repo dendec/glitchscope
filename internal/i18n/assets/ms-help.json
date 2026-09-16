@@ -104,14 +104,14 @@
     "title": "Kualiti dan Bateri",
     "children": [
       {
-        "title": "Prestasi",
+        "title": "Kualiti",
         "lines": [
-          "Ultra: Resolusi penuh sehingga kadar segar semula skrin, dengan kualiti visual kekal maksimum.",
-          "Prestasi: Perincian visual tinggi dengan sasaran 30 FPS.",
-          "Seimbang: Keseimbangan kualiti dan hayat bateri dengan sasaran 24 FPS.",
-          "Jimat kuasa: Resolusi lebih rendah dengan sasaran 24 FPS untuk menjimatkan bateri.",
-          "Resolusi automatik akan disesuaikan mengikut tetapan semasa. Resolusi tetap akan melumpuhkan penyesuaian ini.",
-          "Tetapan yang berat boleh diabaikan jika resolusi paling rendah masih terlalu perlahan."
+          "Ultra: Menggunakan resolusi dipilih secara langsung tanpa had FPS buatan; kadar segar semula skrin ialah had atas.",
+          "Prestasi: Perincian visual tinggi dengan sasaran 30 FPS; resolusi boleh dikurangkan secara automatik apabila beban tinggi.",
+          "Seimbang: Keseimbangan kualiti dan hayat bateri pada 25 FPS; resolusi boleh dikurangkan secara automatik apabila beban tinggi.",
+          "Jimat kuasa: Sasaran 20 FPS menjimatkan kuasa; resolusi boleh dikurangkan secara automatik apabila beban tinggi.",
+          "Resolusi dipilih ialah had adaptif untuk mod Prestasi, Seimbang dan Jimat kuasa. Ultra menggunakannya secara langsung.",
+          "FPS diutamakan: cuba kurangkan resolusi dahulu (separuh setiap dimensi dalam Prestasi/Seimbang, suku dalam Jimat kuasa). Jika tidak membantu, pulihkan resolusi dan kurangkan FPS. FPS hanya dikurangkan jika kadar yang dijadualkan tidak dapat dikekalkan; melebihi bajet penjimatan sahaja tidak mengurangkan FPS."
         ]
       },
       {

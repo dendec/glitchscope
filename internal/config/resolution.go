@@ -6,15 +6,14 @@ type scale struct{ num, den int }
 
 // scaleCandidates are render scale fractions, tried descending (highest res first).
 var scaleCandidates = []scale{
-	{1, 1}, // 1.0
-	{3, 4}, // 0.75
-	{5, 8}, // 0.625
-	{1, 2}, // 0.5
-	{2, 5}, // 0.4
-	{3, 8}, // 0.375
-	{1, 4}, // 0.25
-	{1, 5}, // 0.2
-	{1, 8}, // 0.125
+	{1, 1},  // 1.0
+	{3, 4},  // 0.75
+	{5, 8},  // 0.625
+	{1, 2},  // 0.5
+	{3, 8},  // 0.375
+	{1, 4},  // 0.25
+	{3, 16}, // 0.1875
+	{1, 8},  // 0.125
 }
 
 // ComputeResolutions generates valid RenderResolutions for a base window size.
@@ -68,4 +67,21 @@ func ClosestResolution(list []RenderResolution, target RenderResolution) RenderR
 		return target
 	}
 	return list[ClosestResolutionIndex(list, target)]
+}
+
+// ResolutionAtMost returns the largest available resolution whose area does
+// not exceed target. The list is sorted from largest to smallest, so the
+// first matching entry is the configured quality ceiling. If every available
+// entry is larger than target, the smallest entry is returned.
+func ResolutionAtMost(list []RenderResolution, target RenderResolution) RenderResolution {
+	if len(list) == 0 {
+		return target
+	}
+	targetArea := target.Width * target.Height
+	for _, r := range list {
+		if r.Width*r.Height <= targetArea {
+			return r
+		}
+	}
+	return list[len(list)-1]
 }

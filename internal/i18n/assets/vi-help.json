@@ -104,14 +104,14 @@
     "title": "Chất lượng âm thanh và pin",
     "children": [
       {
-        "title": "Hiệu năng",
+        "title": "Chất lượng",
         "lines": [
-          "Ultra: Độ phân giải đầy đủ, tốc độ khung hình lên đến tần số quét màn hình. Luôn giữ chất lượng cao nhất.",
-          "Hiệu năng: Hình ảnh giàu chi tiết với tốc độ mục tiêu 30 FPS.",
-          "Cân bằng: Cân bằng chất lượng hình ảnh và thời lượng pin với mục tiêu 24 FPS.",
-          "Tiết kiệm: Giảm độ phân giải và đặt mục tiêu 24 FPS để tiết kiệm pin.",
-          "Độ phân giải tự động sẽ điều chỉnh theo thiết lập hiện tại. Nếu độ phân giải cố định được kích hoạt, việc điều chỉnh này sẽ bị vô hiệu hóa.",
-          "Nếu độ phân giải thấp nhất vẫn khiến tốc độ chạy quá chậm, bạn có thể bỏ qua thiết lập có tải cao."
+          "Ultra: Dùng trực tiếp độ phân giải đã chọn, không có giới hạn FPS nhân tạo; tần số quét màn hình là giới hạn trên.",
+          "Hiệu năng: Mục tiêu 30 FPS; độ phân giải có thể tự động giảm khi tải cao.",
+          "Cân bằng: Mục tiêu 25 FPS; độ phân giải có thể tự động giảm khi tải cao.",
+          "Tiết kiệm: Mục tiêu 20 FPS để tiết kiệm điện; độ phân giải có thể tự động giảm khi tải cao.",
+          "Độ phân giải đã chọn là giới hạn thích ứng ở các chế độ khác và được dùng trực tiếp trong Ultra.",
+          "Ưu tiên FPS: thử giảm độ phân giải trước (mỗi chiều còn một nửa ở Hiệu năng/Cân bằng, một phần tư ở Tiết kiệm). Nếu không hiệu quả, khôi phục độ phân giải rồi giảm FPS. Chỉ giảm FPS khi không duy trì được tốc độ khung hình đã đặt; chỉ vượt ngân sách tiết kiệm điện sẽ không làm giảm FPS."
         ]
       },
       {

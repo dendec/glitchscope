@@ -218,12 +218,15 @@ type Overlay struct {
 	ncRight           ncRightPanel // which NC right-panel area is focused
 	ncConfirm         bool         // delete confirm dialog active
 	ncDeleteConfirmed bool         // delete was just confirmed (one-shot)
-	ncInfoFile        string       // selected file path for right-panel info
-	ncInfoDir         string       // selected dir path for right-panel info
-	ncInfoIsDir       bool         // selected entry is a directory
-	ncInfoScroll      int          // vertical scroll offset for right-panel info
-	ncInfoLines       int          // total rendered lines in right-panel info
-	ncInfoVisible     int          // visible lines in right-panel info
+	fileMetadataPath  string
+	fileMetadata      player.TrackInfo
+	fileCover         *image.RGBA
+	ncInfoFile        string // selected file path for right-panel info
+	ncInfoDir         string // selected dir path for right-panel info
+	ncInfoIsDir       bool   // selected entry is a directory
+	ncInfoScroll      int    // vertical scroll offset for right-panel info
+	ncInfoLines       int    // total rendered lines in right-panel info
+	ncInfoVisible     int    // visible lines in right-panel info
 	ncListingStatus   filesystem.Status
 
 	theme        config.Theme
@@ -1091,4 +1094,42 @@ func (o *Overlay) NCSync() {
 	o.tracksDirty = true
 	o.tracksContentDirty = true
 	o.refreshNCPreview()
+}
+
+// MetadataFilePath identifies the visible file whose details need background I/O.
+func (o *Overlay) MetadataFilePath() string {
+	if !o.UIVisible() {
+		return ""
+	}
+	if len(o.navStack) > 0 {
+		if o.isNC() {
+			return o.ncInfoFile
+		}
+		e := o.currentEntry()
+		if e == nil {
+			return ""
+		}
+		if e.kind == entryFavoriteTrack {
+			return e.filePath
+		}
+		albums := o.currentAlbums()
+		if e.IsCatalogTrack() && e.albumIdx >= 0 && e.albumIdx < len(albums) && e.trackIdx >= 0 && e.trackIdx < len(albums[e.albumIdx].Tracks) {
+			return albums[e.albumIdx].Tracks[e.trackIdx]
+		}
+		return ""
+	}
+	if o.trackCursor >= 0 && o.trackCursor < len(o.trackInfos) {
+		return o.trackInfos[o.trackCursor].Path
+	}
+	return ""
+}
+
+// SetFileMetadata accepts only the current selection. GL upload remains in Draw.
+func (o *Overlay) SetFileMetadata(path string, info player.TrackInfo, cover *image.RGBA) {
+	if path != o.MetadataFilePath() {
+		return
+	}
+	o.fileMetadataPath, o.fileMetadata, o.fileCover = path, info, cover
+	o.coverArtPath = ""
+	o.tracksDirty, o.tracksContentDirty = true, true
 }

@@ -104,14 +104,14 @@
     "title": "Kalite ve Batarya",
     "children": [
       {
-        "title": "Performans",
+        "title": "Kalite",
         "lines": [
-          "Ultra: Tam çözünürlükte, ekran yenileme hızına kadar kare hızı. Görüntü kalitesi en yüksek düzeyde kalır.",
-          "Performans: 30 FPS hedefiyle yüksek görsel ayrıntı.",
-          "Dengeli: 24 FPS hedefiyle görüntü kalitesi ve pil ömrü arasında denge.",
-          "Tasarruf: Pil tasarrufu için daha düşük çözünürlük ve 24 FPS hedefi.",
-          "Otomatik çözünürlük, mevcut ayara göre ayarlanır. Sabit çözünürlük bu ayarlamayı devre dışı bırakır.",
-          "En düşük çözünürlük bile yeterince hızlı değilse, ağır bir ayar atlanabilir."
+          "Ultra: Seçilen çözünürlüğü doğrudan kullanır, yapay FPS sınırı yoktur; ekran yenileme hızı üst sınırdır.",
+          "Performans: 30 FPS hedefiyle yüksek ayrıntı; yük altında çözünürlük otomatik olarak düşebilir.",
+          "Dengeli: 25 FPS ile kalite ve pil ömrü arasında denge; yük altında çözünürlük otomatik olarak düşebilir.",
+          "Tasarruf: Güç tasarrufu için 20 FPS hedefi; yük altında çözünürlük otomatik olarak düşebilir.",
+          "Seçilen çözünürlük diğer modlarda uyarlamalı üst sınır, Ultra'da doğrudan kullanılan değerdir.",
+          "Öncelik FPS: önce çözünürlüğü azaltın (Performans/Dengeli için her boyutta yarıya, Tasarruf için dörtte bire kadar). Fayda sağlamazsa çözünürlüğü geri yükleyip FPS değerini azaltın. FPS yalnızca planlanan kare hızı sürdürülemediğinde düşürülür; yalnızca tasarruf bütçesinin aşılması FPS değerini düşürmez."
         ]
       },
       {

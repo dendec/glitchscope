@@ -2,6 +2,8 @@ package app
 
 import "time"
 
+const fpsWindow = 10
+
 type fpsMeter struct {
 	values [fpsWindow]float64
 	count  int

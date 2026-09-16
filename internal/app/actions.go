@@ -432,19 +432,12 @@ func (a *App) applySettings(winW, winH int) {
 		}
 	}
 
-	resIndex := rows[ui.SettingResolution].Index
 	resolutions := config.ComputeResolutions(winW, winH)
-
-	if resIndex == 0 {
-		a.settings.Graphics.Adaptive = true
-		a.resetAdaptiveState(winW, winH)
-	} else {
-		a.settings.Graphics.Adaptive = false
-		fixedIdx := resIndex - 1
-		if fixedIdx >= 0 && fixedIdx < len(resolutions) {
-			a.applyRenderResolution(resolutions[fixedIdx])
-		}
-		a.resetAdaptiveCounters()
+	resIndex := rows[ui.SettingResolution].Index
+	if resIndex >= 0 && resIndex < len(resolutions) {
+		a.configuredResolution = resolutions[resIndex]
+		a.settings.Graphics.RenderWidth = a.configuredResolution.Width
+		a.settings.Graphics.RenderHeight = a.configuredResolution.Height
 	}
 
 	filterIndex := rows[ui.SettingFilter].Index
@@ -460,12 +453,17 @@ func (a *App) applySettings(winW, winH int) {
 		if newMode != a.settings.Graphics.PerformanceMode {
 			a.settings.Graphics.PerformanceMode = newMode
 			params := newMode.Params()
-			a.vizClock.framePeriod = time.Second / time.Duration(params.VisualizerFPS)
+			a.targetVisualizerFPS = params.VisualizerFPS
+			a.setEffectiveVisualizerFPS(params.VisualizerFPS)
 			if a.preview != nil {
 				a.preview.SetFPS(params.VisualizerFPS)
 			}
-			a.resetAdaptiveState(winW, winH)
 		}
+	}
+	if a.settings.Graphics.PerformanceMode == config.PerfModeUltra {
+		a.applyRenderResolution(a.configuredResolution)
+	} else {
+		a.resetAdaptiveState(winW, winH)
 	}
 
 	visualizerOff := rows[ui.SettingVisualizer].Index == 0

@@ -45,6 +45,17 @@ header.
 отражает стоимость preset на текущем устройстве. Автор не извлекается из имени
 файла: стандартный `.milk` не предоставляет надёжного обязательного поля автора.
 
+### Отзывчивость при навигации (ПРИНЯТО)
+
+При активной навигации ввод и UI показываются поверх последней текстуры до
+очередного кадра визуализатора. Фон и активный preview продолжают анимацию:
+приложение автоматически уменьшает частоту по стоимости рендера, сохраняя
+обычную частоту для дешёвых кадров. Через 200 мс без ввода ограничение снимается.
+Выбор нового preview по-прежнему ждёт стабилизации курсора; до этого анимируется
+предыдущий preview. При непрозрачном меню невидимый основной фон не рендерится,
+preview на странице Presets продолжает работать. Параметры расписания и ограничения
+GL-потока описаны в ARCHITECTURE.md.
+
 ## Решения
 
 | # | Идея | Статус |
@@ -317,12 +328,17 @@ Presets-страница: справа скриншот пресета + инф�
 
 ## Handheld power options (ПРИНЯТО)
 
-Settings exposes **Visualizer** next to **Performance**. The tracker seeking
+Settings exposes **Visualizer** next to **Quality**. The tracker seeking
 budget is selected automatically from available device memory. Over-budget
 tracks keep playing through their native decoder, with that decoder's seek
 limitations. Visualizer Off keeps playback and navigation
 working against a solid background. Opening Presets still enables live preview.
-Performance-mode thresholds and quality ceilings are unchanged.
+Performance has a target of 30 FPS, Balanced 25 FPS, and Eco 20 FPS. The
+selected Resolution is always the configured ceiling: these three modes may
+lower it automatically when the render budget is exceeded, but never raise it
+above the selected value. Ultra uses the selected Resolution directly and has
+no adaptive resolution or artificial FPS cap. Mode descriptions explain this
+automatic lowering without adding a separate Auto resolution choice.
 
 Настройка интервала смены визуальных пресетов называется **Rotation**: `Off`
 оставляет текущий пресет до ручной смены, `Auto` делегирует момент смены
@@ -346,10 +362,21 @@ days, 6 months, `Forever`) и лимит размера (128/256/512 MB, 1/2/4 G
 фоновой полосой без изменения начертания текста, включая бегущую строку.
 Жирное начертание сохраняется у заголовков и разделителей групп.
 
-Режим **Ultra / Ультра** в настройках производительности рисует каждый кадр
-в полном разрешении окна с целевой частотой текущего экрана (например,
-60/120/144 Гц; запасное значение — 60 Гц). Автоматическое снижение разрешения
-отключено; фактический FPS зависит от GPU и сложности пресета.
+Режим **Ultra / Ультра** использует выбранное в настройке Resolution значение
+без автоматического снижения. Внутреннего ограничения FPS нет; фактическая
+частота зависит от GPU, сложности пресета и частоты дисплея.
+
+В режимах Performance/Balanced/Eco Resolution задаёт верхний предел. При
+нагрузке сначала пробуется снижение resolution с проверкой выигрыша по полной
+стоимости кадра и интервалам вывода. FPS снижается только при устойчивом
+отставании от назначенной частоты, если resolution больше снижать нельзя или
+бесполезно. Превышение мягкого бюджета Eco не снижает стабильные 20 FPS.
+Предел снижения каждой стороны: High/Balanced — вдвое, Eco — вчетверо.
+Настройка называется Quality / Качество; JSON-идентификаторы сохранены.
+Performance целится в 30 FPS с мягкой целью 70–90% бюджета полного кадра, Balanced — в
+25 FPS и 50–70%, Eco — в 20 FPS и 30–50%. Эти проценты не показываются в меню;
+они нужны quality policy для выбора ступени. В описании каждого режима явно
+указано, что resolution может быть снижена автоматически.
 
 Режимы производительности показаны по убыванию: Ultra → Performance → Balanced → Eco.
 Порядок задаётся в config.AllPerformanceModes; UI связывает подписи и пояснения

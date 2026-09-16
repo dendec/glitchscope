@@ -104,14 +104,14 @@
     "title": "Kualitas dan Baterai",
     "children": [
       {
-        "title": "Kinerja",
+        "title": "Kualitas",
         "lines": [
-          "Ultra: Resolusi penuh hingga laju penyegaran layar, dengan kualitas visual tetap maksimal.",
-          "Kinerja: Detail visual tinggi dengan target 30 FPS.",
-          "Seimbang: Keseimbangan kualitas dan daya tahan baterai dengan target 24 FPS.",
-          "Hemat daya: Resolusi lebih rendah dengan target 24 FPS untuk menghemat baterai.",
-          "Resolusi Otomatis menyesuaikan diri dengan preset saat ini. Resolusi tetap menonaktifkan penyesuaian ini.",
-          "Preset yang berat dapat diabaikan jika resolusi terendah tetap terlalu lambat."
+          "Ultra: Menggunakan resolusi yang dipilih secara langsung tanpa batas FPS buatan; laju penyegaran layar menjadi batas atas.",
+          "Kinerja: Detail visual tinggi dengan target 30 FPS; resolusi dapat diturunkan otomatis saat beban tinggi.",
+          "Seimbang: Keseimbangan kualitas dan daya tahan baterai pada 25 FPS; resolusi dapat diturunkan otomatis saat beban tinggi.",
+          "Hemat daya: Target 20 FPS menghemat daya; resolusi dapat diturunkan otomatis saat beban tinggi.",
+          "Resolusi yang dipilih menjadi batas adaptif pada Kinerja, Seimbang, dan Hemat daya. Ultra menggunakannya secara langsung.",
+          "FPS diutamakan: coba turunkan resolusi dahulu (setengah tiap dimensi di Kinerja/Seimbang, seperempat di Hemat daya). Jika tidak membantu, pulihkan resolusi dan turunkan FPS. FPS hanya diturunkan jika laju yang dijadwalkan tidak dapat dipertahankan; melampaui anggaran penghematan saja tidak menurunkan FPS."
         ]
       },
       {

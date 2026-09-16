@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"time"
 )
 
 // RenderResolution represents a fixed render size.
@@ -75,73 +76,65 @@ type PerformanceMode int
 
 const (
 	PerfModePerformance PerformanceMode = iota // 30 FPS visualizer, default
-	PerfModeBalanced                           // 24 FPS, moderate savings
-	PerfModeEco                                // 24 FPS, lower resolution for battery life
-	PerfModeUltra                              // native resolution at display refresh rate
+	PerfModeBalanced                           // 25 FPS visualizer, moderate savings
+	PerfModeEco                                // 20 FPS visualizer, lower power use
+	PerfModeUltra                              // selected resolution at display refresh rate
 )
 
 // ModeParams holds the tuning knobs for one performance mode.
 type ModeParams struct {
-	VisualizerFPS      int32
-	AdaptiveThreshLow  float64
-	AdaptiveThreshHigh float64
-	AdaptiveLowFrames  int
-	AdaptiveHighFrames int
-	AdaptiveCooldown   int
-	AdaptiveLowSec     float64
-	AdaptiveHighSec    float64
-	LowFPSThresh       float64
-	// AdaptiveMaxIndex is the highest resolution index the adaptive algorithm
-	// may scale up to. 0 = no limit (may reach native resolution). Higher
-	// indices are lower resolutions, so this caps the "quality ceiling".
-	AdaptiveMaxIndex int
+	// ResolutionDivisor bounds each dimension relative to the configured ceiling.
+	ResolutionDivisor int
+	// VisualizerFPS is the target (upper-bound) visualizer cadence.
+	VisualizerFPS int32
+	// MinVisualizerFPS bounds cadence when resolution reduction is exhausted or ineffective.
+	MinVisualizerFPS int32
+	// UtilizationLow/High define soft full-frame work targets. FPS loss, not
+	// exceeding this band alone, permits reducing cadence.
+	UtilizationLow  float64
+	UtilizationHigh float64
+	FrequencyStep   int32
+	DownshiftAfter  time.Duration
+	UpshiftAfter    time.Duration
 }
 
 // Params returns the tuning parameters for mode m.
 func (m PerformanceMode) Params() ModeParams {
 	switch m {
 	case PerfModeUltra:
-		p := PerfModePerformance.Params()
-		p.VisualizerFPS = 60 // fallback until the display rate is known
-		return p
+		return ModeParams{VisualizerFPS: 60, MinVisualizerFPS: 60, ResolutionDivisor: 1}
 	case PerfModeBalanced:
 		return ModeParams{
-			VisualizerFPS:      24,
-			AdaptiveThreshLow:  18.0,
-			AdaptiveThreshHigh: 21.0,
-			AdaptiveLowFrames:  8,
-			AdaptiveHighFrames: 10,
-			AdaptiveCooldown:   12,
-			AdaptiveLowSec:     2.0,
-			AdaptiveHighSec:    4.0,
-			LowFPSThresh:       12.0,
-			AdaptiveMaxIndex:   1, // cap at 0.75× (960×540)
+			ResolutionDivisor: 2,
+			VisualizerFPS:     25,
+			MinVisualizerFPS:  10,
+			UtilizationLow:    0.50,
+			UtilizationHigh:   0.70,
+			FrequencyStep:     5,
+			DownshiftAfter:    time.Second,
+			UpshiftAfter:      3 * time.Second,
 		}
 	case PerfModeEco:
 		return ModeParams{
-			VisualizerFPS:      24,
-			AdaptiveThreshLow:  16.0,
-			AdaptiveThreshHigh: 19.0,
-			AdaptiveLowFrames:  6,
-			AdaptiveHighFrames: 8,
-			AdaptiveCooldown:   15,
-			AdaptiveLowSec:     3.0,
-			AdaptiveHighSec:    6.0,
-			LowFPSThresh:       10.0,
-			AdaptiveMaxIndex:   3, // cap at 0.5× (640×360)
+			ResolutionDivisor: 4,
+			VisualizerFPS:     20,
+			MinVisualizerFPS:  10,
+			UtilizationLow:    0.30,
+			UtilizationHigh:   0.50,
+			FrequencyStep:     5,
+			DownshiftAfter:    time.Second,
+			UpshiftAfter:      4 * time.Second,
 		}
 	default: // PerfModePerformance
 		return ModeParams{
-			VisualizerFPS:      30,
-			AdaptiveThreshLow:  23.0,
-			AdaptiveThreshHigh: 27.0,
-			AdaptiveLowFrames:  10,
-			AdaptiveHighFrames: 10,
-			AdaptiveCooldown:   10,
-			AdaptiveLowSec:     2.0,
-			AdaptiveHighSec:    4.0,
-			LowFPSThresh:       15.0,
-			AdaptiveMaxIndex:   0, // no cap — may reach native
+			ResolutionDivisor: 2,
+			VisualizerFPS:     30,
+			MinVisualizerFPS:  15,
+			UtilizationLow:    0.70,
+			UtilizationHigh:   0.90,
+			FrequencyStep:     5,
+			DownshiftAfter:    time.Second,
+			UpshiftAfter:      3 * time.Second,
 		}
 	}
 }
@@ -201,10 +194,12 @@ func AllPerformanceModes() []PerformanceMode {
 
 // GraphicsSettings is the persisted user-tunable graphics parameters.
 type GraphicsSettings struct {
-	VisualizerOff   bool            `json:"visualizer_off"`
-	RenderWidth     int             `json:"render_width"`
-	RenderHeight    int             `json:"render_height"`
-	UpscaleFilter   UpscaleFilter   `json:"upscale_filter"`
+	VisualizerOff bool          `json:"visualizer_off"`
+	RenderWidth   int           `json:"render_width"`
+	RenderHeight  int           `json:"render_height"`
+	UpscaleFilter UpscaleFilter `json:"upscale_filter"`
+	// Adaptive is retained for settings-file compatibility. Runtime resolution
+	// policy is derived from PerformanceMode and ignores this legacy flag.
 	Adaptive        bool            `json:"adaptive"`
 	BeatSensitivity float64         `json:"beat_sensitivity"`
 	PerformanceMode PerformanceMode `json:"performance_mode"`

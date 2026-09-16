@@ -13,20 +13,20 @@ func TestPresetProfilesRequireStableFramesAndSeparateModes(t *testing.T) {
 	key := presetProfileKey{name: "a", mode: config.PerfModeEco, width: 1280, height: 720}
 	tuning.activate(key, []byte("milk"))
 	for range 29 {
-		tuning.observe(4, 3, true)
+		tuning.observe(4, 3, 15, true)
 	}
 	if tuning.profiles[key].ready {
 		t.Fatal("remembered an unproven resolution")
 	}
-	tuning.observe(4, 3, false)
+	tuning.observe(4, 3, 15, false)
 	for range 29 {
-		tuning.observe(4, 3, true)
+		tuning.observe(4, 3, 15, true)
 	}
 	if tuning.profiles[key].ready {
 		t.Fatal("unstable interval counted toward stability")
 	}
-	tuning.observe(4, 3, true)
-	if p := tuning.activate(key, []byte("milk")); !p.ready || p.index != 4 || p.floor != 3 {
+	tuning.observe(4, 3, 15, true)
+	if p := tuning.activate(key, []byte("milk")); !p.ready || p.index != 4 || p.floor != 3 || p.fps != 15 {
 		t.Fatalf("profile = %+v", p)
 	}
 	tuning.markHeavy()
@@ -71,5 +71,23 @@ func TestEnergySavingPresentation(t *testing.T) {
 	}
 	if !presentationDue(config.PerfModePerformance, now, next, false, false, false) {
 		t.Fatal("performance mode cadence changed")
+	}
+}
+
+func TestNewPresetImmediatelyRestoresQuality(t *testing.T) {
+	var state resolutionState
+	params := config.PerfModeEco.Params()
+	state.Reset(1280, 720, config.RenderResolution{Width: 640, Height: 360}, params)
+	state.index = state.floorIndex
+	state.downBlocked = true
+	state.upscaleFloor = state.floorIndex
+	state.trialAction = adaptiveResolutionDown
+	fps := state.startPreset(presetProfile{})
+	if state.index != state.ceilingIndex || fps != 20 || state.downBlocked || state.trialAction != adaptiveNone || state.upscaleFloor != state.ceilingIndex {
+		t.Fatalf("new preset retained degradation: %+v, fps=%d", state, fps)
+	}
+	fps = state.startPreset(presetProfile{ready: true, index: state.floorIndex, floor: state.floorIndex, fps: 15})
+	if state.index != state.floorIndex || fps != 15 {
+		t.Fatal("known preset did not restore measured cadence and resolution")
 	}
 }

@@ -54,11 +54,7 @@ func BuildSettingsRows(s config.Settings, winW, winH int) []SettingRow {
 // BuildSettingsRowsWithCatalog creates localized rows while preserving enum indices.
 func BuildSettingsRowsWithCatalog(s config.Settings, winW, winH int, catalog i18n.Catalog) []SettingRow {
 	resolutions := config.ComputeResolutions(winW, winH)
-	resValues, resIndex := buildResolutionValuesWithLabels(s, resolutions, catalog.Text(i18n.ValueAuto), catalog.Text(i18n.ValueUnavailable))
-
-	if s.Graphics.PerformanceMode == config.PerfModeUltra {
-		resValues, resIndex = []string{fmt.Sprintf("%dx%d", winW, winH)}, 0
-	}
+	resValues, resIndex := buildResolutionValuesWithLabels(s, resolutions, catalog.Text(i18n.ValueUnavailable))
 
 	filterValues := []string{catalog.Text(i18n.ValueSmooth), catalog.Text(i18n.ValuePixel)}
 	filterIndex := comparableIndex(config.AllFilters(), s.Graphics.UpscaleFilter)
@@ -154,22 +150,16 @@ func localizedPresetIntervals(catalog i18n.Catalog, current config.PresetInterva
 	return values, comparableIndex(all, current)
 }
 
-// buildResolutionValues produces the resolution option list and selected index.
-// "Auto" is always included as the first option so the user can switch back
-// from a fixed resolution to adaptive mode.
-func buildResolutionValuesWithLabels(s config.Settings, resolutions []config.RenderResolution, auto, unavailable string) ([]string, int) {
-	values := append([]string{auto}, renderResolutionStrings(resolutions)...)
+// buildResolutionValues produces the configured resolution list and selection.
+// In non-Ultra modes the selected value is the adaptive quality ceiling.
+func buildResolutionValuesWithLabels(s config.Settings, resolutions []config.RenderResolution, unavailable string) ([]string, int) {
+	values := renderResolutionStrings(resolutions)
 	if len(resolutions) == 0 {
 		values = append(values, unavailable)
 	}
-	if s.Graphics.Adaptive {
-		return values, 0
-	}
-	// Find the currently selected fixed resolution (index offset by 1
-	// because "Auto" is always at position 0).
 	for i, r := range resolutions {
 		if r.Width == s.Graphics.RenderWidth && r.Height == s.Graphics.RenderHeight {
-			return values, i + 1
+			return values, i
 		}
 	}
 	return values, 0
@@ -213,9 +203,6 @@ func settingDescription(catalog i18n.Catalog, setting, value int) string {
 		}
 		return catalog.Text(i18n.DescriptionRotationInterval)
 	case SettingResolution:
-		if value == 0 {
-			return catalog.Text(i18n.DescriptionResolutionAuto)
-		}
 		return catalog.Text(i18n.DescriptionResolutionFixed)
 	case SettingShuffle:
 		switch value {

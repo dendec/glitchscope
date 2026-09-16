@@ -104,14 +104,14 @@
     "title": "Qualidade e Bateria",
     "children": [
       {
-        "title": "Desempenho",
+        "title": "Qualidade",
         "lines": [
-          "Ultra: Resolução total, com quadros até a taxa de atualização da tela, sem reduzir a qualidade.",
-          "Desempenho: Alto nível de detalhe, com meta de 30 FPS.",
-          "Equilibrado: Equilíbrio entre qualidade e autonomia, com meta de 24 FPS.",
-          "Econômico: Resolução reduzida e meta de 24 FPS para economizar bateria.",
-          "A resolução automática se ajusta ao preset atual. Uma resolução fixa desativa esse ajuste.",
-          "Um preset pesado pode ser ignorado se a menor resolução ainda for muito lenta."
+          "Ultra: Usa diretamente a resolução escolhida sem limite artificial de FPS; a taxa de atualização da tela é o limite superior.",
+          "Desempenho: Alto nível de detalhe, com meta de 30 FPS; a resolução pode diminuir automaticamente sob carga.",
+          "Equilibrado: Equilíbrio entre qualidade e autonomia a 25 FPS; a resolução pode diminuir automaticamente sob carga.",
+          "Econômico: Meta de 20 FPS para economizar energia; a resolução pode diminuir automaticamente sob carga.",
+          "A resolução escolhida é o limite adaptativo em Desempenho, Equilibrado e Econômico. Ultra a usa diretamente.",
+          "Prioridade ao FPS: primeiro reduzir a resolução (metade por dimensão em Desempenho/Equilibrado, um quarto em Econômico). Se não ajudar, restaurar a resolução e reduzir o FPS. O FPS só é reduzido quando a frequência prevista não pode ser mantida; ultrapassar apenas o orçamento de economia não reduz o FPS."
         ]
       },
       {

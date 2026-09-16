@@ -129,7 +129,7 @@ func (p *overlayPresenter) needsTrackInfos(albumIdx int) bool {
 	return p.metadata.needsRefresh(albumIdx)
 }
 
-func (p *overlayPresenter) Update(fps float64, adaptive bool, renderHeight int, stats prof.Stats, playback overlayPlaybackSnapshot) {
+func (p *overlayPresenter) Update(fps float64, adaptive bool, effectiveRenderHeight int, stats prof.Stats, playback overlayPlaybackSnapshot) {
 	if p.overlay == nil {
 		return
 	}
@@ -139,7 +139,7 @@ func (p *overlayPresenter) Update(fps float64, adaptive bool, renderHeight int, 
 		line += fmt.Sprintf(" GPU:%.0fM %.0f%%", stats.GPUMemKB/1024, stats.GPUUtilPct)
 	}
 	if adaptive {
-		line += fmt.Sprintf(" %dp", renderHeight)
+		line += fmt.Sprintf(" %dp", effectiveRenderHeight)
 	}
 	p.overlay.SetStats(line)
 

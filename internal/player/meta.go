@@ -33,13 +33,14 @@ type TrackMeta struct {
 }
 
 type albumMeta struct {
-	Version int                  `json:"v"`
-	Tracks  map[string]TrackMeta `json:"t"`
+	Version int                      `json:"v"`
+	Files   map[string]metadataStamp `json:"files,omitempty"`
+	Tracks  map[string]TrackMeta     `json:"t"`
 }
 
 const (
 	metaFileName = ".gsa_meta.json"
-	metaVersion  = 3
+	metaVersion  = 4
 )
 
 // readMetaCache reads the metadata cache for an album directory.

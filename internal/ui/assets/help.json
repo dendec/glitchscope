@@ -104,14 +104,14 @@
     "title": "Quality and Battery",
     "children": [
       {
-        "title": "Performance",
+        "title": "Quality",
         "lines": [
-          "Ultra: Full resolution, with a frame rate up to your display’s refresh rate. Quality stays at its maximum.",
-          "Performance: Rich visual detail at a target of 30 FPS.",
-          "Balanced: A balance of detail and battery life, targeting 24 FPS.",
-          "Eco: Lower resolution and a target of 24 FPS to extend battery life.",
-          "Auto resolution adjusts to the current preset. A fixed resolution disables this adjustment.",
-          "A heavy preset can be skipped if the lowest resolution is still too slow."
+          "Ultra: Uses the selected resolution directly, with no artificial FPS cap; the display refresh rate is the upper limit.",
+          "High: Rich visual detail at a target of 30 FPS; resolution may lower automatically under load.",
+          "Balanced: A balance of detail and battery life, targeting 25 FPS; resolution may lower automatically under load.",
+          "Eco: A 20 FPS target to save power; resolution may lower automatically under load.",
+          "The selected resolution is the adaptive ceiling in High, Balanced and Eco. Ultra uses it directly.",
+          "FPS has priority: try lowering resolution first (half per dimension in High/Balanced, one quarter in Eco). If this does not help, restore resolution and lower FPS. FPS is lowered only when the scheduled cadence cannot be sustained; exceeding the power-saving budget alone does not lower FPS."
         ]
       },
       {
@@ -952,7 +952,7 @@
       "Play local audio, tracker modules and classic game-music formats, or explore the Modland and ModArchive catalogs.",
       "Visuals are rendered by projectM. Audio is decoded by specialized open-source engines selected for each format.",
       "",
-      "Performance, Balanced and Eco modes adapt visual quality to the device. The visualizer can also be disabled for music-only playback.",
+      "High, Balanced and Eco modes adapt visual quality to the device. The visualizer can also be disabled for music-only playback.",
       "",
       "**Project**",
       "https://github.com/dendec/glitchscope",

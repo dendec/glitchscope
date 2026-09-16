@@ -38,7 +38,14 @@ func (s *playbackState) snapshot(trackAlbumIdx int, includeTrackInfos bool) over
 		trackAlbumIdx = snapshot.currentAlbum
 	}
 	if includeTrackInfos {
-		snapshot.trackInfos = s.lib.GetAlbumTracks(trackAlbumIdx)
+		if trackAlbumIdx >= 0 && trackAlbumIdx < len(s.lib.Albums) {
+			// Placeholders only: metadata decoding belongs to the background worker.
+			tracks := s.lib.Albums[trackAlbumIdx].Tracks
+			snapshot.trackInfos = make([]player.TrackInfo, len(tracks))
+			for i, path := range tracks {
+				snapshot.trackInfos[i].Path = path
+			}
+		}
 	}
 	if trackAlbumIdx == snapshot.currentAlbum {
 		snapshot.trackCursor = snapshot.currentTrack

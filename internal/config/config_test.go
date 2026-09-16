@@ -162,16 +162,16 @@ func TestComputeResolutions_NonStandard(t *testing.T) {
 	if len(res) == 0 {
 		t.Fatal("expected resolutions for 400x300")
 	}
-	// 400*0.4 = 160, 300*0.4 = 120 — exact (both divisible by 5)
+	// Half size remains exact for this nonstandard aspect ratio.
 	found := false
 	for _, r := range res {
-		if r.Width == 160 && r.Height == 120 {
+		if r.Width == 200 && r.Height == 150 {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatal("400x300 should yield 160x120 (scale 0.4)")
+		t.Fatal("400x300 should yield 200x150 (scale 0.5)")
 	}
 }
 
@@ -195,6 +195,16 @@ func TestClosestResolution(t *testing.T) {
 		if got != tt.want {
 			t.Fatalf("ClosestResolution(%s) = %s, want %s", tt.target, got, tt.want)
 		}
+	}
+}
+
+func TestResolutionAtMost(t *testing.T) {
+	list := []RenderResolution{{1920, 1080}, {1280, 720}, {960, 540}, {640, 360}}
+	if got, want := ResolutionAtMost(list, RenderResolution{1000, 700}), (RenderResolution{960, 540}); got != want {
+		t.Fatalf("ResolutionAtMost = %s, want %s", got, want)
+	}
+	if got, want := ResolutionAtMost(list, RenderResolution{320, 240}), (RenderResolution{640, 360}); got != want {
+		t.Fatalf("ResolutionAtMost fallback = %s, want %s", got, want)
 	}
 }
 
@@ -412,8 +422,8 @@ func TestPerformanceModeParams(t *testing.T) {
 		if p.VisualizerFPS <= 0 {
 			t.Fatalf("%v: VisualizerFPS = %d, want > 0", m, p.VisualizerFPS)
 		}
-		if p.AdaptiveThreshLow >= p.AdaptiveThreshHigh {
-			t.Fatalf("%v: low=%v >= high=%v", m, p.AdaptiveThreshLow, p.AdaptiveThreshHigh)
+		if m != PerfModeUltra && (p.UtilizationLow <= 0 || p.UtilizationLow >= p.UtilizationHigh || p.UtilizationHigh >= 1) {
+			t.Fatalf("%v: invalid utilization band %v..%v", m, p.UtilizationLow, p.UtilizationHigh)
 		}
 	}
 }
@@ -567,5 +577,18 @@ func TestShuffleModeJSONInSettings(t *testing.T) {
 	}
 	if got.Playback.Repeat != RepeatAll {
 		t.Fatalf("got %v, want RepeatAll", got.Playback.Repeat)
+	}
+}
+
+func TestResolutionGrid720p(t *testing.T) {
+	resolutions := ComputeResolutions(1280, 720)
+	heights := []int{720, 540, 450, 360, 270, 180, 135, 90}
+	if len(resolutions) != len(heights) {
+		t.Fatalf("grid has %d entries, want %d", len(resolutions), len(heights))
+	}
+	for i, height := range heights {
+		if resolutions[i].Height != height || resolutions[i].Width != height*16/9 {
+			t.Fatalf("step %d: %v, want %dp at 16:9", i, resolutions[i], height)
+		}
 	}
 }
