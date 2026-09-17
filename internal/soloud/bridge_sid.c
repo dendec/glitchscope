@@ -3,9 +3,15 @@
 
 #include "bridge_sid.h"
 
-#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
 
 #include "../../lib/cRSID/libcRSID.h"
 
@@ -21,7 +27,37 @@ struct SidCodec {
     char author[33];
 };
 
+#if defined(_WIN32)
+static CRITICAL_SECTION sid_mutex;
+static INIT_ONCE sid_mutex_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK sid_mutex_init(PINIT_ONCE once, PVOID parameter, PVOID *context) {
+    (void)once;
+    (void)parameter;
+    (void)context;
+    InitializeCriticalSection(&sid_mutex);
+    return TRUE;
+}
+
+static void sid_lock(void) {
+    InitOnceExecuteOnce(&sid_mutex_once, sid_mutex_init, NULL, NULL);
+    EnterCriticalSection(&sid_mutex);
+}
+
+static void sid_unlock(void) {
+    LeaveCriticalSection(&sid_mutex);
+}
+#else
 static pthread_mutex_t sid_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void sid_lock(void) {
+    pthread_mutex_lock(&sid_mutex);
+}
+
+static void sid_unlock(void) {
+    pthread_mutex_unlock(&sid_mutex);
+}
+#endif
 
 static int sid_header_valid(const unsigned char *data, unsigned int length) {
     if (!data || length < SID_HEADER_SIZE) return 0;
@@ -54,7 +90,7 @@ int Sid_loadMem(SidCodec *codec, const unsigned char *data, unsigned int length)
     if (!copy) return 1;
     memcpy(copy, data, length);
 
-    pthread_mutex_lock(&sid_mutex);
+    sid_lock();
     cRSID_C64instance *c64 = cRSID_init(SID_SAMPLE_RATE, 1024);
     cRSID_SIDheader *header = c64 ? cRSID_processSIDfile(c64, copy, (int)length) : NULL;
     if (header) {
@@ -64,7 +100,7 @@ int Sid_loadMem(SidCodec *codec, const unsigned char *data, unsigned int length)
         cRSID_initSIDtune(c64, header, (char)default_track);
         codec->tracks = tracks;
     }
-    pthread_mutex_unlock(&sid_mutex);
+    sid_unlock();
     if (!header) {
         free(copy);
         return 1;
@@ -80,9 +116,9 @@ int Sid_loadMem(SidCodec *codec, const unsigned char *data, unsigned int length)
 
 int Sid_read(SidCodec *codec, int frames, int16_t *buffer) {
     if (!codec || !codec->data || !buffer || frames < 0) return 0;
-    pthread_mutex_lock(&sid_mutex);
+    sid_lock();
     for (int i = 0; i < frames; ++i) buffer[i] = cRSID_generateSample(&cRSID_C64);
-    pthread_mutex_unlock(&sid_mutex);
+    sid_unlock();
     return frames;
 }
 

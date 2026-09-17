@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -36,11 +37,12 @@ import (
 )
 
 type App struct {
-	window  *sdl.Window
-	glCtx   sdl.GLContext
-	pm      *projectm.Handle
-	rt      *projectm.RenderTarget
-	preview *previewRenderer
+	window     *sdl.Window
+	windowIcon *sdl.Surface
+	glCtx      sdl.GLContext
+	pm         *projectm.Handle
+	rt         *projectm.RenderTarget
+	preview    *previewRenderer
 
 	overlay *ui.Overlay
 	inp     *input.Input
@@ -163,6 +165,21 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK | sdl.INIT_AUDIO); err != nil {
 		return nil, fmt.Errorf("sdl init: %w", err)
 	}
+	if runtime.GOOS == "windows" {
+		for _, attr := range []struct {
+			name  sdl.GLattr
+			value int
+		}{
+			{sdl.GL_CONTEXT_MAJOR_VERSION, 3},
+			{sdl.GL_CONTEXT_MINOR_VERSION, 3},
+			{sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_COMPATIBILITY},
+		} {
+			if err := sdl.GLSetAttribute(attr.name, attr.value); err != nil {
+				sdl.Quit()
+				return nil, fmt.Errorf("OpenGL context attribute %d: %w", attr.name, err)
+			}
+		}
+	}
 
 	winFlags := uint32(sdl.WINDOW_OPENGL | sdl.WINDOW_SHOWN | sdl.WINDOW_RESIZABLE)
 	if fullscreen {
@@ -176,6 +193,12 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		return nil, fmt.Errorf("window: %w", err)
 	}
 	a.window = win
+	if icon, err := ui.NewWindowIcon(); err != nil {
+		slog.Warn("window icon unavailable", "error", err)
+	} else {
+		win.SetIcon(icon)
+		a.windowIcon = icon
+	}
 	// On Linux, input methods (ibus/fcitx) consume letter-key KEYDOWN
 	// events and only emit TEXTINPUT. Disable text input so all keypresses
 	// arrive as KEYDOWN — needed for n/p/m/q/r/b bindings.
@@ -189,6 +212,12 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	}
 	a.glCtx = glCtx
 	_ = sdl.GLSetSwapInterval(0)
+	if err := projectm.InitOpenGL(); err != nil {
+		sdl.GLDeleteContext(glCtx)
+		_ = win.Destroy()
+		sdl.Quit()
+		return nil, fmt.Errorf("OpenGL init: %w", err)
+	}
 
 	t0 := time.Now()
 	pm, err := projectm.Create()
@@ -324,6 +353,10 @@ func (a *App) Close() {
 	}
 	if a.glCtx != nil {
 		sdl.GLDeleteContext(a.glCtx)
+	}
+	if a.windowIcon != nil {
+		a.windowIcon.Free()
+		a.windowIcon = nil
 	}
 	if a.window != nil {
 		_ = a.window.Destroy()

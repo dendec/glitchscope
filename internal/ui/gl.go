@@ -2,10 +2,19 @@
 package ui
 
 /*
-#cgo LDFLAGS: -lGLESv2
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
+#cgo windows CFLAGS: -DGLITCHSCOPE_GLEW_STATIC
+#cgo linux LDFLAGS: -lGLESv2
+#cgo windows LDFLAGS: -lglew32s -lopengl32
+#include "../gl/compat.h"
 #include <stdlib.h>
+
+#if defined(_WIN32)
+#define GS_GLSL_VERTEX_HEADER "#version 120\n"
+#define GS_GLSL_FRAGMENT_HEADER "#version 120\n"
+#else
+#define GS_GLSL_VERTEX_HEADER "#version 100\n"
+#define GS_GLSL_FRAGMENT_HEADER "#version 100\nprecision mediump float;\n"
+#endif
 
 static unsigned int createTextProgram();
 static unsigned int createImageProgram();
@@ -176,14 +185,13 @@ UIProgramLocations *loc = uiLocations(program);
 
 static unsigned int createTextProgram() {
 	const char *vs =
-		"#version 100\n"
+		GS_GLSL_VERTEX_HEADER
 		"attribute vec2 pos;\n"
 		"attribute vec2 tc;\n"
 		"varying vec2 uv;\n"
 		"void main() { uv = tc; gl_Position = vec4(pos, 0.0, 1.0); }";
 	const char *fs =
-		"#version 100\n"
-		"precision mediump float;\n"
+		GS_GLSL_FRAGMENT_HEADER
 		"uniform sampler2D text;\n"
 		"uniform float opacity;\n"
 		"varying vec2 uv;\n"
@@ -196,14 +204,13 @@ static unsigned int createTextProgram() {
 
 static unsigned int createImageProgram() {
 	const char *vs =
-		"#version 100\n"
+		GS_GLSL_VERTEX_HEADER
 		"attribute vec2 pos;\n"
 		"attribute vec2 tc;\n"
 		"varying vec2 uv;\n"
 		"void main() { uv = tc; gl_Position = vec4(pos, 0.0, 1.0); }";
 	const char *fs =
-		"#version 100\n"
-		"precision mediump float;\n"
+		GS_GLSL_FRAGMENT_HEADER
 		"uniform sampler2D text;\n"
 		"uniform float opacity;\n"
 		"varying vec2 uv;\n"
@@ -216,12 +223,11 @@ static unsigned int createImageProgram() {
 
 static unsigned int createRectProgram() {
 	const char *vs =
-		"#version 100\n"
+		GS_GLSL_VERTEX_HEADER
 		"attribute vec2 pos;\n"
 		"void main() { gl_Position = vec4(pos, 0.0, 1.0); }";
 	const char *fs =
-		"#version 100\n"
-		"precision mediump float;\n"
+		GS_GLSL_FRAGMENT_HEADER
 		"uniform vec4 uColor;\n"
 		"void main() { gl_FragColor = uColor; }";
 	return createProgram(vs, fs);
@@ -250,6 +256,18 @@ static unsigned int texUploadNearest(unsigned char *pixels, int w, int h) {
 static void texDelete(unsigned int tex) {
 	GLuint t = tex;
 	glDeleteTextures(1, &t);
+}
+
+static int uiIsTexture(unsigned int tex) {
+	return glIsTexture((GLuint)tex);
+}
+
+static void clearBackground(int width, int height) {
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+	glDisable(GL_SCISSOR_TEST);
+	glClearColor(0.02f, 0.02f, 0.025f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
 }
 */
 import "C"
@@ -281,7 +299,7 @@ func glDeleteProgram(program uint32) {
 }
 
 func glIsTexture(tex uint32) bool {
-	return tex != 0 && C.glIsTexture(C.uint(tex)) != 0
+	return tex != 0 && C.uiIsTexture(C.uint(tex)) != 0
 }
 
 func glDrawFilledRect(program uint32, x, y, w, h, r, g, b, a float32, winW, winH, viewW, viewH int) {
@@ -344,9 +362,5 @@ func glUploadNearestTexture(rgba *image.RGBA) uint32 {
 
 // ClearBackground presents a quiet player screen without running projectM.
 func ClearBackground(width, height int) {
-	C.glBindFramebuffer(C.GL_FRAMEBUFFER, 0)
-	C.glViewport(0, 0, C.GLsizei(width), C.GLsizei(height))
-	C.glDisable(C.GL_SCISSOR_TEST)
-	C.glClearColor(0.02, 0.02, 0.025, 1)
-	C.glClear(C.GL_COLOR_BUFFER_BIT)
+	C.clearBackground(C.int(width), C.int(height))
 }

@@ -2,6 +2,11 @@
   "sizes": [16, 24, 36],
   "icons": [
     {
+      "name": "app",
+      "source": "internal/ui/app_icon.svg",
+      "color": true
+    },
+    {
       "name": "local-music",
       "source": "lib/pixelarticons/svg/folder.svg"
     },

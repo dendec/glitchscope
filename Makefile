@@ -4,6 +4,7 @@ DIST_DIR := dist
 LOCAL_DIST_DIR := $(DIST_DIR)/local
 X64_DIST_DIR := $(DIST_DIR)/linux-amd64
 ARM64_DIST_DIR := $(DIST_DIR)/linux-arm64
+WINDOWS_DIST_DIR := $(DIST_DIR)/windows-amd64
 FONT_SUBSET := internal/ui/assets/unifont.otf
 FONT_RANGES := internal/ui/font_ranges.json
 FONT_REQUIRED := U+2014,U+2026,U+2192,U+23F8,U+25B6,U+25B8,U+25C0
@@ -55,7 +56,7 @@ MODARCHIVE_CATALOG := .cache/modarchive/catalog
 MODARCHIVE_SNAPSHOT := .cache/modarchive/1980-2007.gsa
 MODARCHIVE_ADDENDUM := .cache/modarchive/2007-addendum.gsa
 
-.PHONY: builder build clean dist dist-arm64 dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font icons
+.PHONY: builder build clean dist dist-arm64 dist-windows dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font icons
 
 DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
 DOCKER_ICON_RUN = docker run --rm --user "$$(id -u):$$(id -g)" -v "$(CURDIR):/build" -w /build $(DOCKER_BUILDER) bash -c
@@ -136,6 +137,7 @@ dist: subset-font icons builder $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATAL
 
 # ARM64 cross-build via Docker
 DOCKER_IMAGE_ARM64 := glitchscope:arm64
+DOCKER_IMAGE_WINDOWS := glitchscope-windows
 
 dist-arm64: subset-font icons builder portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
 	docker build --build-arg BUILDER_IMAGE=$(DOCKER_BUILDER) --build-arg TARGETARCH=arm64 --build-arg APP_VERSION=$(VERSION) -t $(DOCKER_IMAGE_ARM64) -f Dockerfile .
@@ -159,6 +161,30 @@ dist-arm64: subset-font icons builder portable-glitchscope $(TEXTURES_GSA_FILE) 
 	@cp $(ARM64_DIST_DIR)/../linux-amd64/.cache/shuffle/*.idx $(ARM64_DIST_DIR)/glitchscope/.cache/shuffle/ 2>/dev/null || true
 	@echo "=== $(ARM64_DIST_DIR)/ ==="
 	@ls -lhR $(ARM64_DIST_DIR)/
+
+# Windows amd64 cross-build. The dedicated image owns the Windows CRT,
+# OpenGL/GLEW, SDL2 and static native dependency toolchain.
+dist-windows: subset-font icons $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
+	docker build --build-arg APP_VERSION=$(VERSION) -t $(DOCKER_IMAGE_WINDOWS) -f Dockerfile.windows .
+	@rm -rf $(WINDOWS_DIST_DIR)
+	@mkdir -p $(WINDOWS_DIST_DIR)
+	@docker rm -f glitchscope-extract-windows 2>/dev/null || true
+	docker create --name glitchscope-extract-windows $(DOCKER_IMAGE_WINDOWS) /bin/false
+	docker cp glitchscope-extract-windows:/dist/glitchscope/. $(WINDOWS_DIST_DIR)/
+	docker rm glitchscope-extract-windows
+	@# Replace the empty runtime asset directories with the release archives.
+	rm -rf $(WINDOWS_DIST_DIR)/presets/*
+	cp $(GSA_FILE) $(WINDOWS_DIST_DIR)/presets/presets.gsa
+	rm -rf $(WINDOWS_DIST_DIR)/textures
+	cp $(TEXTURES_GSA_FILE) $(WINDOWS_DIST_DIR)/presets/textures.gsa
+	@# Include the offline catalogs shipped by the Linux release.
+	@mkdir -p $(WINDOWS_DIST_DIR)/.cache/modland $(WINDOWS_DIST_DIR)/.cache/modarchive
+	@cp $(MODLAND_CATALOG) $(WINDOWS_DIST_DIR)/.cache/modland/catalog
+	@cp $(MODARCHIVE_CATALOG) $(WINDOWS_DIST_DIR)/.cache/modarchive/catalog
+	@cp $(MODARCHIVE_SNAPSHOT) $(WINDOWS_DIST_DIR)/.cache/modarchive/1980-2007.gsa
+	@cp $(MODARCHIVE_ADDENDUM) $(WINDOWS_DIST_DIR)/.cache/modarchive/2007-addendum.gsa
+	@echo "=== Built $(APP) (Windows amd64) ==="
+	@ls -lhR $(WINDOWS_DIST_DIR)/
 
 # PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
 dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)

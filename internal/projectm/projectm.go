@@ -3,11 +3,39 @@ package projectm
 
 /*
 #cgo CFLAGS: -I ../../lib/projectm/src/api/include -I ../../lib/projectm/build/src/api/include
-#cgo LDFLAGS: -lGLESv2
+#cgo windows CFLAGS: -DGLITCHSCOPE_GLEW_STATIC
+#cgo linux LDFLAGS: -lGLESv2
+#cgo windows LDFLAGS: -lglew32s -lopengl32
 #include <stdlib.h>
+#include "../gl/compat.h"
 #include "projectM-4/projectM.h"
 
+static int pmvInitOpenGL(void) {
+#if defined(_WIN32)
+	glewExperimental = GL_TRUE;
+	GLenum err = glewInit();
+	// glewInit may leave GL_INVALID_ENUM in the error queue on some drivers.
+	(void)glGetError();
+	return (int)err;
+#else
+	return 0;
+#endif
+}
+
+static const char *pmvOpenGLError(int err) {
+#if defined(_WIN32)
+	return (const char *)glewGetErrorString((GLenum)err);
+#else
+	(void)err;
+	return "";
+#endif
+}
+
+#if defined(_WIN32)
+extern __declspec(dllexport) void pmvProjectMPresetSwitchRequested(bool isHardCut);
+#else
 extern void pmvProjectMPresetSwitchRequested(bool isHardCut);
+#endif
 extern void projectm_opengl_bind_feedback_framebuffer(projectm_handle instance);
 extern void projectm_set_preset_transition_filter(projectm_handle instance, bool nearest);
 
@@ -32,6 +60,15 @@ import (
 )
 
 const Mono = C.PROJECTM_MONO
+
+// InitOpenGL loads desktop OpenGL entry points on Windows. GLES2 platforms
+// expose the same functions directly and need no loader step.
+func InitOpenGL() error {
+	if err := C.pmvInitOpenGL(); err != 0 {
+		return fmt.Errorf("initialize OpenGL: %s", C.GoString(C.pmvOpenGLError(err)))
+	}
+	return nil
+}
 
 var presetSwitchRequestedHandler func(bool)
 

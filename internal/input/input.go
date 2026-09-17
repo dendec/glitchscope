@@ -22,6 +22,7 @@ const (
 	ActionNextPreset
 	ActionPrevPreset
 	ActionQuit
+	ActionToggleFullscreen
 	// UI navigation actions.
 	ActionSelect
 	ActionBack
@@ -85,6 +86,9 @@ func (in *Input) ProcessEvent(event sdl.Event, favoriteMode bool, now time.Time)
 		}
 		if e.Repeat != 0 {
 			return ActionNone
+		}
+		if e.Keysym.Mod&sdl.KMOD_CTRL != 0 && e.Keysym.Sym == sdl.K_f {
+			return ActionToggleFullscreen
 		}
 		return keyToAction(e.Keysym.Sym)
 

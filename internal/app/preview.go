@@ -3,8 +3,10 @@
 package app
 
 /*
-#cgo LDFLAGS: -lGLESv2
-#include <GLES2/gl2.h>
+#cgo windows CFLAGS: -DGLITCHSCOPE_GLEW_STATIC
+#cgo linux LDFLAGS: -lGLESv2
+#cgo windows LDFLAGS: -lglew32s -lopengl32
+#include "../gl/compat.h"
 
 static void prCreateThumbTexture(GLuint *tex, GLsizei w, GLsizei h) {
 	glGenTextures(1, tex);
@@ -21,6 +23,14 @@ static void prCaptureThumb(GLuint tex, GLsizei w, GLsizei h) {
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
 	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+static void prDeleteTexture(GLuint tex) {
+	if (tex) glDeleteTextures(1, &tex);
+}
+
+static void prSetViewport(GLsizei w, GLsizei h) {
+	glViewport(0, 0, w, h);
 }
 */
 import "C"
@@ -110,7 +120,7 @@ func (r *previewRenderer) Resize(w, h int) {
 		return
 	}
 	if r.tex != 0 {
-		C.glDeleteTextures(1, &r.tex)
+		C.prDeleteTexture(r.tex)
 		r.tex = 0
 	}
 	r.pm.SetWindowSize(w, h)
@@ -198,7 +208,7 @@ func (r *previewRenderer) ProcessNext() bool {
 		}
 	}
 
-	C.glViewport(0, 0, C.GLsizei(r.w), C.GLsizei(r.h))
+	C.prSetViewport(C.GLsizei(r.w), C.GLsizei(r.h))
 	started := time.Now()
 	r.pm.RenderFrame()
 	r.meter.AddDuration(time.Since(started))
@@ -228,7 +238,7 @@ func (r *previewRenderer) Flush() {
 // Destroy frees GL resources and the projectM instance.
 func (r *previewRenderer) Destroy() {
 	if r.tex != 0 {
-		C.glDeleteTextures(1, &r.tex)
+		C.prDeleteTexture(r.tex)
 		r.tex = 0
 	}
 	if r.pm != nil {

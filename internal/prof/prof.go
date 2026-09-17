@@ -8,7 +8,6 @@ import (
 
 const (
 	procThrottle = 500 * time.Millisecond
-	ticksPerSec  = 100
 )
 
 type Stats struct {
@@ -62,7 +61,7 @@ func (c *Collector) ReadStats() Stats {
 			dJiff := float64(jiffies - c.prevCPUJiffies)
 			dWall := now.Sub(c.prevCPUWall).Seconds()
 			if dWall > 0 {
-				st.CPUPct = dJiff * 100 / (dWall * ticksPerSec)
+				st.CPUPct = dJiff * 100 / (dWall * cpuTicksPerSecond)
 				st.CPUPct = math.Round(st.CPUPct)
 			}
 		}

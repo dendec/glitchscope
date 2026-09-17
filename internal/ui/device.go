@@ -1,9 +1,11 @@
 package ui
 
 /*
-#cgo LDFLAGS: -lGLESv2
-#cgo CFLAGS: -I/opt/projectm/include
-#include <GLES2/gl2.h>
+#cgo windows CFLAGS: -DGLITCHSCOPE_GLEW_STATIC -I ../../lib/projectm/src/api/include
+#cgo linux CFLAGS: -I/opt/projectm/include
+#cgo linux LDFLAGS: -lGLESv2
+#cgo windows LDFLAGS: -lglew32s -lopengl32
+#include "../gl/compat.h"
 #include <projectM-4/version.h>
 
 static const char *glGetStringWrapper(GLenum name) {
@@ -22,7 +24,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -214,20 +215,7 @@ func readCPUName() string {
 }
 
 func readTotalRAM() string {
-	var info syscall.Sysinfo_t
-	err := syscall.Sysinfo(&info)
-	if err != nil {
-		return ""
-	}
-	bytes := uint64(info.Totalram) * uint64(info.Unit)
-	switch {
-	case bytes >= 1<<30:
-		return formatFloat(float64(bytes)/float64(1<<30)) + " GB"
-	case bytes >= 1<<20:
-		return formatFloat(float64(bytes)/float64(1<<20)) + " MB"
-	default:
-		return formatFloat(float64(bytes)/float64(1<<10)) + " KB"
-	}
+	return readTotalRAMPlatform()
 }
 
 func formatFloat(f float64) string {

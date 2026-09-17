@@ -1,8 +1,18 @@
 package projectm
 
 /*
-#cgo LDFLAGS: -lGLESv2
-#include <GLES2/gl2.h>
+#cgo windows CFLAGS: -DGLITCHSCOPE_GLEW_STATIC
+#cgo linux LDFLAGS: -lGLESv2
+#cgo windows LDFLAGS: -lglew32s -lopengl32
+#include "../gl/compat.h"
+
+#if defined(_WIN32)
+#define GS_GLSL_VERTEX_HEADER "#version 120\n"
+#define GS_GLSL_FRAGMENT_HEADER "#version 120\n"
+#else
+#define GS_GLSL_VERTEX_HEADER "#version 100\n"
+#define GS_GLSL_FRAGMENT_HEADER "#version 100\nprecision mediump float;\n"
+#endif
 
 static GLuint rtCompileShader(GLenum type, const char *src) {
 	GLuint s = glCreateShader(type);
@@ -36,7 +46,7 @@ static GLuint rtLinkProgram(const char *vsSrc, const char *fsSrc) {
 
 static GLuint rtCreateBlitProgram() {
 	const char *vs =
-		"#version 100\n"
+		GS_GLSL_VERTEX_HEADER
 		"attribute vec2 pos;\n"
 		"varying vec2 uv;\n"
 		"void main() {\n"
@@ -44,14 +54,17 @@ static GLuint rtCreateBlitProgram() {
 		"  gl_Position = vec4(pos, 0.0, 1.0);\n"
 		"}";
 	const char *fs =
-		"#version 100\n"
-		"precision mediump float;\n"
+		GS_GLSL_FRAGMENT_HEADER
 		"varying vec2 uv;\n"
 		"uniform sampler2D tex;\n"
 		"void main() {\n"
 		"  gl_FragColor = texture2D(tex, uv);\n"
 		"}";
 	return rtLinkProgram(vs, fs);
+}
+
+static void rtDeleteProgram(GLuint program) {
+	if (program) glDeleteProgram(program);
 }
 
 static void rtCreateTexture(GLuint *tex) {
@@ -226,7 +239,7 @@ func (rt *RenderTarget) Destroy() {
 	C.rtDestroyTexture(rt.previousTex)
 	rt.previousTex = 0
 	if rt.program != 0 {
-		C.glDeleteProgram(rt.program)
+		C.rtDeleteProgram(rt.program)
 		rt.program = 0
 	}
 }

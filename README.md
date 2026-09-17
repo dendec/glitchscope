@@ -30,6 +30,17 @@ make VERSION=1.2 dist
 # Output: dist/linux-amd64/
 ```
 
+### Windows (AMD64 via Docker)
+Windows uses a separate cross-builder because the Linux builder produces ELF
+objects and GLES libraries that cannot be linked into a Windows executable.
+```bash
+make dist-windows
+# Output: dist/windows-amd64/
+```
+The package contains `glitchscope.exe`, the SDL2 runtime DLL, preset/texture
+archives, and offline Modland/ModArchive catalogs. The remaining system DLLs
+are provided by Windows itself.
+
 ### PortMaster / ARM64 (Cross-build via Docker)
 ```bash
 # Build PortMaster-compatible zip package for ARM64 handhelds
@@ -121,6 +132,9 @@ seconds. Opening the menu dismisses it permanently; missing the hint lets it
 reappear next time. Help begins with Quick Start, Controls, Playback, Frame rate and
 Battery, and Troubleshooting. Button names match the context hints at the bottom
 of the menu. Settings includes short explanations of the selected options.
+
+On desktop, **Ctrl+F** toggles borderless fullscreen; plain **F** keeps its
+favorite action.
 
 В настройках визуализации частота кадров, адаптивное разрешение и разрешение
 выбираются независимо. Частота предлагает фиксированные значения до частоты

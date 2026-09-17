@@ -1,0 +1,320 @@
+# syntax=docker/dockerfile:1.7
+
+# Windows x86_64 cross-builder.  This is intentionally separate from
+# Dockerfile.builder: its native libraries must be PE/COFF objects and its
+# OpenGL stack is desktop OpenGL/GLEW, not Linux GLES2.
+FROM debian:bookworm-slim
+
+ARG GO_VERSION=1.25.4
+ARG ZIG_VERSION=0.14.0
+ARG SDL_VERSION=2.32.2
+ARG GLEW_VERSION=2.2.0
+ARG OPENMPT_VERSION=0.8.7
+ARG XMP_VERSION=4.7.1
+ARG UNIFONT_VERSION=17.0.05
+ARG APP_VERSION=1.0
+
+ENV WIN_SYSROOT=/opt/win32 \
+    WIN_TARGET=x86_64-windows-gnu \
+    PATH=/usr/local/go/bin:/usr/local/zig-linux-x86_64-0.14.0:$PATH \
+    GOPATH=/go
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        autoconf automake ca-certificates cmake file gcc-mingw-w64-x86-64 \
+        git libtool make \
+        ninja-build pkg-config python3 python3-fonttools python3-pil python3-pip \
+        librsvg2-bin wget xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN wget -q "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -O /tmp/go.tar.gz \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz \
+    && wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz" -O /tmp/zig.tar.xz \
+    && tar -C /usr/local -xf /tmp/zig.tar.xz \
+    && rm /tmp/zig.tar.xz
+
+WORKDIR /build
+
+# Small compiler wrappers keep CMake, autotools, FFmpeg and the hand-written
+# C libraries on the same target and sysroot.
+RUN printf '%s\n' \
+        '#!/bin/sh' \
+        'exec zig cc -target x86_64-windows-gnu -fno-sanitize=undefined "$@"' \
+    > /usr/local/bin/win-cc \
+    && printf '%s\n' \
+        '#!/bin/sh' \
+        'exec zig c++ -target x86_64-windows-gnu -fno-sanitize=undefined "$@"' \
+    > /usr/local/bin/win-cxx \
+    && printf '%s\n' '#!/bin/sh' 'exec zig ar "$@"' > /usr/local/bin/win-ar \
+    && printf '%s\n' '#!/bin/sh' 'exec zig ranlib "$@"' > /usr/local/bin/win-ranlib \
+    && printf '%s\n' '#!/bin/sh' 'exec x86_64-w64-mingw32-nm "$@"' > /usr/local/bin/win-nm \
+    && printf '%s\n' '#!/bin/sh' 'exec x86_64-w64-mingw32-strip "$@"' > /usr/local/bin/win-strip \
+    && chmod +x /usr/local/bin/win-cc /usr/local/bin/win-cxx \
+        /usr/local/bin/win-ar /usr/local/bin/win-ranlib /usr/local/bin/win-nm \
+        /usr/local/bin/win-strip
+
+RUN printf '%s\n' \
+        'set(CMAKE_SYSTEM_NAME Windows)' \
+        'set(CMAKE_SYSTEM_PROCESSOR x86_64)' \
+        'set(CMAKE_C_COMPILER /usr/local/bin/win-cc)' \
+        'set(CMAKE_CXX_COMPILER /usr/local/bin/win-cxx)' \
+        'set(CMAKE_AR /usr/local/bin/win-ar)' \
+        'set(CMAKE_RANLIB /usr/local/bin/win-ranlib)' \
+        'set(CMAKE_STRIP /usr/local/bin/win-strip)' \
+        'set(CMAKE_FIND_ROOT_PATH /opt/win32)' \
+        'set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)' \
+        'set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)' \
+        'set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)' \
+        'set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)' \
+    > /cross-windows.cmake
+
+# SDL2 development package: headers, import library and runtime DLL.
+RUN mkdir -p /tmp/sdl2 "${WIN_SYSROOT}" \
+    && wget -q "https://github.com/libsdl-org/SDL/releases/download/release-${SDL_VERSION}/SDL2-devel-${SDL_VERSION}-mingw.tar.gz" -O /tmp/sdl2.tar.gz \
+    && tar xzf /tmp/sdl2.tar.gz -C /tmp/sdl2 \
+    && cp -r "/tmp/sdl2/SDL2-${SDL_VERSION}/x86_64-w64-mingw32/." "${WIN_SYSROOT}/" \
+    && rm -rf /tmp/sdl2 /tmp/sdl2.tar.gz
+
+# GLEW is built statically.  projectM and the Go GL helpers both use the same
+# header/library pair, while opengl32 remains a Windows system import library.
+RUN mkdir -p /tmp/glew \
+    && wget -q "https://github.com/nigels-com/glew/releases/download/glew-${GLEW_VERSION}/glew-${GLEW_VERSION}.tgz" -O /tmp/glew.tgz \
+    && tar xzf /tmp/glew.tgz -C /tmp/glew \
+    && cp -r "/tmp/glew/glew-${GLEW_VERSION}/include/." "${WIN_SYSROOT}/include/" \
+    && /usr/local/bin/win-cc -DGLEW_STATIC -I"${WIN_SYSROOT}/include" -O2 -c \
+        "/tmp/glew/glew-${GLEW_VERSION}/src/glew.c" -o /tmp/glew.o \
+    && /usr/local/bin/win-ar rcs "${WIN_SYSROOT}/lib/libglew32s.a" /tmp/glew.o \
+    && mkdir -p "${WIN_SYSROOT}/lib/cmake/GLEW" \
+    && printf '%s\n' \
+        'set(GLEW_FOUND TRUE)' \
+        'set(GLEW_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/../../../include")' \
+        'set(GLEW_LIBRARIES GLEW::glew_s)' \
+        'if(NOT TARGET GLEW::glew_s)' \
+        '  add_library(GLEW::glew_s STATIC IMPORTED)' \
+        '  set_target_properties(GLEW::glew_s PROPERTIES' \
+        '    IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libglew32s.a"' \
+        '    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../../include"' \
+        '    INTERFACE_COMPILE_DEFINITIONS GLEW_STATIC)' \
+        'endif()' \
+        'if(NOT TARGET GLEW::glew)' \
+        '  add_library(GLEW::glew INTERFACE IMPORTED)' \
+        '  set_target_properties(GLEW::glew PROPERTIES' \
+        '    INTERFACE_LINK_LIBRARIES GLEW::glew_s' \
+        '    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../../include"' \
+        '    INTERFACE_COMPILE_DEFINITIONS GLEW_STATIC)' \
+        'endif()' \
+    > "${WIN_SYSROOT}/lib/cmake/GLEW/GLEWConfig.cmake" \
+    && rm -rf /tmp/glew /tmp/glew.tgz /tmp/glew.o
+
+# projectM patches are part of the application's native dependency contract.
+COPY lib/projectm lib/projectm
+COPY patches/projectm-feedback.patch /build/patches/projectm-feedback.patch
+COPY patches/projectm-beat-sensitivity.patch /build/patches/projectm-beat-sensitivity.patch
+COPY patches/projectm-transition-shaders.patch /build/patches/projectm-transition-shaders.patch
+COPY patches/projectm-transition-framebuffer.patch /build/patches/projectm-transition-framebuffer.patch
+COPY patches/projectm-transition-filter.patch /build/patches/projectm-transition-filter.patch
+RUN cd lib/projectm \
+    && for patch in \
+        /build/patches/projectm-feedback.patch \
+        /build/patches/projectm-beat-sensitivity.patch \
+        /build/patches/projectm-transition-shaders.patch \
+        /build/patches/projectm-transition-framebuffer.patch \
+        /build/patches/projectm-transition-filter.patch; do \
+        if git apply --check "$patch" >/dev/null 2>&1; then \
+            git apply "$patch"; \
+        elif git apply --reverse --check "$patch" >/dev/null 2>&1; then \
+            :; \
+        else \
+            echo "patch does not apply: $patch" >&2; exit 1; \
+        fi; \
+    done \
+    && sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' config.h.cmake.in
+
+RUN cmake -S lib/projectm -B lib/projectm/build-windows -G Ninja \
+        -DCMAKE_TOOLCHAIN_FILE=/cross-windows.cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DENABLE_PLAYLIST=OFF \
+        -DENABLE_SDL_UI=OFF \
+        -DBUILD_TESTING=OFF \
+        -DENABLE_INSTALL=OFF \
+        -DENABLE_GLES=OFF \
+        -DCMAKE_PREFIX_PATH="${WIN_SYSROOT}" \
+        -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON \
+        -DGLEW_DIR="${WIN_SYSROOT}/lib/cmake/GLEW" \
+        -DCMAKE_C_FLAGS=-DGLEW_STATIC \
+        -DCMAKE_CXX_FLAGS=-DGLEW_STATIC \
+    && cmake --build lib/projectm/build-windows --target projectM -- -j"$(nproc)" \
+    && cp lib/projectm/build-windows/src/libprojectM/libprojectM-4.a "${WIN_SYSROOT}/lib/" \
+    && cp lib/projectm/build-windows/vendor/projectm-eval/projectm-eval/libprojectM_eval.a "${WIN_SYSROOT}/lib/"
+
+# Game Music Emu has no runtime dependency beyond the Windows C runtime.
+COPY lib/game-music-emu lib/game-music-emu
+RUN cmake -S lib/game-music-emu -B lib/game-music-emu/build-windows -G Ninja \
+        -DCMAKE_TOOLCHAIN_FILE=/cross-windows.cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DGME_BUILD_SHARED=OFF \
+        -DGME_BUILD_STATIC=ON \
+        -DGME_BUILD_TESTING=OFF \
+        -DGME_BUILD_EXAMPLES=OFF \
+        -DCMAKE_INSTALL_PREFIX="${WIN_SYSROOT}" \
+    && cmake --build lib/game-music-emu/build-windows --target gme_static -- -j"$(nproc)" \
+    && cmake --install lib/game-music-emu/build-windows
+
+# libopenmpt and libxmp are built without optional Unix/audio backends.  The
+# application's FFmpeg and SoLoud decoders cover compressed audio; these two
+# libraries are needed for tracker playback and metadata.
+RUN wget -q "https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-${OPENMPT_VERSION}+release.autotools.tar.gz" \
+    && tar xzf "libopenmpt-${OPENMPT_VERSION}+release.autotools.tar.gz" \
+    && rm "libopenmpt-${OPENMPT_VERSION}+release.autotools.tar.gz" \
+    && cd "libopenmpt-${OPENMPT_VERSION}+release.autotools" \
+    && CC=/usr/local/bin/win-cc CXX=/usr/local/bin/win-cxx AR=/usr/local/bin/win-ar \
+       RANLIB=/usr/local/bin/win-ranlib ./configure \
+        --host=x86_64-w64-mingw32 --prefix="${WIN_SYSROOT}" \
+        --enable-static --disable-shared \
+        --without-mpg123 --without-ogg --without-vorbis --without-vorbisfile \
+        --without-flac --without-zlib --without-pulseaudio --without-sdl2 \
+        --without-portaudio --without-portaudiocpp --without-dsound --without-sndfile \
+    && make -j"$(nproc)" \
+    && make install \
+    && rm -rf "/build/libopenmpt-${OPENMPT_VERSION}+release.autotools"
+
+RUN wget -q "https://github.com/libxmp/libxmp/releases/download/libxmp-${XMP_VERSION}/libxmp-${XMP_VERSION}.tar.gz" -O /tmp/libxmp.tar.gz \
+    && tar xzf /tmp/libxmp.tar.gz -C /tmp \
+    && cd "/tmp/libxmp-${XMP_VERSION}" \
+    && CC=/usr/local/bin/win-cc AR=/usr/local/bin/win-ar RANLIB=/usr/local/bin/win-ranlib ./configure \
+        --host=x86_64-w64-mingw32 --prefix="${WIN_SYSROOT}" \
+        --enable-static --disable-shared \
+    && make -j"$(nproc)" \
+    && make install \
+    && rm -rf "/tmp/libxmp-${XMP_VERSION}" /tmp/libxmp.tar.gz
+
+# Small tracker/chip libraries are compiled directly so they do not acquire
+# Unix-only build-system or runtime dependencies.
+COPY lib/pt3player lib/pt3player
+COPY patches/pt3player-build.patch /build/patches/pt3player-build.patch
+RUN cd lib/pt3player \
+    && git apply /build/patches/pt3player-build.patch \
+    && /usr/local/bin/win-cc -std=c99 -O2 -Wno-unused-variable -Wno-parentheses \
+        -Wno-dangling-else -I. -c pt3player.c -o /tmp/pt3player.o \
+    && /usr/local/bin/win-ar rcs "${WIN_SYSROOT}/lib/libpt3player.a" /tmp/pt3player.o \
+    && cp pt3player.h "${WIN_SYSROOT}/include/"
+
+COPY lib/ayumi lib/ayumi
+RUN /usr/local/bin/win-cc -std=c99 -O2 -Ilib/ayumi -c lib/ayumi/ayumi.c -o /tmp/ayumi.o \
+    && /usr/local/bin/win-ar rcs "${WIN_SYSROOT}/lib/libayumi.a" /tmp/ayumi.o \
+    && cp lib/ayumi/ayumi.h "${WIN_SYSROOT}/include/"
+
+COPY lib/cRSID lib/cRSID
+RUN x86_64-w64-mingw32-gcc -std=gnu99 -O2 -Ilib/cRSID \
+        -c lib/cRSID/libcRSID.c -o /tmp/libcrsid.o \
+    && x86_64-w64-mingw32-ar rcs "${WIN_SYSROOT}/lib/libcrsid.a" /tmp/libcrsid.o \
+    && cp lib/cRSID/libcRSID.h "${WIN_SYSROOT}/include/"
+
+COPY lib/libstsound lib/libstsound
+RUN for source in YmMusic.cpp Ymload.cpp YmUserInterface.cpp Ym2149Ex.cpp digidrum.cpp YmFilters.cpp; do \
+        /usr/local/bin/win-cxx -std=c++11 -O2 -Wno-write-strings \
+            -Ilib/libstsound -Ilib/libstsound/LZH \
+            -c "lib/libstsound/$source" -o "/tmp/libstsound-${source%.cpp}.o"; \
+    done \
+    && /usr/local/bin/win-cxx -std=c++11 -O2 -Wno-write-strings \
+        -Ilib/libstsound -Ilib/libstsound/LZH \
+        -c lib/libstsound/LZH/LzhLib.cpp -o /tmp/libstsound-LzhLib.o \
+    && /usr/local/bin/win-ar rcs "${WIN_SYSROOT}/lib/libstsound.a" /tmp/libstsound-*.o \
+    && cp lib/libstsound/StSoundLibrary.h lib/libstsound/YmTypes.h "${WIN_SYSROOT}/include/"
+
+# Build only the audio FFmpeg libraries used by the application.
+COPY lib/ffmpeg lib/ffmpeg
+RUN cd lib/ffmpeg \
+    && ./configure \
+        --target-os=mingw32 --arch=x86_64 --enable-cross-compile \
+        --cc=/usr/bin/x86_64-w64-mingw32-gcc \
+        --ar=/usr/bin/x86_64-w64-mingw32-ar \
+        --ranlib=/usr/bin/x86_64-w64-mingw32-ranlib \
+        --nm=/usr/bin/x86_64-w64-mingw32-nm \
+        --strip=/usr/bin/x86_64-w64-mingw32-strip \
+        --prefix="${WIN_SYSROOT}" \
+        --disable-programs --disable-doc --disable-debug --disable-autodetect \
+        --disable-network --disable-openssl --disable-iconv --disable-zlib \
+        --disable-bzlib --disable-lzma --disable-avdevice --disable-avfilter \
+        --disable-swscale --disable-everything --disable-gpl --disable-nonfree \
+        --enable-static --disable-shared \
+        --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
+        --enable-decoder=aac --enable-decoder=aac_latm --enable-decoder=ac3 \
+        --enable-decoder=eac3 --enable-decoder=alac --enable-decoder=ape \
+        --enable-decoder=amrnb --enable-decoder=amrwb --enable-decoder=flac \
+        --enable-decoder=g723_1 --enable-decoder=gsm --enable-decoder=mp1 \
+        --enable-decoder=mp2 --enable-decoder=mp3 --enable-decoder=mpc7 \
+        --enable-decoder=mpc8 --enable-decoder=opus --enable-decoder=speex \
+        --enable-decoder=tta --enable-decoder=wavpack --enable-decoder=vorbis \
+        --enable-decoder=wmalossless --enable-decoder=wmapro \
+        --enable-decoder=wmav1 --enable-decoder=wmav2 --enable-decoder=pcm_s8 \
+        --enable-decoder=pcm_u8 --enable-decoder=pcm_s16le \
+        --enable-decoder=pcm_s16be --enable-decoder=pcm_s24le \
+        --enable-decoder=pcm_s24be --enable-decoder=pcm_s32le \
+        --enable-decoder=pcm_s32be --enable-decoder=pcm_f32le \
+        --enable-decoder=pcm_f32be --enable-decoder=pcm_f64le \
+        --enable-decoder=pcm_f64be --enable-parser=aac --enable-parser=ac3 \
+        --enable-parser=flac --enable-parser=mpegaudio --enable-parser=opus \
+        --enable-parser=vorbis --enable-demuxer=aac --enable-demuxer=ac3 \
+        --enable-demuxer=amr --enable-demuxer=ape --enable-demuxer=asf \
+        --enable-demuxer=aiff --enable-demuxer=caf --enable-demuxer=eac3 \
+        --enable-demuxer=flac --enable-demuxer=matroska --enable-demuxer=mov \
+        --enable-demuxer=mp3 --enable-demuxer=mpegts --enable-demuxer=ogg \
+        --enable-demuxer=rm --enable-demuxer=mpc --enable-demuxer=mpc8 \
+        --enable-demuxer=tta --enable-demuxer=wv --enable-demuxer=wav \
+        --disable-x86asm --disable-asm --disable-inline-asm \
+        --disable-pthreads --disable-w32threads --disable-os2threads \
+        --extra-cflags="-I${WIN_SYSROOT}/include" \
+        --extra-ldflags="-L${WIN_SYSROOT}/lib" \
+    && make -j"$(nproc)" \
+    && make install
+
+# Copy the application only after native dependencies are built.  This keeps
+# source edits cache-friendly and ensures ignored/generated local files do not
+# become part of the image input.
+COPY . .
+
+RUN mkdir -p internal/ui/assets \
+    && python3 scripts/generate-icons.py \
+        --manifest internal/ui/icon_assets.json \
+        --output internal/ui/assets/icons \
+    && wget -q "https://unifoundry.com/pub/unifont/unifont-${UNIFONT_VERSION}/font-builds/unifont-${UNIFONT_VERSION}.otf" -O /tmp/unifont-full.otf \
+    && python3 -m fontTools.subset /tmp/unifont-full.otf \
+        --unicodes="$(python3 -c 'import json; print(",".join(json.load(open("internal/ui/font_ranges.json"))))')" \
+        --no-subset-tables+=OS/2 --no-prune-unicode-ranges \
+        --output-file=internal/ui/assets/unifont.otf \
+    && rm -f /tmp/unifont-full.otf
+
+# Embed the application icon in the PE executable. The ICO is generated in
+# the image so no platform-specific build output is kept in the repository.
+RUN rsvg-convert -w 256 -h 256 internal/ui/app_icon.svg -o windows/glitchscope.png \
+    && python3 -c 'from PIL import Image; Image.open("windows/glitchscope.png").convert("RGBA").save("windows/glitchscope.ico", format="ICO", sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])' \
+    && x86_64-w64-mingw32-windres windows/glitchscope.rc -O coff -o /tmp/glitchscope-resource.o \
+    && rm -f windows/glitchscope.png windows/glitchscope.ico
+
+# CMake generates these API headers; the Go wrappers include them from the
+# source tree, just as the Linux builder does.
+RUN cp lib/projectm/build-windows/src/api/include/projectM-4/projectM_export.h \
+        lib/projectm/src/api/include/projectM-4/ \
+    && cp lib/projectm/build-windows/src/api/include/projectM-4/version.h \
+        lib/projectm/src/api/include/projectM-4/
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+RUN mkdir -p /dist/glitchscope/music /dist/glitchscope/presets \
+    && CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
+        CC=/usr/local/bin/win-cc CXX=/usr/local/bin/win-cxx \
+        CGO_CFLAGS="-fno-sanitize=undefined -Wno-error=unused-command-line-argument -D_REENTRANT -DPROJECTM_STATIC_DEFINE -DLIBXMP_STATIC -I${WIN_SYSROOT}/include -I${WIN_SYSROOT}/include/SDL2" \
+        CGO_CXXFLAGS="-std=c++11 -fno-sanitize=undefined -Wno-error=unused-command-line-argument -DWITH_SDL2_STATIC -DPROJECTM_STATIC_DEFINE -DLIBXMP_STATIC -I/build/lib/soloud/include -I${WIN_SYSROOT}/include -I${WIN_SYSROOT}/include/SDL2 -I${WIN_SYSROOT}/include/projectM-4" \
+        CGO_LDFLAGS="-L${WIN_SYSROOT}/lib /tmp/glitchscope-resource.o -lSDL2 /opt/win32/lib/libpt3player.a /opt/win32/lib/libayumi.a /opt/win32/lib/libstsound.a /opt/win32/lib/libcrsid.a /opt/win32/lib/libavformat.a /opt/win32/lib/libavcodec.a /opt/win32/lib/libswresample.a /opt/win32/lib/libavutil.a /opt/win32/lib/libprojectM-4.a /opt/win32/lib/libprojectM_eval.a -lglew32s -lopengl32 -lm /opt/win32/lib/libxmp.a /opt/win32/lib/libopenmpt.a /opt/win32/lib/libgme.a -lwinmm -lgdi32 -luser32 -lshell32 -lole32 -loleaut32 -limm32 -lversion -lsetupapi -ldinput8 -ldxguid -luuid -lrpcrt4 -lws2_32 -lbcrypt" \
+        go build -ldflags="-s -w -H windowsgui -extldflags=-Wl,--subsystem,windows -X github.com/dendec/glitchscope/internal/version.Version=${APP_VERSION}" \
+        -o /dist/glitchscope/glitchscope.exe ./cmd/glitchscope \
+    && cp "${WIN_SYSROOT}/bin/SDL2.dll" /dist/glitchscope/ \
+    && file /dist/glitchscope/glitchscope.exe \
+    && find /dist/glitchscope -maxdepth 1 -type f -printf '%f\n' | sort
+
+FROM scratch AS runner
+COPY --from=0 /dist /dist

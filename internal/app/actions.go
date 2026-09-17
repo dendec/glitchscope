@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -50,6 +51,9 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 				a.navigateOverlayToPlayingTrack()
 			}
 		}
+		return
+	case input.ActionToggleFullscreen:
+		a.toggleFullscreen()
 		return
 	case input.ActionSeekForward:
 		if a.pl != nil && !player.IsRadio(a.pl.TrackPath()) {
@@ -393,8 +397,18 @@ func (a *App) transitionPreset(name string) {
 		slog.Warn("preset transition read failed", "preset", name, "error", err)
 		return
 	}
-	a.pm.LoadPresetData(string(d), true)
-	a.suspendAdaptiveForPresetTransition(time.Now())
+	// Windows desktop OpenGL drivers can stall for a long time while projectM
+	// initializes a second preset for a soft cut. A hard cut keeps preset
+	// switching responsive there; Linux/handheld builds retain the visual
+	// transition path.
+	smooth := runtime.GOOS != "windows"
+	a.pm.LoadPresetData(string(d), smooth)
+	if smooth {
+		a.suspendAdaptiveForPresetTransition(time.Now())
+	} else {
+		a.adaptiveResumeAt = time.Time{}
+		a.renderCost.Reset()
+	}
 	a.applyPresetName(name)
 	a.activatePresetProfile(name, d)
 }

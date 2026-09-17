@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rasterize the selected Pixelarticons into binary-alpha PNG assets."""
+"""Rasterize manifest icons into PNG assets."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 
-def load_manifest(path: Path) -> tuple[list[int], list[dict[str, str]]]:
+def load_manifest(path: Path) -> tuple[list[int], list[dict[str, object]]]:
     with path.open(encoding="utf-8") as manifest_file:
         manifest = json.load(manifest_file)
 
@@ -28,7 +28,7 @@ def load_manifest(path: Path) -> tuple[list[int], list[dict[str, str]]]:
         raise ValueError("manifest icons must be a non-empty list")
 
     names: set[str] = set()
-    normalized: list[dict[str, str]] = []
+    normalized: list[dict[str, object]] = []
     for icon in icons:
         if not isinstance(icon, dict):
             raise ValueError("each manifest icon must be an object")
@@ -38,14 +38,17 @@ def load_manifest(path: Path) -> tuple[list[int], list[dict[str, str]]]:
             raise ValueError("each manifest icon needs a non-empty name")
         if not isinstance(source, str) or not source:
             raise ValueError(f"icon {name!r} needs a non-empty source")
+        color = icon.get("color", False)
+        if not isinstance(color, bool):
+            raise ValueError(f"icon {name!r} color must be a boolean")
         if name in names:
             raise ValueError(f"duplicate icon name: {name}")
         names.add(name)
-        normalized.append({"name": name, "source": source})
+        normalized.append({"name": name, "source": source, "color": color})
     return sizes, normalized
 
 
-def rasterize(source: Path, destination: Path, size: int) -> None:
+def rasterize(source: Path, destination: Path, size: int, monochrome: bool) -> None:
     with tempfile.NamedTemporaryFile(suffix=".png", dir=destination.parent) as rendered:
         subprocess.run(
             [
@@ -70,10 +73,11 @@ def rasterize(source: Path, destination: Path, size: int) -> None:
                     f"{source} rendered as {rgba.size[0]}x{rgba.size[1]}, "
                     f"expected {size}x{size}"
                 )
-            alpha = rgba.getchannel("A").point(lambda value: 255 if value >= 128 else 0)
-            white = Image.new("L", (size, size), 255)
-            binary = Image.merge("RGBA", (white, white, white, alpha))
-            binary.save(destination, format="PNG", optimize=True)
+            if monochrome:
+                alpha = rgba.getchannel("A").point(lambda value: 255 if value >= 128 else 0)
+                white = Image.new("L", (size, size), 255)
+                rgba = Image.merge("RGBA", (white, white, white, alpha))
+            rgba.save(destination, format="PNG", optimize=True)
 
 
 def source_revision(root: Path) -> str:
@@ -99,7 +103,7 @@ def main() -> None:
     output_path = args.output.resolve()
     sizes, icons = load_manifest(manifest_path)
     for icon in icons:
-        source = (root / icon["source"]).resolve()
+        source = (root / str(icon["source"])).resolve()
         if not source.is_file():
             raise FileNotFoundError(f"icon source does not exist: {source}")
 
@@ -110,8 +114,13 @@ def main() -> None:
             size_dir = staging / str(size)
             size_dir.mkdir()
             for icon in icons:
-                source = (root / icon["source"]).resolve()
-                rasterize(source, size_dir / f"{icon['name']}.png", size)
+                source = (root / str(icon["source"])).resolve()
+                rasterize(
+                    source,
+                    size_dir / f"{icon['name']}.png",
+                    size,
+                    monochrome=not bool(icon["color"]),
+                )
 
         generated_manifest = {
             "source_revision": source_revision(root),

@@ -1,7 +1,8 @@
+//go:build linux
+
 package prof
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"strconv"
@@ -9,9 +10,10 @@ import (
 )
 
 const (
-	procStatus  = "/proc/self/status"
-	procStat    = "/proc/self/stat"
-	procMeminfo = "/proc/meminfo"
+	procStatus        = "/proc/self/status"
+	procStat          = "/proc/self/stat"
+	procMeminfo       = "/proc/meminfo"
+	cpuTicksPerSecond = 100
 )
 
 func readProcStatus() (vmRSS int64, err error) {
@@ -36,24 +38,6 @@ func readProcMemory(field string) (int64, error) {
 		return 0, err
 	}
 	return parseMemoryKB(data, field)
-}
-
-func parseMemoryKB(data []byte, field string) (int64, error) {
-	for _, line := range bytes.Split(data, []byte("\n")) {
-		if !bytes.HasPrefix(line, []byte(field)) {
-			continue
-		}
-		parts := bytes.Fields(line)
-		if len(parts) < 2 {
-			continue
-		}
-		v, err := strconv.ParseInt(string(parts[1]), 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("parse %s: %w", field, err)
-		}
-		return v, nil
-	}
-	return 0, fmt.Errorf("%s not found", field)
 }
 
 func readProcStat() (utime, stime uint64, err error) {
