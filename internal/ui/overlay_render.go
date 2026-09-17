@@ -335,20 +335,33 @@ func renderPlainTextToTex(text string, face font.Face, fontSize float64, textCol
 		return 0, 0, 0
 	}
 	metrics := face.Metrics()
-	bounds, _ := font.BoundString(face, text)
-	contentW := (bounds.Max.X - bounds.Min.X).Ceil()
-	contentH := metrics.Height.Ceil()
-	rgba, texW, texH, _ := newShadowedTextRGBA(contentW, contentH, fontSize, textColor, func(rgba *image.RGBA, originX, originY int) {
-		d := &font.Drawer{
-			Dst:  rgba,
-			Src:  image.NewUniform(textColor),
-			Face: face,
-			Dot: fixed.Point26_6{
-				X: fixed.I(originX) - bounds.Min.X,
-				Y: fixed.I(originY) + metrics.Ascent,
-			},
+	lines := strings.Split(text, "\n")
+	lineHeight := metrics.Height.Ceil()
+	bounds := make([]fixed.Rectangle26_6, len(lines))
+	contentW := 0
+	for i, line := range lines {
+		bounds[i], _ = font.BoundString(face, line)
+		if width := (bounds[i].Max.X - bounds[i].Min.X).Ceil(); width > contentW {
+			contentW = width
 		}
-		d.DrawString(text)
+	}
+	contentH := lineHeight * len(lines)
+	if contentW <= 0 || contentH <= 0 {
+		return 0, 0, 0
+	}
+	rgba, texW, texH, _ := newShadowedTextRGBA(contentW, contentH, fontSize, textColor, func(rgba *image.RGBA, originX, originY int) {
+		for i, line := range lines {
+			d := &font.Drawer{
+				Dst:  rgba,
+				Src:  image.NewUniform(textColor),
+				Face: face,
+				Dot: fixed.Point26_6{
+					X: fixed.I(originX) - bounds[i].Min.X,
+					Y: fixed.I(originY+i*lineHeight) + metrics.Ascent,
+				},
+			}
+			d.DrawString(line)
+		}
 	})
 	return glUploadTexture(rgba), texW, texH
 }

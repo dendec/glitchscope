@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"unsafe"
 
 	"github.com/dendec/glitchscope/internal/player"
@@ -129,19 +130,44 @@ func (p *overlayPresenter) needsTrackInfos(albumIdx int) bool {
 	return p.metadata.needsRefresh(albumIdx)
 }
 
-func (p *overlayPresenter) Update(fps float64, adaptive bool, effectiveRenderHeight int, stats prof.Stats, playback overlayPlaybackSnapshot) {
+// formatStats keeps the two primary telemetry rows in fixed columns. Values
+// are left-aligned inside one shared field, so different digit counts cannot
+// misalign the CPU/FPS or MEM/RES columns. The optional GPU row uses the same
+// layout.
+func formatStats(fps float64, effectiveRenderHeight int, stats prof.Stats) string {
+	cpu := fmt.Sprintf("%.0f%%", stats.CPUPct)
+	mem := fmt.Sprintf("%.0fM", stats.MemKB/1024)
+	frameRate := fmt.Sprintf("%.0f", fps)
+	resolution := "--"
+	if effectiveRenderHeight > 0 {
+		resolution = fmt.Sprintf("%dp", effectiveRenderHeight)
+	}
+
+	leftValueWidth := max(4, len(cpu), len(frameRate))
+	if stats.GPUOK {
+		leftValueWidth = max(leftValueWidth, len(fmt.Sprintf("%.0f%%", stats.GPUUtilPct)))
+	}
+	line := func(leftLabel, leftValue, rightLabel, rightValue string) string {
+		return fmt.Sprintf("%-4s %-*s %-5s %s", leftLabel, leftValueWidth, leftValue, rightLabel, rightValue)
+	}
+	lines := []string{
+		line("CPU:", cpu, "MEM:", mem),
+		line("FPS:", frameRate, "RES:", resolution),
+	}
+	if stats.GPUOK {
+		// Keep GPU memory and utilization visible without widening the primary
+		// rows. The five-character VRAM label shares the same value column.
+		lines = append(lines, line("GPU:", fmt.Sprintf("%.0f%%", stats.GPUUtilPct), "VRAM:", fmt.Sprintf("%.0fM", stats.GPUMemKB/1024)))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (p *overlayPresenter) Update(fps float64, _ bool, effectiveRenderHeight int, stats prof.Stats, playback overlayPlaybackSnapshot) {
 	if p.overlay == nil {
 		return
 	}
 
-	line := fmt.Sprintf("FPS:%.0f MEM:%.0fM CPU:%.0f%%", fps, stats.MemKB/1024, stats.CPUPct)
-	if stats.GPUOK {
-		line += fmt.Sprintf(" GPU:%.0fM %.0f%%", stats.GPUMemKB/1024, stats.GPUUtilPct)
-	}
-	if adaptive {
-		line += fmt.Sprintf(" %dp", effectiveRenderHeight)
-	}
-	p.overlay.SetStats(line)
+	p.overlay.SetStats(formatStats(fps, effectiveRenderHeight, stats))
 
 	if playback.hasPlayer {
 		p.overlay.SetPlayback(playback.position, playback.duration, playback.sampleRate, playback.bitrate, playback.bpm, playback.channels, playback.paused, playback.tracker)

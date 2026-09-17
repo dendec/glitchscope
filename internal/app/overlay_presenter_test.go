@@ -112,8 +112,29 @@ func TestOverlayPresenterShowsEffectiveRenderHeight(t *testing.T) {
 
 	presenter.Update(10, true, 540, prof.Stats{}, overlayPlaybackSnapshot{})
 
-	if view.stats != "FPS:10 MEM:0M CPU:0% 540p" {
+	if view.stats != "CPU: 0%   MEM:  0M\nFPS: 10   RES:  540p" {
 		t.Fatalf("stats = %q, want effective render height", view.stats)
+	}
+}
+
+func TestFormatStatsKeepsColumnsForDifferentValues(t *testing.T) {
+	got := formatStats(165, 1080, prof.Stats{CPUPct: 100, MemKB: 1024 * 8192})
+	want := "CPU: 100% MEM:  8192M\nFPS: 165  RES:  1080p"
+	if got != want {
+		t.Fatalf("stats = %q, want %q", got, want)
+	}
+
+	short := formatStats(9, 90, prof.Stats{CPUPct: 1, MemKB: 1024})
+	if short != "CPU: 1%   MEM:  1M\nFPS: 9    RES:  90p" {
+		t.Fatalf("short stats = %q, want aligned columns", short)
+	}
+}
+
+func TestFormatStatsIncludesGPUOnSeparateAlignedRow(t *testing.T) {
+	got := formatStats(60, 480, prof.Stats{CPUPct: 20, MemKB: 320 * 1024, GPUOK: true, GPUUtilPct: 7, GPUMemKB: 128 * 1024})
+	want := "CPU: 20%  MEM:  320M\nFPS: 60   RES:  480p\nGPU: 7%   VRAM: 128M"
+	if got != want {
+		t.Fatalf("GPU stats = %q, want %q", got, want)
 	}
 }
 
