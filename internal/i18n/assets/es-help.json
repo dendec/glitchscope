@@ -109,6 +109,7 @@
           "La frecuencia de fotogramas selecciona un límite fijo inferior a la frecuencia de actualización activa, o Max (la frecuencia activa).",
           "La resolución adaptativa reduce o restaura el tamaño de la imagen para acercarse a ese objetivo.",
           "La resolución es el tamaño máximo con la adaptación activada y el tamaño fijo cuando está desactivada.",
+          "El filtro de escalado define la imagen final: Bilineal suaviza, mientras Vecino más cercano conserva bordes de píxel nítidos.",
           "Max muestra la frecuencia de actualización activa; se oculta un límite numérico igual para evitar duplicados.",
           "Si el preajuste es demasiado complejo incluso en el nivel mínimo, los FPS reales pueden quedar por debajo del objetivo."
         ]

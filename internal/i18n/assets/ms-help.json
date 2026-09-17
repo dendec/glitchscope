@@ -109,6 +109,7 @@
           "Kadar bingkai memilih had tetap di bawah kadar segar semula paparan aktif, atau Max (kadar aktif).",
           "Resolusi adaptif mengecilkan atau memulihkan saiz imej untuk menghampiri sasaran itu.",
           "Resolusi ialah saiz maksimum apabila adaptasi dihidupkan dan saiz tetap apabila dimatikan.",
+          "Penapis pembesaran menentukan imej akhir: Bilinear kelihatan licin, manakala Jiran terdekat mengekalkan tepi piksel yang tajam.",
           "Max memaparkan kadar segar semula aktif; had angka yang sama disembunyikan bagi mengelakkan pendua.",
           "Jika praset terlalu kompleks walaupun pada tahap terendah, FPS sebenar mungkin kekal di bawah sasaran."
         ]

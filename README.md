@@ -9,7 +9,7 @@ Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing 
 - **Audio Playback** — Plays WAV, MP3, FLAC, Ogg Vorbis, Opus, AAC, WMA, APE, WavPack, Musepack, Speex, and more via FFmpeg & SoLoud
 - **Tracker & Chip Music** — Full support for MOD, XM, IT, S3M (libopenmpt / libxmp), PT3 (pt3player), VTX (ayumi), YM (StSound), SID (cRSID), and console audio formats (libgme)
 - **MilkDrop Visualizations** — Real-time rendering powered by projectM 4.x with 100+ embedded `.milk` presets and compressed `.gsa` preset archives
-- **Graphics Settings** — Independent frame-rate cap (including display-bound Max), adaptive-resolution toggle, render-resolution ceiling and upscale filter for output and preset transitions (Smooth/Pixel)
+- **Graphics Settings** — Independent frame-rate cap (including display-bound Max), adaptive-resolution toggle, render-resolution ceiling and upscale filter for output and preset transitions (Bilinear or Nearest neighbor)
 - **Playback Modes** — Shuffle (Album, Source, All) and Repeat (Off, Repeat One, Repeat All). Manual Next honors shuffle. Offline Shuffle All selects local music and already-downloaded remote tracks; Shuffle Source is restricted to the cached subset of the selected remote source. Connectivity is rechecked every 30 seconds. Failed loads are skipped, with bounded recovery to avoid an endless loop of broken tracks.
 - **Online Module Catalogs** — Browse Modland, yearly ModArchive additions, the 2007 official addendum, and the 1987-2007 ModArchive snapshot; bundled `1980-2007.gsa` and `2007-addendum.gsa` indexes provide offline navigation, while selected tracks are fetched individually with HTTP Range requests
 - **Internet Radio** — Browse Radio Browser stations by popularity, random selection, tag, language, or country; station listings are cached locally, MP3/AAC streams use the existing FFmpeg/SoLoud pipeline, and ICY track titles appear in the station panel. Local `.m3u`, `.m3u8`, and `.pls` station playlists are also supported. Basic unencrypted HLS is supported; byte ranges, gaps, discontinuities and changing init segments are rejected explicitly (see [radio review](docs/RADIO-REVIEW.md))
@@ -65,6 +65,8 @@ Settings are automatically saved to `config.json` next to the binary:
   "graphics": {
     "render_width": 320,
     "render_height": 240,
+    "adaptive": true,
+    "frame_rate": "max",
     "upscale_filter": "pixel",
     "beat_sensitivity": 1
   },

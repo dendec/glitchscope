@@ -109,6 +109,7 @@
           "Frame rate selects a fixed cap below the active display refresh, or Max (the active refresh rate).",
           "Adaptive resolution lowers or restores the image size to approach that target.",
           "Resolution is the maximum size when adaptation is on, and the fixed size when it is off.",
+          "Upscale filter controls the final image: Bilinear is smooth, while Nearest neighbor keeps crisp pixel edges.",
           "Max is shown with the active refresh rate, and an equal numeric cap is hidden to avoid duplication.",
           "If the preset is too complex even at the smallest step, the actual FPS may remain below the target."
         ]

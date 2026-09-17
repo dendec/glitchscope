@@ -12,7 +12,7 @@ func TestSettingsRowsUseCompactSectionsAndLabels(t *testing.T) {
 	rows := BuildSettingsRows(config.DefaultSettings(), 640, 480)
 	want := []string{
 		"── Playback ────", "Shuffle", "Repeat",
-		"── Visualization ──", "Visualizer", "Frame rate", "Adaptive resolution", "Resolution", "Filter", "Sensitivity", "Rotation",
+		"── Visualization ──", "Visualizer", "Frame rate", "Adaptive resolution", "Resolution", "Upscale filter", "Sensitivity", "Rotation",
 		"── Appearance ───", "Language", "Theme", "Transparency", "Stats",
 		"── Downloads ───────", "Size", "Keep for",
 	}
@@ -194,5 +194,12 @@ func TestResolutionDescriptionReflectsIndependentControls(t *testing.T) {
 	}
 	if got := o.selectedSettingDescription(SettingResolution, 0); got != o.catalog.Text(i18n.DescriptionResolution) {
 		t.Fatalf("resolution description = %q", got)
+	}
+}
+
+func TestFilterDescriptionExplainsAlgorithms(t *testing.T) {
+	got := settingDescription(i18n.MustLoad(i18n.English), SettingFilter, 0)
+	if !strings.Contains(got, "Bilinear") || !strings.Contains(got, "Nearest neighbor") {
+		t.Fatalf("filter description = %q, want both algorithms", got)
 	}
 }

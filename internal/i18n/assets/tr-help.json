@@ -109,6 +109,7 @@
           "Kare hızı, etkin ekran yenileme hızının altında sabit bir sınır veya Max (etkin yenileme hızı) seçer.",
           "Uyarlanabilir çözünürlük, hedefe yaklaşmak için görüntü boyutunu düşürür veya geri yükler.",
           "Uyarlama açıkken çözünürlük en yüksek boyuttur; kapalıyken sabit boyut kullanılır.",
+          "Ölçekleme filtresi son görüntüyü belirler: Bilinear yumuşak görünür, En yakın komşu piksel kenarlarını keskin tutar.",
           "Max etkin yenileme hızını gösterir; aynı sayısal sınır tekrar oluşmaması için gizlenir.",
           "Önayar en düşük düzeyde bile fazla karmaşıksa gerçek FPS hedefin altında kalabilir."
         ]

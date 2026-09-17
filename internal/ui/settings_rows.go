@@ -230,6 +230,8 @@ func settingDescription(catalog i18n.Catalog, setting, value int) string {
 			return catalog.Text(i18n.DescriptionAdaptiveOff)
 		}
 		return catalog.Text(i18n.DescriptionAdaptiveOn)
+	case SettingFilter:
+		return catalog.Text(i18n.DescriptionFilter)
 	case SettingShuffle:
 		switch value {
 		case 0:

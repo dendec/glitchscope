@@ -109,6 +109,7 @@
           "Tốc độ khung hình chọn giới hạn cố định thấp hơn tần số quét màn hình hiện tại hoặc Max (tần số quét hiện tại).",
           "Độ phân giải thích ứng giảm hoặc khôi phục kích thước hình ảnh để tiến gần mục tiêu đó.",
           "Độ phân giải là kích thước tối đa khi bật thích ứng và là kích thước cố định khi tắt.",
+          "Bộ lọc phóng to quyết định hình ảnh cuối: Bilinear cho hình mượt, còn Nearest neighbor giữ cạnh pixel rõ nét.",
           "Max hiển thị tần số quét hiện tại; giới hạn số trùng khớp sẽ được ẩn để tránh lặp.",
           "Nếu preset quá phức tạp ngay cả ở mức thấp nhất, FPS thực tế có thể vẫn thấp hơn mục tiêu."
         ]

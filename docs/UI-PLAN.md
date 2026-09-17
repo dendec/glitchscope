@@ -343,6 +343,9 @@ the selected resolution is fixed. Preview rendering remains capped at 25 FPS so
 browsing presets does not consume the full main visualizer budget. First-run
 defaults are Max (the active display refresh), adaptive on, and the largest
 resolution available on the display.
+The **Upscale filter** is an independent output choice: **Bilinear (smooth)**
+softens enlarged pixels, while **Nearest neighbor (crisp pixels)** keeps hard
+pixel edges. The same choice is used while projectM blends between presets.
 
 Настройка интервала смены визуальных пресетов называется **Rotation**: `Off`
 оставляет текущий пресет до ручной смены, `Auto` делегирует момент смены
@@ -374,6 +377,11 @@ days, 6 months, `Forever`) и лимит размера (128/256/512 MB, 1/2/4 G
 ему числовой cap скрывается. После смены пресета текущая эффективная ступень
 сохраняется, а повышение качества выполняется постепенно. Значения срока хранения
 и Unlimited локализованы в UI, строковые значения сохранённых настроек остаются стабильными.
+
+`Upscale filter` выбирает алгоритм масштабирования итогового изображения:
+`Bilinear (smooth)` сглаживает крупные пиксели, а `Nearest neighbor (crisp pixels)`
+сохраняет их резкими. Этот же алгоритм используется во время перехода между
+пресетами.
 
 Тексты интерфейса используют короткие названия и естественные пояснения.
 Действия обозначаются глаголами, одинаковые функции называются одинаково в меню

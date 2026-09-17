@@ -109,6 +109,7 @@
           "A taxa de quadros define um limite fixo abaixo da taxa de atualização ativa ou Max (a taxa ativa).",
           "A resolução adaptativa reduz ou restaura o tamanho da imagem para se aproximar dessa meta.",
           "A resolução é o tamanho máximo quando a adaptação está ligada e o tamanho fixo quando está desligada.",
+          "O filtro de escala define a imagem final: Bilinear suaviza, enquanto Vizinho mais próximo mantém bordas de pixel nítidas.",
           "Max mostra a taxa de atualização ativa; um limite numérico igual fica oculto para evitar duplicidade.",
           "Se o preset for complexo demais mesmo no menor nível, os FPS reais podem ficar abaixo da meta."
         ]

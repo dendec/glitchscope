@@ -85,6 +85,7 @@ const (
 	DescriptionAdaptiveOn       Key = "descriptions.adaptive_on"
 	DescriptionAdaptiveOff      Key = "descriptions.adaptive_off"
 	DescriptionResolution       Key = "descriptions.resolution"
+	DescriptionFilter           Key = "descriptions.filter"
 	DescriptionShuffleOff       Key = "descriptions.shuffle_off"
 	DescriptionShuffleAlbum     Key = "descriptions.shuffle_album"
 	DescriptionShuffleSource    Key = "descriptions.shuffle_source"

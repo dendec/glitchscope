@@ -109,6 +109,7 @@
           "Die Bildrate wählt ein festes Limit unterhalb der aktiven Bildschirmfrequenz oder Max (die aktive Bildwiederholrate).",
           "Die adaptive Auflösung senkt die Bildgröße oder stellt sie wieder her, um dieses Ziel zu erreichen.",
           "Die Auflösung ist bei aktivierter Anpassung die maximale Größe und bei deaktivierter Anpassung fest.",
+          "Der Skalierungsfilter bestimmt das fertige Bild: Bilinear wirkt weich, Nächster Nachbar bewahrt scharfe Pixelkanten.",
           "Max wird mit der aktiven Bildwiederholrate angezeigt; ein gleiches numerisches Limit wird nicht doppelt aufgeführt.",
           "Ist das Preset selbst auf der kleinsten Stufe zu komplex, kann die tatsächliche FPS unter dem Ziel bleiben."
         ]

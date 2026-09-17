@@ -109,6 +109,7 @@
           "Laju frame memilih batas tetap di bawah refresh layar aktif, atau Max (refresh aktif).",
           "Resolusi adaptif menurunkan atau mengembalikan ukuran gambar untuk mendekati target tersebut.",
           "Resolusi menjadi ukuran maksimum saat adaptasi aktif, dan ukuran tetap saat adaptasi nonaktif.",
+          "Filter pembesaran menentukan gambar akhir: Bilinear membuatnya halus, sedangkan Tetangga terdekat mempertahankan tepi piksel yang tajam.",
           "Max menampilkan refresh aktif; batas numerik yang sama disembunyikan agar tidak menjadi duplikat.",
           "Jika preset terlalu kompleks bahkan pada tingkat terendah, FPS aktual dapat tetap di bawah target."
         ]
