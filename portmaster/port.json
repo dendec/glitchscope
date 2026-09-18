@@ -5,22 +5,34 @@
     "GlitchScope.sh",
     "glitchscope/"
   ],
-  "items_opt": null,
+  "items_opt": [],
   "attr": {
     "title": "GlitchScope",
-    "desc": "GlitchScope — plays MP3/FLAC/Ogg/Mod/XM/IT/S3M with real-time MilkDrop visualizations. Comes with demo tracker music. Drop your own files into music/ and enjoy.",
-    "inst": "Music lives in glitchscope/music/. Add your own MP3/FLAC/Ogg/Mod/XM/IT/S3M files there. Presets are in glitchscope/presets/.",
-    "genres": ["music"],
-    "porter": ["dendec"],
+    "desc": "Music player with real-time MilkDrop visualizations, tracker and chip music support, Internet radio, and online module catalogs.",
+    "inst": "Add your own music to glitchscope/music/, or connect to Wi-Fi to use Internet radio and online catalogs. No demo music is bundled.",
+    "genres": [
+      "other"
+    ],
+    "porter": [
+      "dendec"
+    ],
     "image": {
       "screenshot": "screenshot.png",
       "covers": [],
       "thumbnail": null,
       "video": null
     },
-    "rtr": false,
+    "rtr": true,
     "runtime": [],
     "reqs": [],
-    "arch": ["aarch64"]
+    "arch": [
+      "aarch64"
+    ],
+    "availability": "full",
+    "exp": false,
+    "store": [],
+    "min_glibc": "2.36",
+    "desc_md": null,
+    "inst_md": null
   }
 }

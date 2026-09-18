@@ -75,6 +75,7 @@ lint: icons builder
 	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) golangci-lint run --verbose --timeout=5m ./cmd/... ./internal/...'
 
 test: icons builder
+	$(DOCKER_DEV_RUN) 'python3 -m unittest discover -s scripts -p test_package_portmaster.py'
 	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go test -count=1 ./cmd/... ./internal/...'
 
 # Build modarchive catalog via crawler (only if missing).
@@ -186,47 +187,16 @@ dist-windows: subset-font icons $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATAL
 	@echo "=== Built $(APP) (Windows amd64) ==="
 	@ls -lhR $(WINDOWS_DIST_DIR)/
 
-# PortMaster packaging — structure must match zimlite (gameinfo.xml, README.md at root).
-dist-portmaster: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE) $(MODLAND_CATALOG) $(MODARCHIVE_CATALOG) $(MODARCHIVE_SNAPSHOT) $(MODARCHIVE_ADDENDUM)
-	@rm -rf dist/portmaster_build
-	@mkdir -p dist/portmaster_build/glitchscope
-	@# Laucher script in zip root
-	cp portmaster/GlitchScope.sh dist/portmaster_build/
-	@# Everything else goes INSIDE the glitchscope/ folder
-	cp $(ARM64_DIST_DIR)/glitchscope/glitchscope dist/portmaster_build/glitchscope/
-	cp $(GSA_FILE) dist/portmaster_build/glitchscope/presets/presets.gsa
-	cp $(TEXTURES_GSA_FILE) dist/portmaster_build/glitchscope/presets/textures.gsa
-	@mkdir -p dist/portmaster_build/glitchscope/.cache/modland dist/portmaster_build/glitchscope/.cache/modarchive
-	@cp $(MODLAND_CATALOG) dist/portmaster_build/glitchscope/.cache/modland/catalog
-	@cp $(MODARCHIVE_CATALOG) dist/portmaster_build/glitchscope/.cache/modarchive/catalog
-	@cp $(MODARCHIVE_SNAPSHOT) dist/portmaster_build/glitchscope/.cache/modarchive/1980-2007.gsa
-	@cp $(MODARCHIVE_ADDENDUM) dist/portmaster_build/glitchscope/.cache/modarchive/2007-addendum.gsa
-	@# Copy prebuilt shuffle indexes (platform-independent).
-	@mkdir -p dist/portmaster_build/glitchscope/.cache/shuffle
-	@cp $(ARM64_DIST_DIR)/glitchscope/.cache/shuffle/*.idx dist/portmaster_build/glitchscope/.cache/shuffle/ 2>/dev/null || true
-	cp portmaster/port.json dist/portmaster_build/glitchscope/
-	cp portmaster/screenshot.png dist/portmaster_build/glitchscope/
-	cp portmaster/gameinfo.xml dist/portmaster_build/glitchscope/ 2>/dev/null; true
-	cp portmaster/licenses/* dist/portmaster_build/glitchscope/licenses/ 2>/dev/null; true
-	@# Download demo tracker music
-	@mkdir -p dist/portmaster_build/glitchscope/music
-	@echo "=== Downloading demo tracks ==="
-	@curl -sL -o dist/portmaster_build/glitchscope/music/aryx.s3m "https://api.modarchive.org/downloads.php?moduleid=191789"
-	@curl -sL -o dist/portmaster_build/glitchscope/music/external.xm "https://api.modarchive.org/downloads.php?moduleid=66187"
-	@curl -sL -o dist/portmaster_build/glitchscope/music/ELYSIUM.MOD "https://api.modarchive.org/downloads.php?moduleid=40475"
-	@curl -sL -o dist/portmaster_build/glitchscope/music/sick-ass.it "https://api.modarchive.org/downloads.php?moduleid=177712"
-	@echo "=== Demo tracks downloaded ==="
-	@ls -lh dist/portmaster_build/glitchscope/music/
-	@# Zip: root = .sh + glitchscope/ folder only
-	@rm -f dist/glitchscope.zip
-	cd dist/portmaster_build && zip -r ../glitchscope.zip "GlitchScope.sh" glitchscope
-	@echo "=== Generated dist/glitchscope.zip ==="
-	@ls -lh dist/glitchscope.zip
+# Build both an installable ZIP and the PortMaster-New submission directory.
+dist-portmaster: dist-arm64
+	python3 scripts/package-portmaster.py --arm64 $(ARM64_DIST_DIR)/glitchscope --presets $(PRESETS_DIR) --textures $(TEXTURES_DIR)
 
 deploy: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE)
 	adb shell "mkdir -p $(DEVICE_DIR)"
 	adb push $(ARM64_DIST_DIR)/glitchscope/glitchscope $(DEVICE_DIR)/
 	adb push portmaster/GlitchScope.sh $(PORTS_DIR)/
+	adb push $(ARM64_DIST_DIR)/glitchscope/libs.aarch64 $(DEVICE_DIR)/
+	adb push $(ARM64_DIST_DIR)/glitchscope/licenses $(DEVICE_DIR)/
 	# Deploy presets as single .gsa archive (fast on FAT32).
 	adb shell "mkdir -p $(DEVICE_DIR)/presets"
 	adb push $(GSA_FILE) $(DEVICE_DIR)/presets/presets.gsa
@@ -303,7 +273,8 @@ $(TEXTURES_GSA_FILE):
 texture-report: presets cmd/texture-report/main.go
 	go run ./cmd/texture-report $(PRESETS_DIR) $(TEXTURE_REPORT)
 
-# Build presets.gsa archive from cream-of-the-crop dir (only if missing).
+# Build the complete user preset archive from cream-of-the-crop. The packer
+# excludes internal !-prefixed transition presets from every preset archive.
 $(FULL_GSA_FILE):
 	@if [ ! -f "$@" ]; then \
 		$(MAKE) presets; \

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -89,6 +90,19 @@ func TestTranslationsPreserveFormatArguments(t *testing.T) {
 			if !slices.Equal(got, want) {
 				t.Errorf("%s %s: format arguments %v, want %v", language, key, got, want)
 			}
+		}
+	}
+}
+
+func TestInfoSizeIsTranslatedForEveryLanguage(t *testing.T) {
+	const value = "1.6 MB"
+	for language := range supportedLanguages {
+		got := MustLoad(language).Format(InfoSize, value)
+		if !strings.Contains(got, value) {
+			t.Errorf("%s info.size lost its value: %q", language, got)
+		}
+		if strings.TrimSpace(strings.TrimSuffix(got, value)) == "" {
+			t.Errorf("%s info.size has no translated label: %q", language, got)
 		}
 	}
 }

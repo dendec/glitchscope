@@ -66,6 +66,12 @@ func collect(root, kind string, blacklist map[string]bool) ([]archive.SourceEntr
 			return err
 		}
 		key := filepath.ToSlash(rel)
+		// Transition presets are internal cross-fade assets, not user-facing
+		// presets. Exclude them from every generated preset archive, including
+		// the full archive; a leading ! is their established marker.
+		if kind == presetKind && strings.HasPrefix(key, "!") {
+			return nil
+		}
 		if blacklist[key] {
 			return nil
 		}

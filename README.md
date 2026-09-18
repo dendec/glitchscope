@@ -45,8 +45,11 @@ are provided by Windows itself.
 ```bash
 # Build PortMaster-compatible zip package for ARM64 handhelds
 make dist-portmaster
-# Output: dist/glitchscope.zip
+# Output: dist/glitchscope.zip and dist/portmaster-submit/ports/glitchscope/
 ```
+
+See [PortMaster release checks](docs/PORTMASTER-RELEASE.md) for screenshot,
+asset permissions and required device testing before submission.
 
 ### Development (Lint & Test)
 ```bash

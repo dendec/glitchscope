@@ -160,6 +160,8 @@ RUN wget -q https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-${OPENMPT_VE
         --prefix=/opt/openmpt/arm64 \
     && make -j$(nproc) \
     && make install \
+    && mkdir -p /opt/notices \
+    && cp LICENSE /opt/notices/libopenmpt-LICENSE \
     && rm -rf /build/libopenmpt-${OPENMPT_VERSION}+release.autotools
 
 # --- Build libxmp static for amd64 ---
@@ -171,6 +173,9 @@ RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-${XMP_VERS
         --prefix=/opt/xmp/amd64 \
     && make -j$(nproc) \
     && make install \
+    && mkdir -p /opt/notices \
+    && cp docs/COPYING /opt/notices/libxmp-COPYING \
+    && cp src/loaders/prowizard/LICENSE.txt /opt/notices/libxmp-prowizard-LICENSE.txt \
     && rm -rf /build/libxmp-${XMP_VERSION}
 
 # --- Build libxmp static for arm64 ---
@@ -182,6 +187,9 @@ RUN wget -q https://github.com/libxmp/libxmp/releases/download/libxmp-${XMP_VERS
         --prefix=/opt/xmp/arm64 \
     && make -j$(nproc) \
     && make install \
+    && mkdir -p /opt/notices \
+    && cp docs/COPYING /opt/notices/libxmp-COPYING \
+    && cp src/loaders/prowizard/LICENSE.txt /opt/notices/libxmp-prowizard-LICENSE.txt \
     && rm -rf /build/libxmp-${XMP_VERSION}
 
 # --- Build PT3 player core for amd64 and arm64 ---

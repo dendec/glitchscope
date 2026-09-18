@@ -29,6 +29,7 @@ run_in_env() {
 
 case "$sub" in
 test)
+	run_in_env 'python3 -m unittest discover -s scripts -p test_package_portmaster.py'
 	run_in_env 'go test -count=1 ./cmd/... ./internal/...'
 	;;
 race)

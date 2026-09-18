@@ -85,11 +85,22 @@ This file contains license information for all third-party libraries used in gli
 
 ---
 
-## License Compatibility
+## Distribution notices
 
-Our project uses GPL-2.0+ for its own code. All imported libraries retain their original licenses.
+GlitchScope code is GPL-2.0-or-later; see the root LICENSE. Dependencies retain
+their own licenses and copyright notices. The Linux builder collects source
+notices, Go module licenses and Debian library copyright files into the release
+`licenses/` directory. GNU Unifont's upstream license (including the font
+embedding exception), font copyright metadata and Device-Info's MIT notice are
+included separately.
 
-**Key points:**
-- LGPL libraries can be dynamically linked or built as static dependencies with source availability.
-- BSD/MIT/zlib libraries have minimal restrictions.
-- All copyright notices must be preserved.
+Presets: https://github.com/projectM-visualizer/presets-cream-of-the-crop
+Textures: https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
+Their upstream notices are copied into the package. The preset notice describes
+assumed permission; the texture README is not an explicit license grant.
+Redistribution review remains a release prerequisite; see docs/PORTMASTER-RELEASE.md.
+No third-party demo tracks are bundled.
+
+Upstream notice sources retrieved for this release preparation:
+- GNU Unifont: https://unifoundry.com/LICENSE.txt
+- Device-Info: https://github.com/PortsMaster/Device-Info/blob/main/LICENSE

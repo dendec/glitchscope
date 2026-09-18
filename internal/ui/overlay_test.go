@@ -419,6 +419,13 @@ func TestTrackInfoLinesFiltersAndExpandsExtraTags(t *testing.T) {
 	}
 }
 
+func TestFormatInfoSizeIncludesLabel(t *testing.T) {
+	got := formatInfoSize(i18n.MustLoad(i18n.English), 1600*1024)
+	if got != "Size: 1.6 MB" {
+		t.Fatalf("formatInfoSize() = %q, want %q", got, "Size: 1.6 MB")
+	}
+}
+
 func TestSelectModArchiveDirectoryShowsFiles(t *testing.T) {
 	targetURL := "http://modarchive.textfiles.com/2014/IT/J/"
 	entries := []navEntry{

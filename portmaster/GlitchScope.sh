@@ -12,7 +12,7 @@ else
   controlfolder="/roms/ports/PortMaster"
 fi
 
-source $controlfolder/control.txt
+source "$controlfolder/control.txt"
 [ -f "${controlfolder}/mod_${CFW_NAME}.txt" ] && source "${controlfolder}/mod_${CFW_NAME}.txt"
 get_controls
 
@@ -20,23 +20,14 @@ GAMEDIR="/$directory/ports/glitchscope"
 CONFDIR="$GAMEDIR/conf/"
 
 mkdir -p "$GAMEDIR/conf"
-cd "$GAMEDIR"
+cd "$GAMEDIR" || exit 1
 
 > "$GAMEDIR/log.txt" && exec > >(tee "$GAMEDIR/log.txt") 2>&1
 
 export XDG_DATA_HOME="$CONFDIR"
 
-export LD_LIBRARY_PATH="$GAMEDIR/lib:/usr/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$GAMEDIR/libs.aarch64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
-export SDL_AUDIODRIVER="alsa"
-
-# The handheld's codec exposes its capture PCM with the MIC input route muted
-# after boot. Enable it when these codec controls are available; other devices
-# simply ignore the unsupported controls.
-amixer -c 0 cset numid=12 on >/dev/null 2>&1 || true
-amixer -c 0 cset numid=13 on >/dev/null 2>&1 || true
-amixer -c 0 cset numid=9 160,160 >/dev/null 2>&1 || true
-
 # Display standard PortMaster loading text
 pm_message "Loading GlitchScope... (Compiling shaders)"
 
@@ -44,6 +35,6 @@ pm_message "Loading GlitchScope... (Compiling shaders)"
 $GPTOKEYB "glitchscope" &
 
 pm_platform_helper "$GAMEDIR/glitchscope"
-./glitchscope -fullscreen -v
+./glitchscope -fullscreen
 
 pm_finish

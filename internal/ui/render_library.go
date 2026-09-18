@@ -575,7 +575,7 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		o.loadCoverArt(o.ncInfoFile, o.availableRowTextWidth(maxW))
 		// File info.
 		if o.fileMetadataPath == o.ncInfoFile {
-			lines = append(lines, fmt.Sprintf("  %s", formatSize(o.fileMetadata.Size)))
+			lines = append(lines, "  "+formatInfoSize(o.catalog, o.fileMetadata.Size))
 		}
 		// Read audio metadata for the file.
 		meta := player.TrackInfo{}
@@ -753,7 +753,7 @@ func trackInfoLines(catalog i18n.Catalog, title string, ti *player.TrackInfo) []
 		if header != "" {
 			header += " "
 		}
-		header += catalog.Format(i18n.InfoSize, formatSize(ti.Size))
+		header += formatInfoSize(catalog, ti.Size)
 	}
 	if header != "" {
 		lines = append(lines, header)
@@ -797,6 +797,10 @@ func isUnknownMetadataValue(value string) bool {
 
 func normalizeMetadataLines(value string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(value, "\r\n", "\n"), "\r", "\n")
+}
+
+func formatInfoSize(catalog i18n.Catalog, size int64) string {
+	return catalog.Format(i18n.InfoSize, formatSize(size))
 }
 
 // catalogTrackInfoLines builds the right-panel lines for a cached catalog

@@ -14,6 +14,7 @@ COPY lib/ lib/
 COPY test_data/ test_data/
 COPY portmaster/ portmaster/
 COPY scripts/ scripts/
+COPY LICENSE LICENSE
 
 # Use the generated font subset copied with the source tree.  Do not replace it
 # with the builder image's cached font: the subset depends on the current locale
@@ -50,9 +51,12 @@ RUN mkdir -p /dist/glitchscope/presets /dist/glitchscope/textures \
     && if [ "$TARGETARCH" = "arm64" ]; then \
         cp portmaster/GlitchScope.sh /dist/ \
         && cp portmaster/port.json /dist/ \
-        && cp portmaster/screenshot.png /dist/ 2>/dev/null; true \
-        && mkdir -p /dist/glitchscope/licenses \
-        && cp portmaster/LICENSE* /dist/glitchscope/licenses/ 2>/dev/null; true \
+        && cp portmaster/screenshot.png /dist/ \
+        && mkdir -p /dist/glitchscope/libs.aarch64 \
+        && for library in libvorbisfile.so.3 libvorbis.so.0 libogg.so.0 libFLAC.so.12 libmpg123.so.0 libz.so.1 libstdc++.so.6 libgcc_s.so.1; do \
+            cp -L "/usr/lib/aarch64-linux-gnu/$library" /dist/glitchscope/libs.aarch64/ || exit 1; \
+        done \
+        && bash scripts/collect-portmaster-licenses.sh /dist/glitchscope/licenses \
         && cp portmaster/README.md /dist/glitchscope/; \
     fi
 
