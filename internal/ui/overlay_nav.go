@@ -457,6 +457,7 @@ func (o *Overlay) refreshAlbumLabels() {
 
 // syncPanels refreshes the visible navigation panels.
 func (o *Overlay) syncPanels() {
+	o.pointerScroll = [2]bool{}
 	o.refreshAlbumLabels()
 	if o.isNC() {
 		o.refreshNCPreview()
@@ -508,6 +509,29 @@ func (o *Overlay) popLevel() bool {
 	o.marqueeL.invalidate(o)
 	o.syncPanels()
 	return true
+}
+
+// jumpToNavStackDepth restores an existing library navigation level for a
+// breadcrumb click. The root depth is one; the visible level keeps its saved
+// cursor/scroll, while pointer navigation always returns focus to the left
+// panel.
+func (o *Overlay) jumpToNavStackDepth(depth int) {
+	if depth <= 1 {
+		o.switchToSourceRoot()
+		return
+	}
+	if depth > len(o.navStack) {
+		depth = len(o.navStack)
+	}
+	o.navStack = o.navStack[:depth]
+	top := o.topLevel()
+	o.albumCursor = clampCursor(top.cursor, len(top.entries))
+	o.albumsScroll = min(max(0, top.scroll), o.albumCursor)
+	o.trackCursor = 0
+	o.focusPanel = 0
+	o.ncRight = ncRightInfo
+	o.marqueeL.invalidate(o)
+	o.syncPanels()
 }
 
 // AlbumCursor returns the real allAlbums index of the current leaf album

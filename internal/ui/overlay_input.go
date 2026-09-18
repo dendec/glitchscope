@@ -139,10 +139,11 @@ func (o *Overlay) updateScrollHold(h *scrollHold, held bool, now time.Time, step
 }
 
 func (o *Overlay) ToggleUI() {
-	o.markInteraction()
 	if o.uiVisible {
-		o.closeInjectPending = true
+		o.CloseUI()
+		return
 	}
+	o.markInteraction()
 	o.uiVisible = !o.uiVisible
 	if o.uiVisible {
 		o.menuHint.enabled = false
@@ -151,6 +152,10 @@ func (o *Overlay) ToggleUI() {
 		o.uiPage = PageLibrary
 		o.ncRight = ncRightInfo
 		o.ncConfirm = false
+		o.ncDeleteConfirmed = false
+		o.settingsEditing = false
+		o.pointerPress = pointerPress{}
+		o.pointerScroll = [2]bool{}
 		o.pageIndicatorDirty = true
 		if !o.textureCacheReady {
 			o.markAllDirty()
@@ -160,9 +165,33 @@ func (o *Overlay) ToggleUI() {
 	slog.Debug("ui visibility", "visible", o.uiVisible)
 }
 
+// CloseUI closes the overlay directly, unlike Back which preserves its
+// hierarchical navigation semantics. Any unfinished settings edit is
+// reverted before the UI disappears.
+func (o *Overlay) CloseUI() {
+	if !o.uiVisible {
+		return
+	}
+	if o.settingsEditing && o.settingsCursor >= 0 && o.settingsCursor < len(o.settingsRows) {
+		o.settingsValueCursor = o.settingsRows[o.settingsCursor].Index
+		o.settingsDirty = true
+	}
+	o.settingsEditing = false
+	o.ncConfirm = false
+	o.ncDeleteConfirmed = false
+	o.pointerPress = pointerPress{}
+	o.uiVisible = false
+	o.panelEntered = false
+	o.focusPanel = 0
+	o.closeInjectPending = true
+	o.markInteraction()
+	slog.Debug("ui visibility", "visible", false)
+}
+
 // NextScreen cycles Library → Presets → Settings → Help → Library.
 func (o *Overlay) NextScreen() {
 	o.markInteraction()
+	o.pointerScroll = [2]bool{}
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
@@ -186,6 +215,7 @@ func (o *Overlay) NextScreen() {
 // PrevScreen cycles Library → Help → Settings → Presets → Library.
 func (o *Overlay) PrevScreen() {
 	o.markInteraction()
+	o.pointerScroll = [2]bool{}
 	o.focusPanel = 0
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
@@ -236,6 +266,9 @@ func (o *Overlay) scrollNCInfo(dir int) bool {
 // directions can't drift out of sync.
 func (o *Overlay) moveCursor(dir int) {
 	o.markInteraction()
+	if o.focusPanel >= 0 && o.focusPanel < len(o.pointerScroll) {
+		o.pointerScroll[o.focusPanel] = false
+	}
 	o.invalidateActiveMarquee()
 	if o.uiPage == PageHelp {
 		if o.focusPanel == 0 {
@@ -357,6 +390,14 @@ func (o *Overlay) moveCursor(dir int) {
 }
 
 func (o *Overlay) maybeRequestRadioPage() {
+	o.maybeRequestRadioPageAt(o.albumCursor)
+}
+
+// maybeRequestRadioPageAt requests another page when the supplied list index
+// reaches the prefetch window. Pointer scrolling advances the viewport without
+// moving the cursor, so it uses the last visible index here rather than the
+// cursor-only path above.
+func (o *Overlay) maybeRequestRadioPageAt(index int) {
 	if o.focusPanel != 0 || len(o.navStack) == 0 || o.topLevel().ctx != ctxRadio {
 		return
 	}
@@ -369,7 +410,7 @@ func (o *Overlay) maybeRequestRadioPage() {
 		return
 	}
 	const prefetchRows = 5
-	if o.albumCursor >= len(o.albums)-prefetchRows {
+	if index >= len(o.albums)-prefetchRows {
 		o.radioPageRequested = true
 		o.radioPageKind = level.radioKind
 		o.radioPageFilter = level.radioFilter
@@ -560,6 +601,8 @@ func (o *Overlay) Select() bool {
 		if !o.panelEntered {
 			o.panelEntered = true
 			o.focusPanel = 0
+		} else if o.focusPanel == 0 && o.helpView.ParentSelected {
+			o.Back()
 		} else if o.focusPanel == 0 && !o.helpView.InChildren {
 			o.enterHelpChildren()
 		} else if o.focusPanel == 0 && o.helpView.InChildren && !o.helpView.InGrandChildren {
@@ -766,6 +809,7 @@ func (o *Overlay) Back() {
 		}
 		if o.helpView.InGrandChildren {
 			o.helpView.InGrandChildren = false
+			o.helpView.ParentSelected = false
 			o.helpView.GrandChildCursor = 0
 			o.helpView.GrandChildTop = 0
 			o.helpView.ContentTop = 0
@@ -774,6 +818,7 @@ func (o *Overlay) Back() {
 		}
 		if o.helpView.InChildren {
 			o.helpView.InChildren = false
+			o.helpView.ParentSelected = false
 			o.helpView.EntryCursor = 0
 			o.helpView.EntryTop = 0
 			o.helpView.ContentTop = 0
@@ -855,6 +900,17 @@ func (o *Overlay) Back() {
 func (o *Overlay) TrackCursor() int { return o.trackCursor }
 
 func (o *Overlay) FocusPanel() int { return o.focusPanel }
+
+// RestorePointerFocus reapplies the panel selected by the pointer after an
+// app-level action has run. Some actions reuse keyboard navigation and may
+// move focus as part of their normal state transition.
+func (o *Overlay) RestorePointerFocus(panel int) {
+	if panel < 0 || panel > 1 || o.focusPanel == panel {
+		return
+	}
+	o.focusPanel = panel
+	o.markPointerFocusDirty()
+}
 
 func (o *Overlay) IsNCMode() bool { return o.isNC() }
 

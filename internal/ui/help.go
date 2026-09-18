@@ -237,6 +237,7 @@ func (o *Overlay) helpMoveTopic(dir int) {
 		o.helpView.ContentTop = 0
 		o.helpView.InChildren = false
 		o.helpView.InGrandChildren = false
+		o.helpView.ParentSelected = false
 		o.helpView.GrandChildCursor = 0
 		o.helpView.GrandChildTop = 0
 		o.helpDirty = true
@@ -247,6 +248,19 @@ func (o *Overlay) helpMoveEntry(dir int) {
 	topic := o.helpTopic(HelpTopicID(o.helpView.TopicCursor))
 	if o.helpView.InGrandChildren {
 		o.helpMoveGrandChild(dir)
+		return
+	}
+	if o.helpView.ParentSelected {
+		if dir > 0 {
+			o.helpView.ParentSelected = false
+			o.helpDirty = true
+		}
+		return
+	}
+	if dir < 0 && o.helpView.EntryCursor == 0 {
+		o.helpView.ParentSelected = true
+		o.helpView.EntryTop = 0
+		o.helpDirty = true
 		return
 	}
 	next := o.helpView.EntryCursor + dir
@@ -264,6 +278,19 @@ func (o *Overlay) helpMoveGrandChild(dir int) {
 		return
 	}
 	cat := topic.Children[o.helpView.EntryCursor]
+	if o.helpView.ParentSelected {
+		if dir > 0 {
+			o.helpView.ParentSelected = false
+			o.helpDirty = true
+		}
+		return
+	}
+	if dir < 0 && o.helpView.GrandChildCursor == 0 {
+		o.helpView.ParentSelected = true
+		o.helpView.GrandChildTop = 0
+		o.helpDirty = true
+		return
+	}
 	next := o.helpView.GrandChildCursor + dir
 	if next >= 0 && next < len(cat.Children) {
 		o.helpView.GrandChildCursor = next
@@ -279,6 +306,7 @@ func (o *Overlay) enterHelpChildren() {
 		return
 	}
 	o.helpView.InChildren = true
+	o.helpView.ParentSelected = false
 	o.helpView.EntryCursor = 0
 	o.helpView.EntryTop = 0
 	o.helpView.ContentTop = 0
@@ -298,6 +326,7 @@ func (o *Overlay) enterHelpGrandChildren() {
 		return
 	}
 	o.helpView.InGrandChildren = true
+	o.helpView.ParentSelected = false
 	o.helpView.GrandChildCursor = 0
 	o.helpView.GrandChildTop = 0
 	o.helpView.ContentTop = 0

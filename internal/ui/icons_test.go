@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dendec/glitchscope/internal/player"
+	"golang.org/x/image/font/basicfont"
 )
 
 func TestNearestIconRasterSize(t *testing.T) {
@@ -77,6 +78,27 @@ func TestPageIconName(t *testing.T) {
 	}
 	if got := pageIconName(UIPage(-1)); got != "" {
 		t.Fatalf("pageIconName(unknown) = %q, want empty", got)
+	}
+}
+
+func TestBreadcrumbRootUsesHomeIcon(t *testing.T) {
+	o := &Overlay{
+		face:     basicfont.Face7x13,
+		fontSize: 13,
+		screenH:  480,
+		uiPage:   PageLibrary,
+		navStack: []navLevel{{ctx: ctxSourceRoot}},
+	}
+	placements := o.breadcrumbPlacements(640)
+	if len(placements) != 1 {
+		t.Fatalf("root breadcrumb placements = %#v, want one placement", placements)
+	}
+	if placements[0].icon != iconHome || placements[0].label != "" {
+		t.Fatalf("root breadcrumb placement = %#v, want home icon without text", placements[0])
+	}
+	wantWidth := o.sourceIconTextOffset(o.lineHeight())
+	if int(placements[0].w) != wantWidth {
+		t.Fatalf("home breadcrumb width = %.0f, want %d", placements[0].w, wantWidth)
 	}
 }
 

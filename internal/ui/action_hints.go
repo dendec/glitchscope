@@ -107,6 +107,9 @@ func (o *Overlay) controlLabel(action string) string {
 // trailing hints to fit the width, so primary + back must be the first two
 // entries and always shown.
 func (o *Overlay) ActionHints() []UIHint {
+	if !o.keyMappingAvailable() {
+		return nil
+	}
 	// Delete confirmation is an exclusive state: only Confirm + Cancel.
 	if o.uiPage == PageLibrary && o.ncConfirm {
 		return []UIHint{
@@ -162,6 +165,12 @@ func (o *Overlay) helpHints() []UIHint {
 			{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionTopics)},
 			{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionScroll)},
 		}
+	}
+	if o.helpView.ParentSelected {
+		return []UIHint{{
+			Key:   o.controlLabel(hintBack),
+			Label: o.catalog.Text(i18n.ActionBack),
+		}}
 	}
 	// Topic / entry list. Select is meaningful only for a row marked as a
 	// submenu; leaf content is already visible in the right panel.

@@ -34,6 +34,8 @@ const (
 	iconPagePrev   = "page-prev"
 	iconPageNext   = "page-next"
 	iconDownloads  = "downloads"
+	iconHome       = "home"
+	iconClose      = "close"
 )
 
 var iconNames = []string{
@@ -52,6 +54,8 @@ var iconNames = []string{
 	iconPagePrev,
 	iconPageNext,
 	iconDownloads,
+	iconHome,
+	iconClose,
 }
 
 var iconRasterSizes = []int{16, 24, 36}

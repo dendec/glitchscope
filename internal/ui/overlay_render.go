@@ -61,54 +61,49 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	}
 
 	// The menu header contains centered page navigation and, where meaningful,
-	// a second row for the current navigation path.
-	lh := o.face.Metrics().Height.Ceil()
-	navigationHeaderH := o.headerHeight(lh)
-	headerH := o.menuHeaderHeight(lh)
-
-	// Status row grows to fit the actual texture height, but only enough to
-	// leave a single line-gap worth of breathing room below the descenders —
-	// not the full symmetric shadow padding — so the bottom margin doesn't
-	// look oversized. Excess shadow bleed beyond that is drawn past the
-	// window edge and simply isn't visible.
-	statusRowH := lh
-	if o.bottomTexH > statusRowH {
-		metrics := o.face.Metrics()
-		lineGap := lh - metrics.Ascent.Ceil() - metrics.Descent.Ceil()
-		if lineGap < 1 {
-			lineGap = 1
-		}
-		statusRowH = lh + textPadding(o.fontSize) + lineGap
-		if statusRowH > o.bottomTexH {
-			statusRowH = o.bottomTexH
-		}
-	}
-	presetLineH := 0
-	if o.presetNameTex != 0 {
-		presetLineH = lh
-	}
-	hintRowH := o.hintRowHeight()
-	bottomH := presetLineH + statusRowH + hintRowH
-
-	panelY := headerH
-	panelH := winH - panelY - bottomH
-	if panelH < 0 {
-		panelH = 0
-	}
-	panelW := winW * panelWidthPct / 100
+	// a second row for the current navigation path. The same geometry is used
+	// by pointer hit-testing.
+	l := o.overlayLayout(winW, winH)
+	lh := l.lineH
+	navigationHeaderH := l.navigationHeaderHeight
+	headerH := l.headerHeight
+	statusRowH := l.statusRowH
+	presetLineH := l.presetLineH
+	hintRowH := l.hintRowH
+	bottomH := l.bottomH
+	panelY := l.panelY
+	panelH := l.panelH
+	panelW := l.panelW
 
 	// Header backdrop.
 	hR, hG, hB := o.panelBgRGB()
 	glDrawFilledRect(o.programRect, 0, 0, float32(winW), float32(headerH), hR, hG, hB, o.bgAlpha(), winW, winH, viewW, viewH)
 
 	o.renderPageIndicator(winW, winH, viewW, viewH)
-	if o.showsBreadcrumb() && o.breadcrumbTex != 0 {
+	if o.pointerCloseVisible() {
+		closeSize := max(lh, o.scalePx(24))
+		closeX := winW - o.headerMarginX() - closeSize
+		closeY := (headerH - closeSize) / 2
+		if closeY < 0 {
+			closeY = 0
+		}
+		o.drawIcon(iconClose, float32(closeX), float32(closeY), float32(closeSize), winW, winH, viewW, viewH)
+	}
+	if o.showsBreadcrumb() {
 		headerMargin := o.headerMarginX()
 		breadcrumbY := float32(navigationHeaderH - textPadding(o.fontSize))
-		breadcrumbW := float32(winW - headerMargin*2)
-		if !o.drawMarquee(&o.breadcrumbMarquee, float32(headerMargin), breadcrumbY, breadcrumbW, float32(o.breadcrumbTexH), winW, winH, viewW, viewH) {
+		placements := o.breadcrumbPlacements(winW)
+		textX := float32(headerMargin)
+		if len(placements) > 0 && placements[0].icon != "" {
+			o.drawIcon(iconHome, placements[0].x, float32(navigationHeaderH), float32(lh), winW, winH, viewW, viewH)
+			// Text textures include transparent outline padding. Start the
+			// texture inside the icon slot so the visible glyph begins at the
+			// slot's end, keeping the visual gap equal to other icon labels.
+			textX += placements[0].w - float32(textPadding(o.fontSize))
+		}
+		if o.breadcrumbTex != 0 {
 			glDrawOverlayText(o.programText, o.breadcrumbTex, 1,
-				float32(headerMargin), breadcrumbY, float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
+				textX, breadcrumbY, float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
 		}
 	}
 
@@ -278,8 +273,12 @@ func (o *Overlay) renderListRows(rows []listRow, maxTextW, minW int) (uint32, in
 // optional focus border, and cached text.
 func drawListColumn(o *Overlay, x, y, w, h float32, t listTex, bordered bool, cursor, scroll, lh int, winW, winH, viewW, viewH int) {
 	drawPanelBg(o, x, y, w, h, winW, winH, viewW, viewH)
+	// Text textures include outline padding around the glyphs. Keep that
+	// padding outside the first row so the visible glyph rows share the same
+	// boundaries as pointer hit-testing and cursor navigation.
+	padding := float32(textPadding(o.fontSize))
 	if bordered && cursor >= scroll && cursor < scroll+int(h)/lh {
-		rowY := y + float32((cursor-scroll)*lh)
+		rowY := y + float32((cursor-scroll)*lh) - padding
 		o.drawCursorHighlight(x, rowY, w, float32(lh), winW, winH, viewW, viewH)
 	}
 	if bordered {
@@ -289,7 +288,7 @@ func drawListColumn(o *Overlay, x, y, w, h float32, t listTex, bordered bool, cu
 		return
 	}
 	glDrawOverlayTextClipped(o.programText, t.tex, 1,
-		x, y, float32(t.w), float32(t.h), x, y, w, h,
+		x, y-padding, float32(t.w), float32(t.h), x, y, w, h,
 		winW, winH, viewW, viewH)
 }
 
@@ -306,7 +305,7 @@ func (o *Overlay) rebuildBreadcrumbTex(winW int) {
 	if o.face == nil {
 		return
 	}
-	text := o.breadcrumbText()
+	text := o.breadcrumbDisplayText(winW)
 	if !o.breadcrumbDirty && text == o.breadcrumbTextCache {
 		return
 	}
@@ -314,13 +313,9 @@ func (o *Overlay) rebuildBreadcrumbTex(winW int) {
 	o.breadcrumbTextCache = text
 	o.deleteTex(&o.breadcrumbTex)
 	if text == "" {
-		o.breadcrumbMarquee.invalidate(o)
 		return
 	}
-	maxW := winW - o.headerMarginX()*2
-	display := o.truncateEnd(text, maxW)
-	o.breadcrumbTex, o.breadcrumbTexW, o.breadcrumbTexH = o.renderTextToTex(display, o.textColor())
-	o.rebuildMarqueeLine(&o.breadcrumbMarquee, text, maxW, false)
+	o.breadcrumbTex, o.breadcrumbTexW, o.breadcrumbTexH = o.renderTextToTex(text, o.textColor())
 }
 
 func (o *Overlay) statsTextFace() font.Face {

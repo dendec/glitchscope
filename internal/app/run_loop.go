@@ -135,8 +135,7 @@ func (a *App) Run() {
 			a.renderCost.Reset()
 		}
 		if displayChanged && a.overlay != nil && a.overlay.IsSettingsPage() {
-			rows := ui.BuildSettingsRowsWithCatalogForRefresh(*a.settings, w, h, refreshRate, a.overlay.Catalog())
-			a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
+			a.refreshSettingsRows(w, h, refreshRate, a.overlay.SettingsCursor())
 		}
 		a.uiFramePeriod = period
 		dt := now.Sub(state.lastLoop).Seconds()
@@ -194,8 +193,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 				slog.Warn("adaptive: empty resolution list on resize", "window", fmt.Sprintf("%dx%d", w, h))
 			}
 			if a.overlay != nil && a.overlay.IsSettingsPage() {
-				rows := ui.BuildSettingsRowsWithCatalogForRefresh(*a.settings, w, h, refreshRate, a.overlay.Catalog())
-				a.overlay.SetSettingsRows(rows, a.overlay.SettingsCursor())
+				a.refreshSettingsRows(w, h, refreshRate, a.overlay.SettingsCursor())
 			}
 		}
 	}
@@ -284,8 +282,23 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 
 func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h int) bool {
 	favoriteMode := a.favoriteMode()
+	windowW, windowH := a.window.GetSize()
+	a.inp.SetPointerSpace(input.PointerSpace{
+		WindowW:   int(windowW),
+		WindowH:   int(windowH),
+		DrawableW: w,
+		DrawableH: h,
+	})
 	for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 		act := a.inp.ProcessEvent(e, favoriteMode, now)
+		pointerEventSeen := false
+		for pointerEvent, ok := a.inp.PollPointerEvent(); ok; pointerEvent, ok = a.inp.PollPointerEvent() {
+			pointerEventSeen = true
+			a.handlePointerEvent(pointerEvent, w, h)
+		}
+		if pointerEventSeen {
+			a.presentRequested = true
+		}
 		if act != input.ActionNone {
 			a.presentRequested = true
 		}
@@ -416,7 +429,9 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 		if a.trackCacheReady.Swap(false) {
 			a.overlay.RefreshTrackCache()
 		}
-		a.overlay.SetControllerConnected(a.inp.HasController())
+		caps := a.inp.PointerCapabilities()
+		a.overlay.SetControllerConnected(caps.Controller)
+		a.overlay.SetPointerCapabilities(caps.Keyboard, caps.Mouse, caps.Touch)
 		a.overlay.Update(a.inp.DPadUpHeld(), a.inp.DPadDownHeld())
 		uiInteracting = uiVisible && a.overlay.InteractionActive(time.Now())
 		if uiInteracting {

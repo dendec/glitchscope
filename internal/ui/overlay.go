@@ -79,6 +79,7 @@ type HelpViewState struct {
 	ContentTop       int
 	InChildren       bool
 	InGrandChildren  bool
+	ParentSelected   bool
 	GrandChildCursor int
 	GrandChildTop    int
 }
@@ -126,14 +127,18 @@ const (
 
 // Overlay manages UI and notification rendering.
 type Overlay struct {
-	catalog             i18n.Catalog
-	menuHint            menuHint
-	controllerConnected bool
-	programText         uint32
-	programImage        uint32
-	programRect         uint32
-	face                font.Face
-	statsFace           font.Face
+	catalog                i18n.Catalog
+	menuHint               menuHint
+	controllerConnected    bool
+	pointerCapabilitiesSet bool
+	keyboardAvailable      bool
+	pointerMouse           bool
+	pointerTouch           bool
+	programText            uint32
+	programImage           uint32
+	programRect            uint32
+	face                   font.Face
+	statsFace              font.Face
 
 	notif Notifier
 
@@ -236,7 +241,6 @@ type Overlay struct {
 	marqueeR          marqueeState
 	infoMarquee       marqueeState
 	statsMarquee      marqueeState
-	breadcrumbMarquee marqueeState
 	presetNameMarquee marqueeState
 	bottomMarquee     marqueeState
 
@@ -280,6 +284,8 @@ type Overlay struct {
 	pageIndicatorDirty bool
 	textureCacheReady  bool
 	actionPlacements   []actionPlacement
+	pointerPress       pointerPress
+	pointerScroll      [2]bool
 	iconTextures       map[string]uint32
 	iconTextureSize    int
 	iconTextureColor   color.RGBA
@@ -390,6 +396,7 @@ func (o *Overlay) clampHelpView() {
 	if len(topic.Children) == 0 {
 		o.helpView.InChildren = false
 		o.helpView.InGrandChildren = false
+		o.helpView.ParentSelected = false
 		o.helpView.EntryCursor = 0
 		return
 	}
@@ -397,6 +404,7 @@ func (o *Overlay) clampHelpView() {
 	entry := topic.Children[o.helpView.EntryCursor]
 	if len(entry.Children) == 0 {
 		o.helpView.InGrandChildren = false
+		o.helpView.ParentSelected = false
 		o.helpView.GrandChildCursor = 0
 		return
 	}
@@ -435,7 +443,6 @@ func (o *Overlay) Close() {
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
 	o.statsMarquee.invalidate(o)
-	o.breadcrumbMarquee.invalidate(o)
 	o.presetNameMarquee.invalidate(o)
 	o.bottomMarquee.invalidate(o)
 	for i := range o.pageIndicatorTex {
@@ -520,6 +527,22 @@ func (o *Overlay) SetControllerConnected(connected bool) {
 	}
 	o.controllerConnected = connected
 	o.helpDirty = true
+	o.hintTextCache = ""
+}
+
+// SetPointerCapabilities updates the runtime affordances. Mouse and touch
+// detection are sticky upstream and can be promoted after the application
+// starts. The keyboard flag controls whether the keyboard/gamepad footer is
+// shown on pointer-only devices.
+func (o *Overlay) SetPointerCapabilities(keyboard, mouse, touch bool) {
+	if o.pointerCapabilitiesSet && o.keyboardAvailable == keyboard && o.pointerMouse == mouse && o.pointerTouch == touch {
+		return
+	}
+	o.pointerCapabilitiesSet = true
+	o.keyboardAvailable = keyboard
+	o.pointerMouse = mouse
+	o.pointerTouch = touch
+	o.hintTextCache = ""
 }
 
 // SetMusicDir records the resolved local music root (see App.findMusicDir),
@@ -672,7 +695,6 @@ func (o *Overlay) markAllDirty() {
 	o.marqueeL.invalidate(o)
 	o.marqueeR.invalidate(o)
 	o.statsMarquee.invalidate(o)
-	o.breadcrumbMarquee.invalidate(o)
 	o.presetNameMarquee.invalidate(o)
 	o.bottomMarquee.invalidate(o)
 }

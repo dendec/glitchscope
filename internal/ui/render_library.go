@@ -193,7 +193,11 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 	cursor := o.albumCursor
 	scroll := &o.albumsScroll
 
-	*scroll = scrollOffset(*scroll, cursor, len(o.albums), maxRows)
+	if o.pointerScroll[0] {
+		*scroll = clampPointerScroll(*scroll, len(o.albums), maxRows)
+	} else {
+		*scroll = scrollOffset(*scroll, cursor, len(o.albums), maxRows)
+	}
 
 	o.deleteTex(&o.albumsTex)
 	o.marqueeL.invalidate(o)

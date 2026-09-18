@@ -40,6 +40,7 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 		return
 	case input.ActionToggleUI:
 		if a.overlay != nil {
+			a.pointerOpen = pointerOpenGesture{}
 			wasVisible := a.overlay.UIVisible()
 			a.overlay.ToggleUI()
 			if !wasVisible {
@@ -247,13 +248,23 @@ func (a *App) switchScreen(winW, winH int, forward bool) {
 		a.overlay.PrevScreen()
 	}
 	if a.overlay.IsSettingsPage() {
-		rows := ui.BuildSettingsRowsWithCatalogForRefresh(*a.settings, winW, winH, a.displayRefreshRate(), a.overlay.Catalog())
-		a.overlay.SetSettingsRows(rows, 0)
+		a.refreshSettingsRows(winW, winH, a.displayRefreshRate(), 0)
 	}
 	if a.overlay.IsLibraryPage() {
 		a.overlay.RefreshTrackCache()
 		a.requestConnectivity()
 	}
+}
+
+// refreshSettingsRows rebuilds the localized, size-dependent Settings view
+// through the single app-level path used by resize, page changes, and pointer
+// navigation.
+func (a *App) refreshSettingsRows(winW, winH int, refreshRate int32, cursor int) {
+	if a.overlay == nil || a.settings == nil {
+		return
+	}
+	rows := ui.BuildSettingsRowsWithCatalogForRefresh(*a.settings, winW, winH, refreshRate, a.overlay.Catalog())
+	a.overlay.SetSettingsRows(rows, cursor)
 }
 
 func (a *App) handleNormalAction(act input.Action) {

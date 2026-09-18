@@ -2,7 +2,7 @@
 
 **Audio player with MilkDrop-compatible real-time visualization for game consoles and desktop.**
 
-Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing audio files (MP3, FLAC, WAV, Ogg, etc.) and tracker music (MOD, XM, IT, S3M, PT3, YM, etc.). Supports keyboard and gamepad input. Designed for low-power ARM handhelds (PortMaster) but runs on any Linux/Windows desktop.
+Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing audio files (MP3, FLAC, WAV, Ogg, etc.) and tracker music (MOD, XM, IT, S3M, PT3, YM, etc.). Supports keyboard, gamepad, mouse, and touch input. Designed for low-power ARM handhelds (PortMaster) but runs on any Linux/Windows desktop.
 
 ## Features
 
@@ -16,7 +16,7 @@ Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing 
 - **Preset Auto-Switch** — Configurable timer-based preset rotation (Off, 15s, 30s, 60s, 2m)
 - **UI & Themes** — Clean 2-column interface with nine distinct color themes and customizable overlay transparency
 - **Localized UI & Help** — English, Russian, Simplified/Traditional Chinese, Japanese, Korean, Vietnamese, Thai, Indonesian, Malay, Brazilian Portuguese, Spanish, German, French, and Turkish; switch languages in Settings without restarting
-- **Gamepad & Keyboard** — Full controller mapping optimized for PortMaster handhelds (TrimUI Smart Pro, Anbernic, Miyoo, etc.)
+- **Gamepad, Keyboard & Pointer** — Full controller mapping optimized for PortMaster handhelds (TrimUI Smart Pro, Anbernic, Miyoo, etc.); mouse and touch taps open the UI, select rows, and scroll lists
 
 ## Building
 

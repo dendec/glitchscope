@@ -60,7 +60,9 @@
 - поиск по Help;
 - локализация Help на несколько языков;
 - rich text, markdown или HTML-рендеринг;
-- mouse hover и tooltip-модель;
+- интерактивная tooltip-модель; базовый pointer-ввод описан в
+  [PLAN-POINTER-INPUT.md](PLAN-POINTER-INPUT.md), при этом наведение мыши не
+  меняет выделение;
 - динамическая генерация справки из произвольного runtime-кода.
 
 ## 3. UX-модель: четыре уровня объяснения
@@ -161,7 +163,8 @@ func (o *Overlay) ActionHints() []UIHint
 В основном overlay всегда показывается только один mapping:
 
 - при наличии подключенного джойстика — только названия кнопок джойстика;
-- если джойстика нет — только клавиатурные клавиши;
+- если джойстика нет, но есть клавиатура — только клавиатурные клавиши;
+- если нет ни клавиатуры, ни джойстика, footer полностью скрывается;
 - полный mapping обоих способов управления доступен внутри Help, но не в
    компактном runtime footer;
 - при подключении или отключении джойстика активный mapping обновляется без
@@ -194,7 +197,7 @@ type ControlLabel struct {
 
 ```text
 Gamepad
-A Back   B Select   D-pad Navigate   L1/R1 Pages
+A Select   B Back   D-pad Navigate   L1/R1 Pages
 
 Keyboard
 Backspace Back   Enter Select   Arrows Navigate   P Pages
@@ -205,7 +208,7 @@ Backspace Back   Enter Select   Arrows Navigate   P Pages
 Подсказка состоит из короткого active control label и действия:
 
 ```text
-[A] Back   [B] Open   [D-pad] Move   [L1/R1] Pages
+[A] Open   [B] Back   [D-pad] Move   [L1/R1] Pages
 ```
 
 При отсутствии джойстика тот же контекст отображается только с клавиатурой:
@@ -248,7 +251,7 @@ Backspace Back   Enter Select   Arrows Navigate   P Pages
 Примеры минимального набора для 640x480:
 
 ```text
-Gamepad: [B] Open  [A] Back  [D-pad] Move
+Gamepad: [A] Open  [B] Back  [D-pad] Move
 Keyboard: [Enter] Open  [Backspace] Back  [Arrows] Move
 Edit: [Enter] Apply  [Backspace] Cancel  [Arrows] Change
 Delete: [Enter] Confirm  [Backspace] Cancel
@@ -618,7 +621,8 @@ Footer должен иметь собственную вычисляемую в�
 - Help содержит краткий Getting started и подробные операционные темы;
 - Help использует фактический keyboard/gamepad mapping;
 - основной footer показывает только active mapping: gamepad при подключенном
-   джойстике или keyboard без джойстика;
+  джойстике, keyboard без джойстика, и не показывается на pointer-only
+  устройстве без клавиатуры и gamepad;
 - footer помещается на 640x480 без уменьшения основного UI-шрифта и без
    переноса одного hint на две строки;
 - Help не сбрасывает Library path, selection или playback state;
@@ -691,7 +695,8 @@ Footer должен иметь собственную вычисляемую в�
 
 - hints показываются постоянно, но занимают одну компактную строку;
 - при подключенном контроллере в основном UI показывается только gamepad
-   mapping; без контроллера — только keyboard mapping;
+  mapping; без контроллера — только keyboard mapping, а при отсутствии обоих
+  способов footer скрывается;
 - оба mapping доступны только в Help;
 - 640x480 является обязательным размером для layout-проверки footer;
 - Help открывается через обычный page cycle, без нового shortcut;
@@ -720,7 +725,7 @@ Help: Getting Started → Controls → Playback → Frame rate and resolution �
 Плейсхолдеры кнопок в Help разрешаются через тот же controlLabel, что и footer:
 Nintendo A — открыть, B — назад, X — Play/Pause, Y — случайный пресет.
 Клавиатурное переключение страниц обозначено P/N (назад/вперёд); вне меню эти
-кнопки переключают пресеты. Обработка ввода не менялась.
+кнопки переключают пресеты. Pointer-слой не добавляет новых физических кнопок.
 
 Settings показывает пояснения выбранного значения под списком вариантов,
 когда есть свободные строки. В режиме редактирования пояснение относится к

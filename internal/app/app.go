@@ -128,10 +128,11 @@ type App struct {
 	favoritesPath string
 
 	seek             seekControl // continuous-seek drivetrain state
-	onPresetsPage    bool        // true when UI is on Presets page (main viz stopped)
-	selectedPreset   string      // confirmed on Presets page, loaded when the page closes
-	testSignalFreq   float64     // phase accumulator for synthetic test signal
-	testSignalBuf    []float32   // reusable buffer for test signal (avoids alloc per frame)
+	pointerOpen      pointerOpenGesture
+	onPresetsPage    bool      // true when UI is on Presets page (main viz stopped)
+	selectedPreset   string    // confirmed on Presets page, loaded when the page closes
+	testSignalFreq   float64   // phase accumulator for synthetic test signal
+	testSignalBuf    []float32 // reusable buffer for test signal (avoids alloc per frame)
 	trackerBudget    int64
 	trackerBudgetSet bool
 }
@@ -164,6 +165,11 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 
 	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS | sdl.INIT_GAMECONTROLLER | sdl.INIT_JOYSTICK | sdl.INIT_AUDIO); err != nil {
 		return nil, fmt.Errorf("sdl init: %w", err)
+	}
+	// Keep touch input separate from SDL's synthetic mouse events. The app
+	// deduplicates both sources at the neutral pointer-event boundary instead.
+	if !sdl.SetHint(sdl.HINT_TOUCH_MOUSE_EVENTS, "0") {
+		slog.Debug("SDL touch mouse events hint unavailable")
 	}
 	if runtime.GOOS == "windows" {
 		for _, attr := range []struct {

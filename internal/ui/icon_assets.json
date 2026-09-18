@@ -65,6 +65,14 @@
     {
       "name": "downloads",
       "source": "lib/pixelarticons/svg/download.svg"
+    },
+    {
+      "name": "home",
+      "source": "lib/pixelarticons/svg/home.svg"
+    },
+    {
+      "name": "close",
+      "source": "lib/pixelarticons/svg/close.svg"
     }
   ]
 }

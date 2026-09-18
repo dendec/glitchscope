@@ -4,9 +4,9 @@ package ui
 // `[Key] Verb` row at the very bottom of the overlay). The hint model lives in
 // action_hints.go; this file only lays out and draws the ready-made line.
 
-// renderActionHints draws the bottom context-actions footer. It is always
-// shown while the UI is visible (all pages), occupying a single row. The line
-// is rebuilt only when its content changes, so frame cost is negligible.
+// renderActionHints draws the bottom context-actions footer when a keyboard or
+// gamepad is available. It occupies a single row on all pages and is rebuilt
+// only when its content changes, so frame cost is negligible.
 func (o *Overlay) renderActionHints(winW, winH, viewW, viewH int) {
 	if o.face == nil {
 		return
@@ -18,7 +18,7 @@ func (o *Overlay) renderActionHints(winW, winH, viewW, viewH int) {
 	}
 	text := o.buildHintsText(o.ActionHints(), maxW)
 
-	if text != o.hintTextCache {
+	if text != o.hintTextCache || (text == "" && o.hintTex != 0) {
 		o.hintTextCache = text
 		o.deleteTex(&o.hintTex)
 		if text != "" {
@@ -41,7 +41,7 @@ func (o *Overlay) renderActionHints(winW, winH, viewW, viewH int) {
 // hintRowHeight returns the height (in pixels) the footer row occupies. It is
 // constant (one text row) and must be reserved in the vertical layout budget.
 func (o *Overlay) hintRowHeight() int {
-	if o.face == nil {
+	if o.face == nil || !o.keyMappingAvailable() {
 		return 0
 	}
 	return o.face.Metrics().Height.Ceil()

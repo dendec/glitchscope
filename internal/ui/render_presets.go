@@ -48,7 +48,11 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	}
 
 	previousScroll := cur.scroll
-	cur.scroll = scrollOffset(cur.scroll, cur.cursor, totalNodes, maxRows)
+	if o.pointerScroll[0] {
+		cur.scroll = clampPointerScroll(cur.scroll, totalNodes, maxRows)
+	} else {
+		cur.scroll = scrollOffset(cur.scroll, cur.cursor, totalNodes, maxRows)
+	}
 	rebuildList = rebuildList || cur.scroll != previousScroll
 	leftEnd := cur.scroll + maxRows
 	if leftEnd > totalNodes {
@@ -132,7 +136,7 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 		leftCursor, leftScroll, lh, winW, winH, viewW, viewH)
 	drawScrollbar(o, lx+colW-sbW, ly, colH, leftTotal, maxRows, leftScroll, winW, winH, viewW, viewH)
 	if o.panelEntered && leftTotal > 0 {
-		rowY := ly + float32((leftCursor-leftScroll)*lh)
+		rowY := ly + float32((leftCursor-leftScroll)*lh) - float32(textPadding(o.fontSize))
 		o.drawMarqueeCol(&o.marqueeL, lx, ly, textW, colH, lh, rowY, winW, winH, viewW, viewH)
 	}
 

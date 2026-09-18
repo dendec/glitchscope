@@ -24,26 +24,37 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 		var leftItems []leftItem
 		leftCursor := o.helpView.TopicCursor
 		leftTop := &o.helpView.EntryTop
+		hasParent := o.helpHasParent()
+		if hasParent {
+			leftItems = append(leftItems, leftItem{Title: ".."})
+		}
 		if o.helpView.InGrandChildren {
 			if o.helpView.EntryCursor >= 0 && o.helpView.EntryCursor < len(topic.Children) {
 				for _, e := range topic.Children[o.helpView.EntryCursor].Children {
 					leftItems = append(leftItems, leftItem{Title: e.Title})
 				}
 			}
-			leftCursor = o.helpView.GrandChildCursor
+			leftCursor = o.helpView.GrandChildCursor + 1
 			leftTop = &o.helpView.GrandChildTop
 		} else if o.helpView.InChildren {
 			for _, e := range topic.Children {
 				leftItems = append(leftItems, leftItem{Title: helpMenuTitle(e.Title, len(e.Children) > 0)})
 			}
-			leftCursor = o.helpView.EntryCursor
+			leftCursor = o.helpView.EntryCursor + 1
 		} else {
 			for _, t := range o.effectiveHelpTopics() {
 				leftItems = append(leftItems, leftItem{Title: helpMenuTitle(t.Title, len(t.Children) > 0)})
 			}
 		}
+		if hasParent && o.helpView.ParentSelected {
+			leftCursor = 0
+		}
 		leftTotal := len(leftItems)
-		*leftTop = scrollOffset(*leftTop, leftCursor, leftTotal, maxRows)
+		if o.pointerScroll[0] {
+			*leftTop = clampPointerScroll(*leftTop, leftTotal, maxRows)
+		} else {
+			*leftTop = scrollOffset(*leftTop, leftCursor, leftTotal, maxRows)
+		}
 		leftEnd := *leftTop + maxRows
 		if leftEnd > leftTotal {
 			leftEnd = leftTotal
@@ -104,12 +115,18 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 	// compounds the alpha and makes Help less transparent than other pages.
 	leftCursor := o.helpView.TopicCursor
 	leftScroll := o.helpView.EntryTop
+	if o.helpHasParent() {
+		leftCursor++
+	}
 	if o.helpView.InGrandChildren {
-		leftCursor = o.helpView.GrandChildCursor
+		leftCursor = o.helpView.GrandChildCursor + 1
 		leftScroll = o.helpView.GrandChildTop
 	} else if o.helpView.InChildren {
-		leftCursor = o.helpView.EntryCursor
+		leftCursor = o.helpView.EntryCursor + 1
 		leftScroll = o.helpView.EntryTop
+	}
+	if o.helpHasParent() && o.helpView.ParentSelected {
+		leftCursor = 0
 	}
 	drawListColumn(o, lx, py, pw, ph, o.helpColL, o.panelEntered && o.focusPanel == 0, leftCursor, leftScroll, lh, winW, winH, viewW, viewH)
 	drawListColumn(o, rx, py, pw, ph, o.helpColR, o.panelEntered && o.focusPanel == 1, -1, o.helpView.ContentTop, lh, winW, winH, viewW, viewH)
@@ -121,6 +138,9 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 		}
 	} else if o.helpView.InChildren {
 		leftTotal = len(topic.Children)
+	}
+	if o.helpHasParent() {
+		leftTotal++
 	}
 	drawScrollbar(o, lx+pw-sbW, py, ph, leftTotal, maxRows, leftScroll, winW, winH, viewW, viewH)
 	drawScrollbar(o, rx+pw-sbW, py, ph, o.helpContentRowCount(topic), maxRows, o.helpView.ContentTop, winW, winH, viewW, viewH)

@@ -39,7 +39,7 @@ const (
 func (o *Overlay) updateMarquee(now time.Time) {
 	for _, m := range []*marqueeState{
 		&o.marqueeL, &o.marqueeR,
-		&o.statsMarquee, &o.breadcrumbMarquee,
+		&o.statsMarquee,
 		&o.presetNameMarquee, &o.bottomMarquee,
 	} {
 		o.updateMarqueeCol(m, now)

@@ -19,7 +19,11 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 
 	// Rebuild left column (setting names) with scroll window.
 	leftTotal := len(o.settingsRows)
-	o.albumsScroll = scrollOffset(o.albumsScroll, o.settingsCursor, leftTotal, maxRows)
+	if o.pointerScroll[0] {
+		o.albumsScroll = clampPointerScroll(o.albumsScroll, leftTotal, maxRows)
+	} else {
+		o.albumsScroll = scrollOffset(o.albumsScroll, o.settingsCursor, leftTotal, maxRows)
+	}
 	maxTextPx := o.availableRowTextWidth(panelW)
 	var leftRows []listRow
 	leftEnd := o.albumsScroll + maxRows
@@ -57,7 +61,11 @@ func (o *Overlay) renderSettingsPanels(winW, winH, viewW, viewH int, panelW, pan
 		if o.settingsEditing {
 			selIdx = o.settingsValueCursor
 		}
-		o.tracksScroll = scrollOffset(o.tracksScroll, selIdx, rightTotal, maxRows)
+		if o.pointerScroll[1] {
+			o.tracksScroll = clampPointerScroll(o.tracksScroll, rightTotal, maxRows)
+		} else {
+			o.tracksScroll = scrollOffset(o.tracksScroll, selIdx, rightTotal, maxRows)
+		}
 		rightEnd = o.tracksScroll + maxRows
 		if rightEnd > rightTotal {
 			rightEnd = rightTotal
@@ -121,7 +129,7 @@ func (o *Overlay) drawSettingsTextures(winW, winH, viewW, viewH int, panelW, pan
 		o.settingsCursor, o.albumsScroll, lh, winW, winH, viewW, viewH)
 	drawScrollbar(o, lx+colW-sbW, ly, colH, len(o.settingsRows), maxRows, o.albumsScroll, winW, winH, viewW, viewH)
 	if o.panelEntered && !o.settingsEditing && len(o.settingsRows) > 0 {
-		rowY := ly + float32((o.settingsCursor-o.albumsScroll)*lh)
+		rowY := ly + float32((o.settingsCursor-o.albumsScroll)*lh) - float32(textPadding(o.fontSize))
 		o.drawMarqueeCol(&o.marqueeL, lx, ly, textW, colH, lh, rowY, winW, winH, viewW, viewH)
 	}
 
@@ -133,7 +141,7 @@ func (o *Overlay) drawSettingsTextures(winW, winH, viewW, viewH int, panelW, pan
 	}
 	drawScrollbar(o, rx+colW-sbW, ry, colH, rightTotal, maxRows, o.tracksScroll, winW, winH, viewW, viewH)
 	if o.panelEntered && o.settingsEditing && o.settingsValueCursor >= o.tracksScroll && o.settingsCursor < len(o.settingsRows) {
-		rowY := ry + float32((o.settingsValueCursor-o.tracksScroll)*lh)
+		rowY := ry + float32((o.settingsValueCursor-o.tracksScroll)*lh) - float32(textPadding(o.fontSize))
 		o.drawMarqueeCol(&o.marqueeR, rx, ry, textW, colH, lh, rowY, winW, winH, viewW, viewH)
 	}
 }

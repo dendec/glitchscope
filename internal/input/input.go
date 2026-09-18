@@ -1,4 +1,4 @@
-// Package input handles SDL gamepad and keyboard events.
+// Package input handles SDL keyboard, gamepad, mouse, and touch events.
 package input
 
 import (
@@ -47,6 +47,16 @@ type Input struct {
 	controller *sdl.GameController
 	joyIdx     int // -1 = no controller
 
+	pointerSpace       PointerSpace
+	pointerQueue       []PointerEvent
+	keyboardSeen       bool
+	mouseSeen          bool
+	touchSeen          bool
+	touchKnown         bool
+	lastMouseX         float32
+	lastMouseY         float32
+	mousePositionKnown bool
+
 	// Axis tracking for repeat prevention.
 	lAxisY int16
 	lAxisX int16
@@ -60,6 +70,7 @@ type Input struct {
 // New creates an Input handler and opens the first game controller.
 func New() *Input {
 	in := &Input{joyIdx: -1}
+	in.RefreshPointerCapabilities()
 	in.tryOpenController()
 	return in
 }
@@ -76,11 +87,13 @@ func (in *Input) Close() {
 // ProcessEvent translates an SDL event into an Action.
 // favoriteMode enables the X button for favouriting instead of play/pause.
 func (in *Input) ProcessEvent(event sdl.Event, favoriteMode bool, now time.Time) Action {
+	in.capturePointerEvent(event)
 	switch e := event.(type) {
 	case *sdl.QuitEvent:
 		return ActionQuit
 
 	case *sdl.KeyboardEvent:
+		in.keyboardSeen = true
 		if e.Type != sdl.KEYDOWN {
 			return ActionNone
 		}
@@ -140,6 +153,45 @@ func (in *Input) DPadDownHeld() bool {
 // HasController reports whether a game controller is currently connected.
 func (in *Input) HasController() bool {
 	return in.controller != nil
+}
+
+// SetPointerSpace updates the coordinate conversion used for subsequent
+// pointer events. SDL reports mouse positions in window pixels while the
+// overlay is rendered in drawable pixels on high-DPI displays.
+func (in *Input) SetPointerSpace(space PointerSpace) {
+	in.pointerSpace = space
+}
+
+// PollPointerEvent returns the next neutral pointer event in input order.
+func (in *Input) PollPointerEvent() (PointerEvent, bool) {
+	if len(in.pointerQueue) == 0 {
+		return PointerEvent{}, false
+	}
+	event := in.pointerQueue[0]
+	copy(in.pointerQueue, in.pointerQueue[1:])
+	in.pointerQueue = in.pointerQueue[:len(in.pointerQueue)-1]
+	return event, true
+}
+
+// RefreshPointerCapabilities probes SDL once at startup so a touch device can
+// advertise itself before the first finger event. Actual touch events also
+// promote the sticky capability in capturePointerEvent.
+func (in *Input) RefreshPointerCapabilities() {
+	in.touchKnown = true
+	in.touchSeen = in.touchSeen || sdl.GetNumTouchDevices() > 0
+}
+
+// PointerCapabilities reports the devices relevant to UI affordances.
+func (in *Input) PointerCapabilities() PointerCapabilities {
+	if !in.touchKnown {
+		in.RefreshPointerCapabilities()
+	}
+	return PointerCapabilities{
+		Keyboard:   in.keyboardSeen,
+		Controller: in.controller != nil,
+		Mouse:      in.mouseSeen,
+		Touch:      in.touchSeen,
+	}
 }
 
 // RightStickX returns the current right stick X axis value (deadzone-filtered).
@@ -283,6 +335,122 @@ func (in *Input) PollFavoriteHold(favoriteMode bool, now time.Time) Action {
 func (in *Input) ResetFavoriteHold() {
 	in.longPressActive = false
 	in.longPressFired = false
+}
+
+func (in *Input) enqueuePointer(event PointerEvent) {
+	if event.Phase == PointerMove && event.Device == PointerMouse && len(in.pointerQueue) > 0 {
+		last := &in.pointerQueue[len(in.pointerQueue)-1]
+		if last.Device == event.Device && last.Phase == event.Phase && last.PointerID == event.PointerID {
+			last.X = event.X
+			last.Y = event.Y
+			last.DX += event.DX
+			last.DY += event.DY
+			return
+		}
+	}
+	in.pointerQueue = append(in.pointerQueue, event)
+}
+
+func (in *Input) capturePointerEvent(event sdl.Event) {
+	switch e := event.(type) {
+	case *sdl.MouseMotionEvent:
+		if e.Which == sdl.TOUCH_MOUSEID {
+			return
+		}
+		in.mouseSeen = true
+		x, y := in.pointerSpace.point(float32(e.X), float32(e.Y))
+		dx, dy := in.pointerSpace.delta(float32(e.XRel), float32(e.YRel))
+		in.lastMouseX, in.lastMouseY = x, y
+		in.mousePositionKnown = true
+		in.enqueuePointer(PointerEvent{
+			Device:        PointerMouse,
+			Phase:         PointerMove,
+			PointerID:     int64(e.Which),
+			X:             x,
+			Y:             y,
+			PositionValid: true,
+			DX:            dx,
+			DY:            dy,
+		})
+
+	case *sdl.MouseButtonEvent:
+		if e.Which == sdl.TOUCH_MOUSEID {
+			return
+		}
+		in.mouseSeen = true
+		phase := PointerUp
+		if e.Type == sdl.MOUSEBUTTONDOWN {
+			phase = PointerDown
+		} else if e.Type != sdl.MOUSEBUTTONUP {
+			return
+		}
+		x, y := in.pointerSpace.point(float32(e.X), float32(e.Y))
+		in.lastMouseX, in.lastMouseY = x, y
+		in.mousePositionKnown = true
+		in.enqueuePointer(PointerEvent{
+			Device:        PointerMouse,
+			Phase:         phase,
+			PointerID:     int64(e.Which),
+			X:             x,
+			Y:             y,
+			PositionValid: true,
+			Button:        PointerButton(e.Button),
+		})
+
+	case *sdl.MouseWheelEvent:
+		if e.Which == sdl.TOUCH_MOUSEID {
+			return
+		}
+		in.mouseSeen = true
+		sy := e.PreciseY
+		if sy == 0 {
+			sy = float32(e.Y)
+		}
+		if e.Direction == sdl.MOUSEWHEEL_FLIPPED {
+			sy = -sy
+		}
+		in.enqueuePointer(PointerEvent{
+			Device:        PointerMouse,
+			Phase:         PointerWheel,
+			PointerID:     int64(e.Which),
+			X:             in.lastMouseX,
+			Y:             in.lastMouseY,
+			PositionValid: in.mousePositionKnown,
+			ScrollY:       sy,
+		})
+
+	case *sdl.TouchFingerEvent:
+		in.touchKnown = true
+		in.touchSeen = true
+		phase := PointerMove
+		switch e.Type {
+		case sdl.FINGERDOWN:
+			phase = PointerDown
+		case sdl.FINGERUP:
+			phase = PointerUp
+		case sdl.FINGERMOTION:
+		default:
+			return
+		}
+		x, y := in.pointerSpace.normalizedPoint(e.X, e.Y)
+		dx, dy := in.pointerSpace.normalizedDelta(e.DX, e.DY)
+		in.enqueuePointer(PointerEvent{
+			Device:        PointerTouch,
+			Phase:         phase,
+			PointerID:     int64(e.FingerID),
+			X:             x,
+			Y:             y,
+			PositionValid: true,
+			DX:            dx,
+			DY:            dy,
+			Button:        PointerButtonPrimary,
+		})
+
+	case *sdl.WindowEvent:
+		if e.Event == sdl.WINDOWEVENT_FOCUS_LOST || e.Event == sdl.WINDOWEVENT_LEAVE {
+			in.enqueuePointer(PointerEvent{Phase: PointerCancel})
+		}
+	}
 }
 
 func axisToAction(in *Input, e *sdl.ControllerAxisEvent) Action {
