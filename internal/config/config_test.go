@@ -315,6 +315,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		PresetInterval: Preset30s,
 		UI:             DefaultUI(),
 	}
+	orig.UI.ShowPlayerBar = true
 	if err := SaveSettings(p, orig); err != nil {
 		t.Fatal("save:", err)
 	}

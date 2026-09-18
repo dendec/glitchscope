@@ -48,6 +48,13 @@ func (o *Overlay) drawMenuHint(width, height int) {
 	pad := float32(o.scalePx(8))
 	x := float32(width-t.w) / 2
 	y := float32(height-t.h) - pad*3
+	if o.showPlayerBar && (o.playingPath != "" || o.loading || o.presetNameTex != 0) {
+		playerBarH := o.playerStatusRowHeight(o.lineHeight()) + max(1, o.scalePx(2))
+		if o.presetNameTex != 0 {
+			playerBarH += o.lineHeight()
+		}
+		y -= float32(playerBarH)
+	}
 	r, g, b := o.panelBgRGB()
 	glDrawFilledRect(o.programRect, x-pad, y-pad/2, float32(t.w)+pad*2, float32(t.h)+pad, r, g, b, 0.92, width, height, width, height)
 	glDrawOverlayText(o.programText, t.tex, 1, x, y, float32(t.w), float32(t.h), width, height, width, height)

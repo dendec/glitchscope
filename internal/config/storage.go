@@ -79,11 +79,12 @@ func LoadSettings(path string) (Settings, error) {
 		} `json:"track_cache"`
 		PresetInterval *PresetInterval `json:"preset_interval"`
 		UI             *struct {
-			Language     *Language     `json:"language"`
-			Theme        *Theme        `json:"theme"`
-			Transparency *Transparency `json:"transparency"`
-			MenuOpened   *bool         `json:"menu_opened"`
-			ShowStats    *bool         `json:"show_stats"`
+			Language      *Language     `json:"language"`
+			Theme         *Theme        `json:"theme"`
+			Transparency  *Transparency `json:"transparency"`
+			MenuOpened    *bool         `json:"menu_opened"`
+			ShowStats     *bool         `json:"show_stats"`
+			ShowPlayerBar *bool         `json:"show_player_bar"`
 		} `json:"ui"`
 	}
 	if err := json.NewDecoder(f).Decode(&raw); err != nil {
@@ -172,6 +173,9 @@ func LoadSettings(path string) (Settings, error) {
 		}
 		if raw.UI.ShowStats != nil {
 			s.UI.ShowStats = *raw.UI.ShowStats
+		}
+		if raw.UI.ShowPlayerBar != nil {
+			s.UI.ShowPlayerBar = *raw.UI.ShowPlayerBar
 		}
 	}
 

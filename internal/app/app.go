@@ -532,6 +532,7 @@ func (a *App) initAudio() {
 	a.presenter = newOverlayPresenter(a.overlay)
 	a.overlay.SetBaseDir(baseDir())
 	a.overlay.SetShowFPS(a.settings.UI.ShowStats)
+	a.overlay.SetShowPlayerBar(a.settings.UI.ShowPlayerBar)
 	a.overlay.SetMenuHintEnabled(!a.settings.UI.MenuOpened)
 	a.overlay.SetMicDevices(mic.InputDevices())
 	w, h := a.window.GLGetDrawableSize()

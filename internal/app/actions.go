@@ -556,6 +556,12 @@ func (a *App) applySettings(winW, winH int) {
 		a.overlay.SetShowFPS(newShowStats)
 	}
 
+	newShowPlayerBar := rows[ui.SettingPlayerBar].Index == 1
+	if newShowPlayerBar != a.settings.UI.ShowPlayerBar {
+		a.settings.UI.ShowPlayerBar = newShowPlayerBar
+		a.overlay.SetShowPlayerBar(newShowPlayerBar)
+	}
+
 	beatSensitivities := config.AllBeatSensitivities()
 	if index := rows[ui.SettingBeatSensitivity].Index; index >= 0 && index < len(beatSensitivities) {
 		a.settings.Graphics.BeatSensitivity = beatSensitivities[index]

@@ -142,10 +142,11 @@ type Overlay struct {
 
 	notif Notifier
 
-	uiVisible    bool
-	panelEntered bool
-	showFPS      bool
-	uiPage       UIPage
+	uiVisible     bool
+	panelEntered  bool
+	showFPS       bool
+	showPlayerBar bool
+	uiPage        UIPage
 
 	screenW, screenH int
 	fontSize         float64
@@ -480,6 +481,9 @@ func (o *Overlay) Draw(width, height int) {
 		if o.showFPS {
 			o.renderStatsOnly(width, height)
 		}
+		if o.showPlayerBar {
+			o.renderPersistentPlayerBar(width, height, width, height)
+		}
 		if o.notif.Visible() && !o.notif.Hidden() && !o.notif.Injected() {
 			o.notif.Render(o.programText, width, height)
 		}
@@ -611,6 +615,16 @@ func (o *Overlay) UIVisible() bool {
 
 func (o *Overlay) SetShowFPS(v bool) {
 	o.showFPS = v
+}
+
+// SetShowPlayerBar controls the persistent bottom player bar.
+func (o *Overlay) SetShowPlayerBar(v bool) {
+	if o.showPlayerBar == v {
+		return
+	}
+	o.showPlayerBar = v
+	o.bottomDirty = true
+	o.presetNameDirty = true
 }
 
 func (o *Overlay) SettingsCursor() int { return o.settingsCursor }

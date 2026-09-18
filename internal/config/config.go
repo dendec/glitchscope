@@ -686,17 +686,18 @@ func (t Transparency) Validate() error {
 	return nil
 }
 
-// UISettings holds theme and transparency.
+// UISettings holds persisted menu and appearance preferences.
 type UISettings struct {
-	MenuOpened   bool         `json:"menu_opened"`
-	Language     Language     `json:"language"`
-	Theme        Theme        `json:"theme"`
-	Transparency Transparency `json:"transparency"`
-	ShowStats    bool         `json:"show_stats"`
+	MenuOpened    bool         `json:"menu_opened"`
+	Language      Language     `json:"language"`
+	Theme         Theme        `json:"theme"`
+	Transparency  Transparency `json:"transparency"`
+	ShowStats     bool         `json:"show_stats"`
+	ShowPlayerBar bool         `json:"show_player_bar"`
 }
 
 func DefaultUI() UISettings {
-	return UISettings{Language: English, Theme: ThemeDark, Transparency: 0, ShowStats: false}
+	return UISettings{Language: English, Theme: ThemeDark, Transparency: 0, ShowStats: false, ShowPlayerBar: false}
 }
 
 // Settings is the full persisted settings envelope.

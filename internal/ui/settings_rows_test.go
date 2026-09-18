@@ -13,7 +13,7 @@ func TestSettingsRowsUseCompactSectionsAndLabels(t *testing.T) {
 	want := []string{
 		"── Playback ────", "Shuffle", "Repeat",
 		"── Visualization ──", "Visualizer", "Frame rate", "Adaptive resolution", "Resolution", "Upscale filter", "Sensitivity", "Rotation",
-		"── Appearance ───", "Language", "Theme", "Transparency", "Stats",
+		"── Appearance ───", "Language", "Theme", "Transparency", "Stats", "Player bar",
 		"── Downloads ───────", "Size", "Keep for",
 	}
 	if len(rows) != len(want) {

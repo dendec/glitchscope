@@ -49,6 +49,13 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 			o.presetsDetailDirty = true
 		}
 	}
+	now := time.Now()
+	if o.uiVisible {
+		o.updateMarquee(now)
+	} else if o.showPlayerBar {
+		o.updateMarqueeCol(&o.presetNameMarquee, now)
+		o.updateMarqueeCol(&o.bottomMarquee, now)
+	}
 
 	if !o.uiVisible || !o.panelEntered {
 		o.resetScrollHolds()
@@ -56,7 +63,6 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 	}
 
 	state := sdl.GetKeyboardState()
-	now := time.Now()
 
 	o.updateScrollHold(&o.scrollUp, state[sdl.SCANCODE_UP] != 0 || gamepadUp, now, func() { o.moveCursor(-1) })
 	o.updateScrollHold(&o.scrollDown, state[sdl.SCANCODE_DOWN] != 0 || gamepadDown, now, func() { o.moveCursor(1) })
@@ -67,7 +73,6 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 		o.scrollLeft.active = false
 		o.scrollRight.active = false
 	}
-	o.updateMarquee(now)
 }
 
 // InteractionActive reports whether the user has interacted with the visible

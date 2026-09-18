@@ -47,17 +47,12 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	}
 
 	// Rebuild header/footer text textures up front so they're ready before layout/draw below.
-	if o.presetNameDirty {
-		o.rebuildPresetNameTex()
-	}
+	o.preparePlayerBar(winW)
 	if o.pageIndicatorDirty {
 		o.rebuildPageIndicatorTextures()
 	}
 	if o.showsBreadcrumb() {
 		o.rebuildBreadcrumbTex(winW)
-	}
-	if (o.playingPath != "" || o.loading) && o.bottomDirty {
-		o.rebuildBottomTex(winW, o.face.Metrics().Height.Ceil())
 	}
 
 	// The menu header contains centered page navigation and, where meaningful,
@@ -118,44 +113,17 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		o.renderLibraryPanels(winW, winH, viewW, viewH, panelW, panelY, panelH, lh)
 	}
 
-	showBar := o.playingPath != "" || o.loading || o.presetNameTex != 0
+	showBar := o.showPlayerBar && (o.playingPath != "" || o.loading || o.presetNameTex != 0)
 	if showBar {
 		by := float32(winH - bottomH)
 		barBackdropH := float32(presetLineH + statusRowH)
 		bR, bG, bB := o.panelBgRGB()
 		glDrawFilledRect(o.programRect, 0, by, float32(winW), barBackdropH, bR, bG, bB, o.bgAlpha(), winW, winH, viewW, viewH)
-
-		if o.presetNameTex != 0 {
-			headerMargin := o.headerMarginX()
-			if !o.drawMarquee(&o.presetNameMarquee, float32(headerMargin), by, float32(winW-headerMargin*2), float32(o.presetNameTexH), winW, winH, viewW, viewH) {
-				glDrawOverlayText(o.programText, o.presetNameTex, 1,
-					float32(headerMargin), by, float32(o.presetNameTexW), float32(o.presetNameTexH), winW, winH, viewW, viewH)
-			}
-		}
-		if o.bottomTex != 0 || o.bottomPrefixTex != 0 {
-			statusY := by + float32(presetLineH)
-			if o.bottomPrefixTex != 0 {
-				glDrawOverlayText(o.programText, o.bottomPrefixTex, 1,
-					0, statusY, float32(o.bottomPrefixTexW), float32(o.bottomPrefixTexH), winW, winH, viewW, viewH)
-				if o.bottomMarquee.tex != 0 && float32(o.bottomMarquee.texW) > float32(o.bottomTitleW) {
-					o.drawMarquee(&o.bottomMarquee, float32(o.bottomTitleX), statusY, float32(o.bottomTitleW), float32(o.bottomTexH), winW, winH, viewW, viewH)
-				} else if o.bottomTex != 0 {
-					glDrawOverlayText(o.programText, o.bottomTex, 1,
-						float32(o.bottomTitleX), statusY, float32(o.bottomTexW), float32(o.bottomTexH), winW, winH, viewW, viewH)
-				}
-				if o.bottomSuffixTex != 0 {
-					glDrawOverlayText(o.programText, o.bottomSuffixTex, 1,
-						float32(o.bottomTitleX+o.bottomTitleW), statusY, float32(o.bottomSuffixTexW), float32(o.bottomSuffixTexH), winW, winH, viewW, viewH)
-				}
-			} else {
-				glDrawOverlayText(o.programText, o.bottomTex, 1,
-					0, statusY, float32(o.bottomTexW), float32(o.bottomTexH), winW, winH, viewW, viewH)
-			}
-		}
+		o.drawPlayerBarContent(winW, winH, viewW, viewH, by, presetLineH)
 	}
 
 	// Progress bar under the bottom line.
-	if !o.loading && o.duration > 0 {
+	if o.showPlayerBar && !o.loading && o.duration > 0 {
 		barH := o.scalePx(2)
 		tc := o.textColor()
 		r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
@@ -173,6 +141,89 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 
 	// Context action-hints footer: always shown across pages, at the very bottom.
 	o.renderActionHints(winW, winH, viewW, viewH)
+}
+
+func (o *Overlay) preparePlayerBar(winW int) {
+	if !o.showPlayerBar || o.face == nil {
+		return
+	}
+	if o.presetNameDirty {
+		o.rebuildPresetNameTex()
+	}
+	if o.bottomDirty {
+		o.rebuildBottomTex(winW, o.face.Metrics().Height.Ceil())
+	}
+}
+
+func (o *Overlay) renderPersistentPlayerBar(winW, winH, viewW, viewH int) {
+	if o.programRect == 0 {
+		return
+	}
+	o.preparePlayerBar(winW)
+	showBar := o.playingPath != "" || o.loading || o.presetNameTex != 0
+	if !showBar {
+		return
+	}
+
+	lh := o.lineHeight()
+	presetLineH := 0
+	if o.presetNameTex != 0 {
+		presetLineH = lh
+	}
+	statusRowH := o.playerStatusRowHeight(lh)
+	barH := max(1, o.scalePx(2))
+	by := float32(winH - presetLineH - statusRowH - barH)
+	barBackdropH := float32(presetLineH + statusRowH)
+	bR, bG, bB := o.panelBgRGB()
+	glDrawFilledRect(o.programRect, 0, by, float32(winW), barBackdropH, bR, bG, bB, o.bgAlpha(), winW, winH, viewW, viewH)
+
+	o.drawPlayerBarContent(winW, winH, viewW, viewH, by, presetLineH)
+
+	if !o.loading && o.duration > 0 {
+		tc := o.textColor()
+		r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
+		barY := float32(winH - barH)
+		glDrawFilledRect(o.programRect, 0, barY, float32(winW), float32(barH), r, g, b, o.uiAlpha(alphaTrackBg), winW, winH, viewW, viewH)
+		progress := o.position / o.duration
+		if progress > 1 {
+			progress = 1
+		}
+		if progress < 0 {
+			progress = 0
+		}
+		glDrawFilledRect(o.programRect, 0, barY, float32(float64(winW)*progress), float32(barH), r, g, b, o.uiAlpha(alphaTrackFill), winW, winH, viewW, viewH)
+	}
+}
+
+func (o *Overlay) drawPlayerBarContent(winW, winH, viewW, viewH int, by float32, presetLineH int) {
+	if o.presetNameTex != 0 {
+		headerMargin := o.headerMarginX()
+		if !o.drawMarquee(&o.presetNameMarquee, float32(headerMargin), by, float32(winW-headerMargin*2), float32(o.presetNameTexH), winW, winH, viewW, viewH) {
+			glDrawOverlayText(o.programText, o.presetNameTex, 1,
+				float32(headerMargin), by, float32(o.presetNameTexW), float32(o.presetNameTexH), winW, winH, viewW, viewH)
+		}
+	}
+	if o.bottomTex == 0 && o.bottomPrefixTex == 0 {
+		return
+	}
+	statusY := by + float32(presetLineH)
+	if o.bottomPrefixTex != 0 {
+		glDrawOverlayText(o.programText, o.bottomPrefixTex, 1,
+			0, statusY, float32(o.bottomPrefixTexW), float32(o.bottomPrefixTexH), winW, winH, viewW, viewH)
+		if o.bottomMarquee.tex != 0 && float32(o.bottomMarquee.texW) > float32(o.bottomTitleW) {
+			o.drawMarquee(&o.bottomMarquee, float32(o.bottomTitleX), statusY, float32(o.bottomTitleW), float32(o.bottomTexH), winW, winH, viewW, viewH)
+		} else if o.bottomTex != 0 {
+			glDrawOverlayText(o.programText, o.bottomTex, 1,
+				float32(o.bottomTitleX), statusY, float32(o.bottomTexW), float32(o.bottomTexH), winW, winH, viewW, viewH)
+		}
+		if o.bottomSuffixTex != 0 {
+			glDrawOverlayText(o.programText, o.bottomSuffixTex, 1,
+				float32(o.bottomTitleX+o.bottomTitleW), statusY, float32(o.bottomSuffixTexW), float32(o.bottomSuffixTexH), winW, winH, viewW, viewH)
+		}
+		return
+	}
+	glDrawOverlayText(o.programText, o.bottomTex, 1,
+		0, statusY, float32(o.bottomTexW), float32(o.bottomTexH), winW, winH, viewW, viewH)
 }
 
 // --- Panel drawing helpers ---

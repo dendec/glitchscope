@@ -16,20 +16,12 @@ func (o *Overlay) overlayLayout(winW, winH int) overlayLayout {
 	lh := o.lineHeight()
 	navigationHeaderH := o.headerHeight(lh)
 	headerH := o.menuHeaderHeight(lh)
-	statusRowH := lh
-	if o.bottomTexH > statusRowH && o.face != nil {
-		metrics := o.face.Metrics()
-		lineGap := lh - metrics.Ascent.Ceil() - metrics.Descent.Ceil()
-		if lineGap < 1 {
-			lineGap = 1
-		}
-		statusRowH = lh + textPadding(o.fontSize) + lineGap
-		if statusRowH > o.bottomTexH {
-			statusRowH = o.bottomTexH
-		}
+	statusRowH := 0
+	if o.showPlayerBar {
+		statusRowH = o.playerStatusRowHeight(lh)
 	}
 	presetLineH := 0
-	if o.presetNameTex != 0 {
+	if o.showPlayerBar && o.presetNameTex != 0 {
 		presetLineH = lh
 	}
 	hintRowH := o.hintRowHeight()
@@ -52,4 +44,21 @@ func (o *Overlay) overlayLayout(winW, winH int) overlayLayout {
 		hintRowH:               hintRowH,
 		bottomH:                bottomH,
 	}
+}
+
+func (o *Overlay) playerStatusRowHeight(lh int) int {
+	statusRowH := lh
+	if o.bottomTexH <= statusRowH || o.face == nil {
+		return statusRowH
+	}
+	metrics := o.face.Metrics()
+	lineGap := lh - metrics.Ascent.Ceil() - metrics.Descent.Ceil()
+	if lineGap < 1 {
+		lineGap = 1
+	}
+	statusRowH = lh + textPadding(o.fontSize) + lineGap
+	if statusRowH > o.bottomTexH {
+		statusRowH = o.bottomTexH
+	}
+	return statusRowH
 }

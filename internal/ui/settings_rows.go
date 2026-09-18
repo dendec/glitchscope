@@ -23,8 +23,9 @@ const (
 	SettingTheme           = 13
 	SettingTransparency    = 14
 	SettingShowStats       = 15
-	SettingCacheSize       = 17
-	SettingCacheRetention  = 18
+	SettingPlayerBar       = 16
+	SettingCacheSize       = 18
+	SettingCacheRetention  = 19
 )
 
 // settingOpt is a setting whose String() produces a display label.
@@ -144,6 +145,7 @@ func BuildSettingsRowsWithCatalogForRefresh(s config.Settings, winW, winH int, r
 		{Label: catalog.Text(i18n.SettingsTheme), Values: themeValues, Index: themeIndex},
 		{Label: catalog.Text(i18n.SettingsTransparency), Values: transValues, Index: transIndex},
 		{Label: catalog.Text(i18n.SettingsStats), Values: []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueOn)}, Index: boolIndex(s.UI.ShowStats)},
+		{Label: catalog.Text(i18n.SettingsPlayerBar), Values: []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueOn)}, Index: boolIndex(s.UI.ShowPlayerBar)},
 		{Header: true, Label: "── " + catalog.Text(i18n.SourceDownloads) + " ───────"},
 		{Label: catalog.Text(i18n.SettingsSize), Values: cacheSizeValues, Index: cacheSizeIndex},
 		{Label: catalog.Text(i18n.SettingsLifetime), Values: cacheRetentionValues, Index: cacheRetentionIndex},
@@ -232,6 +234,8 @@ func settingDescription(catalog i18n.Catalog, setting, value int) string {
 		return catalog.Text(i18n.DescriptionAdaptiveOn)
 	case SettingFilter:
 		return catalog.Text(i18n.DescriptionFilter)
+	case SettingPlayerBar:
+		return catalog.Text(i18n.DescriptionPlayerBar)
 	case SettingShuffle:
 		switch value {
 		case 0:
