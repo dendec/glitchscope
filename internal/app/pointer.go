@@ -1,7 +1,10 @@
 package app
 
 import (
+	"log/slog"
+
 	"github.com/dendec/glitchscope/internal/input"
+	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/ui"
 )
 
@@ -61,6 +64,34 @@ func (g *pointerOpenGesture) handle(event input.PointerEvent, screenH int) bool 
 func (a *App) handlePointerEvent(event input.PointerEvent, winW, winH int) {
 	if a.overlay == nil {
 		return
+	}
+	if a.inp != nil {
+		caps := a.inp.PointerCapabilities()
+		a.overlay.SetPointerCapabilities(caps.Keyboard, caps.Mouse, caps.Touch)
+	}
+	// An opening gesture retains ownership until its release.
+	if !a.pointerOpen.active {
+		r := a.overlay.HandlePlayerBarPointer(event, winW, winH)
+		if r.Consumed {
+			switch r.Action {
+			case input.ActionPlayPause:
+				a.handleAction(r.Action, winW, winH)
+			case input.ActionPrevTrack:
+				if path, album, ok := a.previousTrack(); ok {
+					a.playTrack(path, album)
+				}
+			case input.ActionNextTrack:
+				if path, album, ok := a.manualNext(a.settings.Playback); ok {
+					a.playTrack(path, album)
+				}
+			}
+			if r.Seek && a.pl != nil && a.pl.TrackPath() == r.Path && !player.IsRadio(r.Path) {
+				if err := a.pl.Seek(r.Seconds); err != nil {
+					slog.Warn("pointer seek failed", "error", err)
+				}
+			}
+			return
+		}
 	}
 	if !a.overlay.UIVisible() {
 		if a.pointerOpen.handle(event, winH) {

@@ -22,10 +22,13 @@ func (o *Overlay) overlayLayout(winW, winH int) overlayLayout {
 	}
 	presetLineH := 0
 	if o.showPlayerBar && o.presetNameTex != 0 {
-		presetLineH = lh
+		presetLineH = o.playerStatusRowHeight(lh)
 	}
 	hintRowH := o.hintRowHeight()
 	bottomH := presetLineH + statusRowH + hintRowH
+	if o.showPlayerBar {
+		bottomH += o.scalePx(4)
+	}
 	panelH := winH - headerH - bottomH
 	if panelH < 0 {
 		panelH = 0
@@ -46,19 +49,12 @@ func (o *Overlay) overlayLayout(winW, winH int) overlayLayout {
 	}
 }
 
+// Player rows reserve the glyph line and its outline, not the transparent
+// padding stored around text textures.
 func (o *Overlay) playerStatusRowHeight(lh int) int {
-	statusRowH := lh
-	if o.bottomTexH <= statusRowH || o.face == nil {
-		return statusRowH
-	}
-	metrics := o.face.Metrics()
-	lineGap := lh - metrics.Ascent.Ceil() - metrics.Descent.Ceil()
-	if lineGap < 1 {
-		lineGap = 1
-	}
-	statusRowH = lh + textPadding(o.fontSize) + lineGap
-	if statusRowH > o.bottomTexH {
-		statusRowH = o.bottomTexH
-	}
-	return statusRowH
+	return lh + 2*shadowRadius(o.fontSize)
+}
+
+func (o *Overlay) playerBarTextY(rowY float32) float32 {
+	return rowY + float32(shadowRadius(o.fontSize)-textPadding(o.fontSize))
 }

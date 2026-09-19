@@ -211,3 +211,11 @@ Radio has no seekable timeline. `Player.Seek` rejects radio before the
 non-seekable tracker restart fallback; keyboard/stick seek and saved-position
 restoration skip live sources. Resume restores the station and queue, not an
 offset inside the stream.
+
+## Pointer timeline
+
+The bottom timeline previews an absolute time on press/drag and submits one
+seek on release, retaining pause state. UI owns geometry and gesture capture;
+app validates the track identity and invokes Player.Seek. Cancellation or a
+track replacement discards the preview. Live radio and unknown durations have
+no interactive timeline. See PLAN-POINTER-INPUT.md for the panel contract.

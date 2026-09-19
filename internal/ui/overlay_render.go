@@ -29,8 +29,8 @@ const (
 	// Design-time alpha values for decorative UI elements. Scaled by
 	// uiAlpha() at draw time so they respect the Transparency setting.
 	alphaAccentHighlight = float32(0.33) // cursor / selection highlight
-	alphaTrackBg         = float32(0.15) // progress bar background, scrollbar track
-	alphaTrackFill       = float32(0.70) // progress bar fill, scrollbar thumb
+	alphaTrackBg         = float32(0.15) // scrollbar track
+	alphaTrackFill       = float32(0.70) // scrollbar thumb
 )
 
 func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
@@ -64,7 +64,6 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	headerH := l.headerHeight
 	statusRowH := l.statusRowH
 	presetLineH := l.presetLineH
-	hintRowH := l.hintRowH
 	bottomH := l.bottomH
 	panelY := l.panelY
 	panelH := l.panelH
@@ -122,22 +121,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		o.drawPlayerBarContent(winW, winH, viewW, viewH, by, presetLineH)
 	}
 
-	// Progress bar under the bottom line.
-	if o.showPlayerBar && !o.loading && o.duration > 0 {
-		barH := o.scalePx(2)
-		tc := o.textColor()
-		r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
-		barY := float32(winH - hintRowH - barH)
-		glDrawFilledRect(o.programRect, 0, barY, float32(winW), float32(barH), r, g, b, o.uiAlpha(alphaTrackBg), winW, winH, viewW, viewH)
-		progress := o.position / o.duration
-		if progress > 1 {
-			progress = 1
-		}
-		if progress < 0 {
-			progress = 0
-		}
-		glDrawFilledRect(o.programRect, 0, barY, float32(float64(winW)*progress), float32(barH), r, g, b, o.uiAlpha(alphaTrackFill), winW, winH, viewW, viewH)
-	}
+	o.drawPlaybackProgress(winW, winH, viewW, viewH)
 
 	// Context action-hints footer: always shown across pages, at the very bottom.
 	o.renderActionHints(winW, winH, viewW, viewH)
@@ -168,10 +152,10 @@ func (o *Overlay) renderPersistentPlayerBar(winW, winH, viewW, viewH int) {
 	lh := o.lineHeight()
 	presetLineH := 0
 	if o.presetNameTex != 0 {
-		presetLineH = lh
+		presetLineH = o.playerStatusRowHeight(lh)
 	}
 	statusRowH := o.playerStatusRowHeight(lh)
-	barH := max(1, o.scalePx(2))
+	barH := o.scalePx(4)
 	by := float32(winH - presetLineH - statusRowH - barH)
 	barBackdropH := float32(presetLineH + statusRowH)
 	bR, bG, bB := o.panelBgRGB()
@@ -179,23 +163,11 @@ func (o *Overlay) renderPersistentPlayerBar(winW, winH, viewW, viewH int) {
 
 	o.drawPlayerBarContent(winW, winH, viewW, viewH, by, presetLineH)
 
-	if !o.loading && o.duration > 0 {
-		tc := o.textColor()
-		r, g, b := float32(tc.R)/255, float32(tc.G)/255, float32(tc.B)/255
-		barY := float32(winH - barH)
-		glDrawFilledRect(o.programRect, 0, barY, float32(winW), float32(barH), r, g, b, o.uiAlpha(alphaTrackBg), winW, winH, viewW, viewH)
-		progress := o.position / o.duration
-		if progress > 1 {
-			progress = 1
-		}
-		if progress < 0 {
-			progress = 0
-		}
-		glDrawFilledRect(o.programRect, 0, barY, float32(float64(winW)*progress), float32(barH), r, g, b, o.uiAlpha(alphaTrackFill), winW, winH, viewW, viewH)
-	}
+	o.drawPlaybackProgress(winW, winH, viewW, viewH)
 }
 
 func (o *Overlay) drawPlayerBarContent(winW, winH, viewW, viewH int, by float32, presetLineH int) {
+	by = o.playerBarTextY(by)
 	if o.presetNameTex != 0 {
 		headerMargin := o.headerMarginX()
 		if !o.drawMarquee(&o.presetNameMarquee, float32(headerMargin), by, float32(winW-headerMargin*2), float32(o.presetNameTexH), winW, winH, viewW, viewH) {
@@ -506,12 +478,8 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	}
 
 	// Normal playback status.
-	pos := formatDuration(o.position)
+	pos := formatDuration(o.playerBarPosition())
 	dur := formatDuration(o.duration)
-	status := "▶"
-	if o.paused {
-		status = "⏸"
-	}
 
 	info := ""
 	if !o.isTracker && o.sampleRate > 0 {
@@ -545,7 +513,7 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	if info != "" {
 		suffix += "  " + info
 	}
-	prefix := status + " "
+	prefix := o.playerBarPrefix()
 	o.bottomTitleX = font.MeasureString(o.face, prefix).Ceil()
 	o.bottomTitleW = w - o.bottomTitleX - font.MeasureString(o.face, suffix).Ceil()
 	if o.bottomTitleW < 1 {

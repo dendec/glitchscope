@@ -53,3 +53,26 @@ func TestPointerOpenGestureDoesNotOpenAfterDrag(t *testing.T) {
 		t.Fatal("drag opened the hidden UI")
 	}
 }
+
+func TestBottomPanelTapDoesNotOpenMenu(t *testing.T) {
+	a := &App{overlay: &ui.Overlay{}}
+	a.overlay.SetShowPlayerBar(true)
+	a.overlay.SetPlayingInfo("album", "track.mp3")
+	down := input.PointerEvent{Phase: input.PointerDown, X: 200, Y: 479, Button: input.PointerButtonPrimary}
+	a.handlePointerEvent(down, 640, 480)
+	down.Phase = input.PointerUp
+	a.handlePointerEvent(down, 640, 480)
+	if a.pointerOpen.active || a.overlay.UIVisible() {
+		t.Fatal("panel tap opened menu")
+	}
+	// The rest of the window still starts an opening gesture.
+	e := input.PointerEvent{Phase: input.PointerDown, X: 200, Y: 100, Button: input.PointerButtonPrimary}
+	a.handlePointerEvent(e, 640, 480)
+	if !a.pointerOpen.active {
+		t.Fatal("outside press did not start opening gesture")
+	}
+	a.handlePointerEvent(input.PointerEvent{Phase: input.PointerCancel}, 640, 480)
+	if a.pointerOpen.active {
+		t.Fatal("opening gesture survived cancellation")
+	}
+}

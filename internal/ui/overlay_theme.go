@@ -329,7 +329,7 @@ func (o *Overlay) transparencyAlpha() float32 {
 func (o *Overlay) bgAlpha() float32 { return o.transparencyAlpha() }
 
 // uiAlpha scales a design-time alpha by the current transparency so that
-// decorative elements (cursor highlight, progress bar, scrollbar) fade
+// decorative elements (cursor highlight, scrollbar) fade
 // together with panel backgrounds when the user increases Transparency.
 // Panel borders are intentionally excluded — the focus ring must remain
 // visible at all times.

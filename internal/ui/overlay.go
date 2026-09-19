@@ -285,6 +285,7 @@ type Overlay struct {
 	pageIndicatorDirty bool
 	textureCacheReady  bool
 	actionPlacements   []actionPlacement
+	barPress           playerBarPress
 	pointerPress       pointerPress
 	pointerScroll      [2]bool
 	iconTextures       map[string]uint32
@@ -542,6 +543,7 @@ func (o *Overlay) SetPointerCapabilities(keyboard, mouse, touch bool) {
 	if o.pointerCapabilitiesSet && o.keyboardAvailable == keyboard && o.pointerMouse == mouse && o.pointerTouch == touch {
 		return
 	}
+	o.bottomDirty = true
 	o.pointerCapabilitiesSet = true
 	o.keyboardAvailable = keyboard
 	o.pointerMouse = mouse
