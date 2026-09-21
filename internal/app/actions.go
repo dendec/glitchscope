@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -403,23 +402,45 @@ func (a *App) randPreset() {
 // transitionPreset loads a preset immediately — single entry point for all
 // preset changes (DRY).
 func (a *App) transitionPreset(name string) {
+	readStarted := time.Now()
 	d, err := presets.Read(name)
 	if err != nil {
 		slog.Warn("preset transition read failed", "preset", name, "error", err)
 		return
 	}
-	// Windows desktop OpenGL drivers can stall for a long time while projectM
-	// initializes a second preset for a soft cut. A hard cut keeps preset
-	// switching responsive there; Linux/handheld builds retain the visual
-	// transition path.
-	smooth := runtime.GOOS != "windows"
+	readDuration := time.Since(readStarted)
+	loadStarted := time.Now()
+	smooth := true
 	a.pm.LoadPresetData(string(d), smooth)
-	if smooth {
-		a.suspendAdaptiveForPresetTransition(time.Now())
-	} else {
-		a.adaptiveResumeAt = time.Time{}
-		a.renderCost.Reset()
+	loadFinished := time.Now()
+	a.suspendAdaptiveForPresetTransition(loadFinished)
+	a.presetLoadProbe = &presetLoadProbe{
+		name:     name,
+		loadedAt: loadFinished,
 	}
+	meta := presets.ParseMeta(d)
+	randomTextures := 0
+	for _, reference := range presets.TextureReferences(d) {
+		if reference.Kind == "random" {
+			randomTextures++
+		}
+	}
+	renderW, renderH := a.rt.Size()
+	slog.Info("preset telemetry",
+		"phase", "load",
+		"preset", name,
+		"bytes", len(d),
+		"per_frame_eqs", meta.PerFrameEqs,
+		"per_pixel_eqs", meta.PerPixelEqs,
+		"shapes", meta.Shapes,
+		"waves", meta.Waves,
+		"external_textures", meta.Textures,
+		"random_textures", randomTextures,
+		"smooth_transition", smooth,
+		"read_us", readDuration.Microseconds(),
+		"projectm_load_us", loadFinished.Sub(loadStarted).Microseconds(),
+		"total_us", loadFinished.Sub(readStarted).Microseconds(),
+		"resolution", fmt.Sprintf("%dx%d", renderW, renderH))
 	a.applyPresetName(name)
 	a.activatePresetProfile(name, d)
 }

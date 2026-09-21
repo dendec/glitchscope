@@ -20,6 +20,9 @@ test_data/*
 !test_data/ffmpeg/
 !test_data/ffmpeg/**
 
+# Windows debug logs
+logs/
+
 # runtime-generated settings
 settings.json
 

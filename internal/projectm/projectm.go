@@ -31,6 +31,11 @@ static const char *pmvOpenGLError(int err) {
 #endif
 }
 
+static const char *pmvGLString(GLenum name) {
+	const GLubyte *value = glGetString(name);
+	return value != NULL ? (const char *)value : "";
+}
+
 #if defined(_WIN32)
 extern __declspec(dllexport) void pmvProjectMPresetSwitchRequested(bool isHardCut);
 #else
@@ -82,6 +87,25 @@ func pmvProjectMPresetSwitchRequested(isHardCut C.bool) {
 // Handle wraps the opaque projectM instance handle.
 type Handle struct {
 	p C.projectm_handle
+}
+
+// GLInfo describes the active driver and shading language selected by SDL.
+type GLInfo struct {
+	Vendor                 string
+	Renderer               string
+	Version                string
+	ShadingLanguageVersion string
+}
+
+// QueryGLInfo reads the current OpenGL context metadata. The context must be
+// current on the calling thread.
+func QueryGLInfo() GLInfo {
+	return GLInfo{
+		Vendor:                 C.GoString(C.pmvGLString(C.GL_VENDOR)),
+		Renderer:               C.GoString(C.pmvGLString(C.GL_RENDERER)),
+		Version:                C.GoString(C.pmvGLString(C.GL_VERSION)),
+		ShadingLanguageVersion: C.GoString(C.pmvGLString(C.GL_SHADING_LANGUAGE_VERSION)),
+	}
 }
 
 // Create creates a new projectM instance. OpenGL context must be current.

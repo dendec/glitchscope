@@ -93,6 +93,7 @@ type App struct {
 	adaptive             resolutionState
 	configuredResolution config.RenderResolution
 	presetTuning         presetTuning
+	presetLoadProbe      *presetLoadProbe
 	presentRequested     bool
 	nextPresent          time.Time
 	vizClock             visualizerClock // visualizer frame clock, promoted from runState
@@ -224,6 +225,12 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		sdl.Quit()
 		return nil, fmt.Errorf("OpenGL init: %w", err)
 	}
+	glInfo := projectm.QueryGLInfo()
+	slog.Info("OpenGL context",
+		"vendor", glInfo.Vendor,
+		"renderer", glInfo.Renderer,
+		"version", glInfo.Version,
+		"glsl", glInfo.ShadingLanguageVersion)
 
 	t0 := time.Now()
 	pm, err := projectm.Create()

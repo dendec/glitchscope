@@ -24,6 +24,16 @@ type pendingPreset struct {
 	at   time.Time
 }
 
+// presetLoadProbe records the first few operations after a preset load. The
+// load itself happens synchronously in projectM, so these samples distinguish
+// preset construction from deferred driver work in rendering or presentation.
+type presetLoadProbe struct {
+	name           string
+	loadedAt       time.Time
+	renderSamples  int
+	presentSamples int
+}
+
 type visualizerClock struct {
 	lastFrame      time.Time
 	nextFrame      time.Time
@@ -201,35 +211,6 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 
 	if a.settings.Graphics.Adaptive && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage &&
 		adaptiveReady && newVisualizerFrame && !a.adaptiveSuspended(now) {
-		renderW, renderH := a.rt.Size()
-		highFor := time.Duration(0)
-		if !a.adaptive.policy.highSince.IsZero() {
-			highFor = now.Sub(a.adaptive.policy.highSince)
-		}
-		lowFor := time.Duration(0)
-		if !a.adaptive.policy.lowSince.IsZero() {
-			lowFor = now.Sub(a.adaptive.policy.lowSince)
-		}
-		cooldownFor := time.Duration(0)
-		if now.Before(a.adaptive.policy.cooldownUntil) {
-			cooldownFor = a.adaptive.policy.cooldownUntil.Sub(now)
-		}
-		slog.Debug("adaptive render sample",
-			"frame_rate", a.settings.Graphics.FrameRate,
-			"adaptive_resolution", a.settings.Graphics.Adaptive,
-			"frame_work_avg_ms", a.renderCost.Average().Seconds()*1000,
-			"cadence_ratio", cadence,
-			"present_interval_avg_ms", a.renderCost.intervals.Average().Seconds()*1000,
-			"budget_utilization_pct", utilization*100,
-			"target_fps", a.targetVisualizerFPS,
-			"resolution", fmt.Sprintf("%dx%d", renderW, renderH),
-			"resolution_index", a.adaptive.index,
-			"ceiling_index", a.adaptive.ceilingIndex,
-			"resolution_count", len(a.adaptive.resolutions),
-			"samples", a.renderCost.Count(),
-			"high_for_ms", highFor.Milliseconds(),
-			"resolution_up_for_ms", lowFor.Milliseconds(),
-			"cooldown_for_ms", cooldownFor.Milliseconds())
 		// Reconfigure the active profile after setting/window changes without
 		// reusing an incompatible measurement.
 		key := a.presetProfileKeyAt(a.currentPresetName(), w, h)
@@ -481,21 +462,17 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 		if !paused && !a.adaptiveSuspended(presented) {
 			a.renderCost.AddFrame(renderCost, presentationCost, presented)
 		}
-		renderW, renderH := a.rt.Size()
-		slog.Debug("visualizer frame",
-			"frame_rate", a.settings.Graphics.FrameRate,
-			"adaptive_resolution", a.settings.Graphics.Adaptive,
-			"render_ms", renderCost.Seconds()*1000,
-			"presentation_ms", presentationCost.Seconds()*1000,
-			"frame_work_ms", (renderCost+presentationCost).Seconds()*1000,
-			"budget_ms", 1000/float64(max(a.targetVisualizerFPS, 1)),
-			"rolling_budget_utilization_pct", a.renderCost.Utilization(a.targetVisualizerFPS)*100,
-			"cadence_ratio", a.renderCost.Cadence(a.targetVisualizerFPS),
-			"present_interval_avg_ms", a.renderCost.intervals.Average().Seconds()*1000,
-			"target_fps", a.targetVisualizerFPS,
-			"resolution", fmt.Sprintf("%dx%d", renderW, renderH),
-			"samples", a.renderCost.Count(),
-			"adaptive_paused", paused || a.adaptiveSuspended(presented))
+		if frameWork := renderCost + presentationCost; frameWork >= 100*time.Millisecond {
+			renderW, renderH := a.rt.Size()
+			slog.Warn("slow visualizer frame",
+				"frame_rate", a.settings.Graphics.FrameRate,
+				"render_ms", renderCost.Seconds()*1000,
+				"presentation_ms", presentationCost.Seconds()*1000,
+				"frame_work_ms", frameWork.Seconds()*1000,
+				"target_fps", a.targetVisualizerFPS,
+				"resolution", fmt.Sprintf("%dx%d", renderW, renderH),
+				"adaptive_paused", paused || a.adaptiveSuspended(presented))
+		}
 	}
 }
 
@@ -527,8 +504,13 @@ func (a *App) renderVisualization(now time.Time, w, h int, opaque, interacting b
 		return false
 	}
 	a.pm.SetFPS(int32(time.Second / budget.Period(a.vizClock.framePeriod, interacting)))
+	renderStarted := time.Now()
 	a.pm.RenderFrame()
+	renderFinished := time.Now()
+	captureStarted := renderFinished
 	a.rt.Capture()
+	captureFinished := time.Now()
+	a.recordPresetRender(renderStarted, renderFinished, captureStarted, captureFinished)
 	if wave := a.readAudio(); len(wave) > 0 {
 		a.pm.PCMAddFloat(wave, projectm.Mono)
 	}
@@ -570,7 +552,9 @@ func (a *App) presentFrame(now time.Time, w, h int, rendered, uiVisible, uiOpaqu
 		}
 	}
 
+	swapStarted := time.Now()
 	a.window.GLSwap()
+	swapFinished := time.Now()
 	budget := &a.vizBudget
 	if a.onPresetsPage {
 		budget = &a.previewBudget
@@ -578,8 +562,48 @@ func (a *App) presentFrame(now time.Time, w, h int, rendered, uiVisible, uiOpaqu
 	// Blit/draw/swap can expose deferred GPU work and UI pressure. Exclude
 	// one UI period, including normal vsync waiting, from the cost estimate.
 	elapsed := time.Since(presentStart)
+	a.recordPresetPresentation(presentStart, elapsed, swapStarted, swapFinished)
 	budget.ObservePresentation(elapsed, a.uiFramePeriod)
 	return elapsed
+}
+
+func (a *App) recordPresetRender(renderStarted, renderFinished, captureStarted, captureFinished time.Time) {
+	p := a.presetLoadProbe
+	if p == nil || p.renderSamples >= 5 {
+		return
+	}
+	p.renderSamples++
+	slog.Info("preset telemetry",
+		"phase", "render",
+		"preset", p.name,
+		"sample", p.renderSamples,
+		"since_load_us", renderStarted.Sub(p.loadedAt).Microseconds(),
+		"render_us", renderFinished.Sub(renderStarted).Microseconds(),
+		"capture_us", captureFinished.Sub(captureStarted).Microseconds())
+	a.finishPresetProbeIfComplete()
+}
+
+func (a *App) recordPresetPresentation(presentStarted time.Time, presentDuration time.Duration, swapStarted, swapFinished time.Time) {
+	p := a.presetLoadProbe
+	if p == nil || p.presentSamples >= 5 {
+		return
+	}
+	p.presentSamples++
+	slog.Info("preset telemetry",
+		"phase", "present",
+		"preset", p.name,
+		"sample", p.presentSamples,
+		"since_load_us", presentStarted.Sub(p.loadedAt).Microseconds(),
+		"present_us", presentDuration.Microseconds(),
+		"swap_us", swapFinished.Sub(swapStarted).Microseconds())
+	a.finishPresetProbeIfComplete()
+}
+
+func (a *App) finishPresetProbeIfComplete() {
+	p := a.presetLoadProbe
+	if p != nil && p.renderSamples >= 5 && p.presentSamples >= 5 {
+		a.presetLoadProbe = nil
+	}
 }
 
 func (a *App) enterPresetsPage() {
