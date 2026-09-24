@@ -4,6 +4,11 @@
 submission directory under `dist/portmaster-submit/ports/glitchscope/`, and
 creates `dist/glitchscope.zip`. Packaging fails on missing required inputs.
 No third-party music is downloaded or bundled during packaging.
+The portable `presets.gsa` is checked against
+`docs/benchmark/render-scale-0.5_mesh-8.csv` on every build. Only measured
+presets with at least 20 FPS are packaged; unmeasured presets and internal
+transition presets are excluded. An existing archive with stale contents is
+rebuilt before deployment or release packaging.
 
 ## Remaining external verification
 

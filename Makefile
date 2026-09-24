@@ -56,7 +56,7 @@ MODARCHIVE_CATALOG := .cache/modarchive/catalog
 MODARCHIVE_SNAPSHOT := .cache/modarchive/1980-2007.gsa
 MODARCHIVE_ADDENDUM := .cache/modarchive/2007-addendum.gsa
 
-.PHONY: builder build clean dist dist-arm64 dist-windows dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font icons
+.PHONY: builder build clean dist dist-arm64 dist-windows dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope force-presets-check textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font icons
 
 DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
 DOCKER_ICON_RUN = docker run --rm --user "$$(id -u):$$(id -g)" -v "$(CURDIR):/build" -w /build $(DOCKER_BUILDER) bash -c
@@ -222,8 +222,13 @@ deploy-music:
 
 deploy-fast: dist-arm64
 	adb push $(ARM64_DIST_DIR)/glitchscope/glitchscope $(DEVICE_DIR)/
+	@local_hash=$$(sha256sum $(GSA_FILE) | cut -d ' ' -f 1); \
+	device_hash=$$(adb shell sha256sum $(DEVICE_DIR)/presets/presets.gsa 2>/dev/null | cut -d ' ' -f 1 | tr -d '\r'); \
+	if [ "$$local_hash" != "$$device_hash" ]; then \
+		adb push $(GSA_FILE) $(DEVICE_DIR)/presets/presets.gsa; \
+	fi
 	adb shell "killall -9 glitchscope 2>/dev/null; true"
-	@echo "=== Deployed binary only ==="
+	@echo "=== Deployed binary and synchronized preset archive ==="
 
 deploy-portmaster: dist-portmaster
 	adb push dist/glitchscope.zip $(PM_AUTOINSTALL)/
@@ -287,14 +292,16 @@ $(FULL_GSA_FILE):
 
 glitchscope: $(FULL_GSA_FILE)
 
-$(GSA_FILE):
-	@if [ ! -f "$@" ]; then \
+force-presets-check:
+
+$(GSA_FILE): force-presets-check
+	@if ! python3 scripts/check-presets-archive.py "$@" "$(BENCHMARK_CSV)"; then \
 		$(MAKE) presets; \
 		mkdir -p $(dir $@); \
-		$(GO) run ./cmd/glitchscope-pack presets $(PRESETS_DIR) $@ $(BENCHMARK_CSV); \
+		$(GO) run ./cmd/glitchscope-pack presets $(PRESETS_DIR) $@.tmp $(BENCHMARK_CSV) || exit $$?; \
+		python3 scripts/check-presets-archive.py "$@.tmp" "$(BENCHMARK_CSV)" || exit $$?; \
+		mv "$@.tmp" "$@"; \
 		echo "=== Built filtered portable preset archive $@ ==="; \
-	else \
-		echo "=== Preset archive $@ already exists, skipping ==="; \
 	fi
 
 portable-glitchscope: $(GSA_FILE)

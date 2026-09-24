@@ -28,15 +28,15 @@ func main() {
 		fatal(fmt.Errorf("unknown archive kind %q", kind))
 	}
 
-	blacklist := map[string]bool{}
+	var allowedPresets map[string]bool
 	if len(os.Args) == 5 {
 		var err error
-		blacklist, err = loadBlacklist(os.Args[4], 20.0)
+		allowedPresets, err = loadAllowedPresets(os.Args[4], 20.0)
 		if err != nil {
 			fatal(fmt.Errorf("load benchmark: %w", err))
 		}
 	}
-	entries, err := collect(inputDir, kind, blacklist)
+	entries, err := collect(inputDir, kind, allowedPresets)
 	if err != nil {
 		fatal(err)
 	}
@@ -52,7 +52,7 @@ func main() {
 	fmt.Printf("wrote %d %s to %s\n", len(entries), kind, outputPath)
 }
 
-func collect(root, kind string, blacklist map[string]bool) ([]archive.SourceEntry, error) {
+func collect(root, kind string, allowedPresets map[string]bool) ([]archive.SourceEntry, error) {
 	var entries []archive.SourceEntry
 	err := filepath.WalkDir(root, func(path string, item fs.DirEntry, err error) error {
 		if err != nil {
@@ -72,7 +72,9 @@ func collect(root, kind string, blacklist map[string]bool) ([]archive.SourceEntr
 		if kind == presetKind && strings.HasPrefix(key, "!") {
 			return nil
 		}
-		if blacklist[key] {
+		// A portable archive contains only presets measured above the FPS
+		// threshold. New source presets need a benchmark before shipping.
+		if kind == presetKind && allowedPresets != nil && !allowedPresets[key] {
 			return nil
 		}
 		data, err := os.ReadFile(path)
@@ -102,7 +104,7 @@ func allowed(name, kind string) bool {
 	}
 }
 
-func loadBlacklist(path string, minFPS float64) (map[string]bool, error) {
+func loadAllowedPresets(path string, minFPS float64) (map[string]bool, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -117,24 +119,23 @@ func loadBlacklist(path string, minFPS float64) (map[string]bool, error) {
 		return nil, fmt.Errorf("invalid benchmark CSV header")
 	}
 
-	blacklist := make(map[string]bool)
+	allowed := make(map[string]bool)
 	for i, row := range records[1:] {
 		if len(row) != 6 {
 			return nil, fmt.Errorf("invalid benchmark CSV row %d", i+2)
 		}
 		if row[1] != "ok" {
-			blacklist[row[0]] = true
 			continue
 		}
 		fps, err := strconv.ParseFloat(row[4], 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid FPS in benchmark CSV row %d: %w", i+2, err)
 		}
-		if fps < minFPS {
-			blacklist[row[0]] = true
+		if fps >= minFPS {
+			allowed[row[0]] = true
 		}
 	}
-	return blacklist, nil
+	return allowed, nil
 }
 
 func fatal(err error) {
