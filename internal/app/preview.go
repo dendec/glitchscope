@@ -64,8 +64,9 @@ type previewRenderer struct {
 	tex  C.GLuint // thumbnail capture texture
 	w, h int      // current thumbnail render dimensions
 
-	queue  []previewJob
-	active *previewJob
+	queue   []previewJob
+	active  *previewJob
+	loading *previewJob
 
 	// Frame throttling: ProcessNext renders at most once per previewFramePeriod.
 	nextFrame   time.Time
@@ -139,15 +140,28 @@ func (r *previewRenderer) Enqueue(key, data string) {
 	if !r.isReady() {
 		return
 	}
-	if r.active != nil && r.active.key == key {
-		return
+	if r.selectJob(key, data) {
+		r.pm.CancelPresetLoad()
+		slog.Debug("preview enqueued", "key", key, "queueLen", len(r.queue))
 	}
-	r.active = nil
-	r.queue = append(r.queue[:0], previewJob{
-		key:  key,
-		data: data,
-	})
-	slog.Debug("preview enqueued", "key", key, "queueLen", len(r.queue))
+}
+
+// selectJob changes only the preview selection model. The active image keeps
+// animating until the selected job commits; true asks the caller to cancel the
+// old native preparation. Selecting the active preset cancels a pending change.
+func (r *previewRenderer) selectJob(key, data string) bool {
+	if r.loading != nil && r.loading.key == key {
+		return false
+	}
+	if r.active != nil && r.active.key == key && r.loading == nil && len(r.queue) == 0 {
+		return false
+	}
+	r.loading = nil
+	r.queue = r.queue[:0]
+	if r.active == nil || r.active.key != key {
+		r.queue = append(r.queue, previewJob{key: key, data: data})
+	}
+	return true
 }
 
 // Result returns the GL texture ID and key of the last successfully
@@ -183,16 +197,40 @@ func (r *previewRenderer) ProcessNext() bool {
 		return false
 	}
 
-	if r.active == nil {
-		if len(r.queue) == 0 {
-			return false
+	if len(r.queue) > 0 {
+		job := r.queue[len(r.queue)-1]
+		r.queue = r.queue[:0]
+		r.loading = &job
+		started := time.Now()
+		if !r.pm.BeginPresetLoad(job.data, false) {
+			slog.Warn("preview load failed", "key", job.key, "error", r.pm.PresetLoadError())
+			r.loading = nil
+		} else {
+			createMS, initializeMS, expressionsMS, framebuffersMS, warpShaderMS, compositeShaderMS := r.pm.PresetPrepareTimes()
+			slog.Info("preview prepare", "key", job.key, "shader_compile_mode", projectm.ShaderCompileMode(),
+				"prepare_ms", time.Since(started).Milliseconds(), "native_create_ms", createMS, "native_initialize_ms", initializeMS,
+				"native_expressions_ms", expressionsMS, "native_framebuffers_ms", framebuffersMS,
+				"native_warp_shader_ms", warpShaderMS, "native_composite_shader_ms", compositeShaderMS)
 		}
-		r.active = &r.queue[0]
-		r.queue = r.queue[1:]
-		r.meter.Reset()
-		r.nextFrame = time.Time{}
-		slog.Debug("preview job started", "key", r.active.key)
-		r.pm.LoadPresetData(r.active.data, false)
+	}
+	if r.loading != nil {
+		switch r.pm.PollPresetLoad() {
+		case projectm.PresetLoadReady:
+			if r.pm.CommitPresetLoad() {
+				r.active = r.loading
+				r.meter.Reset()
+				r.nextFrame = time.Time{}
+			} else {
+				slog.Warn("preview commit failed", "key", r.loading.key, "error", r.pm.PresetLoadError())
+			}
+			r.loading = nil
+		case projectm.PresetLoadFailed:
+			slog.Warn("preview load failed", "key", r.loading.key, "error", r.pm.PresetLoadError())
+			r.loading = nil
+		}
+	}
+	if r.active == nil {
+		return false
 	}
 
 	now := time.Now()
@@ -227,6 +265,10 @@ func (r *previewRenderer) SkipThrottle() {
 
 // Flush cancels all pending jobs and clears the result.
 func (r *previewRenderer) Flush() {
+	if r.pm != nil {
+		r.pm.CancelPresetLoad()
+	}
+	r.loading = nil
 	r.queue = r.queue[:0]
 	r.active = nil
 	r.nextFrame = time.Time{}

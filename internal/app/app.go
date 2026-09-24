@@ -38,6 +38,7 @@ import (
 
 type App struct {
 	window     *sdl.Window
+	windowID   uint32
 	windowIcon *sdl.Surface
 	glCtx      sdl.GLContext
 	pm         *projectm.Handle
@@ -79,6 +80,8 @@ type App struct {
 	trackCacheWg      sync.WaitGroup
 	trackCacheOnce    sync.Once
 	shuffleWg         sync.WaitGroup // tracks background shuffle build goroutine
+	presetLoadWg      sync.WaitGroup
+	shaderCompiler    *shaderCompiler
 	presetNames       []string
 	presetIdx         int
 	presetCats        []string // all preset keys for presets page tree
@@ -106,8 +109,14 @@ type App struct {
 	// appCtx/appCancel govern background work tied to the app lifetime.
 	// Cancelled in Close() so in-flight goroutines (e.g. connectivity check)
 	// stop promptly instead of firing after teardown.
-	appCtx    context.Context
-	appCancel context.CancelFunc
+	appCtx             context.Context
+	appCancel          context.CancelFunc
+	presetLoadCancel   context.CancelFunc
+	presetLoadResults  chan presetLoadResult
+	presetRequestID    atomic.Uint64
+	presetLoadData     *presetLoadResult
+	presetLoadInFlight bool
+	presetLoadFrames   int
 
 	pending           pendingPreset // pending preset name + scheduled load time
 	adaptiveResumeAt  time.Time
@@ -160,6 +169,7 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		presenter:    newOverlayPresenter(nil),
 		connectivity: newConnectivityCache(),
 	}
+	a.presetLoadResults = make(chan presetLoadResult, 4)
 	a.playbackState.shuffle.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	a.offline.Store(true)
 	a.appCtx, a.appCancel = context.WithCancel(context.Background())
@@ -200,6 +210,12 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		return nil, fmt.Errorf("window: %w", err)
 	}
 	a.window = win
+	a.windowID, err = win.GetID()
+	if err != nil {
+		_ = win.Destroy()
+		sdl.Quit()
+		return nil, fmt.Errorf("window id: %w", err)
+	}
 	if icon, err := ui.NewWindowIcon(); err != nil {
 		slog.Warn("window icon unavailable", "error", err)
 	} else {
@@ -230,11 +246,24 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		"vendor", glInfo.Vendor,
 		"renderer", glInfo.Renderer,
 		"version", glInfo.Version,
-		"glsl", glInfo.ShadingLanguageVersion)
+		"glsl", glInfo.ShadingLanguageVersion,
+		"parallel_shader_compile", projectm.ParallelShaderCompile())
+
+	if runtime.GOOS == "windows" {
+		compiler, err := newShaderCompiler(win, glCtx)
+		if err != nil {
+			sdl.GLDeleteContext(glCtx)
+			_ = win.Destroy()
+			sdl.Quit()
+			return nil, fmt.Errorf("shader compiler init: %w", err)
+		}
+		a.shaderCompiler = compiler
+	}
 
 	t0 := time.Now()
 	pm, err := projectm.Create()
 	if err != nil {
+		a.shaderCompiler.Close()
 		sdl.GLDeleteContext(glCtx)
 		_ = win.Destroy()
 		sdl.Quit()
@@ -306,6 +335,9 @@ func (a *App) Close() {
 	if a.appCancel != nil {
 		a.appCancel()
 	}
+	if a.presetLoadCancel != nil {
+		a.presetLoadCancel()
+	}
 	if a.albumMetadata != nil {
 		a.albumMetadata.close()
 	}
@@ -313,6 +345,8 @@ func (a *App) Close() {
 		a.fileMetadata.close()
 	}
 	a.shuffleWg.Wait()
+	a.presetLoadWg.Wait()
+	a.shaderCompiler.Close()
 	a.connectivityWg.Wait()
 	a.trackCacheWg.Wait()
 	if a.modlandShuffleSrc != nil {

@@ -10,6 +10,26 @@ package projectm
 #include "../gl/compat.h"
 #include "projectM-4/projectM.h"
 
+// Keep the wrapper buildable against an unpatched source checkout. The Docker
+// builder supplies the patched projectM header, while local test containers
+// mount the repository's untouched submodule and link the patched library.
+#ifndef GLITCHSCOPE_PROJECTM_PRESET_LOAD_API
+extern const char* projectm_parallel_shader_compile(void);
+extern void projectm_shader_worker_enable(bool enabled);
+extern void projectm_shader_worker_run(void);
+extern void projectm_shader_worker_stop(void);
+extern const char* projectm_shader_compile_mode(void);
+extern double projectm_preset_create_ms(projectm_handle instance);
+extern double projectm_preset_initialize_ms(projectm_handle instance);
+extern double projectm_preset_initialize_phase_ms(projectm_handle instance, int phase);
+extern bool projectm_begin_preset_load(projectm_handle instance, const char* data,
+	bool smooth_transition);
+extern int projectm_poll_preset_load(projectm_handle instance);
+extern bool projectm_commit_preset_load(projectm_handle instance);
+extern void projectm_cancel_preset_load(projectm_handle instance);
+extern const char* projectm_preset_load_error(projectm_handle instance);
+#endif
+
 static int pmvInitOpenGL(void) {
 #if defined(_WIN32)
 	glewExperimental = GL_TRUE;
@@ -65,6 +85,16 @@ import (
 )
 
 const Mono = C.PROJECTM_MONO
+
+// PresetLoadStatus is the native state of a staged preset.
+type PresetLoadStatus int
+
+const (
+	PresetLoadIdle PresetLoadStatus = iota
+	PresetLoadLoading
+	PresetLoadReady
+	PresetLoadFailed
+)
 
 // InitOpenGL loads desktop OpenGL entry points on Windows. GLES2 platforms
 // expose the same functions directly and need no loader step.
@@ -130,6 +160,84 @@ func (h *Handle) LoadPresetData(data string, smooth bool) {
 	cdata := C.CString(data)
 	defer C.free(unsafe.Pointer(cdata))
 	C.projectm_load_preset_data(h.p, cdata, C.bool(smooth))
+}
+
+// ParallelShaderCompile reports the current context's native compile mode.
+// Call only on the GL thread with a current context.
+func ParallelShaderCompile() string {
+	mode := C.GoString(C.projectm_parallel_shader_compile())
+	if mode == "" {
+		return "synchronous"
+	}
+	return mode
+}
+
+// EnableShaderWorker enables submission after a shared context is ready.
+func EnableShaderWorker() { C.projectm_shader_worker_enable(C.bool(true)) }
+
+// RunShaderWorker blocks on its private queue with a shared GL context current.
+func RunShaderWorker() { C.projectm_shader_worker_run() }
+
+// StopShaderWorker wakes the worker and cancels queued jobs. An in-progress
+// driver call finishes on the worker before RunShaderWorker returns.
+func StopShaderWorker() { C.projectm_shader_worker_stop() }
+
+// ShaderCompileMode reports the actual submission path for staged presets.
+func ShaderCompileMode() string {
+	mode := C.GoString(C.projectm_shader_compile_mode())
+	if mode == "" {
+		return "synchronous"
+	}
+	return mode
+}
+
+// PresetPrepareTimes separates construction and the four main initialization
+// phases so Windows logs identify which part of a preset switch blocks.
+func (h *Handle) PresetPrepareTimes() (createMS, initializeMS, expressionsMS, framebuffersMS, warpShaderMS, compositeShaderMS float64) {
+	phase := func(index int) float64 {
+		return float64(C.projectm_preset_initialize_phase_ms(h.p, C.int(index)))
+	}
+	return float64(C.projectm_preset_create_ms(h.p)),
+		float64(C.projectm_preset_initialize_ms(h.p)),
+		phase(0), phase(1), phase(2), phase(3)
+}
+
+// BeginPresetLoad prepares a preset without replacing the active preset.
+// OpenGL work remains on the calling (main) thread; shader compilation is
+// polled later; Windows compiles programs on a dedicated shared context.
+func (h *Handle) BeginPresetLoad(data string, smooth bool) bool {
+	cdata := C.CString(data)
+	defer C.free(unsafe.Pointer(cdata))
+	return bool(C.projectm_begin_preset_load(h.p, cdata, C.bool(smooth)))
+}
+
+// PollPresetLoad advances the pending native shader jobs.
+func (h *Handle) PollPresetLoad() PresetLoadStatus {
+	switch PresetLoadStatus(C.projectm_poll_preset_load(h.p)) {
+	case PresetLoadLoading:
+		return PresetLoadLoading
+	case PresetLoadReady:
+		return PresetLoadReady
+	case PresetLoadFailed:
+		return PresetLoadFailed
+	default:
+		return PresetLoadIdle
+	}
+}
+
+// CommitPresetLoad starts the requested smooth transition after preparation.
+func (h *Handle) CommitPresetLoad() bool {
+	return bool(C.projectm_commit_preset_load(h.p))
+}
+
+// CancelPresetLoad drops a staged preset and keeps the active preset intact.
+func (h *Handle) CancelPresetLoad() {
+	C.projectm_cancel_preset_load(h.p)
+}
+
+// PresetLoadError returns the most recent native preparation error.
+func (h *Handle) PresetLoadError() string {
+	return C.GoString(C.projectm_preset_load_error(h.p))
 }
 
 // PCMAddFloat feeds PCM audio samples (float32, mono or stereo).

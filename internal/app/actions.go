@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
@@ -19,7 +18,6 @@ import (
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/mic"
 	"github.com/dendec/glitchscope/internal/player"
-	"github.com/dendec/glitchscope/internal/presets"
 	"github.com/dendec/glitchscope/internal/radio"
 	"github.com/dendec/glitchscope/internal/ui"
 )
@@ -399,50 +397,10 @@ func (a *App) randPreset() {
 	a.transitionPreset(target)
 }
 
-// transitionPreset loads a preset immediately — single entry point for all
-// preset changes (DRY).
+// transitionPreset is the single entry point for all preset changes. The
+// request is read asynchronously and committed only after native preparation.
 func (a *App) transitionPreset(name string) {
-	readStarted := time.Now()
-	d, err := presets.Read(name)
-	if err != nil {
-		slog.Warn("preset transition read failed", "preset", name, "error", err)
-		return
-	}
-	readDuration := time.Since(readStarted)
-	loadStarted := time.Now()
-	smooth := true
-	a.pm.LoadPresetData(string(d), smooth)
-	loadFinished := time.Now()
-	a.suspendAdaptiveForPresetTransition(loadFinished)
-	a.presetLoadProbe = &presetLoadProbe{
-		name:     name,
-		loadedAt: loadFinished,
-	}
-	meta := presets.ParseMeta(d)
-	randomTextures := 0
-	for _, reference := range presets.TextureReferences(d) {
-		if reference.Kind == "random" {
-			randomTextures++
-		}
-	}
-	renderW, renderH := a.rt.Size()
-	slog.Info("preset telemetry",
-		"phase", "load",
-		"preset", name,
-		"bytes", len(d),
-		"per_frame_eqs", meta.PerFrameEqs,
-		"per_pixel_eqs", meta.PerPixelEqs,
-		"shapes", meta.Shapes,
-		"waves", meta.Waves,
-		"external_textures", meta.Textures,
-		"random_textures", randomTextures,
-		"smooth_transition", smooth,
-		"read_us", readDuration.Microseconds(),
-		"projectm_load_us", loadFinished.Sub(loadStarted).Microseconds(),
-		"total_us", loadFinished.Sub(readStarted).Microseconds(),
-		"resolution", fmt.Sprintf("%dx%d", renderW, renderH))
-	a.applyPresetName(name)
-	a.activatePresetProfile(name, d)
+	a.requestPresetLoad(name)
 }
 
 // applyPresetName updates the preset index and overlay after a load.

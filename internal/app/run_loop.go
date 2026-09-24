@@ -156,6 +156,7 @@ func (a *App) Run() {
 		if !a.handleFrameInput(&state, now, dt, w, h) {
 			return
 		}
+		a.pollPresetLoad()
 		a.updateFramePlayback(now)
 		a.renderFrame(now, w, h)
 	}
@@ -271,6 +272,10 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 		DrawableH: h,
 	})
 	for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
+		if isPrimaryWindowClose(e, a.windowID) {
+			slog.Info("window close requested")
+			return false
+		}
 		act := a.inp.ProcessEvent(e, favoriteMode, now)
 		pointerEventSeen := false
 		for pointerEvent, ok := a.inp.PollPointerEvent(); ok; pointerEvent, ok = a.inp.PollPointerEvent() {
@@ -347,13 +352,21 @@ func (a *App) updateFramePlayback(now time.Time) {
 	if a.presetTicker != nil && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage {
 		select {
 		case <-a.presetTicker.C:
-			a.randPreset()
+			if a.presetLoadInFlight {
+				a.presetSwitch.Store(true)
+			} else {
+				a.randPreset()
+			}
 		default:
 		}
 	}
 
 	if !a.settings.Graphics.VisualizerOff && !a.onPresetsPage && a.settings.PresetInterval == config.PresetAuto && a.presetSwitch.Swap(false) {
-		a.randPreset()
+		if a.presetLoadInFlight {
+			a.presetSwitch.Store(true)
+		} else {
+			a.randPreset()
+		}
 	}
 
 	if a.pl != nil {

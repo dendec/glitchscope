@@ -40,6 +40,7 @@ COPY patches/projectm-beat-sensitivity.patch /build/patches/projectm-beat-sensit
 COPY patches/projectm-transition-shaders.patch /build/patches/projectm-transition-shaders.patch
 COPY patches/projectm-transition-framebuffer.patch /build/patches/projectm-transition-framebuffer.patch
 COPY patches/projectm-transition-filter.patch /build/patches/projectm-transition-filter.patch
+COPY patches/projectm-async-preset.patch /build/patches/projectm-async-preset.patch
 RUN cd lib/projectm \
     && if git apply --check /build/patches/projectm-feedback.patch >/dev/null 2>&1; then \
            git apply /build/patches/projectm-feedback.patch; \
@@ -75,6 +76,13 @@ RUN cd lib/projectm \
            :; \
        else \
            echo 'projectm-transition-filter.patch does not apply' >&2; exit 1; \
+       fi \
+    && if git apply --check /build/patches/projectm-async-preset.patch >/dev/null 2>&1; then \
+           git apply /build/patches/projectm-async-preset.patch; \
+       elif git apply --reverse --check /build/patches/projectm-async-preset.patch >/dev/null 2>&1; then \
+           :; \
+       else \
+           echo 'projectm-async-preset.patch does not apply' >&2; exit 1; \
        fi \
     && sed -i 's/#cmakedefine PROJECTM_VERSION_VCS @PROJECTM_VERSION_VCS@/#define PROJECTM_VERSION_VCS "Unknown"/' \
         config.h.cmake.in

@@ -1,0 +1,1319 @@
+diff --git a/src/api/include/projectM-4/core.h b/src/api/include/projectM-4/core.h
+index 59fc294..bf7a496 100644
+--- a/src/api/include/projectM-4/core.h
++++ b/src/api/include/projectM-4/core.h
+@@ -31,6 +31,16 @@
+ extern "C" {
+ #endif
+ 
++typedef enum projectm_preset_load_status
++{
++    PROJECTM_PRESET_LOAD_IDLE = 0,
++    PROJECTM_PRESET_LOAD_LOADING = 1,
++    PROJECTM_PRESET_LOAD_READY = 2,
++    PROJECTM_PRESET_LOAD_FAILED = 3
++} projectm_preset_load_status;
++
++#define GLITCHSCOPE_PROJECTM_PRESET_LOAD_API 1
++
+ /**
+  * @brief Creates a new projectM instance.
+  *
+@@ -87,6 +97,33 @@ PROJECTM_EXPORT void projectm_load_preset_file(projectm_handle instance, const c
+ PROJECTM_EXPORT void projectm_load_preset_data(projectm_handle instance, const char* data,
+                                                bool smooth_transition);
+ 
++/** Returns "KHR", "ARB", or an empty string for synchronous fallback. */
++PROJECTM_EXPORT const char* projectm_parallel_shader_compile(void);
++PROJECTM_EXPORT void projectm_shader_worker_enable(bool enabled);
++PROJECTM_EXPORT void projectm_shader_worker_run(void);
++PROJECTM_EXPORT void projectm_shader_worker_stop(void);
++PROJECTM_EXPORT const char* projectm_shader_compile_mode(void);
++PROJECTM_EXPORT double projectm_preset_create_ms(projectm_handle instance);
++PROJECTM_EXPORT double projectm_preset_initialize_ms(projectm_handle instance);
++/** phase: 0 expressions, 1 framebuffers, 2 warp shader, 3 composite shader. */
++PROJECTM_EXPORT double projectm_preset_initialize_phase_ms(projectm_handle instance, int phase);
++
++/** Starts a preset load without changing the active preset. */
++PROJECTM_EXPORT bool projectm_begin_preset_load(projectm_handle instance, const char* data,
++                                                bool smooth_transition);
++
++/** Polls the GL preparation of the pending preset. */
++PROJECTM_EXPORT projectm_preset_load_status projectm_poll_preset_load(projectm_handle instance);
++
++/** Commits a ready preset and starts its requested transition. */
++PROJECTM_EXPORT bool projectm_commit_preset_load(projectm_handle instance);
++
++/** Cancels a pending preset load. */
++PROJECTM_EXPORT void projectm_cancel_preset_load(projectm_handle instance);
++
++/** Returns the last pending preset load error, if any. */
++PROJECTM_EXPORT const char* projectm_preset_load_error(projectm_handle instance);
++
+ /**
+  * @brief Reloads all textures.
+  *
+diff --git a/src/libprojectM/MilkdropPreset/FinalComposite.cpp b/src/libprojectM/MilkdropPreset/FinalComposite.cpp
+index 549c950..2ca4670 100644
+--- a/src/libprojectM/MilkdropPreset/FinalComposite.cpp
++++ b/src/libprojectM/MilkdropPreset/FinalComposite.cpp
+@@ -63,6 +63,7 @@ void FinalComposite::LoadCompositeShader(const PresetState& presetState)
+                 // Fall back to default shader
+                 m_compositeShader = std::make_unique<MilkdropShader>(MilkdropShader::ShaderType::CompositeShader);
+                 m_compositeShader->LoadCode(defaultCompositeShader);
++                m_compositeShaderIsFallback = true;
+             }
+         }
+         else
+@@ -110,10 +111,29 @@ void FinalComposite::CompileCompositeShader(PresetState& presetState)
+             m_compositeShader = std::make_unique<MilkdropShader>(MilkdropShader::ShaderType::CompositeShader);
+             m_compositeShader->LoadCode(defaultCompositeShader);
+             m_compositeShader->LoadTexturesAndCompile(presetState);
++            m_compositeShaderIsFallback = true;
+         }
+     }
+ }
+ 
++bool FinalComposite::HandleShaderCompileError(Renderer::Shader* shader,
++                                              PresetState& presetState,
++                                              Renderer::Shader*& replacement)
++{
++    replacement = nullptr;
++    if (!m_compositeShader || m_compositeShaderIsFallback || &m_compositeShader->Shader() != shader)
++    {
++        return false;
++    }
++
++    m_compositeShader = std::make_unique<MilkdropShader>(MilkdropShader::ShaderType::CompositeShader);
++    m_compositeShader->LoadCode(defaultCompositeShader);
++    m_compositeShader->LoadTexturesAndCompile(presetState);
++    m_compositeShaderIsFallback = true;
++    replacement = &m_compositeShader->Shader();
++    return true;
++}
++
+ void FinalComposite::Draw(const PresetState& presetState, const PerFrameContext& perFrameContext)
+ {
+     if (m_compositeShader)
+diff --git a/src/libprojectM/MilkdropPreset/FinalComposite.hpp b/src/libprojectM/MilkdropPreset/FinalComposite.hpp
+index b9cf50b..2cf96f2 100644
+--- a/src/libprojectM/MilkdropPreset/FinalComposite.hpp
++++ b/src/libprojectM/MilkdropPreset/FinalComposite.hpp
+@@ -34,6 +34,10 @@ public:
+      */
+     void CompileCompositeShader(PresetState& presetState);
+ 
++    bool HandleShaderCompileError(Renderer::Shader* shader,
++                                  PresetState& presetState,
++                                  Renderer::Shader*& replacement);
++
+     /**
+      * @brief Renders the composite quad with the appropriate effects or shaders.
+      * @param presetState The preset state to retrieve the configuration values from.
+@@ -98,6 +102,7 @@ private:
+     int m_viewportHeight{}; //!< Last known viewport height.
+ 
+     std::unique_ptr<MilkdropShader> m_compositeShader; //!< The composite shader. Either preset-defined or empty.
++    bool m_compositeShaderIsFallback{};
+     std::unique_ptr<VideoEcho> m_videoEcho; //!< Video echo effect. Used if no composite shader is loaded and video echo is enabled.
+     std::unique_ptr<Filters> m_filters; //!< Color post-processing filters. Used if no composite shader is loaded.
+ };
+diff --git a/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp b/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
+index ec691ff..07d6561 100755
+--- a/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
++++ b/src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
+@@ -25,6 +25,8 @@
+ #include "MilkdropPresetExceptions.hpp"
+ #include "PresetFileParser.hpp"
+ 
++#include <chrono>
++
+ #ifdef MILKDROP_PRESET_DEBUG
+ #include <iostream>
+ #endif
+@@ -61,18 +63,44 @@ void MilkdropPreset::Initialize(const Renderer::RenderContext& renderContext)
+     m_state.renderContext = renderContext;
+ 
+     // Initialize variables and code now we have a proper render state.
++    auto phaseStarted = std::chrono::steady_clock::now();
+     CompileCodeAndRunInitExpressions();
++    m_initializeTimings.expressionsMilliseconds = std::chrono::duration<double, std::milli>(
++        std::chrono::steady_clock::now() - phaseStarted).count();
+ 
+     // Update framebuffer and texture sizes if needed
++    phaseStarted = std::chrono::steady_clock::now();
+     m_framebuffer.SetSize(renderContext.viewportSizeX, renderContext.viewportSizeY);
+     m_motionVectorUVMap->SetSize(renderContext.viewportSizeX, renderContext.viewportSizeY);
+     if (m_state.mainTexture.expired())
+     {
+         m_state.mainTexture = m_framebuffer.GetColorAttachmentTexture(1, 0);
+     }
++    m_initializeTimings.framebuffersMilliseconds = std::chrono::duration<double, std::milli>(
++        std::chrono::steady_clock::now() - phaseStarted).count();
+ 
++    phaseStarted = std::chrono::steady_clock::now();
+     m_perPixelMesh.CompileWarpShader(m_state);
++    m_initializeTimings.warpShaderMilliseconds = std::chrono::duration<double, std::milli>(
++        std::chrono::steady_clock::now() - phaseStarted).count();
++
++    phaseStarted = std::chrono::steady_clock::now();
+     m_finalComposite.CompileCompositeShader(m_state);
++    m_initializeTimings.compositeShaderMilliseconds = std::chrono::duration<double, std::milli>(
++        std::chrono::steady_clock::now() - phaseStarted).count();
++}
++
++bool MilkdropPreset::HandleShaderCompileError(Renderer::Shader* shader,
++                                              const std::string& error,
++                                              Renderer::Shader*& replacement)
++{
++    (void)error;
++    replacement = nullptr;
++    if (m_perPixelMesh.HandleShaderCompileError(shader))
++    {
++        return true;
++    }
++    return m_finalComposite.HandleShaderCompileError(shader, m_state, replacement);
+ }
+ 
+ void MilkdropPreset::RenderFrame(const libprojectM::Audio::FrameAudioData& audioData, const Renderer::RenderContext& renderContext)
+diff --git a/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp b/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp
+index 008ae64..3fd06fc 100644
+--- a/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp
++++ b/src/libprojectM/MilkdropPreset/MilkdropPreset.hpp
+@@ -74,6 +74,12 @@ public:
+      */
+     void Initialize(const Renderer::RenderContext& renderContext) override;
+ 
++    auto InitializationTimings() const -> PresetInitializationTimings override { return m_initializeTimings; }
++
++    bool HandleShaderCompileError(Renderer::Shader* shader,
++                                  const std::string& error,
++                                  Renderer::Shader*& replacement) override;
++
+     /**
+      * @brief Renders the preset.
+      * @param audioData The frame audio data.
+@@ -130,6 +136,8 @@ private:
+ 
+     FinalComposite m_finalComposite; //!< Final composite shader or filters.
+ 
++    PresetInitializationTimings m_initializeTimings;
++
+     bool m_isFirstFrame{true}; //!< Controls drawing the motion vectors starting with the second frame.
+ };
+ 
+diff --git a/src/libprojectM/MilkdropPreset/MilkdropShader.cpp b/src/libprojectM/MilkdropPreset/MilkdropShader.cpp
+index fa769d5..254d97f 100644
+--- a/src/libprojectM/MilkdropPreset/MilkdropShader.cpp
++++ b/src/libprojectM/MilkdropPreset/MilkdropShader.cpp
+@@ -23,6 +23,59 @@ using libprojectM::MilkdropPreset::MilkdropStaticShaders;
+ 
+ static auto floatRand = []() { return static_cast<float>(rand() % 7381) / 7380.0f; };
+ 
++static auto TranspileHLSLShader(MilkdropShader::ShaderType type,
++                                const std::string& program,
++                                const std::vector<std::string>& samplerDeclarations,
++                                const std::vector<std::string>& texSizeDeclarations,
++                                M4::GLSLGenerator::Version glslVersion) -> std::string
++{
++    const auto shaderTypeString = type == MilkdropShader::ShaderType::WarpShader ? "warp" : "composite";
++
++    M4::GLSLGenerator generator;
++    M4::Allocator allocator;
++    M4::HLSLTree tree(&allocator);
++    M4::HLSLParser parser(&allocator, &tree);
++
++    std::string sourcePreprocessed;
++    if (!parser.ApplyPreprocessor("", program.c_str(), program.size(), sourcePreprocessed))
++    {
++        throw Renderer::ShaderException("Error translating HLSL " + std::string(shaderTypeString) +
++                                        " shader: Preprocessing failed.\nSource:\n" + program);
++    }
++
++    std::smatch matches;
++    while (std::regex_search(sourcePreprocessed, matches, std::regex("sampler(2D|3D|)(\\s+|\\().*")))
++    {
++        sourcePreprocessed.replace(matches.position(), matches.length(), "");
++    }
++    while (std::regex_search(sourcePreprocessed, matches, std::regex("float4\\s+texsize_.*")))
++    {
++        sourcePreprocessed.replace(matches.position(), matches.length(), "");
++    }
++
++    for (const auto& declaration : texSizeDeclarations)
++    {
++        sourcePreprocessed.insert(0, declaration);
++    }
++    for (const auto& declaration : samplerDeclarations)
++    {
++        sourcePreprocessed.insert(0, declaration);
++    }
++
++    if (!parser.Parse("", sourcePreprocessed.c_str(), sourcePreprocessed.size()))
++    {
++        throw Renderer::ShaderException("Error translating HLSL " + std::string(shaderTypeString) +
++                                        " shader: HLSL parsing failed.\nSource:\n" + sourcePreprocessed);
++    }
++    if (!generator.Generate(&tree, M4::GLSLGenerator::Target_FragmentShader, glslVersion, "PS",
++                            M4::GLSLGenerator::Options(M4::GLSLGenerator::Flag_AlternateNanPropagation)))
++    {
++        throw Renderer::ShaderException("Error translating HLSL " + std::string(shaderTypeString) +
++                                        " shader: GLSL generating failed.\nSource:\n" + sourcePreprocessed);
++    }
++    return generator.GetResult();
++}
++
+ MilkdropShader::MilkdropShader(ShaderType type)
+     : m_type(type)
+     , m_randValues({floatRand(), floatRand(), floatRand(), floatRand()})
+@@ -140,8 +193,40 @@ void MilkdropShader::LoadTexturesAndCompile(PresetState& presetState)
+         m_textureSamplerDescriptors.push_back(std::move(desc));
+     }
+ 
+-    // Now that we have the textures, transpile the code.
+-    TranspileHLSLShader(presetState, m_preprocessedCode);
++    // Copy only strings and enums into the shader job. It must never retain
++    // this MilkdropShader or the preset's GL-backed texture descriptors.
++    std::set<std::string> samplerDeclarations;
++    std::set<std::string> texSizeDeclarations;
++    for (const auto& desc : m_mainTextureDescriptors)
++    {
++        samplerDeclarations.insert(desc.SamplerDeclaration());
++        texSizeDeclarations.insert(desc.TexSizeDeclaration());
++    }
++    for (const auto& desc : presetState.blurTexture.GetDescriptorsForBlurLevel(m_maxBlurLevelRequired))
++    {
++        samplerDeclarations.insert(desc.SamplerDeclaration());
++    }
++    for (const auto& desc : m_textureSamplerDescriptors)
++    {
++        samplerDeclarations.insert(desc.SamplerDeclaration());
++        texSizeDeclarations.insert(desc.TexSizeDeclaration());
++    }
++
++    const auto shaderType = m_type;
++    const auto program = m_preprocessedCode;
++    const std::vector<std::string> samplerDeclarationsCopy(samplerDeclarations.begin(), samplerDeclarations.end());
++    const std::vector<std::string> texSizeDeclarationsCopy(texSizeDeclarations.begin(), texSizeDeclarations.end());
++    const auto staticShaders = MilkdropStaticShaders::Get();
++    const auto glslVersion = staticShaders->GetGlslGeneratorVersion();
++    const std::string vertexShaderSource = shaderType == ShaderType::WarpShader
++                                               ? staticShaders->GetPresetWarpVertexShader()
++                                               : staticShaders->GetPresetCompVertexShader();
++    m_shader.CompileProgramDeferred([shaderType, program, samplerDeclarationsCopy, texSizeDeclarationsCopy,
++                                     glslVersion, vertexShaderSource]() {
++        auto fragmentShaderSource = TranspileHLSLShader(shaderType, program, samplerDeclarationsCopy,
++                                                        texSizeDeclarationsCopy, glslVersion);
++        return std::make_pair(vertexShaderSource, std::move(fragmentShaderSource));
++    });
+ 
+     // Update blur texture level if shader was compiled successfully.
+     presetState.blurTexture.SetRequiredBlurLevel(m_maxBlurLevelRequired);
+@@ -593,100 +678,6 @@ void MilkdropShader::GetReferencedSamplers(const std::string& program)
+     }
+ }
+ 
+-void MilkdropShader::TranspileHLSLShader(const PresetState& presetState, std::string& program)
+-{
+-    std::string shaderTypeString = "composite";
+-    if (m_type == ShaderType::WarpShader)
+-    {
+-        shaderTypeString = "warp";
+-    }
+-
+-    M4::GLSLGenerator generator;
+-    M4::Allocator allocator;
+-
+-    M4::HLSLTree tree(&allocator);
+-    M4::HLSLParser parser(&allocator, &tree);
+-
+-    // Preprocess define macros
+-    std::string sourcePreprocessed;
+-    if (!parser.ApplyPreprocessor("", program.c_str(), program.size(), sourcePreprocessed))
+-    {
+-        throw Renderer::ShaderException("Error translating HLSL " + shaderTypeString + " shader: Preprocessing failed.\nSource:\n" + program);
+-    }
+-
+-    // Remove previous shader declarations
+-    // ToDo: Quite some presets declare a sampler_state{} struct to change the wrap mode.
+-    //       The below code causes invalid syntax as it leaves part of the expression.
+-    //       Leaving it in causes HLSLParser to add "sampler_XYZ = sampler2D( <unknown expression> );"
+-    //       in the main() function, which is also bad...
+-    std::smatch matches;
+-    while (std::regex_search(sourcePreprocessed, matches, std::regex("sampler(2D|3D|)(\\s+|\\().*")))
+-    {
+-        sourcePreprocessed.replace(matches.position(), matches.length(), "");
+-    }
+-
+-    // Remove previous texsize declarations
+-    while (std::regex_search(sourcePreprocessed, matches, std::regex("float4\\s+texsize_.*")))
+-    {
+-        sourcePreprocessed.replace(matches.position(), matches.length(), "");
+-    }
+-
+-    // Collect unique samplers and texsize uniforms
+-    std::set<std::string> samplerDeclarations;
+-    std::set<std::string> texSizeDeclarations;
+-    for (const auto& desc : m_mainTextureDescriptors)
+-    {
+-        samplerDeclarations.insert(desc.SamplerDeclaration());
+-        texSizeDeclarations.insert(desc.TexSizeDeclaration());
+-    }
+-    for (const auto& desc : presetState.blurTexture.GetDescriptorsForBlurLevel(m_maxBlurLevelRequired))
+-    {
+-        samplerDeclarations.insert(desc.SamplerDeclaration());
+-        // No texsize_blur1 etc.
+-    }
+-    for (const auto& desc : m_textureSamplerDescriptors)
+-    {
+-        samplerDeclarations.insert(desc.SamplerDeclaration());
+-        texSizeDeclarations.insert(desc.TexSizeDeclaration());
+-    }
+-
+-    // Now insert them on top.
+-    for (const auto& texSizeDeclaration : texSizeDeclarations)
+-    {
+-        sourcePreprocessed.insert(0, texSizeDeclaration);
+-    }
+-    for (const auto& samplerDeclaration : samplerDeclarations)
+-    {
+-        sourcePreprocessed.insert(0, samplerDeclaration);
+-    }
+-
+-    // Transpile from HLSL (aka preset shader aka DirectX shader) to GLSL (aka OpenGL shader lang)
+-    // First, parse HLSL into a tree
+-    if (!parser.Parse("", sourcePreprocessed.c_str(), sourcePreprocessed.size()))
+-    {
+-        throw Renderer::ShaderException("Error translating HLSL " + shaderTypeString + " shader: HLSL parsing failed.\nSource:\n" + sourcePreprocessed);
+-    }
+-
+-    // Then generate GLSL from the resulting parser tree
+-    if (!generator.Generate(&tree, M4::GLSLGenerator::Target_FragmentShader,
+-                            MilkdropStaticShaders::Get()->GetGlslGeneratorVersion(),
+-                            "PS", M4::GLSLGenerator::Options(M4::GLSLGenerator::Flag_AlternateNanPropagation)))
+-    {
+-        throw Renderer::ShaderException("Error translating HLSL " + shaderTypeString + " shader: GLSL generating failed.\nSource:\n" + sourcePreprocessed);
+-    }
+-
+-    // Now we have GLSL source for the preset shader program (hopefully it's valid!)
+-    // Compile the preset shader fragment shader with the standard vertex shader and cross our fingers.
+-    if (m_type == ShaderType::WarpShader)
+-    {
+-        m_shader.CompileProgram(MilkdropStaticShaders::Get()->GetPresetWarpVertexShader(), generator.GetResult());
+-    }
+-    else
+-    {
+-        m_shader.CompileProgram(MilkdropStaticShaders::Get()->GetPresetCompVertexShader(), generator.GetResult());
+-    }
+-}
+-
+ void MilkdropShader::UpdateMaxBlurLevel(BlurTexture::BlurLevel requestedLevel)
+ {
+     if (m_maxBlurLevelRequired >= requestedLevel)
+diff --git a/src/libprojectM/MilkdropPreset/MilkdropShader.hpp b/src/libprojectM/MilkdropPreset/MilkdropShader.hpp
+index 4f8165d..6a61ac2 100644
+--- a/src/libprojectM/MilkdropPreset/MilkdropShader.hpp
++++ b/src/libprojectM/MilkdropPreset/MilkdropShader.hpp
+@@ -80,13 +80,6 @@ private:
+      */
+     void GetReferencedSamplers(const std::string& program);
+ 
+-    /**
+-     * @brief Translates the HLSL shader into GLSL.
+-     * @param presetState The preset state to pull the blur textures from.
+-     * @param program The shader to transpile.
+-     */
+-    void TranspileHLSLShader(const PresetState& presetState, std::string& program);
+-
+     /**
+      * @brief Updates the requested blur level if higher than before.
+      * Also adds the required samplers.
+diff --git a/src/libprojectM/MilkdropPreset/PerPixelMesh.cpp b/src/libprojectM/MilkdropPreset/PerPixelMesh.cpp
+index d1f0314..c876dab 100644
+--- a/src/libprojectM/MilkdropPreset/PerPixelMesh.cpp
++++ b/src/libprojectM/MilkdropPreset/PerPixelMesh.cpp
+@@ -111,6 +111,16 @@ void PerPixelMesh::CompileWarpShader(PresetState& presetState)
+     }
+ }
+ 
++bool PerPixelMesh::HandleShaderCompileError(Renderer::Shader* shader)
++{
++    if (!m_warpShader || &m_warpShader->Shader() != shader)
++    {
++        return false;
++    }
++    m_warpShader.reset();
++    return true;
++}
++
+ void PerPixelMesh::Draw(const PresetState& presetState,
+                         const PerFrameContext& perFrameContext,
+                         PerPixelContext& perPixelContext)
+diff --git a/src/libprojectM/MilkdropPreset/PerPixelMesh.hpp b/src/libprojectM/MilkdropPreset/PerPixelMesh.hpp
+index 6dcef42..a9107a8 100644
+--- a/src/libprojectM/MilkdropPreset/PerPixelMesh.hpp
++++ b/src/libprojectM/MilkdropPreset/PerPixelMesh.hpp
+@@ -46,6 +46,8 @@ public:
+      */
+     void CompileWarpShader(PresetState& presetState);
+ 
++    bool HandleShaderCompileError(Renderer::Shader* shader);
++
+     /**
+      * @brief Renders the transformation mesh.
+      * @param presetState The preset state to retrieve the configuration values from.
+diff --git a/src/libprojectM/Preset.hpp b/src/libprojectM/Preset.hpp
+index cb63747..6bb7acc 100644
+--- a/src/libprojectM/Preset.hpp
++++ b/src/libprojectM/Preset.hpp
+@@ -5,11 +5,17 @@
+ #include <Renderer/RenderContext.hpp>
+ #include <Renderer/Texture.hpp>
+ 
++#include "PresetInitializationTimings.hpp"
++
+ #include <memory>
+ #include <string>
+ 
+ namespace libprojectM {
+ 
++namespace Renderer {
++class Shader;
++}
++
+ class Preset
+ {
+ public:
+@@ -21,6 +27,19 @@ public:
+      */
+     virtual void Initialize(const Renderer::RenderContext& renderContext) = 0;
+ 
++    virtual auto InitializationTimings() const -> PresetInitializationTimings { return {}; }
++
++    /** Gives a preset a chance to apply its established fallback for a failed custom shader. */
++    virtual bool HandleShaderCompileError(Renderer::Shader* shader,
++                                          const std::string& error,
++                                          Renderer::Shader*& replacement)
++    {
++        (void)shader;
++        (void)error;
++        replacement = nullptr;
++        return false;
++    }
++
+     /**
+      * @brief Renders the preset into the current framebuffer.
+      * @param audioData Audio data to be used by the preset.
+diff --git a/src/libprojectM/PresetInitializationTimings.hpp b/src/libprojectM/PresetInitializationTimings.hpp
+new file mode 100644
+index 0000000..621a9dd
+--- /dev/null
++++ b/src/libprojectM/PresetInitializationTimings.hpp
+@@ -0,0 +1,13 @@
++#pragma once
++
++namespace libprojectM {
++
++struct PresetInitializationTimings
++{
++    double expressionsMilliseconds{};
++    double framebuffersMilliseconds{};
++    double warpShaderMilliseconds{};
++    double compositeShaderMilliseconds{};
++};
++
++} // namespace libprojectM
+diff --git a/src/libprojectM/ProjectM.cpp b/src/libprojectM/ProjectM.cpp
+index 3cf66fa..279c9ae 100644
+--- a/src/libprojectM/ProjectM.cpp
++++ b/src/libprojectM/ProjectM.cpp
+@@ -31,6 +31,11 @@
+ #include <Renderer/PresetTransition.hpp>
+ #include <Renderer/TextureManager.hpp>
+ #include <Renderer/TransitionShaderManager.hpp>
++#include <Renderer/Shader.hpp>
++
++#include <algorithm>
++#include <sstream>
++#include <chrono>
+ 
+ namespace libprojectM {
+ 
+@@ -79,6 +84,110 @@ void ProjectM::LoadPresetData(std::istream& presetData, bool smoothTransition)
+     }
+ }
+ 
++bool ProjectM::BeginPresetLoad(const std::string& presetData, bool smoothTransition)
++{
++    m_pendingShaders.clear();
++    m_pendingPreset.reset();
++    m_presetLoadError.clear();
++    m_presetCreateMilliseconds = 0;
++    m_presetInitializeMilliseconds = 0;
++    m_presetInitializeTimings = {};
++    m_pendingPresetSmooth = smoothTransition;
++    m_presetLoadStatus = PresetLoadStatus::Failed;
++
++    Renderer::Shader::SetParallelCompileEnabled(true);
++    try
++    {
++        m_textureManager->PurgeTextures();
++        std::stringstream presetDataStream(presetData);
++        const auto started = std::chrono::steady_clock::now();
++        auto preset = m_presetFactoryManager->CreatePresetFromStream(".milk", presetDataStream);
++        const auto created = std::chrono::steady_clock::now();
++        m_presetCreateMilliseconds = std::chrono::duration<double, std::milli>(created - started).count();
++        preset->Initialize(GetRenderContext());
++        m_presetInitializeMilliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - created).count();
++        m_presetInitializeTimings = preset->InitializationTimings();
++        m_pendingShaders = Renderer::Shader::PreparedShaders();
++        m_pendingPreset = std::move(preset);
++        m_presetLoadStatus = PresetLoadStatus::Loading;
++    }
++    catch (const std::exception& ex)
++    {
++        m_presetLoadError = ex.what();
++    }
++    Renderer::Shader::SetParallelCompileEnabled(false);
++    return m_presetLoadStatus != PresetLoadStatus::Failed;
++}
++
++auto ProjectM::PollPresetLoad() -> PresetLoadStatus
++{
++    if (m_presetLoadStatus != PresetLoadStatus::Loading)
++    {
++        return m_presetLoadStatus;
++    }
++
++    try
++    {
++        for (auto* shader : m_pendingShaders)
++        {
++            try
++            {
++                if (!shader->Ready()) return m_presetLoadStatus;
++            }
++            catch (const std::exception& ex)
++            {
++                Renderer::Shader* replacement{};
++                if (!m_pendingPreset->HandleShaderCompileError(shader, ex.what(), replacement))
++                {
++                    throw;
++                }
++
++                m_pendingShaders.erase(std::remove(m_pendingShaders.begin(), m_pendingShaders.end(), shader),
++                                       m_pendingShaders.end());
++                if (replacement != nullptr)
++                {
++                    m_pendingShaders.push_back(replacement);
++                }
++                return m_presetLoadStatus;
++            }
++        }
++        m_presetLoadStatus = PresetLoadStatus::Ready;
++    }
++    catch (const std::exception& ex)
++    {
++        m_presetLoadError = ex.what();
++        m_pendingPreset.reset();
++        m_presetLoadStatus = PresetLoadStatus::Failed;
++    }
++    return m_presetLoadStatus;
++}
++
++bool ProjectM::CommitPresetLoad()
++{
++    if (PollPresetLoad() != PresetLoadStatus::Ready || m_pendingPreset == nullptr)
++    {
++        return false;
++    }
++
++    m_pendingShaders.clear();
++    StartPresetTransition(std::move(m_pendingPreset), !m_pendingPresetSmooth, true);
++    m_presetLoadStatus = PresetLoadStatus::Idle;
++    return true;
++}
++
++void ProjectM::CancelPresetLoad()
++{
++    m_pendingShaders.clear();
++    m_pendingPreset.reset();
++    m_presetLoadStatus = PresetLoadStatus::Idle;
++    m_presetLoadError.clear();
++}
++
++auto ProjectM::PresetLoadError() const -> const std::string&
++{
++    return m_presetLoadError;
++}
++
+ void ProjectM::SetTexturePaths(std::vector<std::string> texturePaths)
+ {
+     m_textureSearchPaths = std::move(texturePaths);
+@@ -240,7 +349,7 @@ void ProjectM::SetWindowSize(uint32_t width, uint32_t height)
+     m_windowHeight = height;
+ }
+ 
+-void ProjectM::StartPresetTransition(std::unique_ptr<Preset>&& preset, bool hardCut)
++void ProjectM::StartPresetTransition(std::unique_ptr<Preset>&& preset, bool hardCut, bool initialized)
+ {
+     m_presetChangeNotified = m_presetLocked;
+ 
+@@ -249,7 +358,10 @@ void ProjectM::StartPresetTransition(std::unique_ptr<Preset>&& preset, bool hard
+         return;
+     }
+ 
+-    preset->Initialize(GetRenderContext());
++    if (!initialized)
++    {
++        preset->Initialize(GetRenderContext());
++    }
+ 
+     // If already in a transition, force immediate completion.
+     if (m_transitioningPreset != nullptr)
+diff --git a/src/libprojectM/ProjectM.hpp b/src/libprojectM/ProjectM.hpp
+index 6158547..7e3d062 100644
+--- a/src/libprojectM/ProjectM.hpp
++++ b/src/libprojectM/ProjectM.hpp
+@@ -22,6 +22,8 @@
+ 
+ #include <projectM-4/projectM_export.h>
+ 
++#include "PresetInitializationTimings.hpp"
++
+ #include <Renderer/RenderContext.hpp>
+ 
+ #include <Audio/PCM.hpp>
+@@ -34,6 +36,7 @@ namespace libprojectM {
+ 
+ namespace Renderer {
+ class CopyTexture;
++class Shader;
+ class PresetTransition;
+ class Renderer;
+ class TextureManager;
+@@ -47,6 +50,14 @@ class TimeKeeper;
+ class PROJECTM_EXPORT ProjectM
+ {
+ public:
++    enum class PresetLoadStatus
++    {
++        Idle,
++        Loading,
++        Ready,
++        Failed
++    };
++
+     ProjectM();
+ 
+     virtual ~ProjectM();
+@@ -87,6 +98,15 @@ public:
+      */
+     void LoadPresetData(std::istream& presetData, bool smoothTransition);
+ 
++    bool BeginPresetLoad(const std::string& presetData, bool smoothTransition);
++    auto PollPresetLoad() -> PresetLoadStatus;
++    bool CommitPresetLoad();
++    void CancelPresetLoad();
++    auto PresetLoadError() const -> const std::string&;
++    double PresetCreateMilliseconds() const { return m_presetCreateMilliseconds; }
++    double PresetInitializeMilliseconds() const { return m_presetInitializeMilliseconds; }
++    auto PresetInitializePhaseTimings() const -> const PresetInitializationTimings& { return m_presetInitializeTimings; }
++
+     void SetWindowSize(uint32_t width, uint32_t height);
+ 
+     /**
+@@ -180,7 +200,7 @@ public:
+ private:
+     void Initialize();
+ 
+-    void StartPresetTransition(std::unique_ptr<Preset>&& preset, bool hardCut);
++    void StartPresetTransition(std::unique_ptr<Preset>&& preset, bool hardCut, bool initialized = false);
+ 
+     void LoadIdlePreset();
+ 
+@@ -217,8 +237,17 @@ private:
+     std::unique_ptr<Renderer::CopyTexture> m_textureCopier;                       //!< Class that copies textures 1:1 to another texture or framebuffer.
+     std::unique_ptr<Preset> m_activePreset;                                       //!< Currently loaded preset.
+     std::unique_ptr<Preset> m_transitioningPreset;                                //!< Destination preset when smooth preset switching.
++    std::unique_ptr<Preset> m_pendingPreset;                                      //!< Preset prepared but not yet committed.
+     std::unique_ptr<Renderer::PresetTransition> m_transition;                     //!< Transition effect used for blending.
+     std::unique_ptr<TimeKeeper> m_timeKeeper;                                     //!< Keeps the different timers used to render and switch presets.
++
++    std::vector<Renderer::Shader*> m_pendingShaders;
++    double m_presetCreateMilliseconds{};
++    double m_presetInitializeMilliseconds{};
++    PresetInitializationTimings m_presetInitializeTimings;
++    bool m_pendingPresetSmooth{true};
++    PresetLoadStatus m_presetLoadStatus{PresetLoadStatus::Idle};
++    std::string m_presetLoadError;
+ };
+ 
+ } // namespace libprojectM
+diff --git a/src/libprojectM/ProjectMCWrapper.cpp b/src/libprojectM/ProjectMCWrapper.cpp
+index 8c12bc0..20c9138 100644
+--- a/src/libprojectM/ProjectMCWrapper.cpp
++++ b/src/libprojectM/ProjectMCWrapper.cpp
+@@ -1,6 +1,7 @@
+ #include "ProjectMCWrapper.hpp"
+ 
+ #include <projectM-4/projectM.h>
++#include <Renderer/Shader.hpp>
+ 
+ #include <Audio/AudioConstants.hpp>
+ 
+@@ -95,6 +96,90 @@ void projectm_load_preset_data(projectm_handle instance, const char* data,
+     projectMInstance->LoadPresetData(presetDataStream, smooth_transition);
+ }
+ 
++const char* projectm_parallel_shader_compile(void)
++{
++    return libprojectM::Renderer::Shader::ParallelCompileExtension();
++}
++
++void projectm_shader_worker_enable(bool enabled)
++{
++    libprojectM::Renderer::Shader::EnableWorker(enabled);
++}
++void projectm_shader_worker_run(void)
++{
++    libprojectM::Renderer::Shader::RunWorker();
++}
++void projectm_shader_worker_stop(void)
++{
++    libprojectM::Renderer::Shader::StopWorker();
++}
++const char* projectm_shader_compile_mode(void)
++{
++    return libprojectM::Renderer::Shader::CompileMode();
++}
++double projectm_preset_create_ms(projectm_handle instance)
++{
++    return handle_to_instance(instance)->PresetCreateMilliseconds();
++}
++double projectm_preset_initialize_ms(projectm_handle instance)
++{
++    return handle_to_instance(instance)->PresetInitializeMilliseconds();
++}
++double projectm_preset_initialize_phase_ms(projectm_handle instance, int phase)
++{
++    const auto& timings = handle_to_instance(instance)->PresetInitializePhaseTimings();
++    switch (phase)
++    {
++        case 0: return timings.expressionsMilliseconds;
++        case 1: return timings.framebuffersMilliseconds;
++        case 2: return timings.warpShaderMilliseconds;
++        case 3: return timings.compositeShaderMilliseconds;
++        default: return 0.0;
++    }
++}
++
++bool projectm_begin_preset_load(projectm_handle instance, const char* data,
++                                bool smooth_transition)
++{
++    auto projectMInstance = handle_to_instance(instance);
++    return projectMInstance->BeginPresetLoad(data, smooth_transition);
++}
++
++projectm_preset_load_status projectm_poll_preset_load(projectm_handle instance)
++{
++    auto projectMInstance = handle_to_instance(instance);
++    switch (projectMInstance->PollPresetLoad())
++    {
++        case libprojectM::ProjectM::PresetLoadStatus::Loading:
++            return PROJECTM_PRESET_LOAD_LOADING;
++        case libprojectM::ProjectM::PresetLoadStatus::Ready:
++            return PROJECTM_PRESET_LOAD_READY;
++        case libprojectM::ProjectM::PresetLoadStatus::Failed:
++            return PROJECTM_PRESET_LOAD_FAILED;
++        case libprojectM::ProjectM::PresetLoadStatus::Idle:
++        default:
++            return PROJECTM_PRESET_LOAD_IDLE;
++    }
++}
++
++bool projectm_commit_preset_load(projectm_handle instance)
++{
++    auto projectMInstance = handle_to_instance(instance);
++    return projectMInstance->CommitPresetLoad();
++}
++
++void projectm_cancel_preset_load(projectm_handle instance)
++{
++    auto projectMInstance = handle_to_instance(instance);
++    projectMInstance->CancelPresetLoad();
++}
++
++const char* projectm_preset_load_error(projectm_handle instance)
++{
++    auto projectMInstance = handle_to_instance(instance);
++    return projectMInstance->PresetLoadError().c_str();
++}
++
+ void projectm_set_preset_switch_requested_event_callback(projectm_handle instance,
+                                                          projectm_preset_switch_requested_event callback, void* user_data)
+ {
+@@ -380,4 +465,4 @@ auto projectm_pcm_add_uint8(projectm_handle instance, const uint8_t* samples, un
+ auto projectm_write_debug_image_on_next_frame(projectm_handle, const char*) -> void
+ {
+     // UNIMPLEMENTED
+-}
+\ No newline at end of file
++}
+diff --git a/src/libprojectM/Renderer/Shader.cpp b/src/libprojectM/Renderer/Shader.cpp
+index 4a64ab9..5a97b24 100644
+--- a/src/libprojectM/Renderer/Shader.cpp
++++ b/src/libprojectM/Renderer/Shader.cpp
+@@ -2,27 +2,252 @@
+ 
+ #include <glm/gtc/type_ptr.hpp>
+ 
++#include <algorithm>
++#include <atomic>
++#include <condition_variable>
++#include <deque>
++#include <mutex>
++#include <chrono>
+ #include <vector>
+ 
+ namespace libprojectM {
+ namespace Renderer {
+ 
++#ifndef GL_COMPLETION_STATUS_KHR
++#define GL_COMPLETION_STATUS_KHR 0x91B1
++#endif
++
++bool Shader::s_parallelCompileEnabled = false;
++bool Shader::s_prepareEnabled = false;
++std::vector<Shader*> Shader::s_preparedShaders;
++
++struct Shader::CompileJob
++{
++    std::function<std::pair<std::string, std::string>()> sourceFactory;
++    std::string vertexSource;
++    std::string fragmentSource;
++    GLuint program{};
++    std::string error;
++    std::atomic<bool> ready{false};
++
++    // The final reference is released by the render or compiler thread,
++    // both with a current context in the same share group.
++    ~CompileJob()
++    {
++        if (program) glDeleteProgram(program);
++    }
++
++    static std::mutex mutex;
++    static std::condition_variable wake;
++    static std::deque<std::weak_ptr<CompileJob>> queue;
++    static bool enabled;
++    static bool stopping;
++};
++
++std::mutex Shader::CompileJob::mutex;
++std::condition_variable Shader::CompileJob::wake;
++std::deque<std::weak_ptr<Shader::CompileJob>> Shader::CompileJob::queue;
++bool Shader::CompileJob::enabled = false;
++bool Shader::CompileJob::stopping = false;
++
++void Shader::EnableWorker(bool enabled)
++{
++    std::lock_guard<std::mutex> lock(CompileJob::mutex);
++    CompileJob::enabled = enabled;
++    if (enabled) CompileJob::stopping = false;
++}
++
++void Shader::StopWorker()
++{
++    {
++        std::lock_guard<std::mutex> lock(CompileJob::mutex);
++        CompileJob::enabled = false;
++        CompileJob::stopping = true;
++    }
++    CompileJob::wake.notify_one();
++}
++
++// This function runs entirely on the caller's dedicated shared GL context.
++// It never accesses Shader instances or the active projectM render state.
++void Shader::RunWorker()
++{
++    for (;;)
++    {
++        std::shared_ptr<CompileJob> job;
++        {
++            std::unique_lock<std::mutex> lock(CompileJob::mutex);
++            CompileJob::wake.wait(lock, [] { return CompileJob::stopping || !CompileJob::queue.empty(); });
++            if (CompileJob::stopping)
++            {
++                CompileJob::queue.clear();
++                return;
++            }
++            job = CompileJob::queue.front().lock();
++            CompileJob::queue.pop_front();
++        }
++        if (!job) continue; // Cancelled before compilation started.
++        GLuint vertex{}, fragment{};
++        try
++        {
++            if (job->sourceFactory)
++            {
++                auto sourceFactory = std::move(job->sourceFactory);
++                auto sources = sourceFactory();
++                job->vertexSource = std::move(sources.first);
++                job->fragmentSource = std::move(sources.second);
++            }
++            const auto compile = [](const std::string& source, GLenum type) {
++                GLuint shader = glCreateShader(type);
++                const auto* text = source.c_str();
++                glShaderSource(shader, 1, &text, nullptr);
++                glCompileShader(shader);
++                GLint success{};
++                glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
++                if (!success)
++                {
++                    GLint size{};
++                    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &size);
++                    std::vector<char> message(size + 1);
++                    glGetShaderInfoLog(shader, size, nullptr, message.data());
++                    glDeleteShader(shader);
++                    throw ShaderException("Worker shader compile: " + std::string(message.data()));
++                }
++                return shader;
++            };
++            vertex = compile(job->vertexSource, GL_VERTEX_SHADER);
++            fragment = compile(job->fragmentSource, GL_FRAGMENT_SHADER);
++            job->program = glCreateProgram();
++            glAttachShader(job->program, vertex);
++            glAttachShader(job->program, fragment);
++            glLinkProgram(job->program);
++            GLint linked{};
++            glGetProgramiv(job->program, GL_LINK_STATUS, &linked);
++            if (!linked)
++            {
++                GLint size{};
++                glGetProgramiv(job->program, GL_INFO_LOG_LENGTH, &size);
++                std::vector<char> message(size + 1);
++                glGetProgramInfoLog(job->program, size, nullptr, message.data());
++                throw ShaderException("Worker program link: " + std::string(message.data()));
++            }
++            glDetachShader(job->program, vertex);
++            glDetachShader(job->program, fragment);
++        }
++        catch (const std::exception& ex)
++        {
++            job->error = ex.what();
++        }
++        if (vertex) glDeleteShader(vertex);
++        if (fragment) glDeleteShader(fragment);
++        // Complete the producer context before publishing shared objects.
++        // Any driver wait occurs here, never in the UI poll/commit path.
++        glFinish();
++        job->ready.store(true, std::memory_order_release);
++    }
++}
++
++auto Shader::CompileMode() -> const char*
++{
++    std::lock_guard<std::mutex> lock(CompileJob::mutex);
++    return CompileJob::enabled ? "shared-context" : ParallelCompileExtension();
++}
++
++auto Shader::PreparedShaders() -> std::vector<Shader*>
++{
++    return s_preparedShaders;
++}
++
++bool Shader::Ready()
++{
++    return Poll();
++}
++std::vector<Shader*> Shader::s_instances;
++
+ Shader::Shader()
+-    : m_shaderProgram(glCreateProgram())
+ {
++    s_instances.push_back(this);
+ }
+ 
+ Shader::~Shader()
+ {
++    s_preparedShaders.erase(std::remove(s_preparedShaders.begin(), s_preparedShaders.end(), this), s_preparedShaders.end());
++    s_instances.erase(std::remove(s_instances.begin(), s_instances.end(), this), s_instances.end());
++    if (m_parallelPending)
++    {
++        glDeleteShader(m_vertexShader);
++        glDeleteShader(m_fragmentShader);
++    }
+     if (m_shaderProgram)
+     {
+         glDeleteProgram(m_shaderProgram);
+     }
+ }
+ 
++void Shader::SetParallelCompileEnabled(bool enabled)
++{
++    s_prepareEnabled = enabled;
++    if (enabled) s_preparedShaders.clear();
++    s_parallelCompileEnabled = enabled && ParallelCompileExtension()[0] != '\0';
++}
++
++auto Shader::ParallelCompileExtension() -> const char*
++{
++    // projectM requires GL 3.3 / GLES 3.0. Indexed enumeration also works in
++    // core contexts, where glGetString(GL_EXTENSIONS) is invalid.
++    GLint count{};
++    glGetIntegerv(GL_NUM_EXTENSIONS, &count);
++    bool arb = false;
++    for (GLint i = 0; i < count; ++i)
++    {
++        const auto* extension = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
++        if (extension == nullptr)
++        {
++            continue;
++        }
++        if (std::string(extension) == "GL_KHR_parallel_shader_compile")
++        {
++            return "KHR";
++        }
++        arb = arb || std::string(extension) == "GL_ARB_parallel_shader_compile";
++    }
++    // ARB and KHR use the same completion-status token and query semantics.
++    return arb ? "ARB" : "";
++}
++
++bool Shader::AllReady()
++{
++    for (auto* shader : s_instances)
++    {
++        if (!shader->Poll())
++        {
++            return false;
++        }
++    }
++    return true;
++}
++
+ void Shader::CompileProgram(const std::string& vertexShaderSource,
+                             const std::string& fragmentShaderSource)
+ {
++    if (s_prepareEnabled)
++    {
++        s_preparedShaders.push_back(this);
++        std::lock_guard<std::mutex> lock(CompileJob::mutex);
++        if (CompileJob::enabled)
++        {
++            m_compileJob = std::make_shared<CompileJob>();
++            m_compileJob->vertexSource = vertexShaderSource;
++            m_compileJob->fragmentSource = fragmentShaderSource;
++            // Keep rapid selection changes bounded while the driver is busy.
++            auto& queue = CompileJob::queue;
++            queue.erase(std::remove_if(queue.begin(), queue.end(),
++                [](const std::weak_ptr<CompileJob>& job) { return job.expired(); }), queue.end());
++            queue.push_back(m_compileJob);
++            CompileJob::wake.notify_one();
++            return;
++        }
++    }
++    if (!m_shaderProgram) m_shaderProgram = glCreateProgram();
+     auto vertexShader = CompileShader(vertexShaderSource, GL_VERTEX_SHADER);
+     auto fragmentShader = CompileShader(fragmentShaderSource, GL_FRAGMENT_SHADER);
+ 
+@@ -31,6 +256,14 @@ void Shader::CompileProgram(const std::string& vertexShaderSource,
+ 
+     glLinkProgram(m_shaderProgram);
+ 
++    if (s_parallelCompileEnabled)
++    {
++        m_vertexShader = vertexShader;
++        m_fragmentShader = fragmentShader;
++        m_parallelPending = true;
++        return;
++    }
++
+     // Shader objects are no longer needed after linking, free the memory.
+     glDetachShader(m_shaderProgram, vertexShader);
+     glDetachShader(m_shaderProgram, fragmentShader);
+@@ -52,6 +285,110 @@ void Shader::CompileProgram(const std::string& vertexShaderSource,
+     throw ShaderException("Error compiling shader: " + std::string(message.data()));
+ }
+ 
++void Shader::CompileProgramDeferred(std::function<std::pair<std::string, std::string>()> sourceFactory)
++{
++    if (!sourceFactory)
++    {
++        throw ShaderException("Cannot compile shader without a source factory.");
++    }
++
++    {
++        std::lock_guard<std::mutex> lock(CompileJob::mutex);
++        if (CompileJob::enabled)
++        {
++            if (s_prepareEnabled)
++            {
++                s_preparedShaders.push_back(this);
++            }
++            m_compileJob = std::make_shared<CompileJob>();
++            m_compileJob->sourceFactory = std::move(sourceFactory);
++            auto& queue = CompileJob::queue;
++            queue.erase(std::remove_if(queue.begin(), queue.end(),
++                [](const std::weak_ptr<CompileJob>& job) { return job.expired(); }), queue.end());
++            queue.push_back(m_compileJob);
++            CompileJob::wake.notify_one();
++            return;
++        }
++    }
++
++    auto sources = sourceFactory();
++    CompileProgram(sources.first, sources.second);
++}
++
++bool Shader::Poll()
++{
++    if (m_compileJob)
++    {
++        if (!m_compileJob->ready.load(std::memory_order_acquire)) return false;
++        if (!m_compileJob->error.empty()) throw ShaderException(m_compileJob->error);
++        if (m_shaderProgram) glDeleteProgram(m_shaderProgram);
++        m_shaderProgram = m_compileJob->program;
++        m_compileJob->program = 0;
++        m_compileJob.reset();
++    }
++    if (!m_parallelPending)
++    {
++        return true;
++    }
++
++    GLint completed{};
++    glGetShaderiv(m_vertexShader, GL_COMPLETION_STATUS_KHR, &completed);
++    if (completed != GL_TRUE)
++    {
++        return false;
++    }
++    glGetShaderiv(m_fragmentShader, GL_COMPLETION_STATUS_KHR, &completed);
++    if (completed != GL_TRUE)
++    {
++        return false;
++    }
++    glGetProgramiv(m_shaderProgram, GL_COMPLETION_STATUS_KHR, &completed);
++    if (completed != GL_TRUE)
++    {
++        return false;
++    }
++
++    GLint compiled{};
++    glGetShaderiv(m_vertexShader, GL_COMPILE_STATUS, &compiled);
++    if (compiled != GL_TRUE)
++    {
++        GLint infoLogLength{};
++        glGetShaderiv(m_vertexShader, GL_INFO_LOG_LENGTH, &infoLogLength);
++        std::vector<char> message(infoLogLength + 1);
++        glGetShaderInfoLog(m_vertexShader, infoLogLength, nullptr, message.data());
++        throw ShaderException("Error compiling vertex shader: " + std::string(message.data()));
++    }
++    glGetShaderiv(m_fragmentShader, GL_COMPILE_STATUS, &compiled);
++    if (compiled != GL_TRUE)
++    {
++        GLint infoLogLength{};
++        glGetShaderiv(m_fragmentShader, GL_INFO_LOG_LENGTH, &infoLogLength);
++        std::vector<char> message(infoLogLength + 1);
++        glGetShaderInfoLog(m_fragmentShader, infoLogLength, nullptr, message.data());
++        throw ShaderException("Error compiling fragment shader: " + std::string(message.data()));
++    }
++
++    GLint linked{};
++    glGetProgramiv(m_shaderProgram, GL_LINK_STATUS, &linked);
++    if (linked != GL_TRUE)
++    {
++        GLint infoLogLength{};
++        glGetProgramiv(m_shaderProgram, GL_INFO_LOG_LENGTH, &infoLogLength);
++        std::vector<char> message(infoLogLength + 1);
++        glGetProgramInfoLog(m_shaderProgram, infoLogLength, nullptr, message.data());
++        throw ShaderException("Error linking shader: " + std::string(message.data()));
++    }
++
++    glDetachShader(m_shaderProgram, m_vertexShader);
++    glDetachShader(m_shaderProgram, m_fragmentShader);
++    glDeleteShader(m_vertexShader);
++    glDeleteShader(m_fragmentShader);
++    m_vertexShader = 0;
++    m_fragmentShader = 0;
++    m_parallelPending = false;
++    return true;
++}
++
+ bool Shader::Validate(std::string& validationMessage) const
+ {
+     GLint result{GL_FALSE};
+@@ -194,6 +531,11 @@ GLuint Shader::CompileShader(const std::string& source, GLenum type)
+ 
+     glCompileShader(shader);
+ 
++    if (s_parallelCompileEnabled)
++    {
++        return shader;
++    }
++
+     glGetShaderiv(shader, GL_COMPILE_STATUS, &shaderCompiled);
+     if (shaderCompiled == GL_TRUE)
+     {
+diff --git a/src/libprojectM/Renderer/Shader.hpp b/src/libprojectM/Renderer/Shader.hpp
+index e3b0e66..818ed36 100644
+--- a/src/libprojectM/Renderer/Shader.hpp
++++ b/src/libprojectM/Renderer/Shader.hpp
+@@ -13,7 +13,11 @@
+ #include <glm/mat4x4.hpp>
+ 
+ #include <map>
++#include <functional>
++#include <memory>
+ #include <string>
++#include <utility>
++#include <vector>
+ 
+ namespace libprojectM {
+ namespace Renderer {
+@@ -74,6 +78,19 @@ public:
+     void CompileProgram(const std::string& vertexShaderSource,
+                         const std::string& fragmentShaderSource);
+ 
++    void CompileProgramDeferred(std::function<std::pair<std::string, std::string>()> sourceFactory);
++
++    static void SetParallelCompileEnabled(bool enabled);
++    static bool AllReady();
++    static auto ParallelCompileExtension() -> const char*;
++    // Configure on the render thread before/after the shared-context worker.
++    static void EnableWorker(bool enabled);
++    static void RunWorker();
++    static void StopWorker();
++    static auto CompileMode() -> const char*;
++    static auto PreparedShaders() -> std::vector<Shader*>;
++    bool Ready();
++
+     /**
+      * @brief Validates that the program can run in the current state.
+      * @param validationMessage The error message if validation failed.
+@@ -180,6 +197,14 @@ public:
+     static auto GetShaderLanguageVersion() -> GlslVersion;
+ 
+ private:
++    struct CompileJob;
++    std::shared_ptr<CompileJob> m_compileJob;
++    bool Poll();
++    static bool s_parallelCompileEnabled;
++    static bool s_prepareEnabled;
++    static std::vector<Shader*> s_preparedShaders;
++    static std::vector<Shader*> s_instances;
++
+     /**
+      * @brief Compiles a single shader.
+      * @throws ShaderException Thrown if compilation of the shader failed.
+@@ -190,6 +215,9 @@ private:
+     auto CompileShader(const std::string& source, GLenum type) -> GLuint;
+ 
+     GLuint m_shaderProgram{}; //!< The program ID.
++    GLuint m_vertexShader{};
++    GLuint m_fragmentShader{};
++    bool m_parallelPending{false};
+ };
+ 
+ } // namespace Renderer

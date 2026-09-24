@@ -111,10 +111,43 @@ NC сохраняет статус listing для явного отображе�
 для `Max`), а главный projectM планируется независимо. Настройка `FrameRate` задаёт
 фиксированный cap из доступных значений ниже частоты дисплея либо `Max`, равный
 активной частоте дисплея; числовой cap, совпадающий с `Max`, в UI не показывается.
-GL-операции остаются на закреплённом main thread; между кадрами визуализации
+Рендеринг и UI остаются на закреплённом main thread; Windows shader compiler
+использует отдельный закреплённый поток со своим shared GL-контекстом и скрытым
+окном (отдельный drawable). Между кадрами визуализации
 выводится последняя захваченная текстура. Показатель `FPS` остаётся телеметрией,
 а adaptive policy учитывает wall-clock стоимость полного кадра и фактические
 интервалы его вывода, исключая намеренные паузы адаптации.
+
+Смена preset использует staged pipeline. `internal/app` читает архив в worker с
+`context`/`requestID`, поэтому новый выбор отменяет устаревший результат, а
+активный preset не заменяется до успешного native commit. Подготовка projectM
+сохраняет parsing preset, выбор текстур и создание GL-ресурсов на main thread.
+На Windows `internal/app.shaderCompiler` владеет отдельным скрытым SDL-окном,
+shared GL-контекстом и закреплённым worker thread. Worker переводит независимые
+MilkDrop HLSL-шейдеры в GLSL и компилирует/линкует их даже без KHR/ARB extensions;
+после `glFinish` он публикует результат через release/acquire. Для подготовки
+шейдера worker получает только копии строк и enum-значения: он не читает preset,
+texture descriptors или активное render state. Main thread проверяет готовность
+и принимает program ID. Ошибка пользовательского warp сохраняет прежний fallback
+на стандартный warp, а ошибка пользовательского composite запускает стандартный
+composite через ту же очередь.
+Очередь хранит weak references, удаляет отменённые jobs и никогда не заставляет UI
+ждать текущую CPU-трансляцию или компиляцию.
+Закрытие приложения будит очередь, дожидается worker и уничтожает его контекст
+до удаления последнего основного контекста. Ошибка создания/проверки sharing
+на Windows явно прекращает запуск, а не включает незаметно блокирующий fallback.
+
+На других платформах сохраняется KHR/ARB polling при наличии расширения и
+синхронный fallback без него. Готовность каждого pending preset проверяется
+по его собственному списку shaders: незавершённый preview не блокирует commit
+основного preset. Preview также использует Begin/Poll/Commit и сохраняет активную
+картинку до успешной подготовки нового выбора. До commit рендерится прежняя
+визуализация; после commit запускается обычный smooth transition. Автоматический
+переход, пришедший во время загрузки, ставится в очередь. Native create/init,
+выбранный compile mode и main-thread commit имеют отдельные замеры в логе.
+Shared context не гарантирует отсутствия внутренних глобальных блокировок драйвера;
+Windows/Intel acceptance и остаточные FPS-замеры описаны в
+[WINDOWS-PRESET-FREEZES.md](WINDOWS-PRESET-FREEZES.md).
 
 При `Adaptive=true` выбранная в настройках resolution является верхним пределом.
 Разрешение временно уменьшается или повышается по результатам cadence, но никогда
@@ -284,6 +317,11 @@ read-only fallback по известным CFW-файлам, device tree, `/proc
 immutable metadata provider-specific shuffle indexes. Открытие темы лениво
 запускает обычную сборку индекса, если shuffle был выключен при старте; Help не
 обходит каталоги и не владеет их данными.
+
+Событие крестика SDL (`WINDOWEVENT_CLOSE`) проверяется по ID главного окна
+в `internal/app.run_loop.go` и завершает цикл явно. Это нужно в том числе потому,
+что окно worker-контекста projectM скрыто, но остаётся окном SDL; полагаться на
+`SDL_QUIT` после закрытия главного окна нельзя.
 
 `FrameRate=Max` follows the current SDL display refresh rate (60 Hz fallback),
 checked once per second for display moves/display-mode changes. The settings list

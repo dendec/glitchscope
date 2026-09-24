@@ -29,8 +29,11 @@ run_in_env() {
 
 case "$sub" in
 test)
-	run_in_env 'python3 -m unittest discover -s scripts -p test_package_portmaster.py'
+	run_in_env 'python3 -m unittest discover -s scripts -p "test_*.py"'
 	run_in_env 'go test -count=1 ./cmd/... ./internal/...'
+	;;
+gl)
+	run_in_env 'SDL_VIDEODRIVER=offscreen LIBGL_ALWAYS_SOFTWARE=1 GLITCHSCOPE_GL_TEST=1 go test -count=1 -v ./internal/app -run TestShaderCompilerGL'
 	;;
 race)
 	run_in_env 'go test -race -count=1 ./internal/player ./internal/radio ./internal/util ./internal/ui ./internal/app ./internal/modarchive'
@@ -42,7 +45,7 @@ lint)
 	run_in_env 'golangci-lint run --timeout=5m ./cmd/... ./internal/...'
 	;;
 *)
-	echo "usage: $0 {test|lint|race|native-radio}" >&2
+	echo "usage: $0 {test|lint|gl|race|native-radio}" >&2
 	exit 2
 	;;
 esac

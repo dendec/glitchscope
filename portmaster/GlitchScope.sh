@@ -35,6 +35,15 @@ pm_message "Loading GlitchScope... (Compiling shaders)"
 $GPTOKEYB "glitchscope" &
 
 pm_platform_helper "$GAMEDIR/glitchscope"
+
+# Some audiocodec images leave the MIC1 capture path disabled at boot.
+# Only touch this card when it exposes the matching mixer control.
+if command -v amixer >/dev/null 2>&1 &&
+   amixer -c audiocodec cget name='ADCL Input MIC1 Boost Switch' >/dev/null 2>&1; then
+  amixer -c audiocodec cset name='ADCL Input MIC1 Boost Switch' on >/dev/null ||
+    echo "Warning: could not enable MIC1 capture input"
+fi
+
 ./glitchscope -fullscreen
 
 pm_finish

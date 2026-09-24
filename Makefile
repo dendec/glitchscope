@@ -75,7 +75,7 @@ lint: icons builder
 	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) golangci-lint run --verbose --timeout=5m ./cmd/... ./internal/...'
 
 test: icons builder
-	$(DOCKER_DEV_RUN) 'python3 -m unittest discover -s scripts -p test_package_portmaster.py'
+	$(DOCKER_DEV_RUN) 'python3 -m unittest discover -s scripts -p "test_*.py"'
 	$(DOCKER_DEV_RUN) '$(DOCKER_GO_ENV) go test -count=1 ./cmd/... ./internal/...'
 
 # Build modarchive catalog via crawler (only if missing).
