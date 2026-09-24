@@ -59,7 +59,17 @@ or start with one track:
 ```sh
 make dist-windows    # Windows AMD64 package
 make dist-portmaster # PortMaster ARM64 zip and submission directory
+make release-archives VERSION=1.0 # Versioned archives for all supported targets
 ```
+
+`make release-archives` builds Linux AMD64, Linux ARM64, Windows AMD64, and
+PortMaster packages, then writes versioned assets to `dist/releases/`. Linux
+archives use `.tar.gz`; Windows and PortMaster use `.zip`. The Linux ARM64
+archive is a regular Linux package with its own launcher; the PortMaster ZIP is
+prepared separately by the PortMaster packager. `SHA256SUMS` contains checksums
+for all four release archives. Desktop archives include the collected
+third-party licenses and omit local music, settings, favorites, and the local
+track cache.
 
 For PortMaster packaging, device checks, and asset redistribution notes, see
 [the release checklist](docs/PORTMASTER-RELEASE.md).

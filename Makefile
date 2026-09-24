@@ -5,6 +5,7 @@ LOCAL_DIST_DIR := $(DIST_DIR)/local
 X64_DIST_DIR := $(DIST_DIR)/linux-amd64
 ARM64_DIST_DIR := $(DIST_DIR)/linux-arm64
 WINDOWS_DIST_DIR := $(DIST_DIR)/windows-amd64
+RELEASE_DIR := $(DIST_DIR)/releases
 FONT_SUBSET := internal/ui/assets/unifont.otf
 FONT_RANGES := internal/ui/font_ranges.json
 FONT_REQUIRED := U+2014,U+2026,U+2192,U+23ED,U+23EE,U+23F8,U+25B6,U+25B8,U+25C0
@@ -56,7 +57,7 @@ MODARCHIVE_CATALOG := .cache/modarchive/catalog
 MODARCHIVE_SNAPSHOT := .cache/modarchive/1980-2007.gsa
 MODARCHIVE_ADDENDUM := .cache/modarchive/2007-addendum.gsa
 
-.PHONY: builder build clean dist dist-arm64 dist-windows dist-portmaster lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope force-presets-check textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font icons
+.PHONY: builder build clean dist dist-arm64 dist-windows dist-portmaster release-archives lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope force-presets-check textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font icons
 
 DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
 DOCKER_ICON_RUN = docker run --rm --user "$$(id -u):$$(id -g)" -v "$(CURDIR):/build" -w /build $(DOCKER_BUILDER) bash -c
@@ -190,6 +191,18 @@ dist-windows: subset-font icons $(GSA_FILE) $(TEXTURES_GSA_FILE) $(MODLAND_CATAL
 # Build both an installable ZIP and the PortMaster-New submission directory.
 dist-portmaster: dist-arm64
 	python3 scripts/package-portmaster.py --arm64 $(ARM64_DIST_DIR)/glitchscope --presets $(PRESETS_DIR) --textures $(TEXTURES_DIR)
+
+# Build versioned archives for the supported desktop and PortMaster releases.
+release-archives: dist dist-arm64 dist-windows dist-portmaster
+	python3 scripts/package-release.py \
+		--version "$(VERSION)" \
+		--linux-amd64 "$(X64_DIST_DIR)" \
+		--linux-arm64 "$(ARM64_DIST_DIR)/glitchscope" \
+		--windows-amd64 "$(WINDOWS_DIST_DIR)" \
+		--portmaster "$(DIST_DIR)/glitchscope.zip" \
+		--arm64-runtime-requirements "$(DIST_DIR)/portmaster-submit/ports/glitchscope/glitchscope/runtime-requirements.txt" \
+		--licenses "$(ARM64_DIST_DIR)/glitchscope/licenses" \
+		--output "$(RELEASE_DIR)"
 
 deploy: dist-arm64 portable-glitchscope $(TEXTURES_GSA_FILE)
 	adb shell "mkdir -p $(DEVICE_DIR)"
