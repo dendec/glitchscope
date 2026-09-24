@@ -166,8 +166,17 @@ func (o *Overlay) playbackProgressColors() (dark, light color.RGBA) {
 	return
 }
 
+func (o *Overlay) playbackProgressState() (visible, seekable bool, progress float64) {
+	visible = o.showPlayerBar && (o.playingPath != "" || o.loading || o.presetNameTex != 0)
+	if !visible || o.playingPath == "" || o.loading || o.duration <= 0 || player.IsRadio(o.playingPath) {
+		return visible, false, 0
+	}
+	return true, true, min(max(o.playerBarPosition()/o.duration, 0), 1)
+}
+
 func (o *Overlay) drawPlaybackProgress(w, h, viewW, viewH int) {
-	if !o.showPlayerBar || o.loading || o.duration <= 0 || player.IsRadio(o.playingPath) {
+	visible, seekable, progress := o.playbackProgressState()
+	if !visible {
 		return
 	}
 	_, end, _ := o.playerBarBounds(w, h)
@@ -175,7 +184,9 @@ func (o *Overlay) drawPlaybackProgress(w, h, viewW, viewH int) {
 	y := float32(end - barH)
 	dark, light := o.playbackProgressColors()
 	glDrawFilledRect(o.programRect, 0, y, float32(w), float32(barH), float32(dark.R)/255, float32(dark.G)/255, float32(dark.B)/255, 1, w, h, viewW, viewH)
+	if !seekable {
+		return
+	}
 	inset := o.scalePx(1)
-	progress := min(max(o.playerBarPosition()/o.duration, 0), 1)
 	glDrawFilledRect(o.programRect, 0, y+float32(inset), float32(float64(w)*progress), float32(max(1, barH-2*inset)), float32(light.R)/255, float32(light.G)/255, float32(light.B)/255, 1, w, h, viewW, viewH)
 }

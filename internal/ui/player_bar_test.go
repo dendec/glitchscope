@@ -103,6 +103,37 @@ func TestPlaybackProgressThemeColorsOpaque(t *testing.T) {
 	}
 }
 
+func TestPlaybackProgressState(t *testing.T) {
+	tests := []struct {
+		name               string
+		showBar            bool
+		path               string
+		loading            bool
+		presetNameTex      uint32
+		duration, position float64
+		visible, seekable  bool
+		progress           float64
+	}{
+		{name: "hidden"},
+		{name: "loading", showBar: true, path: "track.mp3", loading: true, duration: 100, visible: true},
+		{name: "radio", showBar: true, path: "radio:station", duration: 100, visible: true},
+		{name: "unknown duration", showBar: true, path: "track.mp3", visible: true},
+		{name: "preset only", showBar: true, presetNameTex: 1, duration: 100, visible: true},
+		{name: "seekable", showBar: true, path: "track.mp3", duration: 100, position: 50, visible: true, seekable: true, progress: 0.5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := testPointerOverlay()
+			o.showPlayerBar, o.playingPath, o.loading = tt.showBar, tt.path, tt.loading
+			o.presetNameTex, o.duration, o.position = tt.presetNameTex, tt.duration, tt.position
+			visible, seekable, progress := o.playbackProgressState()
+			if visible != tt.visible || seekable != tt.seekable || progress != tt.progress {
+				t.Fatalf("progress state = (%t, %t, %v), want (%t, %t, %v)", visible, seekable, progress, tt.visible, tt.seekable, tt.progress)
+			}
+		})
+	}
+}
+
 func TestPlayerBarEmptyAndUnavailableTimeline(t *testing.T) {
 	o := testPointerOverlay()
 	o.uiVisible = false
