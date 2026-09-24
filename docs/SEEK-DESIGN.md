@@ -118,10 +118,11 @@ native fallback:
 | SID (over cap, native) | none | none | `seek()`/`rewind()` = NOT_IMPLEMENTED |
 
 
-## Velocity + acceleration drivetrain (app layer)
+## Velocity + acceleration drivetrain (shared input model)
 
 Replace the naive `Position()+rx*10*dt` with an explicit velocity model in
-`internal/app`:
+`internal/app`. The reusable response curve lives in `internal/input/stick.go`
+and also drives vertical navigation with the left stick:
 
 ```
 effectiveSpeed = deflection * baseSeekSpeed          // deflection ∈ [0,1]
@@ -130,7 +131,9 @@ if heldMax && holdTime > 0.4s:                        // extreme deflection held
 ```
 
 - `baseSeekSpeed` ≈ 10 s/s, cap on accelerated speed ≈ 80 s/s (8×).
-- `deflection = |RightStickX()|` (already deadzone-filtered).
+- `deflection = |RightStickX()|` (deadzone-filtered by `internal/input`).
+- Left-stick vertical navigation uses the same signed deflection curve and hold
+  multiplier, with list steps per second as its base-speed unit.
 - Direction from sign of `RightStickX()`.
 - Accelerated speed is applied only to the *continuous* (stick) path; the
   discrete `,`/`.` button still does one ±5s step per press, and if the key is
@@ -149,6 +152,8 @@ if heldMax && holdTime > 0.4s:                        // extreme deflection held
 
 - **Right analog stick** — continuous proportional scrub, accelerates if held
   at max deflection.
+- **Left analog stick** — proportional vertical list scroll, with the same
+  max-hold acceleration curve.
 - **`,` / `.`** — discrete ±5s; held → accelerated repeated steps.
 - Everything else (prev/next track, play/pause, etc.) unchanged.
 
@@ -158,6 +163,8 @@ if heldMax && holdTime > 0.4s:                        // extreme deflection held
   backward-seek fallback, **pre-render layer** (`maxRenderFrames`,
   `interleavedToPlanar`, `renderToSeekable`, wired into `loadTracker`/`loadChip`).
 - `internal/app/run_loop.go` — velocity + acceleration drivetrain.
+- `internal/input/stick.go` — shared analog deflection and hold acceleration.
+- `internal/ui/overlay_input.go` — left-stick list scroll scheduling.
 - `internal/app/actions.go` — discrete hold-aware seek.
 - `internal/input/input.go` — expose held-seek button state if keyboard polling
   is the mechanism (or reuse `sdl.GetKeyboardState` in run_loop directly).

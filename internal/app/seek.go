@@ -1,27 +1,22 @@
 package app
 
 import (
-	"math"
 	"time"
+
+	"github.com/dendec/glitchscope/internal/input"
 )
 
-// Continuous-seek drivetrain. Mirrors the held-key scroll acceleration used
-// for navigation (Overlay.updateScrollHold): speed is proportional to stick
-// deflection, and holding the stick at max deflection for long enough
-// accelerates it further (doubling each second, capped). See
-// docs/SEEK-DESIGN.md.
+// Continuous-seek drivetrain. It uses the shared analog response curve from
+// internal/input, also used by left-stick list scrolling. See docs/SEEK-DESIGN.md.
 
 const (
 	// seekBaseSpeed is the seek velocity (seconds/second) at full deflection.
 	seekBaseSpeed = 10.0
-	// seekMaxAccel caps the additional multiplier from hold acceleration.
-	seekMaxAccel = 8.0
-	// seekMaxHoldAt is the deflection (absolute normalized axis) treated as
-	// "held to the max" for acceleration purposes.
-	seekMaxHoldAt = 0.9
-	// seekRampDelay is how long the stick must sit at max deflection before
-	// acceleration begins (seconds).
-	seekRampDelay = 0.4
+	// Keep these names for the seek policy and its regression tests; the shared
+	// stick implementation owns their values.
+	seekMaxAccel  = input.StickMaxAcceleration
+	seekMaxHoldAt = input.StickMaxHoldDeflection
+	seekRampDelay = input.StickRampDelay
 	// seekApplyThresh is the minimum accumulated seek delta (seconds) before a
 	// Seek is actually issued, to avoid re-seeking the decoder every frame.
 	seekApplyThresh = 0.1
@@ -32,66 +27,38 @@ const (
 // doubling each second, capped at seekMaxAccel. A small epsilon keeps the
 // floor stable against binary float representation (e.g. 1.4-0.4 ≈ 0.9999…).
 func seekAccelMultiplier(holdDur float64) float64 {
-	if holdDur <= seekRampDelay {
-		return 1
-	}
-	elapsed := math.Floor(holdDur - seekRampDelay + 1e-9)
-	mult := math.Pow(2, elapsed)
-	if mult > seekMaxAccel {
-		mult = seekMaxAccel
-	}
-	return mult
+	return input.StickAccelerationMultiplier(holdDur)
 }
 
 // seekSpeed returns the effective seek velocity in seconds/second for a stick
 // deflection in [-1,1] and the duration (seconds) the stick has been held at
 // max deflection. Sign carries the direction.
 func seekSpeed(deflection, holdDur float64) float64 {
-	dir := 1.0
-	if deflection < 0 {
-		dir = -1
-		deflection = -deflection
-	}
-	speed := deflection * seekBaseSpeed
-	if deflection >= seekMaxHoldAt {
-		speed *= seekAccelMultiplier(holdDur)
-	}
-	return dir * speed
+	return input.StickSpeed(deflection, holdDur) * seekBaseSpeed
 }
 
 // seekControl drives continuous seek across frames: it tracks whether the
 // stick is pinned at max deflection (to measure the acceleration hold) and
 // batches actual Seek calls so the decoder is not re-seeked every frame.
 type seekControl struct {
-	atMax       bool
-	maxHoldAt   time.Time
+	drive       input.StickDrive
 	lastApplied float64 // last seek target actually applied (-1 = none)
 	lastDir     int     // last applied direction (+1/-1)
 }
 
+func (c *seekControl) Speed(deflection float64, now time.Time) float64 {
+	return c.drive.Update(deflection, now) * seekBaseSpeed
+}
+
 // HoldDuration returns how long the stick has been held at max deflection.
 func (c *seekControl) HoldDuration(now time.Time) float64 {
-	if !c.atMax {
-		return 0
-	}
-	return now.Sub(c.maxHoldAt).Seconds()
+	return c.drive.HoldDuration(now)
 }
 
 // UpdateHold records the stick deflection this frame and returns the updated
 // hold duration (seconds at max deflection).
 func (c *seekControl) UpdateHold(deflection float64, now time.Time) float64 {
-	if deflection < 0 {
-		deflection = -deflection
-	}
-	if deflection >= seekMaxHoldAt {
-		if !c.atMax {
-			c.atMax = true
-			c.maxHoldAt = now
-		}
-	} else {
-		c.atMax = false
-	}
-	return c.HoldDuration(now)
+	return c.drive.UpdateHold(deflection, now)
 }
 
 // Target computes the seek target for this frame. pos is the current

@@ -14,6 +14,7 @@ import (
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
 	"github.com/dendec/glitchscope/internal/i18n"
+	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/modarchive"
 	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/radio"
@@ -215,6 +216,10 @@ type Overlay struct {
 	scrollDown  scrollHold
 	scrollLeft  scrollHold
 	scrollRight scrollHold
+	stickScroll scrollHold
+	stickDrive  input.StickDrive
+	stickDir    int
+	leftStickY  float64
 
 	lastInteraction time.Time
 
@@ -533,6 +538,11 @@ func (o *Overlay) SetControllerConnected(connected bool) {
 	o.controllerConnected = connected
 	o.helpDirty = true
 	o.hintTextCache = ""
+}
+
+// SetLeftStickY supplies the current vertical deflection for analog list scroll.
+func (o *Overlay) SetLeftStickY(deflection float64) {
+	o.leftStickY = deflection
 }
 
 // SetPointerCapabilities updates the runtime affordances. Mouse and touch

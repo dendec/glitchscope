@@ -12,6 +12,7 @@
 | UI translations | `internal/i18n` | `internal/config` language choice, UI/help/notifications |
 | Локальный индекс музыки | `internal/player` | NC navigation, playback selection, catalog albums |
 | Навигация и focus | `internal/ui` | rendered lists and breadcrumbs |
+| Analog-stick response | `internal/input.StickDrive` | left-stick list scroll, right-stick seek |
 | Playback queue | `internal/app` playback state | player commands, overlay snapshot |
 | Удаление файлов | `internal/app/delete_service.go` | confirmation UI, rescan |
 | Favorites | `internal/player` (`favorites.go`) | overlay navigation, input actions, JSON storage |
@@ -188,9 +189,14 @@ session cache. Повышение выполняется последующим�
 Измерения перехода не попадают в policy. Взаимодействие с UI не сбрасывает
 изученную чувствительность пресета к resolution.
 
-Удержание клавиши навигации рассчитывает шаги по монотонному времени, а не по
-числу кадров. Если projectM задержал основной цикл, следующий проход может
-обработать несколько накопившихся шагов с ограниченным бюджетом работы.
+Удержание клавиши или крестовины навигации рассчитывает шаги по монотонному
+времени, а не по числу кадров. Если projectM задержал основной цикл, следующий
+проход может обработать несколько накопившихся шагов с ограниченным бюджетом
+работы. Вертикальный левый стик прокручивает список со скоростью, зависящей от
+отклонения. Он и правый стик для перемотки используют общий
+`internal/input.StickDrive`: удержание не менее 90% отклонения 400 мс запускает
+удвоение скорости раз в секунду с пределом 8×. Навигация применяет эту скорость
+в шагах списка в секунду; перемотка — в секундах аудио в секунду.
 Вне активного взаимодействия расписание и качество фонового визуализатора не
 меняются. Во время взаимодействия сначала показывается обновлённый UI поверх
 последней текстуры, затем планируется следующий кадр projectM на том же GL-потоке.

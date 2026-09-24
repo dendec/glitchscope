@@ -17,13 +17,14 @@ import (
 
 const (
 	scrollHoldStartDelay  = 200 * time.Millisecond
-	scrollHoldInitialRate = 5.0   // steps per second once repeating starts
-	scrollHoldMaxRate     = 120.0 // keep long holds useful on large lists
-	maxScrollCatchUpSteps = 16    // bound work after a delayed frame
+	scrollHoldInitialRate = 5.0                   // steps per second once repeating starts
+	scrollHoldMaxRate     = 120.0                 // keep long holds useful on large lists
+	scrollStickBaseRate   = scrollHoldInitialRate // full tilt starts at the D-Pad's repeat rate
+	maxScrollCatchUpSteps = 16                    // bound work after a delayed frame
 	uiInteractionGrace    = 200 * time.Millisecond
 )
 
-// scrollHold tracks key-hold timing for scroll acceleration.
+// scrollHold tracks repeated navigation steps for digital and analog input.
 type scrollHold struct {
 	holdStart  time.Time
 	lastStep   time.Time
@@ -66,6 +67,11 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 
 	o.updateScrollHold(&o.scrollUp, state[sdl.SCANCODE_UP] != 0 || gamepadUp, now, func() { o.moveCursor(-1) })
 	o.updateScrollHold(&o.scrollDown, state[sdl.SCANCODE_DOWN] != 0 || gamepadDown, now, func() { o.moveCursor(1) })
+	if state[sdl.SCANCODE_UP] != 0 || state[sdl.SCANCODE_DOWN] != 0 || gamepadUp || gamepadDown {
+		o.resetStickScroll()
+	} else {
+		o.updateStickScroll(o.leftStickY, now)
+	}
 	if o.infoPanelFocused() {
 		o.updateScrollHold(&o.scrollLeft, state[sdl.SCANCODE_LEFT] != 0, now, func() { o.scrollInfoHorizontal(-1) })
 		o.updateScrollHold(&o.scrollRight, state[sdl.SCANCODE_RIGHT] != 0, now, func() { o.scrollInfoHorizontal(1) })
@@ -93,6 +99,13 @@ func (o *Overlay) resetScrollHolds() {
 	o.scrollDown.active = false
 	o.scrollLeft.active = false
 	o.scrollRight.active = false
+	o.resetStickScroll()
+}
+
+func (o *Overlay) resetStickScroll() {
+	o.stickScroll.active = false
+	o.stickDir = 0
+	o.stickDrive.Reset()
 }
 
 // scrollHoldRate returns the repeat rate for a hold. Acceleration is smooth so
@@ -112,20 +125,58 @@ func (o *Overlay) updateScrollHold(h *scrollHold, held bool, now time.Time, step
 		h.active = false
 		return
 	}
-	if !h.active || h.uiPage != o.uiPage || h.focusPanel != o.focusPanel || h.navDepth != len(o.navStack) {
-		// New hold — start tracking.
-		*h = scrollHold{
-			holdStart:  now,
-			lastStep:   now,
-			active:     true,
-			uiPage:     o.uiPage,
-			focusPanel: o.focusPanel,
-			navDepth:   len(o.navStack),
-		}
+	if !h.active || o.scrollContextChanged(h) {
+		o.startScrollHold(h, now)
 		return
 	}
 	rate := scrollHoldRate(now.Sub(h.holdStart))
-	if rate == 0 {
+	o.updateScrollRate(h, rate, now, step)
+}
+
+func (o *Overlay) updateStickScroll(deflection float64, now time.Time) {
+	direction := 0
+	if deflection < 0 {
+		direction = -1
+	} else if deflection > 0 {
+		direction = 1
+	}
+	if direction == 0 {
+		o.resetStickScroll()
+		return
+	}
+
+	h := &o.stickScroll
+	if !h.active || o.scrollContextChanged(h) || o.stickDir != direction {
+		o.stickDrive.Reset()
+		o.stickDrive.UpdateHold(deflection, now)
+		o.stickDir = direction
+		o.startScrollHold(h, now)
+		return
+	}
+
+	drive := o.stickDrive.Update(deflection, now)
+	rate := math.Abs(drive) * scrollStickBaseRate
+	step := func() { o.moveCursor(direction) }
+	o.updateScrollRate(h, rate, now, step)
+}
+
+func (o *Overlay) scrollContextChanged(h *scrollHold) bool {
+	return h.uiPage != o.uiPage || h.focusPanel != o.focusPanel || h.navDepth != len(o.navStack)
+}
+
+func (o *Overlay) startScrollHold(h *scrollHold, now time.Time) {
+	*h = scrollHold{
+		holdStart:  now,
+		lastStep:   now,
+		active:     true,
+		uiPage:     o.uiPage,
+		focusPanel: o.focusPanel,
+		navDepth:   len(o.navStack),
+	}
+}
+
+func (o *Overlay) updateScrollRate(h *scrollHold, rate float64, now time.Time, step func()) {
+	if rate <= 0 {
 		return
 	}
 	stepInterval := 1.0 / rate

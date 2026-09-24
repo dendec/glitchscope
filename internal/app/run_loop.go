@@ -324,12 +324,11 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 		var velocity float64
 		switch {
 		case state[sdl.SCANCODE_PERIOD] != 0:
-			velocity = seekSpeed(1.0, a.seek.UpdateHold(1.0, now))
+			velocity = a.seek.Speed(1.0, now)
 		case state[sdl.SCANCODE_COMMA] != 0:
-			velocity = seekSpeed(-1.0, a.seek.UpdateHold(1.0, now))
+			velocity = a.seek.Speed(-1.0, now)
 		default:
-			rx := a.inp.RightStickX()
-			velocity = seekSpeed(rx, a.seek.UpdateHold(rx, now))
+			velocity = a.seek.Speed(a.inp.RightStickX(), now)
 		}
 		if target := a.seek.Target(a.pl.Position(), velocity, dt); target >= 0 {
 			if err := a.pl.Seek(target); err != nil {
@@ -338,6 +337,8 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 				a.seek.lastDir = 0
 			}
 		}
+	} else {
+		a.seek.drive.Reset()
 	}
 	return true
 }
@@ -426,6 +427,7 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 		caps := a.inp.PointerCapabilities()
 		a.overlay.SetControllerConnected(caps.Controller)
 		a.overlay.SetPointerCapabilities(caps.Keyboard, caps.Mouse, caps.Touch)
+		a.overlay.SetLeftStickY(a.inp.LeftStickY())
 		a.overlay.Update(a.inp.DPadUpHeld(), a.inp.DPadDownHeld())
 		uiInteracting = uiVisible && a.overlay.InteractionActive(time.Now())
 		if uiInteracting {

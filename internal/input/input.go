@@ -194,17 +194,22 @@ func (in *Input) PointerCapabilities() PointerCapabilities {
 	}
 }
 
+// LeftStickY returns the current left stick Y axis value (deadzone-filtered).
+// Positive = down, negative = up. Returns 0 when no controller is connected.
+func (in *Input) LeftStickY() float64 {
+	if in.controller == nil {
+		return 0
+	}
+	return normalizeAxis(in.controller.Axis(sdl.CONTROLLER_AXIS_LEFTY))
+}
+
 // RightStickX returns the current right stick X axis value (deadzone-filtered).
 // Positive = right, negative = left. Returns 0 when no controller is connected.
 func (in *Input) RightStickX() float64 {
 	if in.controller == nil {
 		return 0
 	}
-	v := float64(in.controller.Axis(sdl.CONTROLLER_AXIS_RIGHTX))
-	if v > -float64(axisDeadZone) && v < float64(axisDeadZone) {
-		return 0
-	}
-	return v / 32767.0
+	return normalizeAxis(in.controller.Axis(sdl.CONTROLLER_AXIS_RIGHTX))
 }
 
 // tryOpenController opens the first available game controller.
@@ -224,6 +229,13 @@ func (in *Input) tryOpenController() {
 }
 
 // --- internal ---
+
+func normalizeAxis(value int16) float64 {
+	if value > -axisDeadZone && value < axisDeadZone {
+		return 0
+	}
+	return max(-1, min(1, float64(value)/32767.0))
+}
 
 func keyToAction(key sdl.Keycode) Action {
 	switch key {
