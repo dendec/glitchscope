@@ -14,6 +14,7 @@ import copy
 import json
 import os
 import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -27,12 +28,21 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
+HF_HOME = Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface")
 DEFAULT_MODEL = Path(
-    "~/.cache/huggingface/hub/"
-    "models--tencent--Hy-MT2-7B-GGUF/snapshots/"
-    "ab8472660ac61fac25f1af43fac2599d52a8a775/Hy-MT2-7B-Q4_K_M.gguf"
+    os.environ.get("GLITCHSCOPE_TRANSLATION_MODEL")
+    or HF_HOME
+    / "hub"
+    / "models--tencent--Hy-MT2-7B-GGUF"
+    / "snapshots"
+    / "ab8472660ac61fac25f1af43fac2599d52a8a775"
+    / "Hy-MT2-7B-Q4_K_M.gguf"
 )
-DEFAULT_SERVER = Path("~/workspace/lingo/bin/llama")
+DEFAULT_SERVER = Path(
+    os.environ.get("GLITCHSCOPE_LLAMA_SERVER")
+    or shutil.which("llama-server")
+    or "llama-server"
+)
 DEFAULT_INPUT = Path("internal/ui/assets/help.json")
 
 PLACEHOLDER_RE = re.compile(r"\{[a-z0-9_]+\}")

@@ -17,7 +17,8 @@
 
 ## Вдохновение
 
-Проект строится по образу и подобию `../zimlite` (ZIM-ридер для портативок):
+Проект использует некоторые подходы из соседнего проекта `zimlite` (ZIM-ридера
+для портативок):
 
 - Архитектура Go-приложения с cgo-мостами к C/C++ библиотекам
 - Билд-система (Makefile + Dockerfile.arm64 + Dockerfile.windows)
@@ -25,8 +26,8 @@
 - Обработка ввода (gamepad + keyboard)
 - //go:embed статических ассетов
 
-Zimlite лежит в `~/workspace/zimlite`. Смотреть туда за паттернами:
-config, i18n, input обработка, Makefile, Dockerfile, Menu/UI, вердоринг C++.
+Смотреть в `zimlite` за паттернами: config, i18n, обработка input, Makefile,
+Dockerfile, Menu/UI и вердоринг C++.
 
 ---
 
@@ -228,7 +229,7 @@ deploy. Dockerfile.arm64 + Dockerfile.windows.
 
 ## Ссылки
 
-- Zimlite: `~/workspace/zimlite`
+- Zimlite: соседний проект; локальный путь зависит от окружения.
 - SoLoud: https://solhsa.com/soloud/ (vendored src + include)
 - projectM: https://github.com/projectM-visualizer/projectm (vendored)
 - libopenmpt: https://lib.openmpt.org/ (системная зависимость)

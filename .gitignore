@@ -1,5 +1,11 @@
 # Binary (root-level only)
 /mdpp
+/glitchscope
+/glitchscope-pack
+/modland-catalog
+/modarchive-catalog
+/validate-catalog
+/texture-report
 
 # Build output
 dist/
@@ -12,6 +18,25 @@ dist/
 Thumbs.db
 __pycache__/
 .cache
+.vscode/
+.idea/
+
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+secrets/
+credentials/
+*.key
+*.pem
+*.p12
+*.pfx
+*.keystore
+*.jks
+.netrc
+.npmrc
+.pypirc
 
 # local test data (too large, dev only)
 test_data
