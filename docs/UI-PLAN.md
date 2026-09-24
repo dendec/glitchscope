@@ -416,4 +416,10 @@ levels; shutdown cancels and joins the worker before releasing catalog resources
 Radio distinguishes a completed empty listing from an outstanding request.
 Category labels are localized. Radio favicon decode/background removal runs off
 the render thread, with pixel and cache limits; only upload and display stay on
-GL. See ARCHITECTURE.md for the stream lifecycle and memory budgets.
+GL. The station metadata panel appears as soon as a station row is selected;
+favicon loading waits until vertical navigation has been idle for 250 ms, just
+over the initial 200 ms interval between repeated navigation steps, and
+the delay restarts while a key, D-Pad direction, or left stick is scrolling.
+This keeps rapid browsing from fetching each station image while allowing the
+selected station's favicon to load alongside its metadata. See ARCHITECTURE.md
+for the stream lifecycle and memory budgets.

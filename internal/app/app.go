@@ -567,6 +567,9 @@ func (a *App) initAudio() {
 		return path, nil
 	}
 	a.overlay = ui.New()
+	if a.radio != nil {
+		a.overlay.SetRadioFaviconRequest(a.beginRadioFavicon)
+	}
 	if err := a.overlay.SetLanguage(a.settings.UI.Language); err != nil {
 		slog.Warn("load UI language", "language", a.settings.UI.Language, "error", err)
 	}

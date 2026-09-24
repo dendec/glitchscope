@@ -22,6 +22,7 @@ const (
 	scrollStickBaseRate   = scrollHoldInitialRate // full tilt starts at the D-Pad's repeat rate
 	maxScrollCatchUpSteps = 16                    // bound work after a delayed frame
 	uiInteractionGrace    = 200 * time.Millisecond
+	radioFaviconIdleDelay = 250 * time.Millisecond
 )
 
 // scrollHold tracks repeated navigation steps for digital and analog input.
@@ -60,6 +61,7 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 
 	if !o.uiVisible || !o.panelEntered {
 		o.resetScrollHolds()
+		o.updateRadioFaviconPreview(now, false)
 		return
 	}
 
@@ -79,6 +81,53 @@ func (o *Overlay) Update(gamepadUp, gamepadDown bool) {
 		o.scrollLeft.active = false
 		o.scrollRight.active = false
 	}
+	o.updateRadioFaviconPreview(now, o.scrollUp.active || o.scrollDown.active || o.stickScroll.active)
+}
+
+// updateRadioFaviconPreview requests a station favicon only after vertical
+// navigation has been idle long enough for the selected station to settle.
+func (o *Overlay) updateRadioFaviconPreview(now time.Time, navigating bool) {
+	entry := o.currentEntry()
+	if !o.uiVisible || !o.panelEntered || o.uiPage != PageLibrary || entry == nil || entry.kind != entryRadioStation || o.radioFaviconReq == nil {
+		o.clearRadioFaviconPreview()
+		return
+	}
+
+	station := entry.radioStation
+	path := station.Path()
+	if path == "" || strings.TrimSpace(station.Favicon) == "" {
+		o.clearRadioFaviconPreview()
+		return
+	}
+	if o.radioFavicons[path] != nil {
+		o.clearRadioFaviconPreview()
+		return
+	}
+	if o.radioFaviconPath != path || o.radioFaviconURL != station.Favicon {
+		o.radioFaviconPath = path
+		o.radioFaviconURL = station.Favicon
+		o.radioFaviconDue = now.Add(radioFaviconIdleDelay)
+	}
+	if navigating {
+		o.radioFaviconDue = now.Add(radioFaviconIdleDelay)
+		return
+	}
+	if o.radioFaviconDue.IsZero() || now.Before(o.radioFaviconDue) {
+		return
+	}
+	if o.radioFaviconReq(station) {
+		o.radioFaviconDue = time.Time{}
+		return
+	}
+	// The bounded app worker pool may be full; retry while this station remains
+	// selected instead of losing the request.
+	o.radioFaviconDue = now.Add(radioFaviconIdleDelay)
+}
+
+func (o *Overlay) clearRadioFaviconPreview() {
+	o.radioFaviconPath = ""
+	o.radioFaviconURL = ""
+	o.radioFaviconDue = time.Time{}
 }
 
 // InteractionActive reports whether the user has interacted with the visible

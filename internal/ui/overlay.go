@@ -208,6 +208,10 @@ type Overlay struct {
 	presetPreviewFPS func() float64
 	presetPreviewDue time.Time
 	presetDetailKey  string
+	radioFaviconReq  func(station radio.Station) bool
+	radioFaviconPath string
+	radioFaviconURL  string
+	radioFaviconDue  time.Time
 	presetsColL      listTex
 	presetsColR      listTex
 	previewBgTex     uint32 // thumbnail texture drawn full-screen as presets page background
@@ -1003,6 +1007,11 @@ func (o *Overlay) SetRadioNowPlaying(path, title string) {
 		o.tracksDirty = true
 		o.tracksContentDirty = true
 	}
+}
+
+// SetRadioFaviconRequest installs the app-owned asynchronous favicon loader.
+func (o *Overlay) SetRadioFaviconRequest(fn func(station radio.Station) bool) {
+	o.radioFaviconReq = fn
 }
 
 // SetRadioFavicon takes ownership of a prepared bitmap; upload stays on the GL thread.

@@ -671,21 +671,20 @@ func (a *App) beginRadioMetadata(station radio.Station) {
 	if a.overlay != nil {
 		a.overlay.SetRadioNowPlaying(station.Path(), "")
 	}
-	a.beginRadioFavicon(station)
 }
 
-func (a *App) beginRadioFavicon(station radio.Station) {
+func (a *App) beginRadioFavicon(station radio.Station) bool {
 	if a.radio == nil || strings.TrimSpace(station.Favicon) == "" {
-		return
+		return false
 	}
 	path := station.Path()
 	if a.radioFaviconRequested[path] {
-		return
+		return true
 	}
 	select {
 	case a.radioFaviconSlots <- struct{}{}:
 	default:
-		return
+		return false
 	}
 	a.radioFaviconRequested[path] = true
 	a.radioFaviconWG.Add(1)
@@ -702,6 +701,7 @@ func (a *App) beginRadioFavicon(station radio.Station) {
 		case <-a.appCtx.Done():
 		}
 	}()
+	return true
 }
 
 func (a *App) playRadioPlaylist(path string) {

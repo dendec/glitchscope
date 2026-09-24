@@ -11,7 +11,70 @@ import (
 	"image/jpeg"
 	"image/png"
 	"testing"
+	"time"
+
+	"github.com/dendec/glitchscope/internal/radio"
 )
+
+func TestRadioFaviconRequestWaitsForNavigationToSettle(t *testing.T) {
+	station := radio.Station{StationUUID: "station-id", Name: "Station", Favicon: "https://example.test/favicon.png"}
+	var requests int
+	o := &Overlay{
+		uiVisible:    true,
+		panelEntered: true,
+		uiPage:       PageLibrary,
+		albumEntries: []navEntry{{kind: entryRadioStation, radioStation: station}},
+		radioFaviconReq: func(got radio.Station) bool {
+			if got.Path() != station.Path() {
+				t.Fatalf("requested station %q, want %q", got.Path(), station.Path())
+			}
+			requests++
+			return true
+		},
+	}
+	start := time.Now()
+	o.updateRadioFaviconPreview(start, true)
+	o.updateRadioFaviconPreview(start.Add(time.Second), true)
+	deadline := start.Add(time.Second + radioFaviconIdleDelay)
+	o.updateRadioFaviconPreview(deadline.Add(-time.Nanosecond), false)
+	if requests != 0 {
+		t.Fatalf("requested favicon before idle delay elapsed: %d requests", requests)
+	}
+	o.updateRadioFaviconPreview(deadline, false)
+	if requests != 1 {
+		t.Fatalf("requests after navigation settled = %d, want 1", requests)
+	}
+	o.updateRadioFaviconPreview(deadline.Add(time.Second), false)
+	if requests != 1 {
+		t.Fatalf("repeated request for unchanged selection: %d", requests)
+	}
+}
+
+func TestRadioFaviconRequestRetriesWhenWorkerPoolIsFull(t *testing.T) {
+	station := radio.Station{StationUUID: "station-id", Favicon: "https://example.test/favicon.png"}
+	var requests int
+	o := &Overlay{
+		uiVisible:    true,
+		panelEntered: true,
+		uiPage:       PageLibrary,
+		albumEntries: []navEntry{{kind: entryRadioStation, radioStation: station}},
+		radioFaviconReq: func(radio.Station) bool {
+			requests++
+			return requests > 1
+		},
+	}
+	start := time.Now()
+	o.updateRadioFaviconPreview(start, false)
+	o.updateRadioFaviconPreview(start.Add(radioFaviconIdleDelay), false)
+	o.updateRadioFaviconPreview(start.Add(2*radioFaviconIdleDelay-time.Nanosecond), false)
+	if requests != 1 {
+		t.Fatalf("requests before retry deadline = %d, want 1", requests)
+	}
+	o.updateRadioFaviconPreview(start.Add(2*radioFaviconIdleDelay), false)
+	if requests != 2 {
+		t.Fatalf("requests after retry deadline = %d, want 2", requests)
+	}
+}
 
 func TestPrepareRadioFaviconRemovesJPEGBackgroundIncludingInnerHoles(t *testing.T) {
 	src := image.NewRGBA(image.Rect(0, 0, 80, 40))
