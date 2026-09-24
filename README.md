@@ -1,149 +1,98 @@
 # GlitchScope
 
-**Audio player with MilkDrop-compatible real-time visualization for game consoles and desktop.**
+[![CI](https://github.com/dendec/glitchscope/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/dendec/glitchscope/actions/workflows/ci.yml)
 
-Renders MilkDrop preset visualizations (projectM 4.x) over OpenGL while playing audio files (MP3, FLAC, WAV, Ogg, etc.) and tracker music (MOD, XM, IT, S3M, PT3, YM, etc.). Supports keyboard, gamepad, mouse, and touch input. Designed for low-power ARM handhelds (PortMaster) but runs on any Linux/Windows desktop.
+**Bring MilkDrop visuals back to your music.**
 
-## Features
+GlitchScope is an open-source music player for Linux and Windows desktops and
+low-power PortMaster handhelds. Play a local library, classic tracker and chip
+music, or internet radio with real-time MilkDrop-compatible visuals powered by
+projectM 4.
 
-- **Audio Playback** — Plays WAV, MP3, FLAC, Ogg Vorbis, Opus, AAC, WMA, APE, WavPack, Musepack, Speex, and more via FFmpeg & SoLoud
-- **Tracker & Chip Music** — Full support for MOD, XM, IT, S3M (libopenmpt / libxmp), PT3 (pt3player), VTX (ayumi), YM (StSound), SID (cRSID), and console audio formats (libgme)
-- **MilkDrop Visualizations** — Real-time rendering powered by projectM 4.x with 100+ embedded `.milk` presets and compressed `.gsa` preset archives
-- **Graphics Settings** — Independent frame-rate cap (including display-bound Max), adaptive-resolution toggle, render-resolution ceiling and upscale filter for output and preset transitions (Bilinear or Nearest neighbor)
-- **Playback Modes** — Shuffle (Album, Source, All) and Repeat (Off, Repeat One, Repeat All). Manual Next honors shuffle. Offline Shuffle All selects local music and already-downloaded remote tracks; Shuffle Source is restricted to the cached subset of the selected remote source. Connectivity is rechecked every 30 seconds. Failed loads are skipped, with bounded recovery to avoid an endless loop of broken tracks.
-- **Online Module Catalogs** — Browse Modland, yearly ModArchive additions, the 2007 official addendum, and the 1987-2007 ModArchive snapshot; bundled `1980-2007.gsa` and `2007-addendum.gsa` indexes provide offline navigation, while selected tracks are fetched individually with HTTP Range requests
-- **Internet Radio** — Browse Radio Browser stations by popularity, random selection, tag, language, or country; station listings are cached locally, MP3/AAC streams use the existing FFmpeg/SoLoud pipeline, and ICY track titles appear in the station panel. Local `.m3u`, `.m3u8`, and `.pls` station playlists are also supported. Basic unencrypted HLS is supported; byte ranges, gaps, discontinuities and changing init segments are rejected explicitly (see [radio review](docs/RADIO-REVIEW.md))
-- **Preset Auto-Switch** — Configurable timer-based preset rotation (Off, 15s, 30s, 60s, 2m)
-- **UI & Themes** — Clean 2-column interface with nine distinct color themes and customizable overlay transparency
-- **Localized UI & Help** — English, Russian, Simplified/Traditional Chinese, Japanese, Korean, Vietnamese, Thai, Indonesian, Malay, Brazilian Portuguese, Spanish, German, French, and Turkish; switch languages in Settings without restarting
-- **Gamepad, Keyboard & Pointer** — Full controller mapping optimized for PortMaster handhelds (TrimUI Smart Pro, Anbernic, Miyoo, etc.); mouse and touch taps open the UI, select rows, and scroll lists
+![GlitchScope running on a handheld](portmaster/screenshot.png)
 
-## Building
+## What you can do
 
-### Linux (AMD64 via Docker)
-Building via Docker handles all static C/C++ dependencies (`projectM`, `SoLoud`, `FFmpeg`, `libopenmpt`, `libxmp`, etc.) automatically.
-```bash
-# Build Docker builder image and AMD64 distribution package
+- **Watch your music.** Browse MilkDrop presets, preview them before switching,
+  and set automatic rotation. Graphics options include adaptive resolution and
+  frame-rate limits for slower devices.
+- **Play more than standard audio.** FFmpeg handles common formats such as MP3,
+  FLAC, WAV, Ogg Vorbis, Opus, and AAC. Tracker and chip support includes MOD,
+  XM, IT, S3M, PT3, VTX, YM, SID, and console music formats.
+- **Explore music online.** Browse Modland and ModArchive catalogs or find
+  stations through Radio Browser. Save tracks to three favorites playlists;
+  local music and cached downloads remain available offline.
+- **Use the controls that suit your device.** The interface supports gamepads,
+  keyboards, mice, and touch. It includes 64 color themes and 15 UI languages.
+- **Listen without the visualizer.** Turn visualization off to save power while
+  keeping audio playback and library controls available.
+
+Radio plays MP3/AAC streams and basic unencrypted HLS. See the
+[radio compatibility notes](docs/RADIO-STREAMING.md) for unsupported HLS
+features and other limits.
+
+## Build and run
+
+### Linux desktop (AMD64)
+
+Requirements: Git with submodule support, Docker, Make, Python 3, and an internet
+connection for the first build. Docker builds the native audio and graphics
+dependencies; the packaging step also downloads the preset, texture, and online
+catalog data it needs.
+
+```sh
+git clone --recurse-submodules https://github.com/dendec/glitchscope.git
+cd glitchscope
 make dist
-# Set the version embedded in the binary, window title, and Go HTTP User-Agent.
-make VERSION=1.2 dist
-# Output: dist/linux-amd64/
 ```
 
-### Windows (AMD64 via Docker)
-Windows uses a separate cross-builder because the Linux builder produces ELF
-objects and GLES libraries that cannot be linked into a Windows executable.
-```bash
-make dist-windows
-# Output: dist/windows-amd64/
-```
-The package contains `glitchscope.exe`, the SDL2 runtime DLL, preset/texture
-archives, and offline Modland/ModArchive catalogs. The remaining system DLLs
-are provided by Windows itself.
+The package is created in `dist/linux-amd64/`. Put music in the `music/`
+directory beside the executable and launch `./dist/linux-amd64/glitchscope`,
+or start with one track:
 
-### PortMaster / ARM64 (Cross-build via Docker)
-```bash
-# Build PortMaster-compatible zip package for ARM64 handhelds
-make dist-portmaster
-# Output: dist/glitchscope.zip and dist/portmaster-submit/ports/glitchscope/
+```sh
+./dist/linux-amd64/glitchscope -file /path/to/track.flac
 ```
 
-See [PortMaster release checks](docs/PORTMASTER-RELEASE.md) for screenshot,
-asset permissions and required device testing before submission.
+### Other release packages
 
-### Development (Lint & Test)
-```bash
-# Run golangci-lint inside Docker builder environment
+```sh
+make dist-windows    # Windows AMD64 package
+make dist-portmaster # PortMaster ARM64 zip and submission directory
+```
+
+For PortMaster packaging, device checks, and asset redistribution notes, see
+[the release checklist](docs/PORTMASTER-RELEASE.md).
+
+### Development checks
+
+```sh
 make lint
-
-# Run Go unit tests
 make test
 ```
 
-## Quick Start
+Both commands run in the Docker builder so they use the project's native
+dependencies. More commands and repository conventions are in [AGENTS.md](AGENTS.md).
 
-```bash
-# Run local Docker build
-make dist
+## Controls and settings
 
-# Launch the visualizer with a music directory
-./dist/linux-amd64/glitchscope -music /path/to/your/music/
-```
+Press **Start** on a handheld or **Tab** on a keyboard to open the menu. The
+footer shows the controls available on the current screen; the Help page covers
+playback and navigation. **Ctrl+F** toggles borderless fullscreen on desktop.
 
-## Configuration
+Settings and favorites are saved as `settings.json` and `favorites.json`. When
+`XDG_DATA_HOME` is set, the files are stored there; otherwise they are written
+to the current working directory.
 
-Settings are automatically saved to `config.json` next to the binary:
+## Documentation
 
-```json
-{
-  "graphics": {
-    "render_width": 320,
-    "render_height": 240,
-    "adaptive": true,
-    "frame_rate": "max",
-    "upscale_filter": "pixel",
-    "beat_sensitivity": 1
-  },
-  "playback": {
-    "shuffle_mode": "off",
-    "repeat": "off",
-    "last_position": {
-      "path": "/path/to/track.ogg",
-      "seconds": 42.5
-    }
-  },
-  "preset_interval": 30,
-  "ui": {
-    "theme": "dark",
-    "transparency": 0,
-    "language": "en"
-  }
-}
-```
+- [Project documentation index](docs/README.md)
+- [Architecture and ownership](docs/ARCHITECTURE.md)
+- [PortMaster release checklist](docs/PORTMASTER-RELEASE.md)
+- [Seeking and tracker playback design](docs/SEEK-DESIGN.md)
 
 ## License
 
-GPL-2.0+ (See [portmaster/licenses/THIRD_PARTY_LICENSES.md](portmaster/licenses/THIRD_PARTY_LICENSES.md) for third-party component licenses)
-
-
-## Low-power handheld tuning
-
-- **Tracker seeking** selects its working PCM budget automatically from free
-  device memory. Tracks that do not fit stream natively; backward seeking then
-  depends on the decoder.
-- **Visualizer → Off** plays music without running the main visualizer. The
-  presets page still provides previews when opened.
-- The visualizer follows the selected frame-rate limit while input remains
-  responsive. Adaptive resolution is independent and never exceeds the selected
-  resolution ceiling. Preset previews load after a short cursor pause.
-- Stable preset resolutions are remembered during the current run (up to 256
-  profiles). Frame-rate/adaptive setting changes, window size and changed preset
-  content are isolated.
-
-For a device benchmark, run `./glitchscope -benchmark -benchmark-frames=120 -benchmark-out=benchmark-handheld.csv`. CSV contains preset startup
-and load time, mean/p95/p99/max frame times and process-lifetime peak RSS. Use a
-new CSV path for the new schema; older reports are not overwritten or mixed.
-The benchmark uses a synthetic audio signal and does not measure audio dropouts
-or UI rendering. Repeat the same run after warming the device to compare sustained
-performance. `-v` logs audio decoding time and process peak RSS.
-
-
-## Finding your way around
-
-On first use, **START — Open menu** (or **TAB** with a keyboard) appears for ten
-seconds. Opening the menu dismisses it permanently; missing the hint lets it
-reappear next time. Help begins with Quick Start, Controls, Playback, Frame rate and
-Battery, and Troubleshooting. Button names match the context hints at the bottom
-of the menu. Settings includes short explanations of the selected options.
-
-On desktop, **Ctrl+F** toggles borderless fullscreen; plain **F** keeps its
-favorite action.
-
-В настройках визуализации частота кадров, адаптивное разрешение и разрешение
-выбираются независимо. Частота предлагает фиксированные значения до частоты
-дисплея и пункт «Макс.» с текущей частотой обновления; одинаковые значения не
-дублируются. При включённом адаптивном разрешении выбранный размер является
-верхним пределом: приложение может понижать и восстанавливать его, чтобы
-приблизиться к целевой частоте, но не меняет саму настройку FPS. При выключенной
-адаптации разрешение фиксировано. По умолчанию используются «Макс.»,
-адаптивное разрешение и максимальный размер экрана.
+GlitchScope is licensed under the GNU GPL, version 2 or later; see [LICENSE](LICENSE).
+Third-party component notices are in
+[portmaster/licenses/THIRD_PARTY_LICENSES.md](portmaster/licenses/THIRD_PARTY_LICENSES.md).

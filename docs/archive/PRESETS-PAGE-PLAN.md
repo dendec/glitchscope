@@ -1,4 +1,8 @@
-# Presets Page Rework — Plan
+# Presets Page Rework — implementation notes
+
+> Status: implemented. This document preserves the original design and rollout
+> notes. The current UI behavior is described in [UI-PLAN.md](../UI-PLAN.md),
+> with runtime ownership in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 ## Goal
 
@@ -11,7 +15,7 @@ Rework the Presets page navigation to mirror the Library/NC pattern:
 
 ---
 
-## Current State
+## Starting State
 
 The presets page is a flat two-column layout:
 - Left: category list (flat, no nesting)

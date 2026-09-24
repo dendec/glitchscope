@@ -1,5 +1,10 @@
 # Windows port plan
 
+> Status: the Windows AMD64 build and packaging path is implemented through
+> `Dockerfile.windows` and `make dist-windows`. This file preserves the original
+> plan and milestone history; use the Makefile and current Windows diagnostics
+> for present-day build and verification status.
+
 ## Goal
 
 Produce a reproducible `windows-amd64` build of GlitchScope from Docker, using
@@ -10,9 +15,10 @@ loads presets, and plays at least the existing local audio formats.
 This is a native desktop port, not a WASM port. Linux/ARM GLES builds must
 remain unchanged.
 
-## Current assessment
+## Assessment when this plan was written
 
-The repository now has a first reproducible Windows build pipeline:
+At the time this assessment was written, the repository had a first reproducible
+Windows build pipeline:
 
 - `go-sdl2` already has Windows cgo support.
 - projectM has a Windows desktop OpenGL/GLEW configuration.
@@ -23,8 +29,8 @@ The repository now has a first reproducible Windows build pipeline:
 - Several Go/C files contain Linux-only assumptions that must be isolated
   before the Windows build can compile.
 
-The historical `PLAN.md` also mentions `Dockerfile.windows`; this plan remains
-the current, normative port roadmap.
+The archived early roadmap also mentions `Dockerfile.windows`. This document is
+historical context, not the current Windows roadmap.
 
 ## Milestones
 

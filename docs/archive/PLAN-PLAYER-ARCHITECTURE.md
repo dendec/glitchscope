@@ -1,8 +1,13 @@
 # Player Architecture Improvement Plan
 
-This document describes the next architecture iteration after the async playback refactor in commit `83c2442`.
+> Historical design proposal. The player lifecycle and asynchronous loading have
+> since been refactored; the sequence below is not current implementation work.
+> Use [the architecture guide](../ARCHITECTURE.md) and `internal/player` as
+> the current reference.
 
-The current implementation is functional and should not be reverted. The goal of this plan is to make asynchronous playback easier to reason about, cancel, test, and extend without changing the user-visible playback behavior.
+At the time, the implementation was functional and was not intended to be
+reverted. This proposal aimed to make asynchronous playback easier to reason
+about, cancel, test, and extend without changing user-visible behavior.
 
 ## Goals
 

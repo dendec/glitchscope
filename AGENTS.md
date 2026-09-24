@@ -254,9 +254,12 @@ mechanical wrappers. Keep them thin — put business logic in the caller.
 
 - `docs/ARCHITECTURE.md` — module boundaries, ownership table, invariants.
   **Update it when you change ownership or invariants.**
-- `docs/UI-PLAN.md`, `docs/UI-HELP-PLAN.md`, `docs/NAV-MODE-SWITCH.md`,
-  `docs/PLAN*.md` — feature/design plans. Read the relevant one before touching
-  UI/navigation/player features.
+- `docs/README.md` — index of current references and archived design notes.
+- `docs/UI-PLAN.md`, `docs/UI-HELP-PLAN.md`, `docs/PLAN-POINTER-INPUT.md`,
+  `docs/RADIO-STREAMING.md`, and `docs/SEEK-DESIGN.md` — current UI,
+  input, radio, and playback contracts. Read the relevant one before changing
+  those behaviors. Historical plans and reports are under `docs/archive/` and
+  are context, not current requirements.
 - `docs/SEEK-DESIGN.md` — the seek/перемотка architecture (accelerating seek
   drivetrain + pre-render layer). Read it before touching seeking or the
   tracker/chip pre-render path in `internal/player`.

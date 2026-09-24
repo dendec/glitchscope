@@ -1,5 +1,9 @@
 # Adaptive Render Resolution
 
+> Historical implementation plan. Adaptive rendering is implemented and has
+> since evolved beyond the fixed 25–30 FPS policy described below. Treat
+> [the architecture guide](../ARCHITECTURE.md) and current code as authoritative.
+
 ## Goal
 Keep visualizer FPS in 25–30 range by dynamically adjusting render resolution per-preset performance.
 

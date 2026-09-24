@@ -147,8 +147,8 @@ composite через ту же очередь.
 переход, пришедший во время загрузки, ставится в очередь. Native create/init,
 выбранный compile mode и main-thread commit имеют отдельные замеры в логе.
 Shared context не гарантирует отсутствия внутренних глобальных блокировок драйвера;
-Windows/Intel acceptance и остаточные FPS-замеры описаны в
-[WINDOWS-PRESET-FREEZES.md](WINDOWS-PRESET-FREEZES.md).
+Windows/Intel acceptance и остаточные FPS-замеры описаны в архивном отчёте
+[WINDOWS-PRESET-FREEZES.md](archive/WINDOWS-PRESET-FREEZES.md).
 
 При `Adaptive=true` выбранная в настройках resolution является верхним пределом.
 Разрешение временно уменьшается или повышается по результатам cadence, но никогда
@@ -392,4 +392,6 @@ Basic HLS supports master/media playlists, sequence-based deduplication, redirec
 and TS/fMP4 segment transport. Encrypted streams, byte ranges, gaps,
 discontinuities and changing initialization segments return explicit errors.
 Partial segment transfers are never replayed into the same decoder. See
-[RADIO-REVIEW.md](RADIO-REVIEW.md) for verification and remaining platform checks.
+[archived radio review](archive/RADIO-REVIEW.md) for implementation-time
+verification notes; remaining platform checks are in
+[PORTMASTER-RELEASE.md](PORTMASTER-RELEASE.md).
