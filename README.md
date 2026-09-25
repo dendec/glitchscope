@@ -31,6 +31,19 @@ Radio plays MP3/AAC streams and basic unencrypted HLS. See the
 [radio compatibility notes](docs/RADIO-STREAMING.md) for unsupported HLS
 features and other limits.
 
+## Data and asset sources
+
+- MilkDrop presets: [projectM Cream of the Crop](https://github.com/projectM-visualizer/presets-cream-of-the-crop).
+- Preset textures: [projectM Milkdrop Texture Pack](https://github.com/projectM-visualizer/presets-milkdrop-texture-pack).
+- Tracker and chip music catalogs: [Modland](https://modland.com/) (the build
+  uses its [`allmods.zip` listing](https://modland.antarctica.no/allmods.zip))
+  and [The Mod Archive](https://modarchive.org/) (the app browses the
+  [module mirror](http://modarchive.textfiles.com/)).
+- Internet radio directory: [Radio Browser](https://www.radio-browser.info/).
+
+Preset and texture collections retain their upstream terms. See the
+[release checklist](docs/PORTMASTER-RELEASE.md) for their redistribution status.
+
 ## Build and run
 
 ### Linux desktop (AMD64)
