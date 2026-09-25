@@ -85,6 +85,66 @@ track cache.
 For PortMaster packaging, device checks, and asset redistribution notes, see
 [the release checklist](docs/PORTMASTER-RELEASE.md).
 
+## Runtime requirements
+
+The release archives bundle the application and its native decoders, but Linux
+still needs the system graphics, audio, and C runtime libraries listed below.
+The Linux AMD64 package also uses system Vorbis and mpg123 libraries; Linux
+ARM64 and PortMaster bundle their codec and C++ runtime libraries. You do not
+need to install the `ffmpeg` command-line tool.
+
+### Linux AMD64
+
+Requires x86-64 Linux, glibc 2.35 or newer, a C++ runtime providing
+`GLIBCXX_3.4.30`, SDL2, desktop OpenGL, ALSA, Vorbis, mpg123, and zlib. Debian 12
+(Bookworm) provides a compatible runtime. Install the dependencies with:
+
+```sh
+sudo apt update
+sudo apt install \
+  libsdl2-2.0-0 libgl1 \
+  libvorbisfile3 libvorbis0a libmpg123-0 \
+  zlib1g libstdc++6 libasound2
+```
+
+The `libstdc++` symbol requirement matters in addition to the glibc version:
+an older C++ runtime can prevent startup even when glibc is new enough.
+On Debian 13 (Trixie), use `libmpg123-0t64` and `libasound2t64` in place of
+`libmpg123-0` and `libasound2`.
+
+### Linux ARM64
+
+Requires 64-bit ARM Linux, glibc 2.36 or newer, SDL2, OpenGL ES 2, ALSA, and
+working system audio and graphics drivers. The archive includes its codec and
+C++ runtime libraries. On Debian 12 or 64-bit Raspberry Pi OS Bookworm, install
+the system dependencies with:
+
+```sh
+sudo apt update
+sudo apt install libsdl2-2.0-0 libgles2 libasound2
+```
+
+On Debian 13 (Trixie), use `libasound2t64` in place of `libasound2`. Other
+distributions may use different package names; install the packages that
+provide SDL2, GLESv2, and ALSA. Extract the archive and start
+`./run-glitchscope.sh`.
+
+### PortMaster
+
+Install the PortMaster ZIP through PortMaster on compatible 64-bit ARM custom
+firmware. The firmware must provide glibc 2.36 or newer, SDL2, OpenGL ES 2,
+ALSA, and working device graphics and audio drivers. Codec and C++ runtime
+libraries are included in the package. Firmware versions differ, so check the
+requirements for your device and CFW; the archive contains
+`runtime-requirements.txt` for detailed ELF requirements.
+
+### Windows AMD64
+
+Requires 64-bit Windows and a graphics driver that supports desktop OpenGL.
+`SDL2.dll` is included beside `glitchscope.exe`; no separate SDL2 installation
+is needed. OpenGL and audio system libraries are supplied by Windows and its
+device drivers.
+
 ### Development checks
 
 ```sh

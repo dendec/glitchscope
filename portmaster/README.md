@@ -13,6 +13,15 @@ needed for Internet radio and downloading tracks from online catalogs; local
 music and previously downloaded tracks can be played offline. Presets and
 textures are supplied as archives in `glitchscope/presets/`.
 
+## Runtime requirements
+
+The PortMaster package requires compatible 64-bit ARM custom firmware that
+provides glibc 2.36 or newer, SDL2, OpenGL ES 2, ALSA, and working graphics and
+audio drivers. Codec and C++ runtime libraries are bundled in
+`glitchscope/libs.aarch64/`. Firmware requirements vary by device; check the
+runtime requirements included in the package and use the firmware's documented
+update process when a system library is missing.
+
 ## Controls
 
 Use the button labels shown in the menu footer; face-button labels can vary

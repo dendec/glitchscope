@@ -121,9 +121,18 @@ library path for the bundled codec and C++ runtime libraries in `libs.aarch64/`
 and starts GlitchScope from this directory. Put local tracks in `music/`.
 
 Requirements: 64-bit ARM Linux, glibc {minimum_glibc} or newer, SDL2,
-OpenGL ES 2, and working audio and graphics drivers supplied by the system.
-See `runtime-requirements.txt` for the dynamic library and symbol requirements
-of the executable and bundled libraries.
+OpenGL ES 2, ALSA, and working audio and graphics drivers supplied by the
+system. The archive bundles the codec and C++ runtime libraries. On Debian 12
+or 64-bit Raspberry Pi OS Bookworm, install the system libraries with:
+
+```sh
+sudo apt update
+sudo apt install libsdl2-2.0-0 libgles2 libasound2
+```
+
+On Debian 13 (Trixie), use `libasound2t64` in place of `libasound2`. See
+`runtime-requirements.txt` for the dynamic library and symbol requirements of
+the executable and bundled libraries.
 
 This is the regular Linux ARM64 package. PortMaster has a separate launcher and
 installable archive.
