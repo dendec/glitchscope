@@ -5,9 +5,12 @@ ARG OPENMPT_VERSION=0.8.7
 ARG XMP_VERSION=4.7.1
 ARG UNIFONT_VERSION=17.0.05
 
-# Add arm64 architecture and install the complete build toolchain.
+# Install matching OpenSSL versions for both architectures first. Debian can
+# publish arm64 and amd64 security updates at different times; libssl3 is
+# Multi-Arch: same, so APT cannot combine mismatched versions.
 RUN dpkg --add-architecture arm64 \
     && apt-get update \
+    && apt-get install -y --no-install-recommends -t bookworm libssl3:amd64 libssl3:arm64 \
     && apt-get install -y --no-install-recommends \
         wget ca-certificates \
         build-essential cmake git patchelf \
