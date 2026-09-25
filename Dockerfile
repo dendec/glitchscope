@@ -10,6 +10,10 @@ WORKDIR /build
 # Copy source files
 COPY cmd/ cmd/
 COPY internal/ internal/
+# The builder image already contains a patched SoLoud checkout. Clear its
+# sources before copying the pinned submodules so patch-added files cannot
+# survive as stale overlays on top of the clean checkout.
+RUN rm -rf /build/lib
 COPY lib/ lib/
 COPY test_data/ test_data/
 COPY portmaster/ portmaster/
