@@ -1,7 +1,5 @@
 # GlitchScope
 
-[![CI](https://github.com/dendec/glitchscope/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/dendec/glitchscope/actions/workflows/ci.yml)
-
 **Bring MilkDrop visuals back to your music.**
 
 GlitchScope is an open-source music player for Linux and Windows desktops and
