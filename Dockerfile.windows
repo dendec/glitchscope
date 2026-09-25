@@ -278,6 +278,14 @@ RUN cd lib/ffmpeg \
 # become part of the image input.
 COPY . .
 
+RUN if git apply --check patches/soloud-xmp.patch >/dev/null 2>&1; then \
+        git apply patches/soloud-xmp.patch; \
+    elif git apply --reverse --check patches/soloud-xmp.patch >/dev/null 2>&1; then \
+        :; \
+    else \
+        echo 'soloud-xmp.patch does not apply' >&2; exit 1; \
+    fi
+
 RUN mkdir -p internal/ui/assets \
     && python3 scripts/generate-icons.py \
         --manifest internal/ui/icon_assets.json \

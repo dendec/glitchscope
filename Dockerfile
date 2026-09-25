@@ -15,6 +15,15 @@ COPY test_data/ test_data/
 COPY portmaster/ portmaster/
 COPY scripts/ scripts/
 COPY LICENSE LICENSE
+COPY patches/soloud-xmp.patch patches/soloud-xmp.patch
+
+RUN if git apply --check patches/soloud-xmp.patch >/dev/null 2>&1; then \
+        git apply patches/soloud-xmp.patch; \
+    elif git apply --reverse --check patches/soloud-xmp.patch >/dev/null 2>&1; then \
+        :; \
+    else \
+        echo 'soloud-xmp.patch does not apply' >&2; exit 1; \
+    fi
 
 # Use the generated font subset copied with the source tree.  Do not replace it
 # with the builder image's cached font: the subset depends on the current locale

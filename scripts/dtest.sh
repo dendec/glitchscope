@@ -24,7 +24,7 @@ shift
 
 run_in_env() {
 	local cmd="$1"
-	docker run --rm -e GLITCHSCOPE_RADIO_TEST_URL -v "$ROOT:/build" -v "$GO_CACHE_VOL:/root/.cache/go-build" -w /build "$IMAGE" bash -c "$GO_ENV $cmd"
+	"$ROOT/scripts/with-soloud-xmp-patch.sh" docker run --rm -e GLITCHSCOPE_RADIO_TEST_URL -v "$ROOT:/build" -v "$GO_CACHE_VOL:/root/.cache/go-build" -w /build "$IMAGE" bash -c "$GO_ENV $cmd"
 }
 
 case "$sub" in

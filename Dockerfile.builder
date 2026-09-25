@@ -349,6 +349,14 @@ RUN GOBIN=/usr/local/bin go install github.com/golangci/golangci-lint/v2/cmd/gol
 
 # Copy SoLoud headers
 COPY lib/soloud lib/soloud
+COPY patches/soloud-xmp.patch /build/patches/soloud-xmp.patch
+RUN if git apply --check /build/patches/soloud-xmp.patch >/dev/null 2>&1; then \
+        git apply /build/patches/soloud-xmp.patch; \
+    elif git apply --reverse --check /build/patches/soloud-xmp.patch >/dev/null 2>&1; then \
+        :; \
+    else \
+        echo 'soloud-xmp.patch does not apply' >&2; exit 1; \
+    fi
 RUN mkdir -p /opt/soloud/include && cp -r lib/soloud/include/* /opt/soloud/include/
 
 # Export headers and place generated export header into source include tree

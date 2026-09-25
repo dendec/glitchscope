@@ -59,7 +59,7 @@ MODARCHIVE_ADDENDUM := .cache/modarchive/2007-addendum.gsa
 
 .PHONY: builder build clean dist dist-arm64 dist-windows dist-portmaster release-archives lint run run-local projectm-build submodules test tidy presets glitchscope portable-glitchscope force-presets-check textures optimize-textures texture-archive texture-report catalog catalog-validate modland-catalog modarchive-catalog deploy deploy-music deploy-fast deploy-portmaster kill subset-font icons
 
-DOCKER_DEV_RUN = docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
+DOCKER_DEV_RUN = scripts/with-soloud-xmp-patch.sh docker run --rm -v "$(CURDIR):/build" -v "$(DOCKER_GO_CACHE):/root/.cache/go-build" -w /build $(DOCKER_BUILDER) bash -c
 DOCKER_ICON_RUN = docker run --rm --user "$$(id -u):$$(id -g)" -v "$(CURDIR):/build" -w /build $(DOCKER_BUILDER) bash -c
 
 # Builder image: C/C++ static dependencies compiled once for amd64 & arm64

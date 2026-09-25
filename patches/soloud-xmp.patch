@@ -1,48 +1,159 @@
-diff --git a/lib/soloud/src/audiosource/openmpt/soloud_openmpt.cpp b/lib/soloud/src/audiosource/xmp/soloud_xmp.cpp
-index 7be457d..85ec406 100644
---- a/lib/soloud/src/audiosource/openmpt/soloud_openmpt.cpp
-+++ b/lib/soloud/src/audiosource/xmp/soloud_xmp.cpp
-@@ -1,6 +1,7 @@
+diff --git a/lib/soloud/include/soloud_c.h b/lib/soloud/include/soloud_c.h
+index bac939c..03bf951 100644
+--- a/lib/soloud/include/soloud_c.h
++++ b/lib/soloud/include/soloud_c.h
+@@ -151,2 +151,3 @@ typedef void * Monotone;
+ typedef void * Noise;
++typedef void * Xmp;
+ typedef void * Openmpt;
+@@ -489,1 +489,27 @@ void Noise_stop(Noise * aNoise);
++/*
++ * Xmp
++ */
++void Xmp_destroy(Xmp * aXmp);
++Xmp * Xmp_create();
++int Xmp_load(Xmp * aXmp, const char * aFilename);
++int Xmp_loadMem(Xmp * aXmp, const unsigned char * aMem, unsigned int aLength);
++int Xmp_loadMemEx(Xmp * aXmp, const unsigned char * aMem, unsigned int aLength, int aCopy /* = false */, int aTakeOwnership /* = true */);
++int Xmp_loadFile(Xmp * aXmp, File * aFile);
++void Xmp_setVolume(Xmp * aXmp, float aVolume);
++void Xmp_setLooping(Xmp * aXmp, int aLoop);
++void Xmp_setAutoStop(Xmp * aXmp, int aAutoStop);
++void Xmp_set3dMinMaxDistance(Xmp * aXmp, float aMinDistance, float aMaxDistance);
++void Xmp_set3dAttenuation(Xmp * aXmp, unsigned int aAttenuationModel, float aAttenuationRolloffFactor);
++void Xmp_set3dDopplerFactor(Xmp * aXmp, float aDopplerFactor);
++void Xmp_set3dListenerRelative(Xmp * aXmp, int aListenerRelative);
++void Xmp_set3dDistanceDelay(Xmp * aXmp, int aDistanceDelay);
++void Xmp_set3dCollider(Xmp * aXmp, AudioCollider * aCollider);
++void Xmp_set3dColliderEx(Xmp * aXmp, AudioCollider * aCollider, int aUserData /* = 0 */);
++void Xmp_set3dAttenuator(Xmp * aXmp, AudioAttenuator * aAttenuator);
++void Xmp_setInaudibleBehavior(Xmp * aXmp, int aMustTick, int aKill);
++void Xmp_setLoopPoint(Xmp * aXmp, double aLoopPoint);
++double Xmp_getLoopPoint(Xmp * aXmp);
++void Xmp_setFilter(Xmp * aXmp, unsigned int aFilterId, Filter * aFilter);
++void Xmp_stop(Xmp * aXmp);
++
  /*
--Openmpt module for SoLoud audio engine
--Copyright (c) 2016 Jari Komppa
+diff --git a/lib/soloud/include/soloud_xmp.h b/lib/soloud/include/soloud_xmp.h
+new file mode 100644
+index 0000000..81f6346
+--- /dev/null
++++ b/lib/soloud/include/soloud_xmp.h
+@@ -0,0 +1,63 @@
++/*
 +XMP module for SoLoud audio engine
 +Based on Openmpt plugin by Jari Komppa
 +Modified to use libxmp for broader format support
- 
- This software is provided 'as-is', without any express or implied
- warranty. In no event will the authors be held liable for any damages
-@@ -24,66 +25,97 @@ freely, subject to the following restrictions:
- 
- #include <stdlib.h>
- #include <stdio.h>
--#include "soloud_openmpt.h"
++
++This software is provided 'as-is', without any express or implied
++warranty. In no event will the authors be held liable for any damages
++arising from the use of this software.
++
++Permission is granted to anyone to use this software for any purpose,
++including commercial applications, and to alter it and redistribute it
++freely, subject to the following restrictions:
++
++   1. The origin of this software must not be misrepresented; you must not
++   claim that you wrote the original software. If you use this software
++   in a product, an acknowledgment in the product documentation would be
++   appreciated but is not required.
++
++   2. Altered source versions must be plainly marked as such, and must not be
++   misrepresented as being the original software.
++
++   3. This notice may not be removed or altered from any source
++   distribution.
++*/
++
++#ifndef SOLOUD_XMP_H
++#define SOLOUD_XMP_H
++
++#include "soloud.h"
++
++namespace SoLoud
++{
++	class Xmp;
++	class File;
++
++	class XmpInstance : public AudioSourceInstance
++	{
++		Xmp *mParent;
++		char *mContext;
++		int mPlaying;
++
++	public:
++		XmpInstance(Xmp *aParent);
++		virtual ~XmpInstance();
++		virtual unsigned int getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize);
++		virtual bool hasEnded();
++	};
++
++	class Xmp : public AudioSource
++	{
++	public:
++		char *mData;
++		unsigned int mDataLen;
++		Xmp();
++		virtual ~Xmp();
++		result load(const char* aFilename);
++		result loadMem(const unsigned char *aMem, unsigned int aLength, bool aCopy = false, bool aTakeOwnership = true);
++		result loadFile(File *aFile);
++		virtual AudioSourceInstance *createInstance();
++	};
++};
++
++#endif
+diff --git a/lib/soloud/src/audiosource/xmp/soloud_xmp.cpp b/lib/soloud/src/audiosource/xmp/soloud_xmp.cpp
+new file mode 100644
+index 0000000..1520bc2
+--- /dev/null
++++ b/lib/soloud/src/audiosource/xmp/soloud_xmp.cpp
+@@ -0,0 +1,199 @@
++/*
++XMP module for SoLoud audio engine
++Based on Openmpt plugin by Jari Komppa
++Modified to use libxmp for broader format support
++
++This software is provided 'as-is', without any express or implied
++warranty. In no event will the authors be held liable for any damages
++arising from the use of this software.
++
++Permission is granted to anyone to use this software for any purpose,
++including commercial applications, and to alter it and redistribute it
++freely, subject to the following restrictions:
++
++   1. The origin of this software must not be misrepresented; you must not
++   claim that you wrote the original software. If you use this software
++   in a product, an acknowledgment in the product documentation would be
++   appreciated but is not required.
++
++   2. Altered source versions must be plainly marked as such, and must not be
++   misrepresented as being the original software.
++
++   3. This notice may not be removed or altered from any source
++   distribution.
++*/
++
++#include <stdlib.h>
++#include <stdio.h>
 +#include <string.h>
 +#include "soloud_xmp.h"
- #include "soloud_file.h"
- 
- extern "C"
- {
--	void * openmpt_module_create_from_memory(const void * filedata, size_t filesize, void *logfunc, void * user,void * ctls);
--	void openmpt_module_destroy(void * mod);
--	int openmpt_module_read_float_stereo(void * mod, int samplerate, size_t count, float * left, float * right);
--	void openmpt_module_set_repeat_count(void* mod, int repeat_count);
++#include "soloud_file.h"
++
++extern "C"
++{
 +	#include <xmp.h>
- }
- 
- namespace SoLoud
- {
--	OpenmptInstance::OpenmptInstance(Openmpt *aParent)
++}
++
++namespace SoLoud
++{
 +	XmpInstance::XmpInstance(Xmp *aParent)
- 	{
- 		mParent = aParent;
--		mModfile = openmpt_module_create_from_memory((const void*)mParent->mData, mParent->mDataLen, NULL, NULL, NULL);		
--		openmpt_module_set_repeat_count(mModfile, -1);
--		mPlaying = mModfile != NULL;		
++	{
++		mParent = aParent;
 +		mContext = xmp_create_context();
 +		if (mContext)
 +		{
-+			if (xmp_load_module_from_memory(mContext, (const void*)mParent->mData, mParent->mDataLen) == 0)
++			if (xmp_load_module_from_memory(mContext, (const void*)mParent->mData, (long)mParent->mDataLen) == 0)
 +			{
 +				if (xmp_start_player(mContext, 44100, 0) == 0)
 +				{
@@ -61,101 +172,93 @@ index 7be457d..85ec406 100644
 +			}
 +		}
 +		mPlaying = mContext != NULL;
- 	}
- 
--	unsigned int OpenmptInstance::getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize)
-+	unsigned int XmpInstance::getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize)
- 	{
--		if (mModfile == NULL)
-+		if (mContext == NULL)
- 			return 0;
- 		int s = aSamplesToRead;
- 		unsigned int outofs = 0;
--		
++	}
 +
- 		while (s && mPlaying)
- 		{
- 			int samples = 512;
- 			if (s < samples) samples = s;
--			int res = openmpt_module_read_float_stereo(mModfile, (int)floor(mSamplerate), samples, aBuffer + outofs, aBuffer + outofs + aBufferSize);
--			if (res == 0)
++	unsigned int XmpInstance::getAudio(float *aBuffer, unsigned int aSamplesToRead, unsigned int aBufferSize)
++	{
++		if (mContext == NULL)
++			return 0;
++		int s = aSamplesToRead;
++		unsigned int outofs = 0;
++
++		while (s && mPlaying)
++		{
++			int samples = 512;
++			if (s < samples) samples = s;
 +
 +			// libxmp outputs interleaved 16-bit stereo samples
 +			short int buf[512 * 2];
-+			int frames = xmp_play_buffer(mContext, buf, samples * 4, NULL);
++			int bytes = samples * (int)sizeof(short) * 2; // frames × 2ch × 2bytes
++			int ret = xmp_play_buffer(mContext, buf, bytes, 0);
 +
-+			if (frames <= 0)
- 			{
- 				mPlaying = 0;
- 				return outofs;
- 			}
--			outofs += samples;
--			s -= samples;
++			if (ret < 0) // -1 = end of module
++			{
++				mPlaying = 0;
++				return outofs;
++			}
 +
 +			// Convert interleaved int16 to separate float buffers
-+			for (int i = 0; i < frames; i++)
++			for (int i = 0; i < samples; i++)
 +			{
 +				aBuffer[outofs + i] = buf[i * 2] / 32768.0f;
 +				aBuffer[outofs + aBufferSize + i] = buf[i * 2 + 1] / 32768.0f;
 +			}
 +
-+			outofs += frames;
-+			s -= frames;
- 		}
- 
- 		return outofs;
- 	}
- 
--	bool OpenmptInstance::hasEnded()
++			outofs += samples;
++			s -= samples;
++		}
++
++		return outofs;
++	}
++
 +	bool XmpInstance::hasEnded()
- 	{
- 		return !mPlaying;
- 	}
- 
--	OpenmptInstance::~OpenmptInstance()
++	{
++		return !mPlaying;
++	}
++
 +	XmpInstance::~XmpInstance()
- 	{
--		if (mModfile)
++	{
 +		if (mContext)
- 		{
--			openmpt_module_destroy(mModfile);
++		{
 +			xmp_end_player(mContext);
 +			xmp_release_module(mContext);
 +			xmp_free_context(mContext);
- 		}
--		mModfile = 0;
++		}
 +		mContext = NULL;
- 	}
- 
--	result Openmpt::loadMem(const unsigned char *aMem, unsigned int aLength, bool aCopy, bool aTakeOwnership)
++	}
++
 +	result Xmp::loadMem(const unsigned char *aMem, unsigned int aLength, bool aCopy, bool aTakeOwnership)
- 	{
- 		MemoryFile mf;
- 		int res = mf.openMem(aMem, aLength, aCopy, aTakeOwnership);
-@@ -92,7 +124,7 @@ namespace SoLoud
- 		return loadFile(&mf);
- 	}
- 
--	result Openmpt::load(const char *aFilename)
++	{
++		MemoryFile mf;
++		int res = mf.openMem(aMem, aLength, aCopy, aTakeOwnership);
++		if (res != SO_NO_ERROR)
++			return res;
++		return loadFile(&mf);
++	}
++
 +	result Xmp::load(const char *aFilename)
- 	{
- 		DiskFile df;
- 		int res = df.open(aFilename);
-@@ -101,7 +133,7 @@ namespace SoLoud
- 		return loadFile(&df);
- 	}
- 
--	result Openmpt::loadFile(File *aFile)
++	{
++		DiskFile df;
++		int res = df.open(aFilename);
++		if (res != SO_NO_ERROR)
++			return res;
++		return loadFile(&df);
++	}
++
 +	result Xmp::loadFile(File *aFile)
- 	{
- 		delete[] mData;
- 
-@@ -115,19 +147,31 @@ namespace SoLoud
- 		}
- 		aFile->read((unsigned char*)mData, mDataLen);
- 
--		void *mpf = openmpt_module_create_from_memory((const void*)mData, mDataLen, NULL, NULL, NULL);
--		if (!mpf)
++	{
++		delete[] mData;
++
++		mDataLen = aFile->length();
++		mData = new char[mDataLen];
++		if (!mData)
++		{
++			mData = 0;
++			mDataLen = 0;
++			return OUT_OF_MEMORY;
++		}
++		aFile->read((unsigned char*)mData, mDataLen);
++
 +		// Verify the module can be loaded
 +		xmp_context ctx = xmp_create_context();
 +		if (!ctx)
@@ -166,44 +269,42 @@ index 7be457d..85ec406 100644
 +			return FILE_LOAD_FAILED;
 +		}
 +
-+		if (xmp_load_module_from_memory(ctx, (const void*)mData, mDataLen) != 0)
- 		{
++		if (xmp_load_module_from_memory(ctx, (const void*)mData, (long)mDataLen) != 0)
++		{
 +			xmp_free_context(ctx);
- 			delete[] mData;
- 			mData = 0;
- 			mDataLen = 0;
- 			return FILE_LOAD_FAILED;
- 		}
--		openmpt_module_destroy(mpf);
++			delete[] mData;
++			mData = 0;
++			mDataLen = 0;
++			return FILE_LOAD_FAILED;
++		}
 +
 +		xmp_release_module(ctx);
 +		xmp_free_context(ctx);
- 		return 0;
- 	}
- 
--	Openmpt::Openmpt()
++		return 0;
++	}
++
 +	Xmp::Xmp()
- 	{
- 		mBaseSamplerate = 44100;
- 		mChannels = 2;
-@@ -135,7 +179,7 @@ namespace SoLoud
- 		mDataLen = 0;
- 	}
- 
--	Openmpt::~Openmpt()
++	{
++		mBaseSamplerate = 44100;
++		mChannels = 2;
++		mData = 0;
++		mDataLen = 0;
++	}
++
 +	Xmp::~Xmp()
- 	{
- 		stop();
- 		if (mData)
-@@ -146,9 +190,9 @@ namespace SoLoud
- 		mDataLen = 0;
- 	}
- 
--	AudioSourceInstance * Openmpt::createInstance()
++	{
++		stop();
++		if (mData)
++		{
++			delete[] mData;
++			mData = 0;
++		}
++		mDataLen = 0;
++	}
++
 +	AudioSourceInstance * Xmp::createInstance()
- 	{
--		return new OpenmptInstance(this);
++	{
 +		return new XmpInstance(this);
- 	}
- 
- };
++	}
++
++};
