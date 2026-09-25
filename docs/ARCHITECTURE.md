@@ -85,8 +85,7 @@ cache path по-прежнему определяет только `internal/pla
 владеют декодированием и persistent index records, `internal/app` — политикой
 выбора и playback orchestration, а `internal/player.Library` — только текущим
 playback/navigation context и materialized catalog albums, а не полным remote
-shuffle pool. Подробный migration contract находится в
-[shuffle-optimization.instructions.md](../.github/instructions/shuffle-optimization.instructions.md).
+shuffle pool.
 
 ## Правила изменений
 
