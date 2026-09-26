@@ -2,6 +2,9 @@
 
 **Bring MilkDrop visuals back to your music.**
 
+[Website](https://dendec.github.io/glitchscope/) ·
+[Downloads](https://github.com/dendec/glitchscope/releases)
+
 GlitchScope is an open-source music player for Linux and Windows desktops and
 low-power PortMaster handhelds. Play a local library, classic tracker and chip
 music, or internet radio with real-time MilkDrop-compatible visuals powered by

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="$lang">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#efeee8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#171918" media="(prefers-color-scheme: dark)">
+  $language_redirect
+  <title>$page_title</title>
+  <meta name="description" content="$description">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="$page_title">
+  <meta property="og:description" content="$description">
+  <meta property="og:url" content="$canonical">
+  <link rel="canonical" href="$canonical">
+  $alternates
+  <link rel="icon" type="image/svg+xml" href="${prefix}assets/favicon.svg">
+  <link rel="stylesheet" href="${prefix}assets/styles.css">
+  <script src="${prefix}assets/site.js" defer></script>
+</head>
+<body data-copy="$copy" data-copied="$copied" data-copy-failed="$copy_failed">
+  <a class="skip-link" href="#main">$skip</a>
+  <header class="header wrap">
+    <a class="brand" href="#" aria-label="GlitchScope"><span class="brand-icon" aria-hidden="true">▥</span> GLITCH<span>SCOPE</span></a>
+    <nav class="main-nav" aria-label="$navigation">
+      <a href="#features">$nav_features</a><a href="#install">$nav_install</a><a href="$repo">GitHub ↗</a>
+    </nav>
+    <nav class="languages" aria-label="$language">$languages</nav>
+  </header>
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="tiny-cross" aria-hidden="true">✳</span> $eyebrow</p>
+        <h1 id="hero-title">$hero_line1<br>$hero_line2<br><span>$hero_line3</span></h1>
+        <p class="hero-description">$hero_description</p>
+        <div class="hero-actions"><a class="button primary" href="#install">$get_started <span aria-hidden="true">↓</span></a><a class="source-link" href="$repo">$source <span aria-hidden="true">↗</span></a></div>
+        <p class="hero-footnote">$hero_footnote</p>
+      </div>
+      <div class="hero-visual">
+        <div class="visual-label"><span>GS / 01</span><span>$visual_label</span><span aria-hidden="true">＋</span></div>
+        <figure class="capture">
+          <div class="capture-top"><span>GLITCHSCOPE</span><span>PCM → projectM</span></div>
+          <img src="${prefix}assets/screenshot.png" width="640" height="480" alt="$screenshot_alt" fetchpriority="high">
+          <figcaption><span>$screenshot_caption</span><span class="capture-format">640 × 480</span></figcaption>
+        </figure>
+        <div class="visual-bottom"><div class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span>$visual_bottom</span></div>
+      </div>
+    </section>
+    <div class="platform-strip"><div class="wrap"><span>$platform_strip</span><a href="#portmaster">PortMaster</a><span aria-hidden="true">/</span><a href="#raspberry-pi">Raspberry Pi OS</a><span aria-hidden="true">/</span><a href="#linux">Linux</a><span aria-hidden="true">/</span><a href="#windows">Windows</a></div></div>
+    <section class="features wrap section" id="features" aria-labelledby="features-title">
+      <div class="section-top"><p class="eyebrow">01 / $features_label</p><span class="serial" aria-hidden="true">GS—AUDIO / OPEN SOURCE</span></div>
+      <div class="section-heading"><h2 id="features-title">$features_title</h2><p>$features_intro</p></div>
+      <div class="feature-grid">$features</div>
+      <div class="format-row"><span>$formats</span><p>MP3 · FLAC · OGG · WAV · OPUS · AAC <b>/</b> MOD · XM · IT · S3M <b>/</b> PT3 · VTX · YM · SID</p></div>
+    </section>
+    <section class="hardware" aria-labelledby="hardware-title"><div class="wrap hardware-grid">
+      <div><p class="eyebrow">02 / $hardware_label</p><h2 id="hardware-title">$hardware_title1<br><em>$hardware_title2</em></h2><p class="hardware-description">$hardware_description</p><a class="text-link" href="#install">$check_requirements <span aria-hidden="true">↘</span></a></div>
+      <div class="hardware-right"><div class="spec-grid"><div><strong>ARM64</strong><span>$spec_arm</span></div><div><strong>64</strong><span>$spec_themes</span></div><div><strong>15</strong><span>$spec_languages</span></div><div><strong>OFFLINE</strong><span>$spec_offline</span></div></div><div class="hardware-note"><span aria-hidden="true">↳</span><p>$hardware_note</p></div></div>
+    </div></section>
+    <section class="installation wrap section" id="install" aria-labelledby="install-title">
+      <div class="section-top"><p class="eyebrow">03 / $install_label</p><span class="serial">$install_serial</span></div>
+      <div class="section-heading"><h2 id="install-title">$install_title</h2><p>$install_intro</p></div>
+      <div class="platform-tabs" role="tablist" aria-label="$platform_choice" hidden>$tabs</div>
+      <div class="platform-panels">$panels</div>
+      <details class="compatibility"><summary>$compatibility_title<span aria-hidden="true">＋</span></summary><div><p>$compatibility_text <a href="https://portmaster.games/supported-devices.html">$supported_devices ↗</a></p><p>$retroid_text <a href="https://rocknix.org/devices/retroid/retroid-pocket-mini/">ROCKNIX ↗</a></p><p>$compatibility_footer <a href="$repo/blob/master/docs/PORTMASTER-RELEASE.md">$compatibility_link ↗</a></p></div></details>
+      <details class="build-guide"><summary>$build_title<span aria-hidden="true">＋</span></summary><div><p>$build_description</p><div class="command"><div class="command-top"><span>LINUX / BUILD</span><button class="copy" type="button" hidden>$copy</button></div><pre tabindex="0"><code>git clone --recurse-submodules https://github.com/dendec/glitchscope.git
+cd glitchscope
+make dist              # Linux AMD64
+make dist-arm64        # Linux ARM64
+make dist-windows      # Windows AMD64
+make dist-portmaster   # PortMaster</code></pre></div><a class="text-link" href="$repo#build-and-run">$build_link ↗</a></div></details>
+    </section>
+    <section class="controls-section wrap" aria-labelledby="controls-title"><div><p class="eyebrow">04 / $controls_label</p><h2 id="controls-title">$controls_title1<br><em>$controls_title2</em></h2><p>$controls_intro</p></div><dl class="controls">$controls</dl></section>
+    <section class="community wrap"><div class="community-mark" aria-hidden="true">✳</div><div><p class="eyebrow">GPL-2.0-or-later</p><h2>$community_title</h2><p>$community_description</p></div><a class="button primary" href="$repo">$community_link <span aria-hidden="true">↗</span></a></section>
+  </main>
+  <footer class="footer wrap"><div><a class="brand" href="#">GLITCHSCOPE</a><p>$footer_text</p></div><nav aria-label="$footer_navigation"><a href="$repo/blob/master/README.md">$documentation</a><a href="$repo/issues">$issues</a><a href="$repo/blob/master/LICENSE">$license</a><a href="$repo/blob/master/portmaster/licenses/THIRD_PARTY_LICENSES.md">$credits</a></nav><span class="footer-end">END OF SIDE A ■</span></footer>
+  <p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
+</body>
+</html>
