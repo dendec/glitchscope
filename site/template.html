@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#efeee8" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#171918" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#eff6f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#090d18" media="(prefers-color-scheme: dark)">
   $language_redirect
   <title>$page_title</title>
   <meta name="description" content="$description">
@@ -22,7 +22,7 @@
 <body data-copy="$copy" data-copied="$copied" data-copy-failed="$copy_failed">
   <a class="skip-link" href="#main">$skip</a>
   <header class="header wrap">
-    <a class="brand" href="#" aria-label="GlitchScope"><span class="brand-icon" aria-hidden="true">▥</span> GLITCH<span>SCOPE</span></a>
+    <a class="brand" href="#" aria-label="GlitchScope"><img class="brand-logo" src="${prefix}assets/glitchscope.svg" width="36" height="36" alt=""><span class="brand-name">GLITCH<span>SCOPE</span></span></a>
     <nav class="main-nav" aria-label="$navigation">
       <a href="#features">$nav_features</a><a href="#install">$nav_install</a><a href="$repo">GitHub ↗</a>
     </nav>
@@ -74,7 +74,7 @@ make dist-portmaster   # PortMaster</code></pre></div><a class="text-link" href=
     <section class="controls-section wrap" aria-labelledby="controls-title"><div><p class="eyebrow">04 / $controls_label</p><h2 id="controls-title">$controls_title1<br><em>$controls_title2</em></h2><p>$controls_intro</p></div><dl class="controls">$controls</dl></section>
     <section class="community wrap"><div class="community-mark" aria-hidden="true">✳</div><div><p class="eyebrow">GPL-2.0-or-later</p><h2>$community_title</h2><p>$community_description</p></div><a class="button primary" href="$repo">$community_link <span aria-hidden="true">↗</span></a></section>
   </main>
-  <footer class="footer wrap"><div><a class="brand" href="#">GLITCHSCOPE</a><p>$footer_text</p></div><nav aria-label="$footer_navigation"><a href="$repo/blob/master/README.md">$documentation</a><a href="$repo/issues">$issues</a><a href="$repo/blob/master/LICENSE">$license</a><a href="$repo/blob/master/portmaster/licenses/THIRD_PARTY_LICENSES.md">$credits</a></nav><span class="footer-end">END OF SIDE A ■</span></footer>
+  <footer class="footer wrap"><div><a class="brand" href="#"><img class="brand-logo" src="${prefix}assets/glitchscope.svg" width="36" height="36" alt=""><span class="brand-name">GLITCHSCOPE</span></a><p>$footer_text</p></div><nav aria-label="$footer_navigation"><a href="$repo/blob/master/README.md">$documentation</a><a href="$repo/issues">$issues</a><a href="$repo/blob/master/LICENSE">$license</a><a href="$repo/blob/master/portmaster/licenses/THIRD_PARTY_LICENSES.md">$credits</a></nav><span class="footer-end">END OF SIDE A ■</span></footer>
   <p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
 </body>
 </html>

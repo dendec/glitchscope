@@ -49,8 +49,10 @@ def build(base_url):
     OUTPUT.mkdir(parents=True, exist_ok=True)
     assets = OUTPUT / "assets"
     assets.mkdir(exist_ok=True)
-    for name in ("styles.css", "site.js", "favicon.svg"):
+    for name in ("styles.css", "site.js"):
         shutil.copyfile(SOURCE / name, assets / name)
+    shutil.copyfile(ROOT / "internal" / "ui" / "app_icon.svg", assets / "glitchscope.svg")
+    shutil.copyfile(ROOT / "internal" / "ui" / "app_icon.svg", assets / "favicon.svg")
     shutil.copyfile(ROOT / "portmaster" / "screenshot.png", assets / "screenshot.png")
     template = Template((SOURCE / "template.html").read_text(encoding="utf-8"))
     urls = {lang: base_url + ("" if lang == "en" else f"{lang}/") for lang in LANGUAGES}

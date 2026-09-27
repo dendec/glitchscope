@@ -7,12 +7,14 @@ on:
       - "site/**"
       - "scripts/build-site.py"
       - "portmaster/screenshot.png"
+      - "internal/ui/app_icon.svg"
       - ".github/workflows/pages.yml"
   pull_request:
     paths:
       - "site/**"
       - "scripts/build-site.py"
       - "portmaster/screenshot.png"
+      - "internal/ui/app_icon.svg"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
