@@ -22,6 +22,12 @@
 | Provider-neutral directory cache | `internal/catalog` | provider loaders, shuffle selection, UI listings |
 | Downloaded track cache policy | `internal/player.TrackCache` | `internal/config`, downloader wiring, catalog UI |
 
+When a favorited local path is missing, `internal/app` removes it from Favorites
+and refreshes the open list. The check runs before playback and again after a
+load failure to cover files deleted between the preflight and asynchronous
+open. Only `os.ErrNotExist` removes an entry; permission and decode errors keep
+it in Favorites.
+
 Радиопоток разделён на два слоя: `internal/radio.Client.OpenStream` владеет
 Go HTTP/ICY-транспортом и отдаёт очищенный от ICY metadata поток байт, а
 `internal/player` передаёт его в отдельный FFmpeg decoder worker. Native
@@ -377,6 +383,10 @@ Radio Browser listings, click notifications and favicon downloads run in workers
 At most two favicon jobs run concurrently; decoding validates a 2 MP source
 budget, prepares a bitmap no larger than 256×256 off the GL thread, and the UI
 retains at most 32 prepared images. GL upload stays on the main thread.
+When a Favorites playlist contains radio UUIDs whose local cache entry has no
+station name, the radio client resolves them asynchronously by UUID. It skips
+entries with a cached name, persists only results that include a name, and asks
+the UI to refresh the list on the main thread.
 ModArchive cache misses also run in a cancellable worker with request IDs;
 navigation renders a loading entry and never calls the synchronous network API.
 
