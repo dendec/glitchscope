@@ -83,11 +83,35 @@ type pointerPress struct {
 	lastY             float32
 	dragged           bool
 	scrollDY          float32
+	scrollbarDrag     bool
+	scrollbarOffset   float32
 	keepHelpSelection bool
+	downAt            time.Time
+	text              *pointerTextRow
+}
+
+type pointerScrollbar struct {
+	panel    int
+	track    pointerRect
+	thumb    pointerRect
+	total    int
+	visible  int
+	hitWidth float32
+}
+
+type pointerTextRow struct {
+	text     string
+	link     string
+	copyText string
+	x        float32
+	y        float32
+	w        float32
+	h        float32
 }
 
 type breadcrumbSegment struct {
 	label  string
+	icon   string
 	target pointerTarget
 }
 
@@ -129,6 +153,17 @@ func (o *Overlay) HandlePointer(event input.PointerEvent, winW, winH int) Pointe
 }
 
 func (o *Overlay) handlePointerDown(event input.PointerEvent, winW, winH int) PointerResult {
+	textRow := o.pointerTextAt(event.X, event.Y)
+	if event.Device == input.PointerMouse && event.Button == input.PointerButtonSecondary {
+		target := layoutTargetAt(o.pointerLayout(winW, winH).targets, event.X, event.Y)
+		if o.pointerModalBlocks(target) {
+			return PointerResultNone
+		}
+		if textRow != nil {
+			o.pendingPointerCopy = pointerValue(*textRow)
+		}
+		return PointerResultNone
+	}
 	if event.Button != input.PointerButtonPrimary {
 		return PointerResultNone
 	}
@@ -137,10 +172,43 @@ func (o *Overlay) handlePointerDown(event input.PointerEvent, winW, winH int) Po
 	if target.kind == pointerTargetNone {
 		return PointerResultNone
 	}
+	if scrollbar, ok := o.pointerScrollbarAt(event.X, event.Y, winW, winH); ok {
+		modalTarget := target
+		if o.uiPage == PageSettings && o.settingsEditing && scrollbar.panel == 1 {
+			modalTarget = pointerTarget{kind: pointerTargetRow, panel: 1}
+		}
+		if o.pointerModalBlocks(modalTarget) {
+			return PointerResultNone
+		}
+		o.applyPointerPanelFocus(pointerTarget{kind: pointerTargetPanel, panel: scrollbar.panel})
+		grabOffset := scrollbar.thumb.h / 2
+		if event.Y >= scrollbar.thumb.y && event.Y < scrollbar.thumb.y+scrollbar.thumb.h {
+			grabOffset = event.Y - scrollbar.thumb.y
+		}
+		o.pointerPress = pointerPress{
+			active:          true,
+			device:          event.Device,
+			pointer:         event.PointerID,
+			target:          pointerTarget{kind: pointerTargetPanel, panel: scrollbar.panel},
+			downX:           event.X,
+			downY:           event.Y,
+			lastY:           event.Y,
+			dragged:         true,
+			scrollbarDrag:   true,
+			scrollbarOffset: grabOffset,
+		}
+		o.updatePointerScrollbar(event.Y, scrollbar.panel, grabOffset, winW, winH)
+		return PointerResultNone
+	}
 	if o.pointerModalBlocks(target) {
 		return PointerResultNone
 	}
 	keepHelpSelection := o.focusPanel == 1 && o.isCurrentHelpRow(target)
+	var pressedText *pointerTextRow
+	if textRow != nil {
+		copy := *textRow
+		pressedText = &copy
+	}
 	if event.Device == input.PointerTouch {
 		o.applyPointerPanelFocus(target)
 	} else {
@@ -155,6 +223,8 @@ func (o *Overlay) handlePointerDown(event input.PointerEvent, winW, winH int) Po
 		downY:             event.Y,
 		lastY:             event.Y,
 		keepHelpSelection: keepHelpSelection,
+		downAt:            time.Now(),
+		text:              pressedText,
 	}
 	return PointerResultNone
 }
@@ -167,6 +237,10 @@ func (o *Overlay) handlePointerMove(event input.PointerEvent, winW, winH int) Po
 		return PointerResultNone
 	}
 	if event.PointerID != o.pointerPress.pointer || event.Device != o.pointerPress.device {
+		return PointerResultNone
+	}
+	if o.pointerPress.scrollbarDrag {
+		o.updatePointerScrollbar(event.Y, o.pointerPress.target.panel, o.pointerPress.scrollbarOffset, winW, winH)
 		return PointerResultNone
 	}
 	previousY := o.pointerPress.lastY
@@ -203,10 +277,21 @@ func (o *Overlay) handlePointerUp(event input.PointerEvent, winW, winH int) Poin
 	if !press.active || event.PointerID != press.pointer || event.Device != press.device {
 		return PointerResultNone
 	}
+	if press.scrollbarDrag {
+		return PointerResultNone
+	}
 	slop := PointerTapSlop(winH)
 	dx := event.X - press.downX
 	dy := event.Y - press.downY
 	if press.dragged || dx*dx+dy*dy > slop*slop {
+		return PointerResultNone
+	}
+	if press.device == input.PointerTouch && press.text != nil && time.Since(press.downAt) >= 600*time.Millisecond {
+		o.pendingPointerCopy = pointerValue(*press.text)
+		return PointerResultNone
+	}
+	if press.text != nil && press.text.link != "" && o.pointerOverRowLink(*press.text, event.X) {
+		o.pendingPointerURL = press.text.link
 		return PointerResultNone
 	}
 	o.applyPointerFocus(press.target)
@@ -259,6 +344,167 @@ func (o *Overlay) handlePointerUp(event input.PointerEvent, winW, winH int) Poin
 		return PointerResultSelect
 	}
 	return PointerResultNone
+}
+
+// ConsumePointerCopy returns text queued by a right click or long tap.
+func (o *Overlay) ConsumePointerCopy() string {
+	value := o.pendingPointerCopy
+	o.pendingPointerCopy = ""
+	return value
+}
+
+// ConsumePointerURL returns a URL queued by a primary click.
+func (o *Overlay) ConsumePointerURL() string {
+	value := o.pendingPointerURL
+	o.pendingPointerURL = ""
+	return value
+}
+
+// PointerOverLink reports whether a point is over a visible right-panel URL.
+func (o *Overlay) PointerOverLink(x, y float32) bool {
+	row := o.pointerTextAt(x, y)
+	return row != nil && row.link != "" && o.pointerOverRowLink(*row, x)
+}
+
+func (o *Overlay) pointerTextAt(x, y float32) *pointerTextRow {
+	for i := range o.pointerTextRows {
+		row := &o.pointerTextRows[i]
+		if x >= row.x && x < row.x+row.w && y >= row.y && y < row.y+row.h {
+			return row
+		}
+	}
+	return nil
+}
+
+func (o *Overlay) pointerOverRowLink(row pointerTextRow, x float32) bool {
+	if row.link == "" || o.face == nil {
+		return false
+	}
+	_, start, end := findTextURL(row.text)
+	if start < 0 {
+		return x >= row.x && x < row.x+row.w
+	}
+	left := row.x + float32(font.MeasureString(o.face, row.text[:start]).Ceil())
+	right := row.x + float32(font.MeasureString(o.face, row.text[:end]).Ceil())
+	return x >= left && x <= right
+}
+
+func pointerValue(row pointerTextRow) string {
+	if row.copyText != "" {
+		return row.copyText
+	}
+	text := strings.TrimSpace(row.text)
+	if row.link != "" {
+		return row.link
+	}
+	if separator := strings.Index(text, ": "); separator >= 0 {
+		return strings.TrimSpace(text[separator+2:])
+	}
+	return text
+}
+
+func findTextURL(text string) (string, int, int) {
+	start := strings.Index(text, "https://")
+	httpStart := strings.Index(text, "http://")
+	if start < 0 || (httpStart >= 0 && httpStart < start) {
+		start = httpStart
+	}
+	if start < 0 {
+		return "", -1, -1
+	}
+	end := start
+	for end < len(text) && !strings.ContainsRune(" \t\n", rune(text[end])) {
+		end++
+	}
+	urlEnd := end
+	for urlEnd > start && strings.ContainsRune(".,;:!?)]}\"'", rune(text[urlEnd-1])) {
+		urlEnd--
+	}
+	return text[start:urlEnd], start, urlEnd
+}
+
+func (o *Overlay) setPointerTextLines(lines []string, x, y, clipY, w, h float32, lineH int) {
+	rows := make([]listRow, len(lines))
+	commentStart := infoCommentLinesStart(lines, o.infoComment, strings.TrimSpace(o.catalog.Text(i18n.InfoComment)))
+	commentEnd := commentStart + len(strings.Split(o.infoComment, "\n"))
+	for i, line := range lines {
+		copyText := ""
+		if commentStart >= 0 && i >= commentStart && i < commentEnd {
+			copyText = o.infoComment
+		}
+		rows[i] = listRow{text: line, copyText: copyText}
+	}
+	o.setPointerListRows(rows, x, y, clipY, w, h, lineH)
+}
+
+func infoCommentLinesStart(lines []string, comment, commentLabel string) int {
+	if comment == "" || commentLabel == "" {
+		return -1
+	}
+	commentLines := strings.Split(comment, "\n")
+	for labelRow := len(lines) - len(commentLines) - 1; labelRow >= 0; labelRow-- {
+		if strings.TrimSpace(lines[labelRow]) != commentLabel {
+			continue
+		}
+		matches := true
+		for i, commentLine := range commentLines {
+			displayedLine := lines[labelRow+1+i]
+			if displayedLine != commentLine && displayedLine != "  "+commentLine {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return labelRow + 1
+		}
+	}
+	return -1
+}
+
+func (o *Overlay) setPointerListRows(rows []listRow, x, y, clipY, w, h float32, lineH int) {
+	if (!o.pointerMouse && !o.pointerTouch) || lineH <= 0 {
+		return
+	}
+	for i, row := range rows {
+		rowY := y + float32(i*lineH)
+		if rowY+float32(lineH) <= clipY || rowY >= clipY+h || row.text == "" {
+			continue
+		}
+		link := row.link
+		if link == "" {
+			link, _, _ = findTextURL(row.text)
+		}
+		o.pointerTextRows = append(o.pointerTextRows, pointerTextRow{
+			text: row.text, link: link, copyText: row.copyText,
+			x: x, y: rowY, w: w, h: float32(lineH),
+		})
+	}
+}
+
+func (o *Overlay) drawPointerLinks(winW, winH, viewW, viewH int) {
+	if (!o.pointerMouse && !o.pointerTouch) || o.face == nil {
+		return
+	}
+	textColor := o.textColor()
+	metrics := o.face.Metrics()
+	underlineOffset := textPadding(o.fontSize) + metrics.Ascent.Ceil() + max(1, metrics.Descent.Ceil()/2)
+	for _, row := range o.pointerTextRows {
+		if row.link == "" {
+			continue
+		}
+		_, start, end := findTextURL(row.text)
+		left := row.x
+		right := row.x + float32(font.MeasureString(o.face, row.text).Ceil())
+		if start >= 0 {
+			left += float32(font.MeasureString(o.face, row.text[:start]).Ceil())
+			right = row.x + float32(font.MeasureString(o.face, row.text[:end]).Ceil())
+		}
+		right = min(right, row.x+row.w)
+		if right > left {
+			underlineY := row.y + float32(underlineOffset)
+			glDrawFilledRect(o.programRect, left, underlineY, right-left, 1, float32(textColor.R)/255, float32(textColor.G)/255, float32(textColor.B)/255, o.uiAlpha(1), winW, winH, viewW, viewH)
+		}
+	}
 }
 
 func (o *Overlay) handlePointerWheel(event input.PointerEvent, winW, winH int) PointerResult {
@@ -391,6 +637,190 @@ func stepPointerScroll(current *int, total, visible, direction int) bool {
 
 func clampPointerScroll(current, total, visible int) int {
 	return max(0, min(current, max(0, total-visible)))
+}
+
+func (o *Overlay) pointerScrollbars(winW, winH int) []pointerScrollbar {
+	l := o.overlayLayout(winW, winH)
+	visible := max(1, l.panelH/l.lineH)
+	barW := float32(o.scrollbarWidthPx())
+	leftX := float32(l.panelW) - barW
+	rightX := float32(winW) - barW
+	result := make([]pointerScrollbar, 0, 2)
+	add := func(panel int, x, y, h float32, total, pageVisible, scroll int) {
+		thumbY, thumbH, ok := scrollbarThumbGeometry(y, h, total, pageVisible, scroll)
+		if !ok {
+			return
+		}
+		hitWidth := max(barW, float32(o.scalePx(18)))
+		result = append(result, pointerScrollbar{
+			panel:    panel,
+			track:    pointerRect{x: x, y: y, w: barW, h: h},
+			thumb:    pointerRect{x: x, y: thumbY, w: barW, h: thumbH},
+			total:    total,
+			visible:  pageVisible,
+			hitWidth: hitWidth,
+		})
+	}
+
+	switch o.uiPage {
+	case PageLibrary:
+		add(0, leftX, float32(l.panelY), float32(l.panelH), len(o.albums), visible, o.albumsScroll)
+		isCatalogInfo := o.currentEntry() != nil && o.currentEntry().IsCatalogTrack()
+		catalogDelete := isCatalogInfo && o.isTrackCached != nil && o.isTrackCached(o.currentEntry().filePath)
+		metadataH := float32(l.panelH)
+		if o.hasNCSelection() || catalogDelete {
+			metadataH -= float32(o.actionBarHeight(l.lineH))
+			if metadataH < float32(l.lineH) {
+				metadataH = float32(l.lineH)
+			}
+		}
+		if o.libraryRightInfoScrollbar() {
+			add(1, rightX, float32(l.panelY), metadataH, o.ncInfoLines, o.ncInfoVisible, o.ncInfoScroll)
+		} else {
+			add(1, rightX, float32(l.panelY), float32(l.panelH), len(o.trackInfos), visible, o.tracksScroll)
+		}
+	case PageSettings:
+		add(0, leftX, float32(l.panelY), float32(l.panelH), len(o.settingsRows), visible, o.albumsScroll)
+		rightTotal := 0
+		if o.panelEntered && o.settingsEditing && o.settingsCursor >= 0 && o.settingsCursor < len(o.settingsRows) {
+			rightTotal = len(o.settingsRows[o.settingsCursor].Values)
+		}
+		add(1, rightX, float32(l.panelY), float32(l.panelH), rightTotal, visible, o.tracksScroll)
+	case PagePresets:
+		if cur := o.presetNav.current(); cur != nil {
+			total := len(cur.nodes) + boolToInt(len(o.presetNav.stack) > 1)
+			add(0, leftX, float32(l.panelY), float32(l.panelH), total, visible, cur.scroll)
+		}
+	case PageHelp:
+		leftScroll := o.helpView.EntryTop
+		if o.helpView.InGrandChildren {
+			leftScroll = o.helpView.GrandChildTop
+		}
+		leftTotal := o.helpLeftCount()
+		add(0, leftX, float32(l.panelY), float32(l.panelH), leftTotal, visible, leftScroll)
+		topic := o.helpTopic(HelpTopicID(o.helpView.TopicCursor))
+		add(1, rightX, float32(l.panelY), float32(l.panelH), o.helpContentRowCount(topic), visible, o.helpView.ContentTop)
+	}
+	return result
+}
+
+func (o *Overlay) pointerScrollbarAt(x, y float32, winW, winH int) (pointerScrollbar, bool) {
+	for _, scrollbar := range o.pointerScrollbars(winW, winH) {
+		hitX := scrollbar.track.x - (scrollbar.hitWidth-scrollbar.track.w)/2
+		if x >= hitX && x < hitX+scrollbar.hitWidth && y >= scrollbar.track.y && y < scrollbar.track.y+scrollbar.track.h {
+			return scrollbar, true
+		}
+	}
+	return pointerScrollbar{}, false
+}
+
+func (o *Overlay) updatePointerScrollbar(y float32, panel int, grabOffset float32, winW, winH int) {
+	for _, scrollbar := range o.pointerScrollbars(winW, winH) {
+		if scrollbar.panel != panel {
+			continue
+		}
+		travel := scrollbar.track.h - scrollbar.thumb.h
+		if travel <= 0 {
+			return
+		}
+		thumbTop := max(0, min(y-grabOffset-scrollbar.track.y, travel))
+		position := int(math.Round(float64(thumbTop / travel * float32(scrollbar.total-scrollbar.visible))))
+		o.setPointerScrollPosition(panel, position, winW, winH)
+		return
+	}
+}
+
+func (o *Overlay) setPointerScrollPosition(panel, position, winW, winH int) {
+	visible := o.pointerVisibleRows(winW, winH)
+	var current *int
+	switch o.uiPage {
+	case PageLibrary:
+		if panel == 0 {
+			current = &o.albumsScroll
+			o.pointerScroll[0] = true
+		} else if o.libraryRightInfoScrollbar() {
+			current = &o.ncInfoScroll
+			visible = o.ncInfoVisible
+		} else {
+			current = &o.tracksScroll
+			o.pointerScroll[1] = true
+		}
+	case PageSettings:
+		if panel == 0 {
+			current = &o.albumsScroll
+			o.pointerScroll[0] = true
+		} else {
+			current = &o.tracksScroll
+			o.pointerScroll[1] = true
+		}
+	case PagePresets:
+		if panel == 0 {
+			if cur := o.presetNav.current(); cur != nil {
+				current = &cur.scroll
+				o.pointerScroll[0] = true
+			}
+		}
+	case PageHelp:
+		if panel == 0 {
+			o.pointerScroll[0] = true
+			if o.helpView.InGrandChildren {
+				current = &o.helpView.GrandChildTop
+			} else {
+				current = &o.helpView.EntryTop
+			}
+		} else {
+			current = &o.helpView.ContentTop
+		}
+	}
+	if current == nil {
+		return
+	}
+	next := clampPointerScroll(position, pointerScrollbarTotal(o, panel), visible)
+	if *current == next {
+		return
+	}
+	*current = next
+	o.markPointerScrollDirty(panel)
+}
+
+func pointerScrollbarTotal(o *Overlay, panel int) int {
+	switch o.uiPage {
+	case PageLibrary:
+		if panel == 0 {
+			return len(o.albums)
+		}
+		if o.libraryRightInfoScrollbar() {
+			return o.ncInfoLines
+		}
+		return len(o.trackInfos)
+	case PageSettings:
+		if panel == 0 {
+			return len(o.settingsRows)
+		}
+		if o.settingsCursor >= 0 && o.settingsCursor < len(o.settingsRows) {
+			return len(o.settingsRows[o.settingsCursor].Values)
+		}
+	case PagePresets:
+		if panel == 0 {
+			if cur := o.presetNav.current(); cur != nil {
+				return len(cur.nodes) + boolToInt(len(o.presetNav.stack) > 1)
+			}
+		}
+	case PageHelp:
+		if panel == 0 {
+			return o.helpLeftCount()
+		}
+		return o.helpContentRowCount(o.helpTopic(HelpTopicID(o.helpView.TopicCursor)))
+	}
+	return 0
+}
+
+func (o *Overlay) libraryRightInfoScrollbar() bool {
+	if o.hasNCSelection() {
+		return true
+	}
+	entry := o.currentEntry()
+	return (entry != nil && entry.IsCatalogTrack()) || o.infoLines != nil
 }
 
 func (o *Overlay) pointerVisibleRows(winW, winH int) int {
@@ -884,7 +1314,11 @@ func (o *Overlay) breadcrumbSegments() []breadcrumbSegment {
 		if depth >= len(o.navStack) || (o.focusPanel == 1 && i == len(parts)-1) {
 			target.kind = pointerTargetNone
 		}
-		segments = append(segments, breadcrumbSegment{label: parts[i], target: target})
+		icon := ""
+		if i < len(o.navStack) && o.navStack[i].ctx == ctxFavorites && o.navStack[i].playlistID != "" {
+			icon = favoriteFolderIconName(o.navStack[i].playlistID)
+		}
+		segments = append(segments, breadcrumbSegment{label: parts[i], icon: icon, target: target})
 	}
 	return segments
 }
@@ -935,15 +1369,30 @@ func (o *Overlay) breadcrumbItemLabel(index int, item breadcrumbSegment) (string
 		return "", iconHome
 	}
 	if index > 0 {
+		if item.icon != "" {
+			return "/" + strings.Repeat(" ", o.breadcrumbIconSpacerCount()), item.icon
+		}
 		return "/" + item.label, ""
 	}
 	return item.label, ""
 }
 
+func (o *Overlay) breadcrumbIconSpacerCount() int {
+	if o.face == nil {
+		return 0
+	}
+	targetWidth := o.sourceIconTextOffset(o.lineHeight())
+	spaces := 0
+	for spaces < 64 && font.MeasureString(o.face, strings.Repeat(" ", spaces)).Ceil() < targetWidth {
+		spaces++
+	}
+	return spaces
+}
+
 func (o *Overlay) breadcrumbItemWidth(index int, item breadcrumbSegment) int {
 	label, icon := o.breadcrumbItemLabel(index, item)
 	width := font.MeasureString(o.face, label).Ceil()
-	if icon != "" {
+	if icon != "" && label == "" {
 		width += o.sourceIconTextOffset(o.lineHeight())
 	}
 	return width

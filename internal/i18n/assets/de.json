@@ -116,7 +116,6 @@
   "radio.popular": "Beliebt",
   "radio.random": "Zufälliger Sender",
   "radio.by_tag": "Nach Tag",
-  "radio.by_language": "Nach Sprache",
   "radio.by_country": "Nach Land",
   "radio.empty": "Keine Sender gefunden",
   "radio.now": "Jetzt: %s",
@@ -126,6 +125,7 @@
   "radio.language": "Sprache: %s",
   "radio.country": "Land: %s",
   "radio.homepage": "Website: %s",
+  "radio.stream": "Stream-URL: %s",
   "presets.shapes_waves": "Formen: %d   Wellen: %d",
   "presets.equations": "Gleichungen: %d pro Frame, %d pro Pixel",
   "presets.textures": "Texturen: %d",
@@ -139,5 +139,12 @@
   "sources.microphone": "Mikrofon",
   "sources.microphone_capturing": "Mikrofon · Aktiv",
   "sources.stop_capture": "Mikrofon stoppen",
-  "sources.no_input_devices": "Keine Eingabegeräte"
+  "sources.no_input_devices": "Keine Eingabegeräte",
+  "settings.sort": "Sortierung", "values.source_order": "Quellreihenfolge", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "Legt die Reihenfolge für lokale Musik, Kataloge und Radio fest.", "info.copied": "Kopiert", "radio.history": "Zuletzt gespielt",
+  "info.copy_failed": "Kopieren fehlgeschlagen",
+  "radio.last_played": "Zuletzt gestartet: %s",
+  "radio.clear_history": "Verlauf löschen",
+  "info.radio_playback_failed": "Radiosender konnte nicht abgespielt werden",
+  "info.radio_history_cleared": "Radioverlauf gelöscht",
+  "radio.favorite": "Favorit: %s"
 }

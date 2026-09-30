@@ -131,6 +131,10 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 				imgX, imgY, imgW, imgH, tx, ty, float32(panelW), metadataH,
 				winW, winH, viewW, viewH)
 		}
+		if isInfoPanel {
+			o.setPointerTextLines(o.infoLines, tx, contentY, ty, float32(panelW), metadataH, lh)
+			o.drawPointerLinks(winW, winH, viewW, viewH)
+		}
 		if isLocalInfo || isNCInfo || isCatalogInfo {
 			drawScrollbar(o, tx+float32(panelW)-sbW, ty, remainH, o.ncInfoLines, o.ncInfoVisible, o.ncInfoScroll, winW, winH, viewW, viewH)
 			if isNCInfo || isCatalogInfo {
@@ -142,7 +146,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 				tm = 1
 			}
 			tracksCount := len(o.trackInfos)
-			drawScrollbar(o, tx+float32(panelW)-sbW, contentY, remainH, tracksCount, tm, o.tracksScroll, winW, winH, viewW, viewH)
+			drawScrollbar(o, tx+float32(panelW)-sbW, ty, remainH, tracksCount, tm, o.tracksScroll, winW, winH, viewW, viewH)
 			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
 				rowY := contentY + float32((o.trackCursor-o.tracksScroll)*lh)
 				o.drawMarqueeCol(&o.marqueeR, tx, contentY, float32(textW), remainH, lh, rowY, winW, winH, viewW, viewH)
@@ -316,7 +320,13 @@ func (o *Overlay) rebuildTracksTex(maxW, maxH int) {
 func (o *Overlay) rebuildRadioInfoTex(station radio.Station, nowPlaying string, maxW, maxH int) {
 	o.tracksContentDirty = false
 	lines := radioInfoLines(o.catalog, station, nowPlaying)
+	if o.favoritesView != nil {
+		if favorite := o.favoritesView.GetPlaylist(station.Path()); favorite != "" {
+			lines = append(lines, o.catalog.Format(i18n.RadioFavorite, player.PlaylistLabel(favorite)))
+		}
+	}
 	o.infoLines = lines
+	o.infoComment = ""
 	o.infoMarquee.invalidate(o)
 	lh := o.face.Metrics().Height.Ceil()
 	logoMaxH := maxH * 32 / 100
@@ -340,6 +350,9 @@ func (o *Overlay) rebuildRadioInfoTex(station radio.Station, nowPlaying string, 
 
 func radioInfoLines(catalog i18n.Catalog, station radio.Station, nowPlaying string) []string {
 	lines := []string{station.DisplayName(), ""}
+	if !station.PlayedAt.IsZero() {
+		lines = append(lines, catalog.Format(i18n.RadioLastPlayed, station.PlayedAt.Local().Format("2006-01-02 15:04")))
+	}
 	if nowPlaying != "" {
 		lines = append(lines, catalog.Format(i18n.RadioNow, nowPlaying))
 	}
@@ -355,11 +368,20 @@ func radioInfoLines(catalog i18n.Catalog, station radio.Station, nowPlaying stri
 	if station.Language != "" {
 		lines = append(lines, catalog.Format(i18n.RadioLanguage, station.Language))
 	}
-	if station.Country != "" {
-		lines = append(lines, catalog.Format(i18n.RadioCountry, station.Country))
+	countryName := catalog.DisplayRegionName(station.CountryCode)
+	if countryName == "" {
+		countryName = catalog.DisplayRegionNameFromEnglish(station.Country)
+	}
+	if countryName == "" {
+		countryName = station.Country
+	}
+	if countryName != "" {
+		lines = append(lines, catalog.Format(i18n.RadioCountry, countryName))
 	}
 	if station.Homepage != "" {
 		lines = append(lines, catalog.Format(i18n.RadioHomepage, station.Homepage))
+	} else if streamURL := station.StreamURL(); streamURL != "" {
+		lines = append(lines, catalog.Format(i18n.RadioStream, streamURL))
 	}
 	return lines
 }
@@ -448,10 +470,10 @@ func (o *Overlay) rebuildLocalTrackInfoTex(maxW, maxH int) {
 	if len(lines) == 0 {
 		return
 	}
-
 	maxTextPx := o.availableRowTextWidth(maxW)
 	o.infoMarquee.invalidate(o)
 	o.infoLines = lines
+	o.infoComment = ti.Comment
 	// Vertical scroll: keep the cursor line visible.
 	lh := o.face.Metrics().Height.Ceil()
 	if lh <= 0 {
@@ -537,6 +559,7 @@ func (o *Overlay) clearInfoPanel() {
 	o.tracksTexW = 0
 	o.tracksTexH = 0
 	o.infoLines = nil
+	o.infoComment = ""
 	o.ncInfoLines = 0
 	o.ncInfoVisible = 0
 	o.marqueeR.invalidate(o)
@@ -552,6 +575,7 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 	o.rebuildNCActionsTex()
 
 	var lines []string
+	infoComment := ""
 	if status := o.NCListingStatus(); status != filesystem.StatusOK {
 		if status == filesystem.StatusPartial {
 			lines = append(lines, "! "+o.catalog.Text(i18n.InfoCatalogPartial), "")
@@ -582,6 +606,7 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		if o.fileMetadataPath == o.ncInfoFile {
 			meta = o.fileMetadata
 		}
+		infoComment = meta.Comment
 		if meta.Title != "" {
 			lines = append(lines, "", "  "+o.catalog.Format(i18n.InfoTitle, meta.Title))
 		}
@@ -655,6 +680,8 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		return
 	} else {
 		// No selected file/dir (e.g. cursor on ".."), but still show the banner.
+		o.infoLines = append([]string(nil), lines...)
+		o.infoComment = ""
 		maxTextPx := o.availableRowTextWidth(maxW)
 		var rows []listRow
 		for _, line := range lines {
@@ -663,6 +690,8 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
 		return
 	}
+	o.infoLines = append([]string(nil), lines...)
+	o.infoComment = infoComment
 
 	maxTextPx := o.availableRowTextWidth(maxW)
 	infoTextW := maxTextPx
@@ -803,20 +832,19 @@ func formatInfoSize(catalog i18n.Catalog, size int64) string {
 	return catalog.Format(i18n.InfoSize, formatSize(size))
 }
 
-// catalogTrackInfoLines builds the right-panel lines for a cached catalog
-// track. Returns nil when the track is not cached or metadata is not yet
-// available — the caller hides the right panel in that case.
-// Pure logic, no GL — unit-testable.
-func catalogTrackInfoLines(catalog i18n.Catalog, e *navEntry, albums []player.Album, trackInfos []player.TrackInfo) []string {
+// catalogTrackInfo builds the right-panel lines and original comment for a
+// cached catalog track. Returns no lines when the track is not cached or
+// metadata is not yet available — the caller hides the right panel then.
+func catalogTrackInfo(catalog i18n.Catalog, e *navEntry, albums []player.Album, trackInfos []player.TrackInfo) ([]string, string) {
 	if e.albumIdx < 0 || e.trackIdx < 0 {
-		return nil
+		return nil, ""
 	}
 	if e.albumIdx >= len(albums) {
-		return nil
+		return nil, ""
 	}
 	album := albums[e.albumIdx]
 	if e.trackIdx >= len(album.Tracks) {
-		return nil
+		return nil, ""
 	}
 	trackPath := album.Tracks[e.trackIdx]
 
@@ -827,13 +855,20 @@ func catalogTrackInfoLines(catalog i18n.Catalog, e *navEntry, albums []player.Al
 		}
 		ti := &trackInfos[i]
 		if !ti.Cached {
-			return nil
+			return nil, ""
 		}
-		return trackInfoLines(catalog, player.TrackTitle(e.label), ti)
+		return trackInfoLines(catalog, player.TrackTitle(e.label), ti), ti.Comment
 	}
 
 	// Track info not yet available (metadata still loading).
-	return nil
+	return nil, ""
+}
+
+// catalogTrackInfoLines returns only the display lines for a cached catalog
+// track. Pure logic, no GL — unit-testable.
+func catalogTrackInfoLines(catalog i18n.Catalog, e *navEntry, albums []player.Album, trackInfos []player.TrackInfo) []string {
+	lines, _ := catalogTrackInfo(catalog, e, albums, trackInfos)
+	return lines
 }
 
 // rebuildCatalogTrackInfoTex renders the right-panel info for a cached catalog
@@ -846,10 +881,12 @@ func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 	if o.fileMetadataPath != "" && o.fileMetadataPath == o.MetadataFilePath() {
 		infos = []player.TrackInfo{o.fileMetadata}
 	}
-	lines := catalogTrackInfoLines(o.catalog, e, o.currentAlbums(), infos)
+	lines, comment := catalogTrackInfo(o.catalog, e, o.currentAlbums(), infos)
 	if len(lines) == 0 {
 		return
 	}
+	o.infoLines = append([]string(nil), lines...)
+	o.infoComment = comment
 	o.rebuildCatalogActionsTex()
 
 	maxTextPx := o.availableRowTextWidth(maxW)

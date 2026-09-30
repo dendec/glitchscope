@@ -22,13 +22,14 @@ const (
 )
 
 // PointerButton is deliberately smaller than SDL's button namespace. Pointer
-// consumers only need to distinguish the primary button from unsupported
-// buttons; the latter are still useful for capability detection.
+// consumers distinguish the primary button from the secondary copy gesture;
+// other buttons remain useful only for capability detection.
 type PointerButton uint8
 
 const (
-	PointerButtonNone    PointerButton = 0
-	PointerButtonPrimary PointerButton = sdl.BUTTON_LEFT
+	PointerButtonNone      PointerButton = 0
+	PointerButtonPrimary   PointerButton = sdl.BUTTON_LEFT
+	PointerButtonSecondary PointerButton = sdl.BUTTON_RIGHT
 )
 
 // PointerEvent is the SDL-independent pointer event passed to the UI. X/Y and

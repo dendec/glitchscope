@@ -116,7 +116,6 @@
   "radio.popular": "人気",
   "radio.random": "ランダムなラジオ局",
   "radio.by_tag": "タグ別",
-  "radio.by_language": "言語別",
   "radio.by_country": "国別",
   "radio.empty": "放送局が見つかりません",
   "radio.now": "現在：%s",
@@ -126,6 +125,7 @@
   "radio.language": "言語：%s",
   "radio.country": "国：%s",
   "radio.homepage": "ホームページ：%s",
+  "radio.stream": "ストリーム URL：%s",
   "presets.shapes_waves": "シェイプ：%d   ウェーブ：%d",
   "presets.equations": "数式：フレームごと %d、ピクセルごと %d",
   "presets.textures": "テクスチャ：%d",
@@ -139,5 +139,12 @@
   "sources.microphone": "マイク",
   "sources.microphone_capturing": "マイク · 使用中",
   "sources.stop_capture": "マイクを停止",
-  "sources.no_input_devices": "入力デバイスなし"
+  "sources.no_input_devices": "入力デバイスなし",
+  "settings.sort": "並べ替え", "values.source_order": "ソース順", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "ローカル音楽、カタログ、ラジオの表示順を選びます。", "info.copied": "コピーしました", "radio.history": "最近再生したもの",
+  "info.copy_failed": "コピーに失敗しました",
+  "radio.last_played": "最終再生開始: %s",
+  "radio.clear_history": "履歴を消去",
+  "info.radio_playback_failed": "ラジオ局を再生できませんでした",
+  "info.radio_history_cleared": "ラジオ履歴を消去しました",
+  "radio.favorite": "お気に入り: %s"
 }

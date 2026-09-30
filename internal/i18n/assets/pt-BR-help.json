@@ -25,6 +25,10 @@
           "{focus} alterna entre os painéis.",
           "{select} abre o item selecionado ou aplica um valor.",
           "{back} volta para trás ou cancela a edição.",
+          "Escape volta no menu e não faz nada quando ele está fechado. Q não encerra o aplicativo; feche a janela da área de trabalho para sair.",
+          "Com mouse ou tela sensível ao toque, os links no painel direito ficam sublinhados e abrem no navegador.",
+          "Clique com o botão direito ou mantenha um valor do painel direito pressionado para copiá-lo por inteiro.",
+          "Com mouse, arraste o volume na barra do player. Sem mouse, o volume fica no máximo e é controlado pelos botões do dispositivo.",
           "{pages} alterna entre as páginas.",
           "",
           "**Menu**",
@@ -192,7 +196,8 @@
         "lines": [
           "**Manter faixas por perto**",
           "Adicione faixas às listas Estrela, Coração ou Nota.",
-          "Favoritos ficam disponíveis na Biblioteca e protegem downloads da limpeza automática."
+          "Favoritos ficam disponíveis na Biblioteca e protegem downloads da limpeza automática.",
+          "Os detalhes da estação mostram a lista de Favoritos; um ícone marca as estações salvas."
         ]
       },
       {
@@ -200,7 +205,8 @@
         "lines": [
           "**Cópias offline**",
           "Navegue pelas faixas baixadas de fontes remotas.",
-          "Downloads podem ser reproduzidos sem internet e removidos em Downloads."
+          "Downloads podem ser reproduzidos sem internet e removidos em Downloads.",
+          "Downloads é um cache gerenciado pelo aplicativo. Favoritos protegem downloads da limpeza automática."
         ]
       },
       {
@@ -215,9 +221,10 @@
         "title": "Rádio",
         "lines": [
           "**Rádio pela internet**",
-          "Navegue por estações populares ou filtre por tag, idioma ou país.",
+          "Navegue por estações populares ou filtre por tag ou país.",
           "As listas ficam em cache por 30 dias e carregam mais linhas ao rolar.",
-          "O rádio precisa de rede; um fluxo pode falhar mesmo quando o diretório está online."
+          "O rádio precisa de rede; um fluxo pode falhar mesmo quando o diretório está online.",
+          "Tocadas recentemente mantém as últimas 50 estações iniciadas com sucesso e o horário de início. Estações indisponíveis permanecem na lista e falhas de reprodução são exibidas. Escolha Limpar histórico para esvaziar a lista."
         ]
       },
       {

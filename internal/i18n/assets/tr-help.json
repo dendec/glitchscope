@@ -25,6 +25,10 @@
           "{focus} paneller arasında geçiş yapar.",
           "{select} seçilen öğeyi açar veya bir değer uygular.",
           "{back} geri döner veya düzenlemeyi iptal eder.",
+          "Escape menüde geri gider, menü kapalıyken işlem yapmaz. Q uygulamadan çıkmaz; masaüstünde çıkmak için pencereyi kapatın.",
+          "Fare veya dokunmatik ekranda sağ paneldeki bağlantılar altı çizili görünür ve tarayıcıda açılır.",
+          "Sağ paneldeki bir değerin tamamını kopyalamak için sağ tıklayın veya değere basılı tutun.",
+          "Fareyle oynatıcı çubuğundaki ses düzeyini sürükleyin. Fare yoksa ses en yüksek düzeyde kalır ve cihaz düğmeleriyle ayarlanır.",
           "{pages} sayfalar arasında geçiş yapar.",
           "",
           "**Menü**",
@@ -192,7 +196,8 @@
         "lines": [
           "**Parçaları sakla**",
           "Parçaları Yıldız, Kalp veya Nota listelerine ekleyin.",
-          "Favoriler Library'de bulunur ve indirilen parçaları otomatik temizlemeden korur."
+          "Favoriler Library'de bulunur ve indirilen parçaları otomatik temizlemeden korur.",
+          "İstasyon ayrıntıları Favoriler listesini gösterir; kaydedilen istasyonlar bir simgeyle işaretlenir."
         ]
       },
       {
@@ -200,7 +205,8 @@
         "lines": [
           "**Çevrimdışı kopyalar**",
           "Uzak kaynaklardan indirilen parçaları açın.",
-          "İndirilen parçalar internetsiz çalınabilir ve Downloads'tan silinebilir."
+          "İndirilen parçalar internetsiz çalınabilir ve Downloads'tan silinebilir.",
+          "Downloads, uygulamanın yönettiği bir önbellektir. Favoriler, indirilenleri otomatik temizlemeden korur."
         ]
       },
       {
@@ -215,9 +221,10 @@
         "title": "Radyo",
         "lines": [
           "**İnternet radyosu**",
-          "Popüler istasyonları açın veya etiket, dil ve ülkeye göre filtreleyin.",
+          "Popüler istasyonları açın veya etiket ve ülkeye göre filtreleyin.",
           "İstasyon listeleri 30 gün önbelleğe alınır ve kaydırdıkça yeni satırlar yüklenir.",
-          "Radyo ağ bağlantısı ister; dizin çevrimiçi olsa bile akış başarısız olabilir."
+          "Radyo ağ bağlantısı ister; dizin çevrimiçi olsa bile akış başarısız olabilir.",
+          "Son çalınanlar, başarıyla başlatılan son 50 istasyonu ve başlama saatini saklar. Kullanılamayan istasyonlar listede kalır ve çalma hatası gösterilir. Listeyi boşaltmak için Geçmişi temizle'yi seçin."
         ]
       },
       {

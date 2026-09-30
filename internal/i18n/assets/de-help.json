@@ -25,6 +25,10 @@
           "{focus} wechselt die Panels.",
           "{select} öffnet den ausgewählten Eintrag oder wendet einen Wert an.",
           "{back} geht zurück oder storniert die Bearbeitung.",
+          "Escape geht im Menü zurück und hat bei geschlossenem Menü keine Wirkung. Q beendet die App nicht; zum Beenden das Desktopfenster schließen.",
+          "Links im rechten Bereich sind mit Maus oder Touchscreen unterstrichen und öffnen sich im Browser.",
+          "Mit Rechtsklick oder langem Drücken auf einen Wert im rechten Bereich kopieren Sie ihn vollständig.",
+          "Mit einer Maus lässt sich die Lautstärke in der Playerleiste ziehen. Ohne Maus bleibt sie auf Maximum und wird über Hardwaretasten geregelt.",
           "{pages} wechselt die Seiten.",
           "",
           "**Menü**",
@@ -192,7 +196,8 @@
         "lines": [
           "**Titel griffbereit halten**",
           "Fügen Sie Titel den Wiedergabelisten Stern, Herz oder Note hinzu.",
-          "Favoriten sind in der Bibliothek verfügbar und schützen heruntergeladene Titel vor der Bereinigung."
+          "Favoriten sind in der Bibliothek verfügbar und schützen heruntergeladene Titel vor der Bereinigung.",
+          "Die Stationsdetails zeigen die Favoritenliste; ein Symbol markiert gespeicherte Sender."
         ]
       },
       {
@@ -200,7 +205,8 @@
         "lines": [
           "**Offline-Kopien**",
           "Durchsuchen Sie Titel, die aus entfernten Quellen heruntergeladen wurden.",
-          "Heruntergeladene Titel funktionieren ohne Internet und können in Downloads gelöscht werden."
+          "Heruntergeladene Titel funktionieren ohne Internet und können in Downloads gelöscht werden.",
+          "Downloads ist der von der App verwaltete Cache. Favoriten schützen heruntergeladene Titel vor automatischer Bereinigung."
         ]
       },
       {
@@ -215,9 +221,10 @@
         "title": "Radio",
         "lines": [
           "**Internetradio**",
-          "Durchsuchen Sie beliebte Sender oder filtern Sie nach Tag, Sprache oder Land.",
+          "Durchsuchen Sie beliebte Sender oder filtern Sie nach Tag oder Land.",
           "Senderlisten werden 30 Tage zwischengespeichert und beim Scrollen erweitert.",
-          "Radio benötigt eine Netzwerkverbindung; ein Stream kann trotz erreichbarem Verzeichnis ausfallen."
+          "Radio benötigt eine Netzwerkverbindung; ein Stream kann trotz erreichbarem Verzeichnis ausfallen.",
+          "Zuletzt gespielt speichert die letzten 50 erfolgreich gestarteten Sender samt Startzeit. Nicht erreichbare Sender bleiben in der Liste; Wiedergabefehler werden angezeigt. Verlauf löschen leert die Liste."
         ]
       },
       {

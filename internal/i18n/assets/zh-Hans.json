@@ -116,7 +116,6 @@
   "radio.popular": "热门",
   "radio.random": "随机电台",
   "radio.by_tag": "按标签",
-  "radio.by_language": "按语言",
   "radio.by_country": "按国家",
   "radio.empty": "未找到电台",
   "radio.now": "当前：%s",
@@ -126,6 +125,7 @@
   "radio.language": "语言：%s",
   "radio.country": "国家/地区：%s",
   "radio.homepage": "主页：%s",
+  "radio.stream": "流地址：%s",
   "presets.shapes_waves": "形状：%d   波形：%d",
   "presets.equations": "方程：每帧 %d，每像素 %d",
   "presets.textures": "纹理：%d",
@@ -139,5 +139,12 @@
   "sources.microphone": "麦克风",
   "sources.microphone_capturing": "麦克风 · 已启用",
   "sources.stop_capture": "关闭麦克风",
-  "sources.no_input_devices": "没有输入设备"
+  "sources.no_input_devices": "没有输入设备",
+  "settings.sort": "排序", "values.source_order": "来源顺序", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "选择本地音乐、目录和电台的排序方式。", "info.copied": "已复制", "radio.history": "最近播放",
+  "info.copy_failed": "复制失败",
+  "radio.last_played": "最近开始播放：%s",
+  "radio.clear_history": "清除历史记录",
+  "info.radio_playback_failed": "无法播放电台",
+  "info.radio_history_cleared": "已清除电台历史记录",
+  "radio.favorite": "收藏夹：%s"
 }

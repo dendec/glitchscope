@@ -3,9 +3,11 @@ package app
 import (
 	"log/slog"
 
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/ui"
+	"github.com/veandco/go-sdl2/sdl"
 )
 
 // pointerOpenGesture owns the special gesture used while the overlay is
@@ -73,6 +75,9 @@ func (a *App) handlePointerEvent(event input.PointerEvent, winW, winH int) {
 	if !a.pointerOpen.active {
 		r := a.overlay.HandlePlayerBarPointer(event, winW, winH)
 		if r.Consumed {
+			if r.Volume && a.pl != nil {
+				a.pl.SetVolume(r.Level)
+			}
 			switch r.Action {
 			case input.ActionPlayPause:
 				a.handleAction(r.Action, winW, winH)
@@ -94,6 +99,7 @@ func (a *App) handlePointerEvent(event input.PointerEvent, winW, winH int) {
 		}
 	}
 	if !a.overlay.UIVisible() {
+		a.setLinkCursor(false)
 		if a.pointerOpen.handle(event, winH) {
 			a.handleAction(input.ActionToggleUI, winW, winH)
 		}
@@ -101,15 +107,51 @@ func (a *App) handlePointerEvent(event input.PointerEvent, winW, winH int) {
 	}
 
 	wasSettings := a.overlay.IsSettingsPage()
-	switch a.overlay.HandlePointer(event, winW, winH) {
+	result := a.overlay.HandlePointer(event, winW, winH)
+	if text := a.overlay.ConsumePointerCopy(); text != "" {
+		if err := sdl.SetClipboardText(text); err != nil {
+			slog.Warn("copy text to clipboard", "error", err)
+			a.overlay.ShowMessage(i18n.InfoCopyFailed)
+		} else {
+			a.overlay.ShowMessage(i18n.InfoCopied)
+		}
+	}
+	if targetURL := a.overlay.ConsumePointerURL(); targetURL != "" {
+		if err := openExternalURL(targetURL); err != nil {
+			slog.Warn("open external URL", "url", targetURL, "error", err)
+		}
+	}
+	if event.Device == input.PointerMouse && event.Phase == input.PointerMove {
+		a.setLinkCursor(a.overlay.PointerOverLink(event.X, event.Y))
+	}
+	switch result {
 	case ui.PointerResultSelect:
 		pointerPanel := a.overlay.FocusPanel()
 		a.handleAction(input.ActionSelect, winW, winH)
 		a.overlay.RestorePointerFocus(pointerPanel)
 	case ui.PointerResultClose:
 		a.overlay.CloseUI()
+		a.setLinkCursor(false)
 	}
 	if !wasSettings && a.overlay.IsSettingsPage() {
 		a.refreshSettingsRows(winW, winH, a.displayRefreshRate(), a.overlay.SettingsCursor())
 	}
+}
+
+func (a *App) setLinkCursor(active bool) {
+	if a.linkCursorActive == active {
+		return
+	}
+	if active {
+		if a.linkCursor == nil {
+			a.linkCursor = sdl.CreateSystemCursor(sdl.SYSTEM_CURSOR_HAND)
+		}
+		if a.linkCursor == nil {
+			return
+		}
+		sdl.SetCursor(a.linkCursor)
+	} else {
+		sdl.SetCursor(sdl.GetDefaultCursor())
+	}
+	a.linkCursorActive = active
 }

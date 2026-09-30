@@ -256,6 +256,12 @@ func (o *Overlay) libraryHints() []UIHint {
 	}
 
 	// Left panel.
+	if entry := o.currentEntry(); entry != nil && entry.kind == entryRadioHistoryClear {
+		return []UIHint{
+			{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.RadioClearHistory)},
+			{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionBack)},
+		}
+	}
 	backVerb := o.catalog.Text(i18n.ActionUp)
 	if !o.isNC() && o.topLevel().ctx == ctxSourceRoot {
 		backVerb = o.catalog.Text(i18n.ActionClose)
@@ -266,9 +272,8 @@ func (o *Overlay) libraryHints() []UIHint {
 		{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionItem)},
 	}
 	if o.HasPlayableTrack() && o.favoritesView != nil {
-		e := o.currentEntry()
-		if e != nil {
-			if o.favoritesView.GetPlaylist(e.filePath) != "" {
+		if path := o.SelectedTrackPath(); path != "" {
+			if o.favoritesView.GetPlaylist(path) != "" {
 				hints = append(hints, UIHint{Key: o.controlLabel(hintFavorite), Label: o.catalog.Text(i18n.ActionRemove)})
 			} else {
 				hints = append(hints, UIHint{Key: o.controlLabel(hintFavorite), Label: o.catalog.Text(i18n.ActionFavorite)})

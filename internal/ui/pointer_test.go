@@ -6,6 +6,7 @@ import (
 	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/player"
+	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 )
 
@@ -18,6 +19,40 @@ func testPointerOverlay() *Overlay {
 		uiVisible:    true,
 		panelEntered: true,
 		navStack:     []navLevel{{ctx: ctxSourceRoot}},
+	}
+}
+
+func TestPointerRightClickCopiesLinkAndPrimaryClickOpensIt(t *testing.T) {
+	const url = "https://example.test/stream"
+	o := testPointerOverlay()
+	o.SetPointerCapabilities(false, true, false)
+	layout := o.pointerLayout(640, 480)
+	var row pointerTextRow
+	found := false
+	for _, target := range layout.targets {
+		if target.target.kind == pointerTargetPanel && target.target.panel == 1 {
+			row = pointerTextRow{text: "Homepage: " + url, link: url, x: target.rect.x, y: target.rect.y, w: target.rect.w, h: target.rect.h}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("right panel target missing")
+	}
+	o.pointerTextRows = []pointerTextRow{row}
+	x := row.x + float32(font.MeasureString(o.face, "Homepage: ").Ceil()+4)
+	y := row.y + row.h/2
+	down := input.PointerEvent{Device: input.PointerMouse, Phase: input.PointerDown, X: x, Y: y, Button: input.PointerButtonSecondary}
+	o.HandlePointer(down, 640, 480)
+	if got := o.ConsumePointerCopy(); got != url {
+		t.Fatalf("right-click copy = %q, want %q", got, url)
+	}
+	down.Button = input.PointerButtonPrimary
+	o.HandlePointer(down, 640, 480)
+	down.Phase = input.PointerUp
+	o.HandlePointer(down, 640, 480)
+	if got := o.ConsumePointerURL(); got != url {
+		t.Fatalf("primary click URL = %q, want %q", got, url)
 	}
 }
 

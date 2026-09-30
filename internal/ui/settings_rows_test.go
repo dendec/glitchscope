@@ -11,7 +11,7 @@ import (
 func TestSettingsRowsUseCompactSectionsAndLabels(t *testing.T) {
 	rows := BuildSettingsRows(config.DefaultSettings(), 640, 480)
 	want := []string{
-		"── Playback ────", "Shuffle", "Repeat",
+		"── Playback ────", "Shuffle", "Repeat", "Sort",
 		"── Visualization ──", "Visualizer", "Frame rate", "Adaptive resolution", "Resolution", "Upscale filter", "Sensitivity", "Rotation",
 		"── Appearance ───", "Language", "Theme", "Transparency", "Stats", "Player bar",
 		"── Downloads ───────", "Size", "Keep for",
@@ -36,6 +36,15 @@ func TestSettingsRowsUseLocalizedLabelsWithoutChangingSelection(t *testing.T) {
 	}
 	if rows[SettingShuffle].Index != 2 || rows[SettingShuffle].Values[2] != "Источник" {
 		t.Fatalf("localized shuffle selection = %+v", rows[SettingShuffle])
+	}
+}
+
+func TestSortSettingUsesPersistedGlobalOrder(t *testing.T) {
+	settings := config.DefaultSettings()
+	settings.UI.SortOrder = config.SortZA
+	row := BuildSettingsRowsWithCatalog(settings, 640, 480, i18n.MustLoad(i18n.English))[SettingSort]
+	if row.Label != "Sort" || row.Index != 2 || !equalStrings(row.Values, []string{"Source order", "A–Z", "Z–A"}) {
+		t.Fatalf("sort row = %+v", row)
 	}
 }
 

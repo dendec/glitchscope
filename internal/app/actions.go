@@ -40,6 +40,9 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 			a.pointerOpen = pointerOpenGesture{}
 			wasVisible := a.overlay.UIVisible()
 			a.overlay.ToggleUI()
+			if wasVisible {
+				a.setLinkCursor(false)
+			}
 			if !wasVisible {
 				a.rememberMenuOpened()
 				a.requestConnectivity()
@@ -149,6 +152,12 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 				a.startMicCapture(device)
 			} else if a.overlay.ConsumeMicStopRequest() {
 				a.stopMicCapture()
+			} else if a.overlay.ConsumeRadioHistoryClearRequest() {
+				if a.radio != nil {
+					a.radio.ClearHistory()
+					a.overlay.SetRadioHistory(nil)
+					a.overlay.ShowMessage(i18n.InfoRadioHistoryCleared)
+				}
 			} else if kind, filter, ok := a.overlay.ConsumeRadioPageRequest(); ok {
 				a.requestMoreRadio(kind, filter)
 			} else if kind, filter, ok := a.overlay.ConsumeRadioBrowseRequest(); ok {
@@ -181,6 +190,9 @@ func (a *App) handleUIAction(act input.Action, winW, winH int) {
 		}
 	case input.ActionBack:
 		a.overlay.Back()
+		if !a.overlay.UIVisible() {
+			a.setLinkCursor(false)
+		}
 
 	case input.ActionNextPreset:
 		// While the UI is open, L1/R1 page through Library/Settings/Presets
@@ -509,6 +521,18 @@ func (a *App) applySettings(winW, winH int) {
 		a.settings.Playback.Repeat = repeatModes[rows[ui.SettingRepeat].Index]
 	}
 
+	sortOrders := config.AllSortOrders()
+	if index := rows[ui.SettingSort].Index; index >= 0 && index < len(sortOrders) {
+		order := sortOrders[index]
+		if order != a.settings.UI.SortOrder {
+			a.settings.UI.SortOrder = order
+			a.overlay.SetSortOrder(order)
+			if a.radio != nil {
+				a.overlay.SetRadioHistory(a.radio.History())
+			}
+		}
+	}
+
 	presetIntervals := config.AllPresetIntervals()
 	if rows[ui.SettingRotation].Index >= 0 && rows[ui.SettingRotation].Index < len(presetIntervals) {
 		a.settings.PresetInterval = presetIntervals[rows[ui.SettingRotation].Index]
@@ -598,12 +622,13 @@ func (a *App) requestRadio(kind radio.BrowseKind, filter string) {
 	if a.radio == nil {
 		return
 	}
+	order := a.radioListingOrder()
 	if kind == radio.BrowseRandom {
 		a.requestConnectivity()
-		a.radio.Begin(a.appCtx, kind, filter)
+		a.radio.BeginSorted(a.appCtx, kind, filter, order)
 		return
 	}
-	if kind == radio.BrowseTag || kind == radio.BrowseLanguage || kind == radio.BrowseCountry {
+	if kind == radio.BrowseTag || kind == radio.BrowseCountry {
 		if filter == "" {
 			values, stale := a.radio.Values(kind)
 			if values != nil {
@@ -612,30 +637,45 @@ func (a *App) requestRadio(kind radio.BrowseKind, filter string) {
 			if !stale {
 				return
 			}
-		} else if stations, stale := a.radio.Snapshot(kind, filter); stations != nil {
-			a.overlay.SetRadioStations(kind, filter, stations, a.radio.HasMore(kind, filter))
+		} else if stations, stale := a.radio.SnapshotSorted(kind, filter, order); stations != nil {
+			a.overlay.SetRadioStations(kind, filter, stations, a.radio.HasMoreSorted(kind, filter, order))
 			if !stale {
 				return
 			}
 		}
-	} else if stations, stale := a.radio.Snapshot(kind, filter); stations != nil {
-		a.overlay.SetRadioStations(kind, filter, stations, a.radio.HasMore(kind, filter))
+	} else if stations, stale := a.radio.SnapshotSorted(kind, filter, order); stations != nil {
+		a.overlay.SetRadioStations(kind, filter, stations, a.radio.HasMoreSorted(kind, filter, order))
 		if !stale {
 			return
 		}
 	}
-	a.radio.Begin(a.appCtx, kind, filter)
+	a.radio.BeginSorted(a.appCtx, kind, filter, order)
 }
 
 func (a *App) requestMoreRadio(kind radio.BrowseKind, filter string) {
 	if a.radio == nil {
 		return
 	}
-	offset, ok := a.radio.NextPage(kind, filter)
+	order := a.radioListingOrder()
+	offset, ok := a.radio.NextPageSorted(kind, filter, order)
 	if !ok {
 		return
 	}
-	a.radio.BeginPage(a.appCtx, kind, filter, offset)
+	a.radio.BeginPageSorted(a.appCtx, kind, filter, offset, order)
+}
+
+func (a *App) radioListingOrder() radio.StationOrder {
+	if a.settings == nil {
+		return radio.StationOrderSource
+	}
+	switch a.settings.UI.SortOrder {
+	case config.SortAZ:
+		return radio.StationOrderAZ
+	case config.SortZA:
+		return radio.StationOrderZA
+	default:
+		return radio.StationOrderSource
+	}
 }
 
 func (a *App) startRadioStation(station radio.Station, queue ...[]radio.Station) {
@@ -784,6 +824,7 @@ func (a *App) playDirectory(dirPath string) {
 		}
 		return
 	}
+	sortTrackPaths(files, a.trackSortOrder())
 	if len(files) == 0 {
 		if a.overlay != nil {
 			a.overlay.ShowTrack("no playable files")
@@ -808,6 +849,7 @@ func (a *App) playFile(path string) {
 		}
 		return
 	}
+	sortTrackPaths(files, a.trackSortOrder())
 	if len(files) == 0 {
 		if a.overlay != nil {
 			a.overlay.ShowTrack("no playable files")
@@ -822,6 +864,26 @@ func (a *App) playFile(path string) {
 	if a.playbackState.setPlaylist(files, idx, album) {
 		a.playTrack(files[idx], album)
 	}
+}
+
+func (a *App) trackSortOrder() config.SortOrder {
+	if a.settings == nil {
+		return config.SortSource
+	}
+	return a.settings.UI.SortOrder
+}
+
+func sortTrackPaths(paths []string, order config.SortOrder) {
+	if order != config.SortAZ && order != config.SortZA {
+		return
+	}
+	direction := 1
+	if order == config.SortZA {
+		direction = -1
+	}
+	slices.SortStableFunc(paths, func(left, right string) int {
+		return direction * strings.Compare(strings.ToLower(left), strings.ToLower(right))
+	})
 }
 
 // playFavoriteFile plays a track from a favorites playlist. The queue becomes
@@ -843,12 +905,8 @@ func (a *App) playFavoriteFile(path string) {
 	kind := a.favorites.GetPlaylist(path)
 	if kind == "" {
 		// Not in any playlist — fall back to single-file playback.
-		if player.IsLocalPath(path) {
-			if _, err := os.Stat(path); err != nil {
-				slog.Warn("favorites: track missing, removing", "path", path)
-				_ = a.favorites.Remove(path)
-				return
-			}
+		if a.pruneMissingLocalFavorite(path) {
+			return
 		}
 		a.playFile(path)
 		return
@@ -858,17 +916,14 @@ func (a *App) playFavoriteFile(path string) {
 	if len(tracks) == 0 {
 		return
 	}
+	sortTrackPaths(tracks, a.trackSortOrder())
 	// Auto-skip missing local files and remove them from favorites.
 	for idx := slices.Index(tracks, path); idx < len(tracks); idx++ {
-		if player.IsLocalPath(tracks[idx]) {
-			if _, err := os.Stat(tracks[idx]); err != nil {
-				slog.Warn("favorites: track missing, skipping", "path", tracks[idx])
-				_ = a.favorites.Remove(tracks[idx])
-				if idx < len(tracks)-1 {
-					continue
-				}
-				return // last track is missing, nothing to play
+		if a.pruneMissingLocalFavorite(tracks[idx]) {
+			if idx < len(tracks)-1 {
+				continue
 			}
+			return // last track is missing, nothing to play
 		}
 		// Found an available track.
 		if a.playbackState.setPlaylist(tracks, idx, kind.String()) {
@@ -876,6 +931,29 @@ func (a *App) playFavoriteFile(path string) {
 		}
 		return
 	}
+}
+
+// pruneMissingLocalFavorite reports whether path is definitely absent. When it
+// is in Favorites, it removes the entry and refreshes the visible list.
+func (a *App) pruneMissingLocalFavorite(path string) bool {
+	if !player.IsLocalPath(path) {
+		return false
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	if a.favorites == nil || a.favorites.GetPlaylist(path) == "" {
+		return true
+	}
+	if err := a.favorites.Remove(path); err != nil {
+		slog.Warn("favorites: remove missing local track failed", "path", path, "error", err)
+		return true
+	}
+	slog.Info("favorites: removed missing local track", "path", path)
+	if a.overlay != nil {
+		a.overlay.RefreshFavorites()
+	}
+	return true
 }
 
 type audioScanError struct {

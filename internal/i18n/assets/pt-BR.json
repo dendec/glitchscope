@@ -116,7 +116,6 @@
   "radio.popular": "Populares",
   "radio.random": "Estação aleatória",
   "radio.by_tag": "Por tag",
-  "radio.by_language": "Por idioma",
   "radio.by_country": "Por país",
   "radio.empty": "Nenhuma estação encontrada",
   "radio.now": "Agora: %s",
@@ -126,6 +125,7 @@
   "radio.language": "Idioma: %s",
   "radio.country": "País: %s",
   "radio.homepage": "Página inicial: %s",
+  "radio.stream": "URL do fluxo: %s",
   "presets.shapes_waves": "Formas: %d   Ondas: %d",
   "presets.equations": "Equações: %d por quadro, %d por pixel",
   "presets.textures": "Texturas: %d",
@@ -139,5 +139,12 @@
   "sources.microphone": "Microfone",
   "sources.microphone_capturing": "Microfone · Ativo",
   "sources.stop_capture": "Desativar microfone",
-  "sources.no_input_devices": "Nenhum dispositivo de entrada"
+  "sources.no_input_devices": "Nenhum dispositivo de entrada",
+  "settings.sort": "Ordenação", "values.source_order": "Ordem da fonte", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "Escolha a ordem da música local, dos catálogos e do rádio.", "info.copied": "Copiado", "radio.history": "Tocadas recentemente",
+  "info.copy_failed": "Falha ao copiar",
+  "radio.last_played": "Última reprodução: %s",
+  "radio.clear_history": "Limpar histórico",
+  "info.radio_playback_failed": "Não foi possível reproduzir a estação",
+  "info.radio_history_cleared": "Histórico do rádio limpo",
+  "radio.favorite": "Favorito: %s"
 }

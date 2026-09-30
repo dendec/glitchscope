@@ -139,6 +139,8 @@ type App struct {
 
 	seek             seekControl // continuous-seek drivetrain state
 	pointerOpen      pointerOpenGesture
+	linkCursor       *sdl.Cursor
+	linkCursorActive bool
 	onPresetsPage    bool      // true when UI is on Presets page (main viz stopped)
 	selectedPreset   string    // confirmed on Presets page, loaded when the page closes
 	testSignalFreq   float64   // phase accumulator for synthetic test signal
@@ -392,6 +394,11 @@ func (a *App) Close() {
 	if a.inp != nil {
 		a.inp.Close()
 	}
+	if a.linkCursor != nil {
+		sdl.SetCursor(sdl.GetDefaultCursor())
+		sdl.FreeCursor(a.linkCursor)
+		a.linkCursor = nil
+	}
 	if a.pm != nil {
 		a.pm.Destroy()
 	}
@@ -569,6 +576,8 @@ func (a *App) initAudio() {
 	a.overlay = ui.New()
 	if a.radio != nil {
 		a.overlay.SetRadioFaviconRequest(a.beginRadioFavicon)
+		a.overlay.SetRadioStationLookup(a.radio.Lookup)
+		a.overlay.SetRadioStationResolveRequest(a.radio.ResolveStations)
 	}
 	if err := a.overlay.SetLanguage(a.settings.UI.Language); err != nil {
 		slog.Warn("load UI language", "language", a.settings.UI.Language, "error", err)
@@ -577,6 +586,10 @@ func (a *App) initAudio() {
 	a.overlay.SetBaseDir(baseDir())
 	a.overlay.SetShowFPS(a.settings.UI.ShowStats)
 	a.overlay.SetShowPlayerBar(a.settings.UI.ShowPlayerBar)
+	a.overlay.SetSortOrder(a.settings.UI.SortOrder)
+	if a.radio != nil {
+		a.overlay.SetRadioHistory(a.radio.History())
+	}
 	a.overlay.SetMenuHintEnabled(!a.settings.UI.MenuOpened)
 	a.overlay.SetMicDevices(mic.InputDevices())
 	w, h := a.window.GLGetDrawableSize()
@@ -733,6 +746,9 @@ func (a *App) pollRadio() {
 	if a.radio == nil {
 		return
 	}
+	if a.radio.PollResolved() && a.overlay != nil {
+		a.overlay.RefreshFavorites()
+	}
 	if a.overlay != nil {
 		if kind, filter, ok := a.overlay.ConsumeRadioPageRequest(); ok {
 			a.requestMoreRadio(kind, filter)
@@ -761,7 +777,7 @@ func (a *App) pollRadio() {
 				a.startRadioStation(stations[0])
 			}
 		} else if a.overlay != nil {
-			if filter == "" && (kind == radio.BrowseTag || kind == radio.BrowseLanguage || kind == radio.BrowseCountry) {
+			if filter == "" && (kind == radio.BrowseTag || kind == radio.BrowseCountry) {
 				a.overlay.SetRadioValues(kind, values, a.radio.ValueCounts(kind))
 			} else {
 				a.overlay.SetRadioStations(kind, filter, stations, hasMore)

@@ -116,7 +116,6 @@
   "radio.popular": "Populer",
   "radio.random": "Stasiun acak",
   "radio.by_tag": "Menurut tag",
-  "radio.by_language": "Menurut bahasa",
   "radio.by_country": "Menurut negara",
   "radio.empty": "Stasiun tidak ditemukan",
   "radio.now": "Sekarang: %s",
@@ -126,6 +125,7 @@
   "radio.language": "Bahasa: %s",
   "radio.country": "Negara: %s",
   "radio.homepage": "Situs web: %s",
+  "radio.stream": "URL streaming: %s",
   "presets.shapes_waves": "Bentuk: %d   Gelombang: %d",
   "presets.equations": "Persamaan: %d per frame, %d per piksel",
   "presets.textures": "Tekstur: %d",
@@ -139,5 +139,12 @@
   "sources.microphone": "Mikrofon",
   "sources.microphone_capturing": "Mikrofon · Aktif",
   "sources.stop_capture": "Nonaktifkan mikrofon",
-  "sources.no_input_devices": "Tidak ada perangkat input"
+  "sources.no_input_devices": "Tidak ada perangkat input",
+  "settings.sort": "Urutan", "values.source_order": "Urutan sumber", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "Pilih urutan untuk musik lokal, katalog, dan radio.", "info.copied": "Disalin", "radio.history": "Baru diputar",
+  "info.copy_failed": "Gagal menyalin",
+  "radio.last_played": "Terakhir diputar: %s",
+  "radio.clear_history": "Hapus riwayat",
+  "info.radio_playback_failed": "Stasiun radio tidak dapat diputar",
+  "info.radio_history_cleared": "Riwayat radio dihapus",
+  "radio.favorite": "Favorit: %s"
 }

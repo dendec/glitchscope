@@ -60,6 +60,29 @@ func TestWalkAudioFiles(t *testing.T) {
 	}
 }
 
+func TestSortTrackPathsFollowsGlobalOrder(t *testing.T) {
+	tests := []struct {
+		order config.SortOrder
+		want  []string
+	}{
+		{order: config.SortSource, want: []string{"/music/Zeta.it", "/music/alpha.it", "/music/Beta.it"}},
+		{order: config.SortAZ, want: []string{"/music/alpha.it", "/music/Beta.it", "/music/Zeta.it"}},
+		{order: config.SortZA, want: []string{"/music/Zeta.it", "/music/Beta.it", "/music/alpha.it"}},
+	}
+	for _, test := range tests {
+		paths := []string{"/music/Zeta.it", "/music/alpha.it", "/music/Beta.it"}
+		sortTrackPaths(paths, test.order)
+		if len(paths) != len(test.want) {
+			t.Fatalf("order %v: paths=%v, want %v", test.order, paths, test.want)
+		}
+		for i := range paths {
+			if paths[i] != test.want[i] {
+				t.Fatalf("order %v: paths=%v, want %v", test.order, paths, test.want)
+			}
+		}
+	}
+}
+
 func TestWalkAudioFilesEmptyDir(t *testing.T) {
 	root := t.TempDir()
 	files, err := walkAudioFiles(root)

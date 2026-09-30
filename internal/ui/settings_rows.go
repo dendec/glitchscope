@@ -12,20 +12,21 @@ import (
 const (
 	SettingShuffle         = 1
 	SettingRepeat          = 2
-	SettingVisualizer      = 4
-	SettingFrameRate       = 5
-	SettingAdaptive        = 6
-	SettingResolution      = 7
-	SettingFilter          = 8
-	SettingBeatSensitivity = 9
-	SettingRotation        = 10
-	SettingLanguage        = 12
-	SettingTheme           = 13
-	SettingTransparency    = 14
-	SettingShowStats       = 15
-	SettingPlayerBar       = 16
-	SettingCacheSize       = 18
-	SettingCacheRetention  = 19
+	SettingSort            = 3
+	SettingVisualizer      = 5
+	SettingFrameRate       = 6
+	SettingAdaptive        = 7
+	SettingResolution      = 8
+	SettingFilter          = 9
+	SettingBeatSensitivity = 10
+	SettingRotation        = 11
+	SettingLanguage        = 13
+	SettingTheme           = 14
+	SettingTransparency    = 15
+	SettingShowStats       = 16
+	SettingPlayerBar       = 17
+	SettingCacheSize       = 19
+	SettingCacheRetention  = 20
 )
 
 // settingOpt is a setting whose String() produces a display label.
@@ -77,6 +78,8 @@ func BuildSettingsRowsWithCatalogForRefresh(s config.Settings, winW, winH int, r
 	presetValues, presetIndex := localizedPresetIntervals(catalog, s.PresetInterval)
 	shuffleValues := []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueShuffleAlbum), catalog.Text(i18n.ValueShuffleSource), catalog.Text(i18n.ValueShuffleAll)}
 	shuffleIndex := comparableIndex(config.AllShuffleModes(), s.Playback.ShuffleMode)
+	sortValues := []string{catalog.Text(i18n.ValueSourceOrder), catalog.Text(i18n.ValueAZ), catalog.Text(i18n.ValueZA)}
+	sortIndex := comparableIndex(config.AllSortOrders(), s.UI.SortOrder)
 	themeValues, themeIndex := optionPair(config.AllThemes(), s.UI.Theme)
 	transValues, transIndex := optionPair(config.AllTransparencies(), s.UI.Transparency)
 	refreshRate = config.NormalizeRefreshRate(refreshRate)
@@ -130,6 +133,7 @@ func BuildSettingsRowsWithCatalogForRefresh(s config.Settings, winW, winH int, r
 		{Header: true, Label: "── " + catalog.Text(i18n.SettingsPlayback) + " ────"},
 		{Label: catalog.Text(i18n.SettingsShuffle), Values: shuffleValues, Index: shuffleIndex},
 		{Label: catalog.Text(i18n.SettingsRepeat), Values: repeatValues, Index: repeatIndex},
+		{Label: catalog.Text(i18n.SettingsSort), Values: sortValues, Index: sortIndex},
 		// Visualization
 		{Header: true, Label: "── " + catalog.Text(i18n.SettingsVisualization) + " ──"},
 		{Label: catalog.Text(i18n.SettingsVisualizer), Values: []string{catalog.Text(i18n.ValueOff), catalog.Text(i18n.ValueOn)}, Index: boolIndex(!s.Graphics.VisualizerOff)},
@@ -236,6 +240,8 @@ func settingDescription(catalog i18n.Catalog, setting, value int) string {
 		return catalog.Text(i18n.DescriptionFilter)
 	case SettingPlayerBar:
 		return catalog.Text(i18n.DescriptionPlayerBar)
+	case SettingSort:
+		return catalog.Text(i18n.DescriptionSort)
 	case SettingShuffle:
 		switch value {
 		case 0:

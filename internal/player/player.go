@@ -105,7 +105,14 @@ func New() (*Player, error) {
 		return nil, fmt.Errorf("soloud init: %w", err)
 	}
 	slog.Info("SoLoud initialized")
+	s.SetGlobalVolume(1)
 	return &Player{s: s, pendingCh: make(chan loadResult, 1)}, nil
+}
+
+// SetVolume changes the session output volume.
+func (p *Player) SetVolume(volume float32) {
+	volume = min(max(volume, 0), 1)
+	p.s.SetGlobalVolume(volume)
 }
 
 func isTrackerExt(ext string) bool {

@@ -31,6 +31,35 @@ func TestPlayerBarScrub(t *testing.T) {
 	}
 }
 
+func TestPlayerBarVolumeRequiresMouseAndChangesGain(t *testing.T) {
+	o := testPointerOverlay()
+	o.showPlayerBar = true
+	o.playingPath = "track.mp3"
+	o.duration = 100
+	o.bottomVolumeX = 540
+	o.bottomVolumeW = 80
+	_, end, _ := o.playerBarBounds(640, 480)
+	x := float32(580)
+	y := float32(end - 8)
+	if target := o.playerBarTarget(x, y, 640, 480); target == 5 {
+		t.Fatal("volume control is available without a mouse")
+	}
+	o.SetPointerCapabilities(false, true, false)
+	_, end, _ = o.playerBarBounds(640, 480)
+	y = float32(end - 8)
+	if target := o.playerBarTarget(x, y, 640, 480); target != 5 {
+		t.Fatalf("mouse volume target = %d, want 5 (mouse=%t loading=%t path=%q face=%v xy=%.0f,%.0f volume=%d..%d)", target, o.pointerMouse, o.loading, o.playingPath, o.face != nil, x, y, o.bottomVolumeX, o.bottomVolumeX+o.bottomVolumeW)
+	}
+	result := o.HandlePlayerBarPointer(input.PointerEvent{Device: input.PointerMouse, Phase: input.PointerDown, X: x, Y: y, Button: input.PointerButtonPrimary}, 640, 480)
+	wantLevel := float32((x - float32(o.bottomVolumeX)) / float32(o.bottomVolumeW))
+	if !result.Volume || result.Level != wantLevel || o.volume != wantLevel {
+		t.Fatalf("volume result=%+v overlay volume=%v, want %v", result, o.volume, wantLevel)
+	}
+	if y >= float32(end) {
+		t.Fatal("test volume point fell outside player bar")
+	}
+}
+
 func TestPlayerBarCancelAndTrackReplacement(t *testing.T) {
 	for _, cancel := range []bool{false, true} {
 		o := testPointerOverlay()

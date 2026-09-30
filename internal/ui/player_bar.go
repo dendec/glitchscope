@@ -15,6 +15,8 @@ type PlayerBarResult struct {
 	Seek     bool
 	Seconds  float64
 	Path     string
+	Volume   bool
+	Level    float32
 }
 
 type playerBarPress struct {
@@ -67,6 +69,9 @@ func (o *Overlay) playerBarTarget(x, y float32, w, h int) int {
 		return -1
 	}
 	if y >= float32(statusY) && y < float32(end-o.scalePx(4)) && !o.loading && o.playingPath != "" && (o.pointerMouse || o.pointerTouch) && o.face != nil {
+		if o.pointerMouse && o.bottomVolumeW > 0 && x >= float32(o.bottomVolumeX) {
+			return 5
+		}
 		// Each padded glyph is both a rendered button and its hit region.
 		status := "⏸"
 		if o.paused {
@@ -119,6 +124,11 @@ func (o *Overlay) HandlePlayerBarPointer(e input.PointerEvent, w, h int) PlayerB
 			p.seconds = min(max(float64(e.X)/float64(w), 0), 1) * o.duration
 			o.bottomDirty = true
 		}
+		if p.target == 5 && o.bottomVolumeW > 0 {
+			result.Volume = true
+			result.Level = min(max((e.X-float32(o.bottomVolumeX))/float32(o.bottomVolumeW), 0), 1)
+			o.SetVolume(result.Level)
+		}
 		if e.Phase == input.PointerUp && e.Button == input.PointerButtonPrimary {
 			if p.target == 4 {
 				result.Seek = true
@@ -150,6 +160,11 @@ func (o *Overlay) HandlePlayerBarPointer(e input.PointerEvent, w, h int) PlayerB
 		if target == 4 && w > 0 {
 			o.barPress.seconds = min(max(float64(e.X)/float64(w), 0), 1) * o.duration
 			o.bottomDirty = true
+		}
+		if target == 5 && o.bottomVolumeW > 0 {
+			result.Volume = true
+			result.Level = min(max((e.X-float32(o.bottomVolumeX))/float32(o.bottomVolumeW), 0), 1)
+			o.SetVolume(result.Level)
 		}
 	}
 	return result

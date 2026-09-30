@@ -25,6 +25,10 @@
           "{focus} mengganti panel.",
           "{select} membuka item yang dipilih atau menerapkan nilai.",
           "{back} kembali atau membatalkan editasi.",
+          "Escape kembali di menu dan tidak melakukan apa pun saat menu tertutup. Q tidak keluar dari aplikasi; tutup jendela desktop untuk keluar.",
+          "Tautan di panel kanan digarisbawahi saat menggunakan mouse atau layar sentuh dan dibuka di browser.",
+          "Klik kanan atau tekan lama nilai di panel kanan untuk menyalin seluruhnya.",
+          "Dengan mouse, seret nilai volume di bilah pemutar. Tanpa mouse, volume tetap maksimum dan diatur dengan tombol perangkat.",
           "{pages} mengganti halaman.",
           "",
           "**Menu**",
@@ -192,7 +196,8 @@
         "lines": [
           "**Simpan trek pilihan**",
           "Tambahkan trek ke daftar Star, Heart, atau Note.",
-          "Favorit tersedia di Library dan melindungi unduhan dari pembersihan otomatis."
+          "Favorit tersedia di Library dan melindungi unduhan dari pembersihan otomatis.",
+          "Detail stasiun menampilkan daftar Favorit; ikon menandai stasiun yang disimpan."
         ]
       },
       {
@@ -200,7 +205,8 @@
         "lines": [
           "**Salinan offline**",
           "Jelajahi trek yang diunduh dari sumber jarak jauh.",
-          "Trek yang diunduh dapat diputar tanpa internet dan dihapus dari Downloads."
+          "Trek yang diunduh dapat diputar tanpa internet dan dihapus dari Downloads.",
+          "Downloads adalah cache yang dikelola aplikasi. Favorit melindungi unduhan dari pembersihan otomatis."
         ]
       },
       {
@@ -215,9 +221,10 @@
         "title": "Radio",
         "lines": [
           "**Radio internet**",
-          "Jelajahi stasiun populer atau filter berdasarkan tag, bahasa, atau negara.",
+          "Jelajahi stasiun populer atau filter berdasarkan tag atau negara.",
           "Daftar stasiun disimpan selama 30 hari dan memuat baris berikutnya saat digulir.",
-          "Radio memerlukan jaringan; siaran dapat gagal meski direktorinya online."
+          "Radio memerlukan jaringan; siaran dapat gagal meski direktorinya online.",
+          "Baru diputar menyimpan 50 stasiun terakhir yang berhasil dimulai beserta waktunya. Stasiun yang tidak tersedia tetap ada dan kegagalan pemutaran ditampilkan. Pilih Hapus riwayat untuk mengosongkan daftar."
         ]
       },
       {

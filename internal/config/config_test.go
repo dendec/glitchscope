@@ -18,6 +18,29 @@ func TestDefaultGraphicsValid(t *testing.T) {
 	}
 }
 
+func TestDefaultUIShowsPlayerBarAndUsesSourceOrder(t *testing.T) {
+	settings := DefaultSettings()
+	if !settings.UI.ShowPlayerBar {
+		t.Fatal("player bar should be enabled for new settings")
+	}
+	if settings.UI.SortOrder != SortSource {
+		t.Fatalf("default sort order = %v, want source order", settings.UI.SortOrder)
+	}
+}
+
+func TestSortOrderRoundTrip(t *testing.T) {
+	for _, order := range AllSortOrders() {
+		data, err := json.Marshal(order)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var decoded SortOrder
+		if err := json.Unmarshal(data, &decoded); err != nil || decoded != order {
+			t.Fatalf("sort order round trip %v: data=%s decoded=%v err=%v", order, data, decoded, err)
+		}
+	}
+}
+
 func TestFrameRateChoicesAndEncoding(t *testing.T) {
 	want := []FrameRate{FrameRate15, FrameRate20, FrameRate25, FrameRate30, FrameRate40, FrameRate50, FrameRate60, FrameRateMax}
 	got := AllFrameRates()

@@ -116,7 +116,6 @@
   "radio.popular": "인기",
   "radio.random": "무작위 라디오 방송국",
   "radio.by_tag": "태그별",
-  "radio.by_language": "언어별",
   "radio.by_country": "국가별",
   "radio.empty": "방송국을 찾을 수 없습니다",
   "radio.now": "현재: %s",
@@ -126,6 +125,7 @@
   "radio.language": "언어: %s",
   "radio.country": "국가: %s",
   "radio.homepage": "홈페이지: %s",
+  "radio.stream": "스트림 URL: %s",
   "presets.shapes_waves": "도형: %d   파형: %d",
   "presets.equations": "수식: 프레임당 %d, 픽셀당 %d",
   "presets.textures": "텍스처: %d",
@@ -139,5 +139,12 @@
   "sources.microphone": "마이크",
   "sources.microphone_capturing": "마이크 · 사용 중",
   "sources.stop_capture": "마이크 끄기",
-  "sources.no_input_devices": "입력 장치 없음"
+  "sources.no_input_devices": "입력 장치 없음",
+  "settings.sort": "정렬", "values.source_order": "소스 순서", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "로컬 음악, 카탈로그 및 라디오의 순서를 선택합니다.", "info.copied": "복사됨", "radio.history": "최근 재생",
+  "info.copy_failed": "복사하지 못했습니다",
+  "radio.last_played": "마지막 재생 시작: %s",
+  "radio.clear_history": "기록 지우기",
+  "info.radio_playback_failed": "라디오 방송국을 재생할 수 없습니다",
+  "info.radio_history_cleared": "라디오 기록을 지웠습니다",
+  "radio.favorite": "즐겨찾기: %s"
 }

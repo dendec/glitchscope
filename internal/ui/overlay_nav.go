@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
 	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/modarchive"
@@ -61,6 +62,7 @@ const (
 	entryRadioCategory
 	entryRadioFilter
 	entryRadioStation
+	entryRadioHistoryClear
 )
 
 // navEntry is one row in the library's left (navigation) panel.
@@ -231,18 +233,10 @@ func (o *Overlay) rebuildCurrentFavoritePlaylist() {
 	}
 	kind := player.PlaylistID(lvl.playlistID)
 	tracks := o.favoritesView.Tracks(kind)
-	entries := make([]navEntry, len(tracks))
-	for i, path := range tracks {
-		label := player.FavoriteTrackTitle(path)
-		entries[i] = navEntry{
-			label:    label,
-			kind:     entryFavoriteTrack,
-			filePath: path,
-		}
-	}
+	entries := withParentEntry(o.favoriteTrackEntries(tracks, false))
 	path := ""
-	if lvl.cursor >= 0 && lvl.cursor < len(lvl.entries) {
-		path = lvl.entries[lvl.cursor].filePath
+	if o.albumCursor >= 0 && o.albumCursor < len(lvl.entries) {
+		path = lvl.entries[o.albumCursor].filePath
 	}
 	o.navStack[len(o.navStack)-1] = navLevel{
 		ctx:        ctxFavorites,
@@ -265,6 +259,59 @@ func (o *Overlay) rebuildCurrentFavoritePlaylist() {
 	o.albumCursor = clampCursor(o.navStack[len(o.navStack)-1].cursor, len(o.albumEntries))
 	o.albumsScroll = 0
 	o.syncPanels()
+}
+
+func (o *Overlay) favoriteStation(path string) (radio.Station, bool) {
+	if o.radioStationLookup == nil {
+		return radio.Station{}, false
+	}
+	station, ok := o.radioStationLookup(path)
+	return station, ok && strings.TrimSpace(station.Name) != "" && station.StreamURL() != ""
+}
+
+func (o *Overlay) favoriteTrackEntry(path string) (navEntry, bool) {
+	if player.IsRadio(path) {
+		station, ok := o.favoriteStation(path)
+		if !ok {
+			return navEntry{}, false
+		}
+		return navEntry{label: station.DisplayName(), kind: entryFavoriteTrack, filePath: path}, true
+	}
+	return navEntry{label: player.FavoriteTrackTitle(path), kind: entryFavoriteTrack, filePath: path}, true
+}
+
+func (o *Overlay) requestFavoriteStationMetadata(paths []string) {
+	if o.radioStationResolveRequest == nil {
+		return
+	}
+	stations := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if !player.IsRadio(path) {
+			continue
+		}
+		if _, ok := o.favoriteStation(path); !ok {
+			stations = append(stations, path)
+		}
+	}
+	if len(stations) > 0 {
+		o.radioStationResolveRequest(stations)
+	}
+}
+
+func (o *Overlay) favoriteTrackEntries(paths []string, skipMissingLocal bool) []navEntry {
+	o.requestFavoriteStationMetadata(paths)
+	entries := make([]navEntry, 0, len(paths))
+	for _, path := range paths {
+		if skipMissingLocal && player.IsLocalPath(path) {
+			if _, err := os.Stat(path); err != nil {
+				continue
+			}
+		}
+		if entry, ok := o.favoriteTrackEntry(path); ok {
+			entries = append(entries, entry)
+		}
+	}
+	return o.sortNavEntries(entries)
 }
 
 // ShowMicrophoneDevices enters the capture-device selection list.
@@ -312,7 +359,7 @@ func (o *Overlay) buildFormatEntries() []navEntry {
 	for i, f := range formats {
 		entries[i] = navEntry{label: f + "/", kind: entryFormat, format: f, albumIdx: -1}
 	}
-	return entries
+	return o.sortNavEntries(entries)
 }
 
 // buildAlbumsInFormatEntries lists modland albums within a single format.
@@ -335,7 +382,7 @@ func (o *Overlay) buildAlbumsInFormatEntries(format string) []navEntry {
 		}
 		entries = append(entries, navEntry{label: label, kind: entryModlandAlbum, albumIdx: i})
 	}
-	return entries
+	return o.sortNavEntries(entries)
 }
 
 func (o *Overlay) buildCatalogTrackEntries(albumIdx int) []navEntry {
@@ -358,7 +405,7 @@ func (o *Overlay) buildCatalogTrackEntries(albumIdx int) []navEntry {
 			filePath: track,
 		})
 	}
-	return entries
+	return o.sortNavEntries(entries)
 }
 
 // buildModArchiveEntries returns directory items from the overlay cache or
@@ -409,7 +456,7 @@ func (o *Overlay) buildModArchiveEntriesFromItems(targetURL string, items []moda
 				})
 			}
 		}
-		return entries
+		return o.sortNavEntries(entries)
 	}
 
 	if hasFiles {
@@ -451,8 +498,34 @@ func (o *Overlay) currentEntry() *navEntry {
 
 // refreshAlbumLabels recomputes albumEntries/albums from the current level.
 func (o *Overlay) refreshAlbumLabels() {
+	if len(o.navStack) == 0 {
+		o.albumEntries = nil
+		o.albums = nil
+		o.albumCursor = 0
+		o.albumsScroll = 0
+		return
+	}
 	o.albumEntries = o.currentLevelEntries()
-	o.albums = labelsOf(o.albumEntries)
+	o.albums = o.displayNavEntryLabels(o.albumEntries)
+}
+
+func (o *Overlay) displayNavEntryLabels(entries []navEntry) []string {
+	labels := make([]string, len(entries))
+	for i, entry := range entries {
+		labels[i] = entry.label
+		if entry.kind == entryRadioFilter {
+			labels[i] = o.radioFilterLabel(entry.radioKind, entry.radioFilter)
+		}
+	}
+	for i, entry := range entries {
+		if entry.kind != entryRadioFilter {
+			continue
+		}
+		if count := o.radioValueCounts[entry.radioKind][entry.radioFilter]; count > 0 {
+			labels[i] = fmt.Sprintf("%s (%d)", labels[i], count)
+		}
+	}
+	return labels
 }
 
 // syncPanels refreshes the visible navigation panels.
@@ -559,7 +632,20 @@ func (o *Overlay) SelectedCatalogInfo() (albumName, path string, tracks []string
 	if e.trackIdx < 0 || e.trackIdx >= len(album.Tracks) {
 		return "", "", nil, -1
 	}
-	return album.Name, album.Tracks[e.trackIdx], album.Tracks, e.trackIdx
+	path = album.Tracks[e.trackIdx]
+	for _, entry := range o.albumEntries {
+		if !entry.IsCatalogTrack() || entry.albumIdx != e.albumIdx || entry.trackIdx < 0 || entry.trackIdx >= len(album.Tracks) {
+			continue
+		}
+		if entry.trackIdx == e.trackIdx {
+			idx = len(tracks)
+		}
+		tracks = append(tracks, album.Tracks[entry.trackIdx])
+	}
+	if len(tracks) == 0 {
+		return album.Name, path, album.Tracks, e.trackIdx
+	}
+	return album.Name, path, tracks, idx
 }
 
 // --- NC-local filesystem navigation ---
@@ -624,8 +710,17 @@ func (o *Overlay) buildNCDirectoryEntries(dirPath string) []navEntry {
 		})
 	}
 
-	sort.Slice(dirs, func(i, j int) bool { return dirs[i].label < dirs[j].label })
-	sort.Slice(files, func(i, j int) bool { return files[i].label < files[j].label })
+	if o.sortOrder == config.SortSource {
+		sort.Slice(dirs, func(i, j int) bool { return dirs[i].label < dirs[j].label })
+		sort.Slice(files, func(i, j int) bool { return files[i].label < files[j].label })
+	} else {
+		sort.SliceStable(dirs, func(i, j int) bool { return strings.ToLower(dirs[i].label) < strings.ToLower(dirs[j].label) })
+		sort.SliceStable(files, func(i, j int) bool { return strings.ToLower(files[i].label) < strings.ToLower(files[j].label) })
+	}
+	if o.sortOrder == config.SortZA {
+		slices.Reverse(dirs)
+		slices.Reverse(files)
+	}
 	entries = append(entries, dirs...)
 	entries = append(entries, files...)
 
@@ -855,8 +950,8 @@ func (o *Overlay) buildRadioCategoryEntries() []navEntry {
 	return []navEntry{
 		{label: o.catalog.Text(i18n.RadioPopular), kind: entryRadioCategory, radioKind: radio.BrowsePopular},
 		{label: o.catalog.Text(i18n.RadioRandom), kind: entryRadioCategory, radioKind: radio.BrowseRandom},
+		{label: o.catalog.Text(i18n.RadioHistory), kind: entryRadioCategory, radioKind: radio.BrowseHistory},
 		{label: o.catalog.Text(i18n.RadioByTag), kind: entryRadioCategory, radioKind: radio.BrowseTag},
-		{label: o.catalog.Text(i18n.RadioByLanguage), kind: entryRadioCategory, radioKind: radio.BrowseLanguage},
 		{label: o.catalog.Text(i18n.RadioByCountry), kind: entryRadioCategory, radioKind: radio.BrowseCountry},
 	}
 }
@@ -866,9 +961,9 @@ func (o *Overlay) buildRadioFilterEntries(kind radio.BrowseKind) []navEntry {
 	counts := o.radioValueCounts[kind]
 	entries := make([]navEntry, 0, len(values)+1)
 	for _, value := range values {
-		label := value
+		label := o.radioFilterLabel(kind, value)
 		if count := counts[value]; count > 0 {
-			label = fmt.Sprintf("%s (%d)", value, count)
+			label = fmt.Sprintf("%s (%d)", label, count)
 		}
 		entries = append(entries, navEntry{label: label, kind: entryRadioFilter, radioKind: kind, radioFilter: value})
 	}
@@ -879,7 +974,19 @@ func (o *Overlay) buildRadioFilterEntries(kind radio.BrowseKind) []navEntry {
 		}
 		entries = append(entries, navEntry{label: o.catalog.Text(key), kind: entryInfo})
 	}
-	return entries
+	return o.sortNavEntries(entries)
+}
+
+func (o *Overlay) radioFilterLabel(kind radio.BrowseKind, value string) string {
+	if kind == radio.BrowseCountry {
+		if label := o.catalog.DisplayRegionName(value); label != "" {
+			return label
+		}
+		if label := o.catalog.DisplayRegionNameFromEnglish(value); label != "" {
+			return label
+		}
+	}
+	return value
 }
 
 func (o *Overlay) buildRadioStationEntries(kind radio.BrowseKind, filter string) []navEntry {
@@ -894,6 +1001,13 @@ func (o *Overlay) buildRadioStationEntries(kind radio.BrowseKind, filter string)
 			key = i18n.RadioEmpty
 		}
 		entries = append(entries, navEntry{label: o.catalog.Text(key), kind: entryInfo})
+	}
+	if kind != radio.BrowseHistory {
+		entries = o.sortNavEntries(entries)
+	}
+	if kind == radio.BrowseHistory && len(stations) > 0 {
+		clear := navEntry{label: o.catalog.Text(i18n.RadioClearHistory), kind: entryRadioHistoryClear}
+		entries = append([]navEntry{clear}, entries...)
 	}
 	return entries
 }
@@ -939,19 +1053,7 @@ func (o *Overlay) switchToFavoritesPlaylist(kind player.PlaylistID) {
 		return
 	}
 	tracks := o.favoritesView.Tracks(kind)
-	var entries []navEntry
-	for _, path := range tracks {
-		if player.IsLocalPath(path) {
-			if _, err := os.Stat(path); err != nil {
-				continue
-			}
-		}
-		entries = append(entries, navEntry{
-			label:    player.FavoriteTrackTitle(path),
-			kind:     entryFavoriteTrack,
-			filePath: path,
-		})
-	}
+	entries := o.favoriteTrackEntries(tracks, true)
 	label := player.PlaylistLabel(kind)
 	if label == "" {
 		label = string(kind)
@@ -962,6 +1064,21 @@ func (o *Overlay) switchToFavoritesPlaylist(kind player.PlaylistID) {
 		label:      label,
 		playlistID: string(kind),
 	})
+}
+
+func (o *Overlay) sortNavEntries(entries []navEntry) []navEntry {
+	if o.sortOrder == config.SortSource || len(entries) < 2 {
+		return entries
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		left := strings.ToLower(strings.TrimSuffix(entries[i].label, "/"))
+		right := strings.ToLower(strings.TrimSuffix(entries[j].label, "/"))
+		if o.sortOrder == config.SortZA {
+			return left > right
+		}
+		return left < right
+	})
+	return entries
 }
 
 // ncEnterDir enters a subdirectory in NC mode.
@@ -1111,7 +1228,7 @@ func validRadioBrowseContext(kind radio.BrowseKind, filter string) bool {
 	switch kind {
 	case radio.BrowsePopular:
 		return filter == ""
-	case radio.BrowseTag, radio.BrowseLanguage, radio.BrowseCountry:
+	case radio.BrowseTag, radio.BrowseCountry:
 		return filter != ""
 	default:
 		return false

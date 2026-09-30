@@ -116,7 +116,6 @@
   "radio.popular": "Popüler",
   "radio.random": "Rastgele istasyon",
   "radio.by_tag": "Etikete göre",
-  "radio.by_language": "Dile göre",
   "radio.by_country": "Ülkeye göre",
   "radio.empty": "İstasyon bulunamadı",
   "radio.now": "Şimdi: %s",
@@ -126,6 +125,7 @@
   "radio.language": "Dil: %s",
   "radio.country": "Ülke: %s",
   "radio.homepage": "Ana sayfa: %s",
+  "radio.stream": "Yayın URL'si: %s",
   "presets.shapes_waves": "Şekiller: %d   Dalgalar: %d",
   "presets.equations": "Denklemler: kare başına %d, piksel başına %d",
   "presets.textures": "Dokular: %d",
@@ -139,5 +139,12 @@
   "sources.microphone": "Mikrofon",
   "sources.microphone_capturing": "Mikrofon · Etkin",
   "sources.stop_capture": "Mikrofonu kapat",
-  "sources.no_input_devices": "Giriş aygıtı yok"
+  "sources.no_input_devices": "Giriş aygıtı yok",
+  "settings.sort": "Sıralama", "values.source_order": "Kaynak sırası", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "Yerel müzik, kataloglar ve radyo için sıralamayı seçin.", "info.copied": "Kopyalandı", "radio.history": "Son çalınanlar",
+  "info.copy_failed": "Kopyalama başarısız",
+  "radio.last_played": "Son başlatma: %s",
+  "radio.clear_history": "Geçmişi temizle",
+  "info.radio_playback_failed": "Radyo istasyonu çalınamadı",
+  "info.radio_history_cleared": "Radyo geçmişi temizlendi",
+  "radio.favorite": "Favori: %s"
 }

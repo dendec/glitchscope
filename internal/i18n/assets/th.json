@@ -116,7 +116,6 @@
   "radio.popular": "ยอดนิยม",
   "radio.random": "สถานีวิทยุแบบสุ่ม",
   "radio.by_tag": "ตามแท็ก",
-  "radio.by_language": "ตามภาษา",
   "radio.by_country": "ตามประเทศ",
   "radio.empty": "ไม่พบสถานี",
   "radio.now": "ขณะนี้: %s",
@@ -126,6 +125,7 @@
   "radio.language": "ภาษา: %s",
   "radio.country": "ประเทศ: %s",
   "radio.homepage": "หน้าแรก: %s",
+  "radio.stream": "URL สตรีม: %s",
   "presets.shapes_waves": "รูปร่าง: %d   คลื่น: %d",
   "presets.equations": "สมการ: %d ต่อเฟรม, %d ต่อพิกเซล",
   "presets.textures": "พื้นผิว: %d",
@@ -139,5 +139,12 @@
   "sources.microphone": "ไมโครโฟน",
   "sources.microphone_capturing": "ไมโครโฟน · ใช้งานอยู่",
   "sources.stop_capture": "ปิดไมโครโฟน",
-  "sources.no_input_devices": "ไม่มีอุปกรณ์อินพุต"
+  "sources.no_input_devices": "ไม่มีอุปกรณ์อินพุต",
+  "settings.sort": "การเรียงลำดับ", "values.source_order": "ลำดับจากแหล่ง", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "เลือกลำดับสำหรับเพลงในเครื่อง แค็ตตาล็อก และวิทยุ", "info.copied": "คัดลอกแล้ว", "radio.history": "เล่นล่าสุด",
+  "info.copy_failed": "คัดลอกไม่สำเร็จ",
+  "radio.last_played": "เริ่มเล่นล่าสุด: %s",
+  "radio.clear_history": "ล้างประวัติ",
+  "info.radio_playback_failed": "ไม่สามารถเล่นสถานีวิทยุได้",
+  "info.radio_history_cleared": "ล้างประวัติวิทยุแล้ว",
+  "radio.favorite": "รายการโปรด: %s"
 }

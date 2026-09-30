@@ -239,8 +239,6 @@ func normalizeAxis(value int16) float64 {
 
 func keyToAction(key sdl.Keycode) Action {
 	switch key {
-	case sdl.K_ESCAPE, sdl.K_q:
-		return ActionQuit
 	case sdl.K_SPACE:
 		return ActionPlayPause
 	case sdl.K_LEFT:
@@ -264,6 +262,8 @@ func keyToAction(key sdl.Keycode) Action {
 	case sdl.K_RETURN, sdl.K_KP_ENTER:
 		return ActionSelect
 	case sdl.K_BACKSPACE:
+		return ActionBack
+	case sdl.K_ESCAPE:
 		return ActionBack
 	case sdl.K_COMMA:
 		return ActionSeekBackward

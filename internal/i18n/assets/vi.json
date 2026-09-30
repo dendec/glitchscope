@@ -116,7 +116,6 @@
   "radio.popular": "Phổ biến",
   "radio.random": "Đài ngẫu nhiên",
   "radio.by_tag": "Theo thẻ",
-  "radio.by_language": "Theo ngôn ngữ",
   "radio.by_country": "Theo quốc gia",
   "radio.empty": "Không tìm thấy đài",
   "radio.now": "Hiện tại: %s",
@@ -126,6 +125,7 @@
   "radio.language": "Ngôn ngữ: %s",
   "radio.country": "Quốc gia: %s",
   "radio.homepage": "Trang chủ: %s",
+  "radio.stream": "URL luồng: %s",
   "presets.shapes_waves": "Hình dạng: %d   Sóng: %d",
   "presets.equations": "Phương trình: %d mỗi khung hình, %d mỗi pixel",
   "presets.textures": "Họa tiết: %d",
@@ -139,5 +139,12 @@
   "sources.microphone": "Micrô",
   "sources.microphone_capturing": "Micrô · Đang bật",
   "sources.stop_capture": "Tắt micrô",
-  "sources.no_input_devices": "Không có thiết bị đầu vào"
+  "sources.no_input_devices": "Không có thiết bị đầu vào",
+  "settings.sort": "Sắp xếp", "values.source_order": "Thứ tự nguồn", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "Chọn thứ tự cho nhạc cục bộ, danh mục và radio.", "info.copied": "Đã sao chép", "radio.history": "Đã phát gần đây",
+  "info.copy_failed": "Không thể sao chép",
+  "radio.last_played": "Lần phát gần nhất: %s",
+  "radio.clear_history": "Xóa lịch sử",
+  "info.radio_playback_failed": "Không thể phát đài radio",
+  "info.radio_history_cleared": "Đã xóa lịch sử radio",
+  "radio.favorite": "Yêu thích: %s"
 }

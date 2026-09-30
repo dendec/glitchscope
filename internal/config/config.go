@@ -265,6 +265,68 @@ func (m RepeatMode) String() string {
 
 func AllRepeatModes() []RepeatMode { return []RepeatMode{RepeatOff, RepeatOne, RepeatAll} }
 
+// SortOrder controls the display order used by every browsable music source.
+type SortOrder int
+
+const (
+	SortSource SortOrder = iota
+	SortAZ
+	SortZA
+)
+
+func (o SortOrder) String() string {
+	switch o {
+	case SortSource:
+		return "Source order"
+	case SortAZ:
+		return "A–Z"
+	case SortZA:
+		return "Z–A"
+	default:
+		return "Unknown"
+	}
+}
+
+func (o SortOrder) MarshalJSON() ([]byte, error) {
+	switch o {
+	case SortSource:
+		return json.Marshal("source")
+	case SortAZ:
+		return json.Marshal("a-z")
+	case SortZA:
+		return json.Marshal("z-a")
+	default:
+		return nil, fmt.Errorf("invalid sort order %d", o)
+	}
+}
+
+func (o *SortOrder) UnmarshalJSON(data []byte) error {
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return fmt.Errorf("invalid sort order: %w", err)
+	}
+	switch value {
+	case "source":
+		*o = SortSource
+	case "a-z":
+		*o = SortAZ
+	case "z-a":
+		*o = SortZA
+	default:
+		return fmt.Errorf("unknown sort order: %s", value)
+	}
+	return nil
+}
+
+func (o SortOrder) Validate() error {
+	if o < SortSource || o > SortZA {
+		return fmt.Errorf("invalid sort order %d", o)
+	}
+	return nil
+}
+
+func AllSortOrders() []SortOrder { return []SortOrder{SortSource, SortAZ, SortZA} }
+
 // RepeatMode JSON: lowercase strings with integer fallback for legacy files.
 
 func (m RepeatMode) MarshalJSON() ([]byte, error) {
@@ -694,10 +756,11 @@ type UISettings struct {
 	Transparency  Transparency `json:"transparency"`
 	ShowStats     bool         `json:"show_stats"`
 	ShowPlayerBar bool         `json:"show_player_bar"`
+	SortOrder     SortOrder    `json:"sort_order"`
 }
 
 func DefaultUI() UISettings {
-	return UISettings{Language: English, Theme: ThemeDark, Transparency: 0, ShowStats: false, ShowPlayerBar: false}
+	return UISettings{Language: English, Theme: ThemeDark, Transparency: 0, ShowStats: false, ShowPlayerBar: true, SortOrder: SortSource}
 }
 
 // Settings is the full persisted settings envelope.
@@ -740,6 +803,9 @@ func (s Settings) Validate() error {
 	}
 	if err := s.UI.Transparency.Validate(); err != nil {
 		return fmt.Errorf("ui transparency: %w", err)
+	}
+	if err := s.UI.SortOrder.Validate(); err != nil {
+		return fmt.Errorf("ui sort order: %w", err)
 	}
 	return nil
 }

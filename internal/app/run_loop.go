@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/presets"
@@ -381,6 +382,12 @@ func (a *App) updateFramePlayback(now time.Time) {
 			// its metadata (Cached, duration, comment) — even if the load
 			// finished before the presenter ever observed loading=true.
 			if started {
+				if a.radio != nil && player.IsRadio(loadingPath) {
+					a.radio.RememberPlayed(loadingPath)
+					if a.overlay != nil {
+						a.overlay.SetRadioHistory(a.radio.History())
+					}
+				}
 				a.notifyRadioStarted(loadingPath)
 				a.failedTracks = nil
 				a.presenter.invalidateTrackInfos()
@@ -798,6 +805,9 @@ func (a *App) displayRefreshRate() int32 {
 // recoverPlaybackFailure also handles a live stream ending after startup;
 // Repeat One must not trap the listener on a failed radio source.
 func (a *App) recoverPlaybackFailure(path string) {
+	// A local track can disappear after the favorites preflight but before the
+	// asynchronous player opens it. Remove only that confirmed-missing entry.
+	a.pruneMissingLocalFavorite(path)
 	if player.IsRadio(path) && a.radio != nil && a.online.Load() {
 		a.radio.MarkDead(path)
 	} else if player.IsRadio(path) {
@@ -808,7 +818,7 @@ func (a *App) recoverPlaybackFailure(path string) {
 	if !player.IsRadio(path) {
 		a.pruneTrackCache()
 	}
-	if a.overlay != nil {
+	if a.overlay != nil && !player.IsRadio(path) {
 		a.overlay.ShowTrack(" playback error")
 	}
 	a.resumePath, a.resumeSeconds = "", 0
@@ -816,8 +826,11 @@ func (a *App) recoverPlaybackFailure(path string) {
 		a.playNextTrack(track)
 	} else {
 		slog.Warn("playback recovery stopped", "reason", "no next candidate or failure limit reached")
-		if a.overlay != nil {
+		if a.overlay != nil && !player.IsRadio(path) {
 			a.overlay.ShowTrack("no playable track; select another track")
 		}
+	}
+	if a.overlay != nil && player.IsRadio(path) {
+		a.overlay.ShowMessage(i18n.InfoRadioPlaybackFailed)
 	}
 }

@@ -116,7 +116,6 @@
   "radio.popular": "熱門",
   "radio.random": "隨機電台",
   "radio.by_tag": "依標籤",
-  "radio.by_language": "依語言",
   "radio.by_country": "依國家",
   "radio.empty": "找不到電台",
   "radio.now": "目前：%s",
@@ -126,6 +125,7 @@
   "radio.language": "語言：%s",
   "radio.country": "國家/地區：%s",
   "radio.homepage": "首頁：%s",
+  "radio.stream": "串流網址：%s",
   "presets.shapes_waves": "形狀：%d   波形：%d",
   "presets.equations": "方程式：每幀 %d，每像素 %d",
   "presets.textures": "材質：%d",
@@ -139,5 +139,12 @@
   "sources.microphone": "麥克風",
   "sources.microphone_capturing": "麥克風 · 已啟用",
   "sources.stop_capture": "關閉麥克風",
-  "sources.no_input_devices": "沒有輸入裝置"
+  "sources.no_input_devices": "沒有輸入裝置",
+  "settings.sort": "排序", "values.source_order": "來源順序", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "選擇本機音樂、目錄和電台的排序方式。", "info.copied": "已複製", "radio.history": "最近播放",
+  "info.copy_failed": "複製失敗",
+  "radio.last_played": "最近開始播放：%s",
+  "radio.clear_history": "清除播放記錄",
+  "info.radio_playback_failed": "無法播放電台",
+  "info.radio_history_cleared": "已清除電台播放記錄",
+  "radio.favorite": "我的最愛：%s"
 }

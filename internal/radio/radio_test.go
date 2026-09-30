@@ -181,6 +181,7 @@ func TestClientMarkDeadRemovesCachedStation(t *testing.T) {
 	t.Cleanup(client.Close)
 	station := Station{StationUUID: "dead", Name: "Dead", URL: "https://example/stream", LastCheckOK: 1}
 	client.stations[station.StationUUID] = station
+	client.RememberPlayed(station.Path())
 	client.queries[queryKey(BrowsePopular, "")] = queryCache{
 		Version:  cacheVersion,
 		Stations: []Station{station},
@@ -196,12 +197,108 @@ func TestClientMarkDeadRemovesCachedStation(t *testing.T) {
 	if !stale {
 		t.Fatal("dead-station eviction did not invalidate the query cache")
 	}
+	if history := client.History(); len(history) != 1 || history[0].StationUUID != station.StationUUID {
+		t.Fatalf("failed station was removed from history: %#v", history)
+	}
+}
+
+func TestClientHistoryPersistsDeduplicatedStationsAndCanBeCleared(t *testing.T) {
+	dir := t.TempDir()
+	client := New(dir)
+	first := Station{StationUUID: "first", Name: "First", URL: "https://example.test/first"}
+	second := Station{StationUUID: "second", Name: "Second", URL: "https://example.test/second"}
+	client.AddTransientStations([]Station{first, second})
+	client.RememberPlayed(first.Path())
+	client.RememberPlayed(second.Path())
+	client.RememberPlayed(first.Path())
+	client.Close()
+
+	reloaded := New(dir)
+	history := reloaded.History()
+	if len(history) != 2 || history[0].StationUUID != "first" || history[1].StationUUID != "second" {
+		t.Fatalf("reloaded history = %#v, want first then second", history)
+	}
+	if history[0].PlayedAt.IsZero() || history[1].PlayedAt.IsZero() {
+		t.Fatalf("history timestamps were not persisted: %#v", history)
+	}
+	reloaded.ClearHistory()
+	reloaded.Close()
+
+	cleared := New(dir)
+	t.Cleanup(cleared.Close)
+	if history := cleared.History(); len(history) != 0 {
+		t.Fatalf("cleared history = %#v, want empty", history)
+	}
+}
+
+func TestClientHistoryIsLimitedToFiftyStations(t *testing.T) {
+	client := New(t.TempDir())
+	stations := make([]Station, radioHistoryLimit+1)
+	for i := range stations {
+		stations[i] = Station{
+			StationUUID: fmt.Sprintf("station-%02d", i),
+			Name:        fmt.Sprintf("Station %02d", i),
+			URL:         fmt.Sprintf("https://example.test/%02d", i),
+		}
+	}
+	client.AddTransientStations(stations)
+	for _, station := range stations {
+		client.RememberPlayed(station.Path())
+	}
+	history := client.History()
+	if len(history) != radioHistoryLimit {
+		t.Fatalf("history length = %d, want %d", len(history), radioHistoryLimit)
+	}
+	if history[0].StationUUID != stations[len(stations)-1].StationUUID || history[len(history)-1].StationUUID != stations[1].StationUUID {
+		t.Fatalf("history bounds = %q..%q, want %q..%q", history[0].StationUUID, history[len(history)-1].StationUUID, stations[len(stations)-1].StationUUID, stations[1].StationUUID)
+	}
+	client.Close()
+}
+
+func TestFetchStationPageUsesServerSideAlphabeticalOrder(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("order") != "name" {
+			t.Errorf("station order = %q, want name", r.URL.Query().Get("order"))
+		}
+		var body string
+		switch r.URL.Query().Get("reverse") {
+		case "false":
+			body = `[{"stationuuid":"a","name":"Alpha","url":"https://example.test/a","lastcheckok":1},{"stationuuid":"z","name":"Zulu","url":"https://example.test/z","lastcheckok":1}]`
+		case "true":
+			body = `[{"stationuuid":"z","name":"Zulu","url":"https://example.test/z","lastcheckok":1},{"stationuuid":"a","name":"Alpha","url":"https://example.test/a","lastcheckok":1}]`
+		default:
+			t.Errorf("reverse = %q, want false or true", r.URL.Query().Get("reverse"))
+			body = `[{"stationuuid":"a","name":"Alpha","url":"https://example.test/a","lastcheckok":1},{"stationuuid":"z","name":"Zulu","url":"https://example.test/z","lastcheckok":1}]`
+		}
+		_, _ = io.WriteString(w, body)
+	}))
+	defer server.Close()
+
+	client := New(t.TempDir())
+	client.servers = []string{server.URL}
+	t.Cleanup(client.Close)
+	for _, test := range []struct {
+		order StationOrder
+		want  []string
+	}{
+		{order: StationOrderAZ, want: []string{"Alpha", "Zulu"}},
+		{order: StationOrderZA, want: []string{"Zulu", "Alpha"}},
+	} {
+		page, err := client.fetchStationPage(context.Background(), BrowsePopular, "", 0, test.order)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := []string{page.stations[0].Name, page.stations[1].Name}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Fatalf("ordered station page = %v, want %v", got, test.want)
+		}
+	}
 }
 
 func TestClientLoadsCachedFilterValues(t *testing.T) {
 	dir := t.TempDir()
 	client := New(dir)
-	cache := valueCache{Version: cacheVersion, FetchedAt: time.Now(), Values: []string{"rock", "jazz"}, Counts: map[string]int{"rock": 123}}
+	cache := valueCache{Version: cacheVersion, ValueVersion: radioValueVersion, FetchedAt: time.Now(), Values: []string{"rock", "jazz"}, Counts: map[string]int{"rock": 123}}
 	client.saveValues(BrowseTag, cache)
 	client.Close()
 
@@ -336,8 +433,34 @@ func TestPopularQueryHidesBrokenStations(t *testing.T) {
 	client := New(t.TempDir())
 	client.servers = []string{server.URL}
 	t.Cleanup(client.Close)
-	if stations, err := client.fetchStations(context.Background(), BrowsePopular, ""); err != nil || len(stations) != 0 {
-		t.Fatalf("fetchStations = %#v, %v; want empty result", stations, err)
+	if page, err := client.fetchStationPage(context.Background(), BrowsePopular, "", 0, StationOrderSource); err != nil || len(page.stations) != 0 {
+		t.Fatalf("fetchStationPage = %#v, %v; want empty result", page, err)
+	}
+}
+
+func TestResolveStationsFillsMissingStreamURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/json/stations/byuuid" || r.URL.Query().Get("uuids") != "partial" {
+			t.Fatalf("station lookup request = %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = io.WriteString(w, `[{"stationuuid":"partial","name":"Station","url":"https://example.test/stream"}]`)
+	}))
+	defer server.Close()
+
+	client := New(t.TempDir())
+	client.servers = []string{server.URL}
+	client.stations["partial"] = Station{StationUUID: "partial", Name: "Station"}
+	defer client.Close()
+
+	client.ResolveStations([]string{"radio:partial"})
+	select {
+	case <-client.resolved:
+	case <-time.After(5 * time.Second):
+		t.Fatal("station metadata lookup did not complete")
+	}
+	station, ok := client.Lookup("radio:partial")
+	if !ok || station.StreamURL() != "https://example.test/stream" {
+		t.Fatalf("resolved station = %+v, %t; want cached stream URL", station, ok)
 	}
 }
 
@@ -352,7 +475,7 @@ func TestRandomQueryUsesCacheBuster(t *testing.T) {
 	client := New(t.TempDir())
 	client.servers = []string{server.URL}
 	t.Cleanup(client.Close)
-	if _, err := client.fetchStations(context.Background(), BrowseRandom, ""); err != nil {
+	if _, err := client.fetchStationPage(context.Background(), BrowseRandom, "", 0, StationOrderSource); err != nil {
 		t.Fatal(err)
 	}
 	values := strings.Split(query, "&")

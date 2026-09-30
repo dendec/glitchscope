@@ -68,6 +68,7 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 	panelY := l.panelY
 	panelH := l.panelH
 	panelW := l.panelW
+	o.pointerTextRows = o.pointerTextRows[:0]
 
 	// Header backdrop.
 	hR, hG, hB := o.panelBgRGB()
@@ -89,7 +90,6 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		placements := o.breadcrumbPlacements(winW)
 		textX := float32(headerMargin)
 		if len(placements) > 0 && placements[0].icon != "" {
-			o.drawIcon(iconHome, placements[0].x, float32(navigationHeaderH), float32(lh), winW, winH, viewW, viewH)
 			// Text textures include transparent outline padding. Start the
 			// texture inside the icon slot so the visible glyph begins at the
 			// slot's end, keeping the visual gap equal to other icon labels.
@@ -98,6 +98,16 @@ func (o *Overlay) renderUI(winW, winH, viewW, viewH int) {
 		if o.breadcrumbTex != 0 {
 			glDrawOverlayText(o.programText, o.breadcrumbTex, 1,
 				textX, breadcrumbY, float32(o.breadcrumbTexW), float32(o.breadcrumbTexH), winW, winH, viewW, viewH)
+		}
+		for _, placement := range placements {
+			if placement.icon == "" {
+				continue
+			}
+			iconX := placement.x
+			if placement.label != "" {
+				iconX += float32(font.MeasureString(o.face, "/").Ceil() + o.scalePx(2))
+			}
+			o.drawIcon(placement.icon, iconX, float32(navigationHeaderH), float32(lh), winW, winH, viewW, viewH)
 		}
 	}
 
@@ -219,7 +229,8 @@ func drawPanelBorder(o *Overlay, x, y, w, h float32, winW, winH, viewW, viewH in
 
 // drawScrollbar draws a track+thumb scrollbar in the theme scrollbar color.
 func drawScrollbar(o *Overlay, sbX, panelY, panelH float32, totalItems, visibleItems, scrollPos int, winW, winH, viewW, viewH int) {
-	if totalItems <= visibleItems {
+	thumbY, thumbH, ok := scrollbarThumbGeometry(panelY, panelH, totalItems, visibleItems, scrollPos)
+	if !ok {
 		return
 	}
 	tc := o.palette().scrollbar
@@ -228,16 +239,20 @@ func drawScrollbar(o *Overlay, sbX, panelY, panelH float32, totalItems, visibleI
 	// Track.
 	glDrawFilledRect(o.programRect, sbX, panelY, thumbW, panelH, r, g, b, o.uiAlpha(alphaTrackBg), winW, winH, viewW, viewH)
 	// Thumb.
-	thumbH := panelH * float32(visibleItems) / float32(totalItems)
+	glDrawFilledRect(o.programRect, sbX, thumbY, thumbW, thumbH, r, g, b, o.uiAlpha(alphaTrackFill), winW, winH, viewW, viewH)
+}
+
+func scrollbarThumbGeometry(panelY, panelH float32, totalItems, visibleItems, scrollPos int) (thumbY, thumbH float32, ok bool) {
+	if panelH <= 0 || totalItems <= visibleItems || totalItems <= 0 || visibleItems <= 0 {
+		return 0, 0, false
+	}
+	thumbH = panelH * float32(visibleItems) / float32(totalItems)
 	if thumbH < 8 {
 		thumbH = 8
 	}
-	maxScroll := totalItems - visibleItems
-	if maxScroll < 1 {
-		maxScroll = 1
-	}
-	thumbY := panelY + (panelH-thumbH)*float32(scrollPos)/float32(maxScroll)
-	glDrawFilledRect(o.programRect, sbX, thumbY, thumbW, thumbH, r, g, b, o.uiAlpha(alphaTrackFill), winW, winH, viewW, viewH)
+	maxScroll := max(1, totalItems-visibleItems)
+	thumbY = panelY + (panelH-thumbH)*float32(scrollPos)/float32(maxScroll)
+	return thumbY, thumbH, true
 }
 
 // scrollOffset returns the first visible row keeping cursor within the window.
@@ -267,9 +282,11 @@ type listTex struct {
 }
 
 type listRow struct {
-	text   string
-	active bool
-	bold   bool
+	text     string
+	active   bool
+	bold     bool
+	link     string
+	copyText string
 }
 
 // rebuildListRows renders rows, reserving the active row for marquee.
@@ -454,6 +471,8 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	o.deleteTex(&o.bottomSuffixTex)
 	o.bottomTitleX = 0
 	o.bottomTitleW = 0
+	o.bottomVolumeX = 0
+	o.bottomVolumeW = 0
 
 	if o.playingPath == "" && !o.loading {
 		return
@@ -513,9 +532,18 @@ func (o *Overlay) rebuildBottomTex(w, botH int) {
 	if info != "" {
 		suffix += "  " + info
 	}
+	if o.pointerMouse {
+		volumeText := fmt.Sprintf("  VOL %d%%", int(math.Round(float64(o.volume*100))))
+		o.bottomVolumeW = font.MeasureString(o.face, volumeText).Ceil()
+		suffix += volumeText
+	}
 	prefix := o.playerBarPrefix()
 	o.bottomTitleX = font.MeasureString(o.face, prefix).Ceil()
-	o.bottomTitleW = w - o.bottomTitleX - font.MeasureString(o.face, suffix).Ceil()
+	suffixW := font.MeasureString(o.face, suffix).Ceil()
+	o.bottomTitleW = w - o.bottomTitleX - suffixW
+	if o.bottomVolumeW > 0 {
+		o.bottomVolumeX = w - o.bottomVolumeW
+	}
 	if o.bottomTitleW < 1 {
 		o.bottomTitleW = 1
 	}

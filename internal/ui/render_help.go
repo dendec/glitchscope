@@ -106,6 +106,7 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 			rightEnd = len(rightRows)
 		}
 		o.rebuildListRows(&o.helpColR, rightRows[o.helpView.ContentTop:rightEnd], maxTextW, panelW)
+		o.helpRightRows = append([]listRow(nil), rightRows[o.helpView.ContentTop:rightEnd]...)
 		o.helpDirty = false
 	}
 
@@ -130,6 +131,8 @@ func (o *Overlay) renderHelpPanels(winW, winH, viewW, viewH int, panelW, panelY,
 	}
 	drawListColumn(o, lx, py, pw, ph, o.helpColL, o.panelEntered && o.focusPanel == 0, leftCursor, leftScroll, lh, winW, winH, viewW, viewH)
 	drawListColumn(o, rx, py, pw, ph, o.helpColR, o.panelEntered && o.focusPanel == 1, -1, o.helpView.ContentTop, lh, winW, winH, viewW, viewH)
+	o.setPointerListRows(o.helpRightRows, rx, py, py, pw, ph, lh)
+	o.drawPointerLinks(winW, winH, viewW, viewH)
 	sbW := float32(o.scrollbarWidthPx())
 	leftTotal := o.helpTopicCount()
 	if o.helpView.InGrandChildren {
@@ -150,8 +153,9 @@ func (o *Overlay) appendHelpRows(rows []listRow, lines []string, maxTextW int) [
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		bold := len(trimmed) >= 4 && strings.HasPrefix(trimmed, "**") && strings.HasSuffix(trimmed, "**")
+		link, _, _ := findTextURL(line)
 		for _, wrapped := range wrapHelpLines([]string{line}, o.face, maxTextW) {
-			rows = append(rows, listRow{text: wrapped, bold: bold})
+			rows = append(rows, listRow{text: wrapped, bold: bold, link: link})
 		}
 	}
 	return rows

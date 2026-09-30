@@ -813,13 +813,17 @@ func (o *Overlay) Select() bool {
 			case e.kind == entryInfo:
 				return false
 			case e.kind == entryRadioCategory:
+				if e.radioKind == radio.BrowseHistory {
+					o.pushLevel(navLevel{ctx: ctxRadio, label: e.label, entries: o.buildRadioStationEntries(e.radioKind, ""), radioKind: e.radioKind})
+					return false
+				}
 				o.radioBrowseKind = e.radioKind
 				o.radioBrowseFilter = ""
 				o.radioBrowseRequested = true
 				if e.radioKind == radio.BrowseRandom {
 					return false
 				}
-				if e.radioKind == radio.BrowseTag || e.radioKind == radio.BrowseLanguage || e.radioKind == radio.BrowseCountry {
+				if e.radioKind == radio.BrowseTag || e.radioKind == radio.BrowseCountry {
 					o.pushLevel(navLevel{ctx: ctxRadio, label: e.label, entries: o.buildRadioFilterEntries(e.radioKind), radioKind: e.radioKind})
 				} else {
 					o.pushLevel(navLevel{ctx: ctxRadio, label: e.label, entries: o.buildRadioStationEntries(e.radioKind, ""), radioKind: e.radioKind})
@@ -834,6 +838,9 @@ func (o *Overlay) Select() bool {
 			case e.kind == entryRadioStation:
 				station := e.radioStation
 				o.radioSelected = &station
+				return false
+			case e.kind == entryRadioHistoryClear:
+				o.radioHistoryClearRequested = true
 				return false
 			case e.IsNCDirectory():
 				o.ncEnterDir(e.dirPath)

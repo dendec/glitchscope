@@ -116,7 +116,6 @@
   "radio.popular": "Populaires",
   "radio.random": "Station aléatoire",
   "radio.by_tag": "Par mot-clé",
-  "radio.by_language": "Par langue",
   "radio.by_country": "Par pays",
   "radio.empty": "Aucune station trouvée",
   "radio.now": "Maintenant : %s",
@@ -126,6 +125,7 @@
   "radio.language": "Langue : %s",
   "radio.country": "Pays : %s",
   "radio.homepage": "Site web : %s",
+  "radio.stream": "URL du flux : %s",
   "presets.shapes_waves": "Formes : %d   Ondes : %d",
   "presets.equations": "Équations : %d par image, %d par pixel",
   "presets.textures": "Textures : %d",
@@ -139,5 +139,12 @@
   "sources.microphone": "Microphone",
   "sources.microphone_capturing": "Microphone · Actif",
   "sources.stop_capture": "Désactiver le microphone",
-  "sources.no_input_devices": "Aucun périphérique d’entrée"
+  "sources.no_input_devices": "Aucun périphérique d’entrée",
+  "settings.sort": "Tri", "values.source_order": "Ordre de la source", "values.a_z": "A–Z", "values.z_a": "Z–A", "descriptions.sort": "Choisissez l’ordre de la musique locale, des catalogues et de la radio.", "info.copied": "Copié", "radio.history": "Écoutées récemment",
+  "info.copy_failed": "Échec de la copie",
+  "radio.last_played": "Dernier démarrage : %s",
+  "radio.clear_history": "Effacer l’historique",
+  "info.radio_playback_failed": "La station de radio n’a pas pu être lue",
+  "info.radio_history_cleared": "Historique radio effacé",
+  "radio.favorite": "Favori : %s"
 }

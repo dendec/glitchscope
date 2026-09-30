@@ -85,6 +85,7 @@ func LoadSettings(path string) (Settings, error) {
 			MenuOpened    *bool         `json:"menu_opened"`
 			ShowStats     *bool         `json:"show_stats"`
 			ShowPlayerBar *bool         `json:"show_player_bar"`
+			SortOrder     *SortOrder    `json:"sort_order"`
 		} `json:"ui"`
 	}
 	if err := json.NewDecoder(f).Decode(&raw); err != nil {
@@ -176,6 +177,9 @@ func LoadSettings(path string) (Settings, error) {
 		}
 		if raw.UI.ShowPlayerBar != nil {
 			s.UI.ShowPlayerBar = *raw.UI.ShowPlayerBar
+		}
+		if raw.UI.SortOrder != nil {
+			s.UI.SortOrder = *raw.UI.SortOrder
 		}
 	}
 

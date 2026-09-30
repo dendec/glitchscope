@@ -25,11 +25,15 @@
           "{focus} switches panels.",
           "{select} opens the selected item or applies a value.",
           "{back} goes back or cancels editing.",
+          "Escape goes back in the menu and does nothing when it is closed. Q does not quit; close the desktop window to exit.",
           "{pages} switches pages.",
           "",
           "**Menu**",
           "{menu} opens or closes the menu.",
-          "The footer shows actions for the current selection."
+          "The footer shows actions for the current selection.",
+          "With a mouse or touchscreen, links in the right panel are underlined and open in your browser when selected.",
+          "Right-click or long-press a value in the right panel to copy it.",
+          "With a mouse, drag the volume value in the player bar. Without a mouse, output stays at maximum for hardware volume controls."
         ]
       },
       {
@@ -87,13 +91,14 @@
       {
         "title": "Favorites",
         "lines": [
-          "Select a track outside Favorites playlists and follow the Favorite hint in the footer.",
+          "Select a local track, catalog track or radio station outside Favorites playlists and follow the Favorite hint in the footer.",
           "A short press cycles Star / Heart / Note / None.",
+          "The station details show its Favorite playlist, and a badge marks saved stations in the list.",
           "{gamepad_heading}",
           "Hold {favourite} to remove the selected track from favorites.",
           "Outside track browsing, {play} is Play / Pause.",
           "{keyboard_heading}",
-          "F cycles the favorite; Delete removes it.",
+          "F cycles the favorite; Delete removes it. Saved radio stations remain available after restart.",
           ""
         ]
       }
@@ -191,16 +196,19 @@
         "title": "Favorites",
         "lines": [
           "**Keep tracks close**",
-          "Add tracks to Star, Heart or Note playlists.",
-          "Favorites are available from Library and protect downloaded tracks from cleanup."
+          "Select a local track, catalog track or radio station, then use the Favorite action shown in the footer.",
+          "A short press cycles Star, Heart, Note and no mark. Favorites are available from Library after restart.",
+          "Favorite downloads are protected from automatic cleanup."
         ]
       },
       {
         "title": "Downloads",
         "lines": [
           "**Offline copies**",
-          "Browse tracks downloaded from remote sources.",
-          "Downloaded tracks play without internet and can be removed from the Downloads view."
+          "Library > Downloads shows tracks fetched from Modland and ModArchive.",
+          "Files are stored beside the application in .cache/modland/files and .cache/modarchive/files; you do not need to move or organize them manually.",
+          "Downloaded tracks play without internet and can be removed from the Downloads view. Cache size and lifetime are configured in Settings.",
+          "Mark a downloaded track as a Favorite to protect it from automatic cleanup."
         ]
       },
       {
@@ -215,7 +223,8 @@
         "title": "Radio",
         "lines": [
           "**Internet radio**",
-          "Browse popular stations or filter by tag, language or country.",
+          "Browse popular stations or filter by tag or country.",
+          "Recently played keeps the last 50 stations whose streams started successfully, with the start time. Unavailable stations stay in history and show a playback error; choose Clear history to empty the list. Favorite a station to keep it in a playlist after restart.",
           "Station lists are cached for 30 days and load more rows as you scroll.",
           "Radio needs a network connection; a stream can fail even when the directory is online."
         ]

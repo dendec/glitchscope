@@ -25,6 +25,10 @@
           "{focus} chuyển đổi giữa các bảng điều khiển.",
           "{select} mở mục được chọn hoặc áp dụng giá trị tương ứng.",
           "{back} quay lại hoặc hủy bỏ thao tác chỉnh sửa.",
+          "Escape quay lại trong menu và không làm gì khi menu đóng. Q không thoát ứng dụng; hãy đóng cửa sổ trên máy tính để thoát.",
+          "Khi dùng chuột hoặc màn hình cảm ứng, liên kết ở bảng bên phải được gạch chân và mở trong trình duyệt.",
+          "Nhấp chuột phải vào một từ hoặc nhấn giữ từ đó trên màn hình cảm ứng để sao chép.",
+          "Dùng chuột kéo âm lượng trên thanh trình phát. Khi không có chuột, âm lượng luôn ở mức tối đa và được điều chỉnh bằng nút phần cứng.",
           "{pages} chuyển sang trang khác.",
           "",
           "**Menu**",
@@ -192,7 +196,8 @@
         "lines": [
           "**Giữ bài hát yêu thích**",
           "Thêm bài hát vào danh sách Star, Heart hoặc Note.",
-          "Mục yêu thích có trong Library và bảo vệ tệp đã tải khỏi việc dọn dẹp."
+          "Mục yêu thích có trong Library và bảo vệ tệp đã tải khỏi việc dọn dẹp.",
+          "Chi tiết đài hiển thị danh sách Yêu thích; biểu tượng đánh dấu các đài đã lưu."
         ]
       },
       {
@@ -200,7 +205,8 @@
         "lines": [
           "**Bản sao ngoại tuyến**",
           "Duyệt các bài hát đã tải từ nguồn từ xa.",
-          "Bài đã tải có thể phát khi không có internet và xóa trong Downloads."
+          "Bài đã tải có thể phát khi không có internet và xóa trong Downloads.",
+          "Downloads là bộ nhớ đệm do ứng dụng quản lý. Yêu thích bảo vệ nội dung đã tải khỏi việc dọn dẹp tự động."
         ]
       },
       {
@@ -215,9 +221,10 @@
         "title": "Radio",
         "lines": [
           "**Radio internet**",
-          "Duyệt đài phổ biến hoặc lọc theo thẻ, ngôn ngữ hay quốc gia.",
+          "Duyệt đài phổ biến hoặc lọc theo thẻ hay quốc gia.",
           "Danh sách đài được lưu 30 ngày và tải thêm khi cuộn.",
-          "Radio cần mạng; luồng có thể lỗi dù thư mục vẫn trực tuyến."
+          "Radio cần mạng; luồng có thể lỗi dù thư mục vẫn trực tuyến.",
+          "Đã phát gần đây lưu 50 đài mới nhất đã bắt đầu thành công cùng thời gian bắt đầu. Đài không khả dụng vẫn nằm trong danh sách và lỗi phát sẽ được hiển thị. Chọn Xóa lịch sử để làm trống danh sách."
         ]
       },
       {

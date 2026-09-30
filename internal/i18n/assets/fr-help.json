@@ -25,6 +25,10 @@
           "{focus} change de panneau.",
           "{select} ouvre l’élément sélectionné ou applique une valeur.",
           "{back} revient en arrière ou annule l’édition.",
+          "Échap revient en arrière dans le menu et ne fait rien lorsqu’il est fermé. Q ne quitte pas l’application ; fermez la fenêtre du bureau pour quitter.",
+          "Avec une souris ou un écran tactile, les liens du panneau droit sont soulignés et s’ouvrent dans le navigateur.",
+          "Faites un clic droit ou maintenez une valeur du panneau droit appuyée pour la copier entièrement.",
+          "Avec une souris, faites glisser le volume dans la barre du lecteur. Sans souris, il reste au maximum et se règle avec les boutons matériels.",
           "{pages} change de page.",
           "",
           "**Menu**",
@@ -192,7 +196,8 @@
         "lines": [
           "**Garder les morceaux à portée de main**",
           "Ajoutez des morceaux aux listes Étoile, Cœur ou Note.",
-          "Les favoris sont disponibles dans la bibliothèque et protègent les téléchargements du nettoyage."
+          "Les favoris sont disponibles dans la bibliothèque et protègent les téléchargements du nettoyage.",
+          "Les détails de la station indiquent sa liste de favoris ; une icône marque les stations enregistrées."
         ]
       },
       {
@@ -200,7 +205,8 @@
         "lines": [
           "**Copies hors ligne**",
           "Parcourez les morceaux téléchargés depuis des sources distantes.",
-          "Les téléchargements sont lisibles sans Internet et peuvent être supprimés depuis Téléchargements."
+          "Les téléchargements sont lisibles sans Internet et peuvent être supprimés depuis Téléchargements.",
+          "Téléchargements est un cache géré par l’application. Les favoris protègent les fichiers téléchargés du nettoyage automatique."
         ]
       },
       {
@@ -215,9 +221,10 @@
         "title": "Radio",
         "lines": [
           "**Radio Internet**",
-          "Parcourez les stations populaires ou filtrez par tag, langue ou pays.",
+          "Parcourez les stations populaires ou filtrez par tag ou pays.",
           "Les listes sont conservées 30 jours et se complètent pendant le défilement.",
-          "La radio nécessite le réseau ; un flux peut échouer même si le répertoire est accessible."
+          "La radio nécessite le réseau ; un flux peut échouer même si le répertoire est accessible.",
+          "Récemment écoutées conserve les 50 dernières stations lancées avec succès et leur heure de démarrage. Les stations indisponibles restent dans la liste et les échecs sont signalés. Choisissez Effacer l’historique pour vider la liste."
         ]
       },
       {

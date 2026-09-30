@@ -25,6 +25,10 @@
           "{focus} menukar panel.",
           "{select} membuka item yang dipilih atau melaksanakan nilai tertentu.",
           "{back} kembali atau membatalkan pengeditan.",
+          "Escape kembali dalam menu dan tidak berbuat apa-apa apabila menu ditutup. Q tidak keluar daripada aplikasi; tutup tetingkap desktop untuk keluar.",
+          "Pautan pada panel kanan bergaris bawah apabila menggunakan tetikus atau skrin sentuh dan dibuka dalam pelayar.",
+          "Klik kanan atau tekan lama nilai di panel kanan untuk menyalin keseluruhannya.",
+          "Dengan tetikus, seret nilai kelantangan pada bar pemain. Tanpa tetikus, kelantangan kekal maksimum dan dikawal dengan butang perkakasan.",
           "{pages} menukar halaman.",
           "",
           "**Menu**",
@@ -192,7 +196,8 @@
         "lines": [
           "**Simpan trek pilihan**",
           "Tambah trek ke senarai Star, Heart atau Note.",
-          "Kegemaran tersedia dalam Library dan melindungi muat turun daripada pembersihan."
+          "Kegemaran tersedia dalam Library dan melindungi muat turun daripada pembersihan.",
+          "Butiran stesen menunjukkan senarai Kegemaran; ikon menandakan stesen yang disimpan."
         ]
       },
       {
@@ -200,7 +205,8 @@
         "lines": [
           "**Salinan luar talian**",
           "Semak trek yang dimuat turun daripada sumber jauh.",
-          "Trek yang dimuat turun boleh dimainkan tanpa internet dan dipadam dari Downloads."
+          "Trek yang dimuat turun boleh dimainkan tanpa internet dan dipadam dari Downloads.",
+          "Downloads ialah cache yang diuruskan aplikasi. Kegemaran melindungi muat turun daripada pembersihan automatik."
         ]
       },
       {
@@ -215,9 +221,10 @@
         "title": "Radio",
         "lines": [
           "**Radio internet**",
-          "Semak stesen popular atau tapis mengikut tag, bahasa atau negara.",
+          "Semak stesen popular atau tapis mengikut tag atau negara.",
           "Senarai stesen dicache selama 30 hari dan memuatkan baris seterusnya semasa menatal.",
-          "Radio memerlukan rangkaian; aliran boleh gagal walaupun direktori dalam talian."
+          "Radio memerlukan rangkaian; aliran boleh gagal walaupun direktori dalam talian.",
+          "Baru dimainkan menyimpan 50 stesen terakhir yang berjaya dimulakan berserta waktunya. Stesen yang tidak tersedia kekal dalam senarai dan ralat main balik dipaparkan. Pilih Kosongkan sejarah untuk mengosongkan senarai."
         ]
       },
       {

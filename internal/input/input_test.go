@@ -33,6 +33,19 @@ func TestProcessEventCtrlF(t *testing.T) {
 	}
 }
 
+func TestEscapeGoesBackAndQDoesNotQuit(t *testing.T) {
+	in := &Input{joyIdx: -1}
+	now := time.Now()
+	escape := &sdl.KeyboardEvent{Type: sdl.KEYDOWN, Keysym: sdl.Keysym{Sym: sdl.K_ESCAPE}}
+	if got := in.ProcessEvent(escape, false, now); got != ActionBack {
+		t.Fatalf("Escape action = %v, want %v", got, ActionBack)
+	}
+	q := &sdl.KeyboardEvent{Type: sdl.KEYDOWN, Keysym: sdl.Keysym{Sym: sdl.K_q}}
+	if got := in.ProcessEvent(q, false, now); got != ActionNone {
+		t.Fatalf("Q action = %v, want %v", got, ActionNone)
+	}
+}
+
 func TestPointerMouseUsesDrawableCoordinates(t *testing.T) {
 	in := &Input{joyIdx: -1, pointerSpace: PointerSpace{
 		WindowW: 640, WindowH: 480, DrawableW: 1280, DrawableH: 960,

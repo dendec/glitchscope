@@ -25,6 +25,10 @@
           "{focus} cambia los paneles.",
           "{select} abre el elemento seleccionado o aplica un valor.",
           "{back} vuelve atrás o cancela la edición.",
+          "Escape vuelve atrás en el menú y no hace nada cuando está cerrado. Q no sale de la aplicación; cierra la ventana de escritorio para salir.",
+          "Los enlaces del panel derecho aparecen subrayados al usar ratón o pantalla táctil y se abren en el navegador.",
+          "Haz clic derecho o mantén pulsado un valor del panel derecho para copiarlo completo.",
+          "Con ratón, arrastra el volumen en la barra del reproductor. Sin ratón, queda al máximo y se controla con los botones físicos.",
           "{pages} cambia de página.",
           "",
           "**Menú**",
@@ -192,7 +196,8 @@
         "lines": [
           "**Guardar pistas cerca**",
           "Añade pistas a las listas Estrella, Corazón o Nota.",
-          "Los favoritos están disponibles en la biblioteca y protegen las descargas de la limpieza automática."
+          "Los favoritos están disponibles en la biblioteca y protegen las descargas de la limpieza automática.",
+          "Los detalles de la emisora muestran su lista de Favoritos; un icono marca las emisoras guardadas."
         ]
       },
       {
@@ -200,7 +205,8 @@
         "lines": [
           "**Copias sin conexión**",
           "Explora pistas descargadas de fuentes remotas.",
-          "Las descargas se reproducen sin internet y pueden eliminarse desde Descargas."
+          "Las descargas se reproducen sin internet y pueden eliminarse desde Descargas.",
+          "Descargas es una caché administrada por la aplicación. Los Favoritos protegen las descargas de la limpieza automática."
         ]
       },
       {
@@ -215,9 +221,10 @@
         "title": "Radio",
         "lines": [
           "**Radio por internet**",
-          "Explora emisoras populares o filtra por etiqueta, idioma o país.",
+          "Explora emisoras populares o filtra por etiqueta o país.",
           "Las listas se guardan 30 días y cargan más filas al desplazarte.",
-          "La radio necesita red; una emisión puede fallar aunque el directorio esté disponible."
+          "La radio necesita red; una emisión puede fallar aunque el directorio esté disponible.",
+          "Recientes guarda las últimas 50 emisoras que iniciaron correctamente, con la hora de inicio. Las emisoras no disponibles permanecen y los errores de reproducción se muestran. Elige Borrar historial para vaciar la lista."
         ]
       },
       {

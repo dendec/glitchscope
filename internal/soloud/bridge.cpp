@@ -20,6 +20,10 @@ int Soloud_initEx(void * aClassPtr, unsigned int aFlags, unsigned int aBackend, 
 	return ((Soloud *)aClassPtr)->init(aFlags, (Soloud::BACKENDS)aBackend, aSamplerate, aBufferSize, aChannels);
 }
 
+void Soloud_setGlobalVolume(void * aClassPtr, float aVolume) {
+	((Soloud *)aClassPtr)->setGlobalVolume(aVolume);
+}
+
 void Soloud_deinit(void * aClassPtr) {
 	((Soloud *)aClassPtr)->deinit();
 }

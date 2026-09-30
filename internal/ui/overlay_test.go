@@ -6,15 +6,95 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
 	"github.com/dendec/glitchscope/internal/i18n"
 	"github.com/dendec/glitchscope/internal/modarchive"
 	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/radio"
 )
+
+type favoriteTracksView struct {
+	tracks []string
+}
+
+func (f favoriteTracksView) GetPlaylist(path string) player.PlaylistID {
+	if slices.Contains(f.tracks, path) {
+		return player.PlaylistStar
+	}
+	return ""
+}
+
+func (f favoriteTracksView) Tracks(id player.PlaylistID) []string {
+	if id != player.PlaylistStar {
+		return nil
+	}
+	return slices.Clone(f.tracks)
+}
+
+func (f favoriteTracksView) Count(id player.PlaylistID) int {
+	if id == player.PlaylistStar {
+		return len(f.tracks)
+	}
+	return 0
+}
+
+func (f favoriteTracksView) TotalCount() int { return len(f.tracks) }
+
+func TestFavoriteRadioRowsRequirePlayableMetadata(t *testing.T) {
+	missingPath := "radio:missing"
+	incompletePath := "radio:incomplete"
+	readyPath := "radio:ready"
+	tracks := []string{missingPath, incompletePath, readyPath}
+	stations := map[string]radio.Station{
+		incompletePath: {StationUUID: "incomplete", Name: "Name without a stream"},
+		readyPath:      {StationUUID: "ready", Name: "Ready Station", URL: "https://example.test/ready"},
+	}
+	var requested []string
+	o := &Overlay{
+		catalog:       i18n.MustLoad(i18n.English),
+		favoritesView: favoriteTracksView{tracks: tracks},
+		navStack:      []navLevel{{ctx: ctxSourceRoot}},
+		radioStationLookup: func(path string) (radio.Station, bool) {
+			station, ok := stations[path]
+			return station, ok
+		},
+		radioStationResolveRequest: func(paths []string) {
+			requested = slices.Clone(paths)
+		},
+	}
+	o.switchToFavoritesPlaylist(player.PlaylistStar)
+
+	if !slices.Equal(requested, []string{missingPath, incompletePath}) {
+		t.Fatalf("metadata requests = %v, want missing and incomplete stations", requested)
+	}
+	trackRows := func() []navEntry {
+		return slices.DeleteFunc(slices.Clone(o.topLevel().entries), func(entry navEntry) bool {
+			return entry.kind != entryFavoriteTrack
+		})
+	}
+	rows := trackRows()
+	if len(rows) != 1 || rows[0].filePath != readyPath || rows[0].label != "Ready Station" {
+		t.Fatalf("favorite rows before resolution = %#v, want only the playable station", rows)
+	}
+
+	o.albumCursor = 1
+	stations[missingPath] = radio.Station{StationUUID: "missing", Name: "Resolved Station", URL: "https://example.test/missing"}
+	stations[incompletePath] = radio.Station{StationUUID: "incomplete", Name: "Completed Station", URL: "https://example.test/completed"}
+	o.RefreshFavorites()
+	rows = trackRows()
+	if len(rows) != 3 {
+		t.Fatalf("favorite rows after resolution = %#v, want all three playable stations", rows)
+	}
+	if current := o.currentEntry(); current == nil || current.filePath != readyPath {
+		t.Fatalf("favorite cursor after metadata refresh = %v, want %q", current, readyPath)
+	}
+}
 
 func TestDisplayTrackPath(t *testing.T) {
 	o := &Overlay{baseDir: "/opt/glitchscope"}
@@ -60,6 +140,21 @@ func TestDisplayTrackPath(t *testing.T) {
 	}
 }
 
+func TestRadioInfoUsesStreamURLWhenHomepageIsMissing(t *testing.T) {
+	catalog := i18n.MustLoad(i18n.English)
+	station := radio.Station{StationUUID: "station", Name: "Station", URL: "https://stream.example/live"}
+	lines := radioInfoLines(catalog, station, "")
+	if !slices.Contains(lines, "Stream URL: https://stream.example/live") {
+		t.Fatalf("radio info lines = %v, missing copyable stream URL", lines)
+	}
+
+	station.Homepage = "https://station.example"
+	lines = radioInfoLines(catalog, station, "")
+	if !slices.Contains(lines, "Homepage: https://station.example") || slices.Contains(lines, "Stream URL: https://stream.example/live") {
+		t.Fatalf("radio info lines = %v, want homepage instead of stream URL", lines)
+	}
+}
+
 func TestDisplayTrackPathRadioNowPlaying(t *testing.T) {
 	o := &Overlay{
 		playingAlbum:         "Adrenalin FM",
@@ -88,6 +183,31 @@ func TestRadioNavigationUsesCachedRowsAndLocalizedLoading(t *testing.T) {
 	}
 }
 
+func TestRadioHistoryKeepsNewestFirstAndOffersClearAction(t *testing.T) {
+	older := radio.Station{StationUUID: "older", Name: "Zulu", URL: "https://example.test/older", PlayedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+	newer := radio.Station{StationUUID: "newer", Name: "Alpha", URL: "https://example.test/newer", PlayedAt: time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)}
+	o := &Overlay{
+		catalog:      i18n.MustLoad(i18n.English),
+		sortOrder:    config.SortZA,
+		radioQueries: map[string][]radio.Station{radioQueryKey(radio.BrowseHistory, ""): {newer, older}},
+	}
+	entries := o.buildRadioStationEntries(radio.BrowseHistory, "")
+	if len(entries) != 3 || entries[0].kind != entryRadioHistoryClear || entries[1].radioStation.StationUUID != "newer" || entries[2].radioStation.StationUUID != "older" {
+		t.Fatalf("history entries = %#v", entries)
+	}
+	allEntries := withParentEntry(entries)
+	o.navStack = []navLevel{{ctx: ctxRadio, entries: allEntries, radioKind: radio.BrowseHistory}}
+	o.albumEntries = allEntries
+	o.albums = labelsOf(allEntries)
+	o.albumCursor = 1
+	if o.Select() {
+		t.Fatal("clear history action should not select a playable track")
+	}
+	if !o.ConsumeRadioHistoryClearRequest() {
+		t.Fatal("clear history action was not reported")
+	}
+}
+
 func TestRadioFilterShowsStationCountWhenAvailable(t *testing.T) {
 	o := &Overlay{
 		catalog:          i18n.MustLoad(i18n.English),
@@ -97,6 +217,19 @@ func TestRadioFilterShowsStationCountWhenAvailable(t *testing.T) {
 	entries := o.buildRadioFilterEntries(radio.BrowseTag)
 	if entries[0].label != "rock (123)" || entries[1].label != "jazz" {
 		t.Fatalf("radio filter labels = %#v", labelsOf(entries))
+	}
+}
+
+func TestSortNavEntriesUsesGlobalOrder(t *testing.T) {
+	entries := []navEntry{{label: "Beta"}, {label: "alpha"}, {label: "Gamma"}}
+	o := &Overlay{sortOrder: config.SortAZ}
+	if got, want := labelsOf(o.sortNavEntries(entries)), []string{"alpha", "Beta", "Gamma"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("A-Z entries = %v, want %v", got, want)
+	}
+	entries = []navEntry{{label: "Beta"}, {label: "alpha"}, {label: "Gamma"}}
+	o.sortOrder = config.SortZA
+	if got, want := labelsOf(o.sortNavEntries(entries)), []string{"Gamma", "Beta", "alpha"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Z-A entries = %v, want %v", got, want)
 	}
 }
 
@@ -212,6 +345,14 @@ func TestRadioInfoShowsMetadata(t *testing.T) {
 	}
 	if strings.Contains(joined, station.Favicon) {
 		t.Errorf("radio info should not expose favicon URL: %q", joined)
+	}
+}
+
+func TestRadioInfoShowsLastPlayedTime(t *testing.T) {
+	station := radio.Station{Name: "Station", PlayedAt: time.Date(2025, 1, 2, 3, 4, 0, 0, time.UTC)}
+	lines := radioInfoLines(i18n.MustLoad(i18n.English), station, "")
+	if !strings.Contains(strings.Join(lines, "\n"), "Last started:") {
+		t.Fatalf("station details omit last played time: %#v", lines)
 	}
 }
 

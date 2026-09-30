@@ -147,6 +147,7 @@ type Overlay struct {
 	panelEntered  bool
 	showFPS       bool
 	showPlayerBar bool
+	sortOrder     config.SortOrder
 	uiPage        UIPage
 
 	screenW, screenH int
@@ -183,8 +184,9 @@ type Overlay struct {
 	loadPercent     int64
 	focusPanel      int // 0=albums, 1=tracks
 
-	// Local track info panel (non-nil when showing track info in right panel).
-	infoLines []string
+	// Track info text and the original multi-line comment shown in the right panel.
+	infoLines   []string
+	infoComment string
 
 	settingsRows        []SettingRow
 	settingsCursor      int
@@ -200,21 +202,23 @@ type Overlay struct {
 	helpDirty           bool
 	helpVisibleRows     int
 
-	presetTreeRoot   []presetNode
-	presetNav        presetNavigation
-	presetMeta       presetMetaProvider
-	presetPreviewReq func(key string)
-	presetPreviewTex func(key string) (tex uint32, w, h int, ok bool)
-	presetPreviewFPS func() float64
-	presetPreviewDue time.Time
-	presetDetailKey  string
-	radioFaviconReq  func(station radio.Station) bool
-	radioFaviconPath string
-	radioFaviconURL  string
-	radioFaviconDue  time.Time
-	presetsColL      listTex
-	presetsColR      listTex
-	previewBgTex     uint32 // thumbnail texture drawn full-screen as presets page background
+	presetTreeRoot             []presetNode
+	presetNav                  presetNavigation
+	presetMeta                 presetMetaProvider
+	presetPreviewReq           func(key string)
+	presetPreviewTex           func(key string) (tex uint32, w, h int, ok bool)
+	presetPreviewFPS           func() float64
+	presetPreviewDue           time.Time
+	presetDetailKey            string
+	radioFaviconReq            func(station radio.Station) bool
+	radioStationLookup         func(path string) (radio.Station, bool)
+	radioStationResolveRequest func(paths []string)
+	radioFaviconPath           string
+	radioFaviconURL            string
+	radioFaviconDue            time.Time
+	presetsColL                listTex
+	presetsColR                listTex
+	previewBgTex               uint32 // thumbnail texture drawn full-screen as presets page background
 
 	scrollUp    scrollHold
 	scrollDown  scrollHold
@@ -274,6 +278,8 @@ type Overlay struct {
 	bottomSuffixTex                          uint32
 	bottomSuffixTexW, bottomSuffixTexH       int
 	bottomTitleX, bottomTitleW               int
+	bottomVolumeX, bottomVolumeW             int
+	volume                                   float32
 	statsTex                                 uint32
 	statsTexW, statsTexH                     int
 	presetNameTex                            uint32
@@ -296,55 +302,60 @@ type Overlay struct {
 	actionPlacements   []actionPlacement
 	barPress           playerBarPress
 	pointerPress       pointerPress
+	pointerTextRows    []pointerTextRow
+	pendingPointerCopy string
+	pendingPointerURL  string
+	helpRightRows      []listRow
 	pointerScroll      [2]bool
 	iconTextures       map[string]uint32
 	iconTextureSize    int
 	iconTextureColor   color.RGBA
 
-	albumsDirty          bool
-	albumsContentDirty   bool
-	tracksDirty          bool
-	tracksContentDirty   bool
-	statsDirty           bool
-	bottomDirty          bool
-	presetNameDirty      bool
-	presetsDirty         bool
-	presetCursorDirty    bool
-	presetsDetailDirty   bool
-	presetsRightRows     int // cached right panel row count for thumbnail draw
-	presetPreviewFPSNow  int // rounded value currently baked into the detail texture
-	online               bool
-	micActive            bool // microphone capture is running
-	micDevices           []string
-	micMenuRequested     bool   // one-shot: microphone source selected
-	micDeviceSelected    string // one-shot: selected SDL capture device name
-	micStopRequested     bool   // one-shot: stop capture selected
-	closeInjectPending   bool
-	modArchiveItems      map[string][]modarchive.DirItem
-	modArchiveCancel     context.CancelFunc
-	modArchiveWG         sync.WaitGroup
-	modArchiveResults    chan modArchiveResult
-	modArchiveRequestID  uint64
-	modArchivePendingURL string
-	radioQueries         map[string][]radio.Station
-	radioQueryMore       map[string]bool
-	radioFavicons        map[string]*image.RGBA
-	radioValues          map[radio.BrowseKind][]string
-	radioValueCounts     map[radio.BrowseKind]map[string]int
-	radioBrowseRequested bool
-	radioPageRequested   bool
-	radioPageKind        radio.BrowseKind
-	radioPageFilter      string
-	radioBrowseKind      radio.BrowseKind
-	radioBrowseFilter    string
-	radioSelected        *radio.Station
-	radioNowPlayingPath  string
-	radioNowPlayingTitle string
-	favoritesView        FavoritesView
-	deviceInfo           *DeviceInfo
-	deviceInfoProvider   func() *DeviceInfo
-	catalogInfoProvider  func() CatalogInfo
-	catalogInfo          CatalogInfo
+	albumsDirty                bool
+	albumsContentDirty         bool
+	tracksDirty                bool
+	tracksContentDirty         bool
+	statsDirty                 bool
+	bottomDirty                bool
+	presetNameDirty            bool
+	presetsDirty               bool
+	presetCursorDirty          bool
+	presetsDetailDirty         bool
+	presetsRightRows           int // cached right panel row count for thumbnail draw
+	presetPreviewFPSNow        int // rounded value currently baked into the detail texture
+	online                     bool
+	micActive                  bool // microphone capture is running
+	micDevices                 []string
+	micMenuRequested           bool   // one-shot: microphone source selected
+	micDeviceSelected          string // one-shot: selected SDL capture device name
+	micStopRequested           bool   // one-shot: stop capture selected
+	closeInjectPending         bool
+	modArchiveItems            map[string][]modarchive.DirItem
+	modArchiveCancel           context.CancelFunc
+	modArchiveWG               sync.WaitGroup
+	modArchiveResults          chan modArchiveResult
+	modArchiveRequestID        uint64
+	modArchivePendingURL       string
+	radioQueries               map[string][]radio.Station
+	radioQueryMore             map[string]bool
+	radioFavicons              map[string]*image.RGBA
+	radioValues                map[radio.BrowseKind][]string
+	radioValueCounts           map[radio.BrowseKind]map[string]int
+	radioBrowseRequested       bool
+	radioPageRequested         bool
+	radioPageKind              radio.BrowseKind
+	radioPageFilter            string
+	radioBrowseKind            radio.BrowseKind
+	radioBrowseFilter          string
+	radioSelected              *radio.Station
+	radioHistoryClearRequested bool
+	radioNowPlayingPath        string
+	radioNowPlayingTitle       string
+	favoritesView              FavoritesView
+	deviceInfo                 *DeviceInfo
+	deviceInfoProvider         func() *DeviceInfo
+	catalogInfoProvider        func() CatalogInfo
+	catalogInfo                CatalogInfo
 }
 
 // New creates an Overlay. The stack always has a virtual source root.
@@ -361,6 +372,7 @@ func New() *Overlay {
 		radioFavicons:    make(map[string]*image.RGBA),
 		radioValues:      make(map[radio.BrowseKind][]string),
 		radioValueCounts: make(map[radio.BrowseKind]map[string]int),
+		volume:           1,
 	}
 	o.navStack = []navLevel{{ctx: ctxSourceRoot, entries: o.buildSourceEntries()}}
 	o.albumEntries = o.navStack[0].entries
@@ -389,6 +401,7 @@ func (o *Overlay) SetLanguage(language config.Language) error {
 	o.catalog = catalog
 	o.helpTopics = topics
 	o.relocalizeSourceLabels()
+	o.refreshAlbumLabels()
 	o.clampHelpView()
 	o.markAllDirty()
 	if o.notif.TextKey() != "" {
@@ -565,10 +578,35 @@ func (o *Overlay) SetPointerCapabilities(keyboard, mouse, touch bool) {
 	o.hintTextCache = ""
 }
 
+// SetVolume updates the session volume shown in the mouse-only player control.
+func (o *Overlay) SetVolume(volume float32) {
+	volume = min(max(volume, 0), 1)
+	if o.volume == volume {
+		return
+	}
+	o.volume = volume
+	o.bottomDirty = true
+}
+
 // SetMusicDir records the resolved local music root (see App.findMusicDir),
 // used by NC navigation instead of assuming baseDir/"music" exists.
 func (o *Overlay) SetMusicDir(dir string) {
 	o.musicDir = dir
+}
+
+// SetSortOrder applies one global display order to local music, catalogs,
+// downloads, favorites, and radio listings. Returning to the source root
+// ensures cached navigation levels are rebuilt from their owners.
+func (o *Overlay) SetSortOrder(order config.SortOrder) {
+	if o.sortOrder == order {
+		return
+	}
+	o.sortOrder = order
+	o.radioQueries = make(map[string][]radio.Station)
+	o.radioQueryMore = make(map[string]bool)
+	if len(o.navStack) > 0 {
+		o.switchToSourceRoot()
+	}
 }
 
 func (o *Overlay) SetSettingsRows(rows []SettingRow, cursor int) {
@@ -972,6 +1010,11 @@ func (o *Overlay) SetRadioStations(kind radio.BrowseKind, filter string, station
 	}
 }
 
+// SetRadioHistory installs the locally persisted recently played list.
+func (o *Overlay) SetRadioHistory(stations []radio.Station) {
+	o.SetRadioStations(radio.BrowseHistory, "", stations, false)
+}
+
 // SetRadioError replaces an empty loading view with the same unavailable
 // state used elsewhere in the UI. Existing cached rows remain usable.
 func (o *Overlay) SetRadioError(kind radio.BrowseKind, filter string) {
@@ -979,7 +1022,7 @@ func (o *Overlay) SetRadioError(kind radio.BrowseKind, filter string) {
 		return
 	}
 	key := radioQueryKey(kind, filter)
-	if filter == "" && (kind == radio.BrowseTag || kind == radio.BrowseLanguage || kind == radio.BrowseCountry) {
+	if filter == "" && (kind == radio.BrowseTag || kind == radio.BrowseCountry) {
 		if len(o.radioValues[kind]) > 0 {
 			return
 		}
@@ -1012,6 +1055,16 @@ func (o *Overlay) SetRadioNowPlaying(path, title string) {
 // SetRadioFaviconRequest installs the app-owned asynchronous favicon loader.
 func (o *Overlay) SetRadioFaviconRequest(fn func(station radio.Station) bool) {
 	o.radioFaviconReq = fn
+}
+
+// SetRadioStationLookup installs the app-owned station lookup used by favorites.
+func (o *Overlay) SetRadioStationLookup(fn func(path string) (radio.Station, bool)) {
+	o.radioStationLookup = fn
+}
+
+// SetRadioStationResolveRequest installs the app-owned async metadata resolver.
+func (o *Overlay) SetRadioStationResolveRequest(fn func(paths []string)) {
+	o.radioStationResolveRequest = fn
 }
 
 // SetRadioFavicon takes ownership of a prepared bitmap; upload stays on the GL thread.
@@ -1081,11 +1134,23 @@ func (o *Overlay) ConsumeRadioStationSelection() (radio.Station, []radio.Station
 	station := *o.radioSelected
 	o.radioSelected = nil
 	level := o.topLevel()
-	stations := append([]radio.Station(nil), o.radioQueries[radioQueryKey(level.radioKind, level.radioFilter)]...)
+	stations := make([]radio.Station, 0, len(level.entries))
+	for _, entry := range level.entries {
+		if entry.kind == entryRadioStation {
+			stations = append(stations, entry.radioStation)
+		}
+	}
 	if len(stations) == 0 {
 		stations = []radio.Station{station}
 	}
 	return station, stations, level.radioKind, level.radioFilter, true
+}
+
+// ConsumeRadioHistoryClearRequest returns a one-shot request to clear history.
+func (o *Overlay) ConsumeRadioHistoryClearRequest() bool {
+	requested := o.radioHistoryClearRequested
+	o.radioHistoryClearRequested = false
+	return requested
 }
 
 // SetTrackCacheLookup supplies the read-only cache projection used by offline navigation.

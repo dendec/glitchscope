@@ -160,6 +160,11 @@ func (s *Soloud) Destroy() {
 	C.Soloud_destroy(s.p)
 }
 
+// SetGlobalVolume sets the engine output gain.
+func (s *Soloud) SetGlobalVolume(volume float32) {
+	C.Soloud_setGlobalVolume(s.p, C.float(volume))
+}
+
 // AudioSource is the common interface for all SoLoud audio source types.
 type AudioSource interface {
 	raw() unsafe.Pointer

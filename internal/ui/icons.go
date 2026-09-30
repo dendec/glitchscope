@@ -9,6 +9,7 @@ import (
 	"image/draw"
 	"image/png"
 	"log/slog"
+	"strings"
 
 	"github.com/dendec/glitchscope/internal/player"
 )
@@ -190,9 +191,20 @@ func (o *Overlay) drawLibraryIcons(x, y, w, h float32, start, end, lh, winW, win
 			name = sourceIconName(entry.source)
 		case o.showsFavoriteFolderIcons():
 			name = favoriteFolderIconName(entry.format)
-		case o.favoritesView != nil && entry.filePath != "":
-			name = favoriteFolderIconName(string(o.favoritesView.GetPlaylist(entry.filePath)))
-			iconX = x + w - float32(o.scrollbarWidthPx()+o.scalePx(5)+lh)
+		case o.topLevel().ctx == ctxFavorites && o.topLevel().playlistID != "":
+			if entry.filePath != "" {
+				name = favoriteTrackSourceIconName(entry.filePath)
+				iconX = x + w - float32(o.scrollbarWidthPx()+o.scalePx(5)+lh)
+			}
+		case o.favoritesView != nil:
+			path := entry.filePath
+			if entry.kind == entryRadioStation {
+				path = entry.radioStation.Path()
+			}
+			if path != "" {
+				name = favoriteFolderIconName(string(o.favoritesView.GetPlaylist(path)))
+				iconX = x + w - float32(o.scrollbarWidthPx()+o.scalePx(5)+lh)
+			}
 		}
 		if name != "" {
 			o.drawIconClipped(name, iconX, y+float32((i-start)*lh), float32(lh), x, y, w, h, winW, winH, viewW, viewH)
@@ -250,6 +262,19 @@ func favoriteFolderIconName(playlistID string) string {
 		return iconLibrary
 	default:
 		return ""
+	}
+}
+
+func favoriteTrackSourceIconName(path string) string {
+	switch {
+	case player.IsRadio(path):
+		return iconRadio
+	case player.IsModland(path), player.IsModArchive(path):
+		return iconCatalogs
+	case strings.HasPrefix(path, player.DownloadsPrefix):
+		return iconDownloads
+	default:
+		return iconLocalMusic
 	}
 }
 
