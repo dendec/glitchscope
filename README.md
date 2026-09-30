@@ -73,7 +73,7 @@ or start with one track:
 ```sh
 make dist-windows    # Windows AMD64 package
 make dist-portmaster # PortMaster ARM64 zip and submission directory
-make release-archives VERSION=1.0 # Versioned archives for all supported targets
+make release-archives VERSION=1.1 # Versioned archives for all supported targets
 ```
 
 `make release-archives` builds Linux AMD64, Linux ARM64, Windows AMD64, and

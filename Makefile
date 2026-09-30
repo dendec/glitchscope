@@ -1,5 +1,5 @@
 APP      := glitchscope
-VERSION  ?= 1.0
+VERSION  ?= 1.1
 DIST_DIR := dist
 LOCAL_DIST_DIR := $(DIST_DIR)/local
 X64_DIST_DIR := $(DIST_DIR)/linux-amd64
@@ -42,7 +42,7 @@ CGO_LDFLAGS  := $(SDL_LIBS) /opt/pt3player/amd64/lib/libpt3player.a /opt/ayumi/a
 
 # Shared amd64 cgo environment for Docker-based development checks.
 DOCKER_GO_ENV := GOFLAGS=-buildvcs=false CGO_ENABLED=1 \
-	CGO_CFLAGS="-I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/opt/crsid/include -I/opt/ffmpeg/amd64/include -I/usr/include/SDL2 -D_REENTRANT" \
+	CGO_CFLAGS="-I/opt/projectm/include -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/opt/crsid/include -I/opt/ffmpeg/amd64/include -I/usr/include/SDL2 -D_REENTRANT" \
 	CGO_CXXFLAGS="-std=c++11 -Wno-write-strings -DWITH_SDL2_STATIC -I/opt/soloud/include -I/opt/ayumi/include -I/opt/pt3player/include -I/opt/libstsound/include -I/opt/crsid/include -I/opt/ffmpeg/amd64/include -I/opt/projectm/include -I/opt/projectm/include/projectM-4 -I/opt/gme/amd64/include -I/opt/xmp/amd64/include -I/opt/openmpt/amd64/include -I/usr/include/SDL2 -D_REENTRANT" \
 	CGO_LDFLAGS="-lSDL2 /opt/pt3player/amd64/lib/libpt3player.a /opt/ayumi/amd64/lib/libayumi.a /opt/libstsound/amd64/lib/libstsound.a /opt/crsid/amd64/lib/libcrsid.a /opt/ffmpeg/amd64/lib/libavformat.a /opt/ffmpeg/amd64/lib/libavcodec.a /opt/ffmpeg/amd64/lib/libswresample.a /opt/ffmpeg/amd64/lib/libavutil.a /opt/projectm/amd64/lib/libprojectM-4.a /opt/projectm/amd64/lib/libprojectM_eval.a -lGL -lGLESv2 -lm -pthread /opt/xmp/amd64/lib/libxmp.a /opt/openmpt/amd64/lib/libopenmpt.a /opt/gme/amd64/lib/libgme.a -lvorbisfile -lvorbis -lFLAC -logg -lmpg123 -lz -lstdc++"
 

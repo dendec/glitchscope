@@ -15,10 +15,15 @@ rebuilt before deployment or release packaging.
 - `portmaster/screenshot.png` is now a 640x480 English capture of the player,
   local music list and visualization. Keep this composition when refreshing
   the image on the device.
-- Review bundled preset/texture redistribution with their maintainers and
-  PortMaster. The preset repository's LICENSE.md describes assumed permission,
-  not explicit grants from every author; the texture README is not a license.
-  Copies of both notices are packaged; this does not resolve permission.
+- Project decision for the Cream of the Crop presets: ship them as free bundled
+  content, not sold separately, accepting the upstream public-domain assumption.
+  The upstream notice says most presets have no specific license and authors
+  theoretically hold copyright; this is not an explicit grant from each author.
+  Keep the upstream notice and attribution with the bundle.
+- The Milkdrop texture pack is separate: its upstream repository recommends
+  including it with bundled presets, but has no LICENSE file. Before release,
+  confirm the same distribution decision applies to these textures, obtain
+  permission, or omit the texture pack.
 - Publish corresponding release sources and dependency versions/build recipes
   alongside the binary. Font and Device-Info notices are included explicitly.
 - Inspect `glitchscope/runtime-requirements.txt` in the staged directory after each build.

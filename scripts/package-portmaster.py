@@ -68,7 +68,7 @@ def main():
         for path in sorted(game.rglob('*')):
             output.write(path, path.relative_to(root))
     print(f'Installable ZIP: {archive}\nSubmission directory: {root}')
-    print('Review asset permissions and test CFW compatibility before submission; see docs/PORTMASTER-RELEASE.md.')
+    print('Review docs/PORTMASTER-RELEASE.md and test CFW compatibility before submission.')
 
 
 if __name__ == '__main__':

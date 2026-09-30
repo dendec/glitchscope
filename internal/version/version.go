@@ -4,7 +4,7 @@ package version
 const Name = "GlitchScope"
 
 // Version is overridden by the release build with -ldflags -X.
-var Version = "1.0"
+var Version = "1.1"
 
 // UserAgent returns the application identity used for outbound Go requests.
 func UserAgent() string { return Name + "/" + Version }
