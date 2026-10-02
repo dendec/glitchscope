@@ -31,6 +31,8 @@ def include_path(relative: Path, is_dir: bool) -> bool:
         return False
     if parts[0] == "music":
         return is_dir and len(parts) == 1
+    if parts[0] == "presets":
+        return is_dir and len(parts) == 1
     if relative.name in MUTABLE_FILES:
         return False
     if parts[0] == ".cache":
@@ -155,8 +157,6 @@ def validate_portmaster_archive(path: Path) -> None:
     required = {
         "GlitchScope.sh",
         "glitchscope/glitchscope",
-        "glitchscope/presets/presets.gsa",
-        "glitchscope/presets/textures.gsa",
         "glitchscope/licenses/THIRD_PARTY_LICENSES.md",
     }
     with zipfile.ZipFile(path) as archive:
@@ -168,6 +168,10 @@ def validate_portmaster_archive(path: Path) -> None:
     for name in names:
         parts = PurePosixPath(name).parts
         if any(part in MUTABLE_FILES for part in parts):
+            forbidden.append(name)
+        elif parts[:2] == ("glitchscope", "presets") and len(parts) > 2:
+            forbidden.append(name)
+        elif name.endswith(("presets.gsa", "textures.gsa")):
             forbidden.append(name)
         elif "music" in parts and not name.endswith("/"):
             forbidden.append(name)
@@ -217,12 +221,7 @@ def main() -> None:
     for source, binary, platform, _suffix, platform_files in packages:
         if not source.is_dir() or not (source / binary).is_file():
             raise SystemExit(f"Missing {platform} package or executable: {source / binary}")
-        for relative in (
-            "presets/presets.gsa",
-            "presets/textures.gsa",
-            *catalog_files,
-            *platform_files,
-        ):
+        for relative in (*catalog_files, *platform_files):
             if not (source / relative).is_file():
                 raise SystemExit(f"Missing {platform} release asset: {source / relative}")
 
@@ -230,8 +229,6 @@ def main() -> None:
     if not arm64.is_dir() or not (arm64 / "glitchscope").is_file():
         raise SystemExit(f"Missing Linux ARM64 package or executable: {arm64 / 'glitchscope'}")
     required_arm64_files = (
-        "presets/presets.gsa",
-        "presets/textures.gsa",
         ".cache/modland/catalog",
         ".cache/modarchive/catalog",
         ".cache/modarchive/1980-2007.gsa",

@@ -15,8 +15,8 @@ reports, and deferred research are collected in [archive/](archive/README.md).
 - [Radio streaming](RADIO-STREAMING.md) — implemented pipeline, protocol
   limits, and remaining device checks.
 - [PortMaster release checklist](PORTMASTER-RELEASE.md) — packaging and device
-  checks. Device testing and permission to redistribute bundled preset/texture
-  assets remain open before publishing a PortMaster binary.
+  checks. Device testing remains open before publishing a PortMaster binary;
+  optional preset collections are user-downloaded and excluded from releases.
 
 Build commands and the contributor workflow are in [README.md](../README.md)
 and [AGENTS.md](../AGENTS.md).

@@ -94,12 +94,17 @@ notices, Go module licenses and Debian library copyright files into the release
 embedding exception), font copyright metadata and Device-Info's MIT notice are
 included separately.
 
-Presets: https://github.com/projectM-visualizer/presets-cream-of-the-crop
-Textures: https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
-Their upstream notices are copied into the package. The preset notice describes
-assumed permission; the texture README is not an explicit license grant.
-Redistribution review remains a release prerequisite; see docs/PORTMASTER-RELEASE.md.
-No third-party demo tracks are bundled.
+Optional MilkDrop preset collections are not included in GlitchScope release
+archives. From the in-app Presets page, users may choose to download these ZIPs
+directly from the author's Patreon files:
+- Cream of the Crop: https://www.patreon.com/file?h=91682111&i=16310421
+- Isosceles Mashups 2020: https://www.patreon.com/file?h=91682111&i=16310422
+- Isosceles Mashups 2024: https://www.patreon.com/file?h=115453098&m=375145864
+
+The author authorized GlitchScope to offer these downloads. The archives remain
+the author's and contributors' works; this permission does not transfer
+intellectual-property rights or change the terms applying to their contents.
+GlitchScope does not sell the collections. No third-party demo tracks are bundled.
 
 Upstream notice sources retrieved for this release preparation:
 - GNU Unifont: https://unifoundry.com/LICENSE.txt

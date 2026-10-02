@@ -12,13 +12,10 @@ import zipfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--arm64', type=Path, required=True)
-    parser.add_argument('--presets', type=Path, required=True)
-    parser.add_argument('--textures', type=Path, required=True)
     parser.add_argument('--output', type=Path, default=Path('dist'))
     args = parser.parse_args()
     source = Path('portmaster')
-    required = ['glitchscope', 'presets/presets.gsa', 'presets/textures.gsa',
-                'licenses/GlitchScope-GPL-2.0-or-later.txt',
+    required = ['glitchscope', 'licenses/GlitchScope-GPL-2.0-or-later.txt',
                 'licenses/libopenmpt-LICENSE', 'licenses/libxmp-COPYING',
                 'libs.aarch64/libstdc++.so.6', 'libs.aarch64/libvorbisfile.so.3',
                 '.cache/modland/catalog', '.cache/modarchive/catalog',
@@ -38,7 +35,11 @@ def main():
     game = root / 'glitchscope'
     game.mkdir(parents=True)
     for name in ('presets', '.cache', 'licenses', 'libs.aarch64'):
-        shutil.copytree(args.arm64 / name, game / name)
+        source_dir = args.arm64 / name
+        if name == 'presets':
+            (game / name).mkdir()
+        else:
+            shutil.copytree(source_dir, game / name)
     shutil.copy2(args.arm64 / 'glitchscope', game / 'glitchscope')
     (game / 'glitchscope').chmod(0o755)
     (game / 'music').mkdir()
@@ -49,8 +50,6 @@ def main():
     # and the image path used by gameinfo.xml.
     for name in ('port.json', 'README.md', 'gameinfo.xml', 'screenshot.png'):
         shutil.copy2(root / name, game / name)
-    shutil.copy2(args.presets / 'LICENSE.md', game / 'licenses/presets-LICENSE.md')
-    shutil.copy2(args.textures / 'README.md', game / 'licenses/textures-README.md')
     elf_files = [str(game / 'glitchscope'), *map(str, sorted((game / 'libs.aarch64').iterdir()))]
     versions = subprocess.check_output(['readelf', '--version-info', *elf_files], text=True)
     dynamic = subprocess.check_output(['readelf', '-d', *elf_files], text=True)

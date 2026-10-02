@@ -59,7 +59,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     fi
 
 # Prepare output layout in /dist
-RUN mkdir -p /dist/glitchscope/presets /dist/glitchscope/textures \
+RUN mkdir -p /dist/glitchscope/presets \
     && cp glitchscope /dist/glitchscope/ \
     && if [ "$TARGETARCH" = "arm64" ]; then \
         cp portmaster/GlitchScope.sh /dist/ \

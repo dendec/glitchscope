@@ -3,27 +3,22 @@
 `make dist-portmaster` builds an ARM64 release, stages the PortMaster-New
 submission directory under `dist/portmaster-submit/ports/glitchscope/`, and
 creates `dist/glitchscope.zip`. Packaging fails on missing required inputs.
-No third-party music is downloaded or bundled during packaging.
-The portable `presets.gsa` is checked against
-`docs/benchmark/render-scale-0.5_mesh-8.csv` on every build. Only measured
-presets with at least 20 FPS are packaged; unmeasured presets and internal
-transition presets are excluded. An existing archive with stale contents is
-rebuilt before deployment or release packaging.
+No third-party music or preset collections are bundled during packaging.
+Users can download author-approved preset collections from the Presets page.
+Release archives must contain an empty `presets/` directory only: never
+include downloaded ZIP collections, extracted texture caches, or legacy
+`presets.gsa` / `textures.gsa` archives. ModArchive catalog snapshots remain
+separate GSA assets under `.cache/modarchive/`.
 
 ## Remaining external verification
 
 - `portmaster/screenshot.png` is now a 640x480 English capture of the player,
   local music list and visualization. Keep this composition when refreshing
   the image on the device.
-- Project decision for the Cream of the Crop presets: ship them as free bundled
-  content, not sold separately, accepting the upstream public-domain assumption.
-  The upstream notice says most presets have no specific license and authors
-  theoretically hold copyright; this is not an explicit grant from each author.
-  Keep the upstream notice and attribution with the bundle.
-- The Milkdrop texture pack is separate: its upstream repository recommends
-  including it with bundled presets, but has no LICENSE file. Before release,
-  confirm the same distribution decision applies to these textures, obtain
-  permission, or omit the texture pack.
+- The preset author authorized direct, optional downloads for Cream of the Crop,
+  Isosceles Mashups 2020, and Isosceles Mashups 2024. Keep attribution and this
+  distinction from bundled GPL application code in the third-party notice.
+- Do not add Spout Jamming until its compatibility and availability are reviewed.
 - Publish corresponding release sources and dependency versions/build recipes
   alongside the binary. Font and Device-Info notices are included explicitly.
 - Inspect `glitchscope/runtime-requirements.txt` in the staged directory after each build.
