@@ -39,6 +39,20 @@ func TestSettingsRowsUseLocalizedLabelsWithoutChangingSelection(t *testing.T) {
 	}
 }
 
+func TestEverySettingHasAContextDescriptionInEveryLanguage(t *testing.T) {
+	for _, language := range config.AllLanguages() {
+		catalog := i18n.MustLoad(i18n.Language(language))
+		for index, row := range BuildSettingsRowsWithCatalog(config.DefaultSettings(), 640, 480, catalog) {
+			if row.Header {
+				continue
+			}
+			if got := settingDescription(catalog, index, row.Index); got == "" {
+				t.Errorf("%s setting %q has no context description", language, row.Label)
+			}
+		}
+	}
+}
+
 func TestSortSettingUsesPersistedGlobalOrder(t *testing.T) {
 	settings := config.DefaultSettings()
 	settings.UI.SortOrder = config.SortZA

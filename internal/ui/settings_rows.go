@@ -253,6 +253,18 @@ func settingDescription(catalog i18n.Catalog, setting, value int) string {
 		case 3:
 			return catalog.Text(i18n.DescriptionShuffleAll)
 		}
+	case SettingRepeat:
+		return catalog.Text(i18n.DescriptionRepeat)
+	case SettingBeatSensitivity:
+		return catalog.Text(i18n.DescriptionSensitivity)
+	case SettingLanguage:
+		return catalog.Text(i18n.DescriptionLanguage)
+	case SettingTheme:
+		return catalog.Text(i18n.DescriptionTheme)
+	case SettingTransparency:
+		return catalog.Text(i18n.DescriptionTransparency)
+	case SettingShowStats:
+		return catalog.Text(i18n.DescriptionStats)
 	case SettingCacheRetention:
 		if value == 0 {
 			return downloadsDescription(catalog, i18n.DescriptionCacheSession)
