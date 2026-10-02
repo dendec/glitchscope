@@ -3,18 +3,15 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/dendec/glitchscope/internal/presets"
 )
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "Usage: texture-report <preset-dir> <output.csv>")
+		fmt.Fprintln(os.Stderr, "Usage: texture-report <presets-dir> <output.csv>")
 		os.Exit(1)
 	}
 
@@ -45,29 +42,20 @@ func main() {
 }
 
 func collect(root string) ([][]string, error) {
+	if err := presets.Open(root); err != nil {
+		return nil, err
+	}
+	defer presets.Close()
+
 	var rows [][]string
-	err := filepath.WalkDir(root, func(path string, item fs.DirEntry, err error) error {
+	for _, name := range presets.Names() {
+		data, err := presets.Read(name)
 		if err != nil {
-			return err
-		}
-		if item.IsDir() || !strings.EqualFold(filepath.Ext(item.Name()), ".milk") {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
+			return nil, fmt.Errorf("read preset %q: %w", name, err)
 		}
 		for _, reference := range presets.TextureReferences(data) {
-			rows = append(rows, []string{filepath.ToSlash(rel), reference.Sampler, reference.Texture, reference.Kind})
+			rows = append(rows, []string{name, reference.Sampler, reference.Texture, reference.Kind})
 		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		for column := range rows[i] {

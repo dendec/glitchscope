@@ -21,8 +21,8 @@ func TestHelpTopicsLoadFromAsset(t *testing.T) {
 	if helpTopics[HelpQuickStart].Title != "Getting Started" || len(helpTopics[HelpQuickStart].Lines) == 0 {
 		t.Fatalf("Getting Started topic was not loaded from asset: %+v", helpTopics[HelpQuickStart])
 	}
-	if len(helpTopics[HelpFormats].Children) != 3 || len(helpTopics[HelpSources].Children) != 7 {
-		t.Fatalf("hierarchical Help entries were not loaded: formats=%d sources=%d", len(helpTopics[HelpFormats].Children), len(helpTopics[HelpSources].Children))
+	if len(helpTopics[HelpFormats].Children) != 3 || len(helpTopics[HelpSources].Children) != 7 || len(helpTopics[HelpFrameRate].Children) != 5 {
+		t.Fatalf("hierarchical Help entries were not loaded: formats=%d sources=%d frame rate=%d", len(helpTopics[HelpFormats].Children), len(helpTopics[HelpSources].Children), len(helpTopics[HelpFrameRate].Children))
 	}
 	wantSources := []string{"Local Music", "Favorites", "Downloads", "Microphone", "Radio", "Modland", "ModArchive"}
 	for i, want := range wantSources {
@@ -79,8 +79,31 @@ func TestTranslatedHelpPreservesStructureAndLicenses(t *testing.T) {
 		if !sameHelpPlaceholders(helpTopics, o.helpTopics) {
 			t.Errorf("%s Help placeholders differ from English", language)
 		}
+		for _, ref := range []string{"preset_pack.download", "preset_pack.remove", "preset_pack.test", "preset_pack.cancel"} {
+			if got := o.helpDescription(ref); got == "" {
+				t.Errorf("%s Help is missing inline description %q", language, ref)
+			}
+		}
 		if !reflect.DeepEqual(helpTopics[HelpLicenses].Children, o.helpTopics[HelpLicenses].Children) {
 			t.Errorf("%s translated license metadata or text", language)
+		}
+	}
+}
+
+func TestPresetActionHelpDescriptionsAreShortAndLocalized(t *testing.T) {
+	refs := []string{"preset_pack.download", "preset_pack.remove", "preset_pack.test", "preset_pack.cancel"}
+	for _, language := range config.AllLanguages() {
+		catalog := i18n.MustLoad(i18n.Language(language))
+		o := &Overlay{catalog: catalog}
+		if language != config.English {
+			if err := o.SetLanguage(language); err != nil {
+				t.Fatalf("load %s Help: %v", language, err)
+			}
+		}
+		for _, ref := range refs {
+			if got := o.helpDescription(ref); got == "" || len([]rune(got)) > 140 {
+				t.Errorf("%s Help description %q has unsuitable text %q", language, ref, got)
+			}
 		}
 	}
 }
@@ -136,7 +159,7 @@ func sameHelpEntries(left, right []HelpEntry) bool {
 		return false
 	}
 	for i := range left {
-		if !sameHelpEntries(left[i].Children, right[i].Children) {
+		if left[i].Ref != right[i].Ref || !sameHelpEntries(left[i].Children, right[i].Children) {
 			return false
 		}
 	}

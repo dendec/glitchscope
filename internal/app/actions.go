@@ -18,6 +18,7 @@ import (
 	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/mic"
 	"github.com/dendec/glitchscope/internal/player"
+	"github.com/dendec/glitchscope/internal/presets"
 	"github.com/dendec/glitchscope/internal/radio"
 	"github.com/dendec/glitchscope/internal/ui"
 )
@@ -76,6 +77,11 @@ func (a *App) handleAction(act input.Action, winW, winH int) {
 	case input.ActionFavoriteRemove:
 		a.handleFavoriteRemove()
 		return
+	}
+	if a.presetPackCalibrationActive() {
+		if act == input.ActionRandomPreset || ((act == input.ActionNextPreset || act == input.ActionPrevPreset) && (a.overlay == nil || !a.overlay.UIVisible())) {
+			return
+		}
 	}
 
 	if a.overlay != nil && a.overlay.UIVisible() {
@@ -363,19 +369,50 @@ func (a *App) currentPresetName() string {
 	return ""
 }
 
-// loadPreset loads a preset by index (with wrapping) via transition.
-func (a *App) loadPreset(idx int) {
-	if len(a.presetNames) == 0 {
-		return
+// loadPreset loads the next eligible preset by index (with wrapping).
+func (a *App) loadPreset(idx int) bool {
+	return a.loadPresetMode(idx, true)
+}
+
+func (a *App) loadPresetHard(idx int) bool {
+	return a.loadPresetMode(idx, false)
+}
+
+func (a *App) loadPresetMode(idx int, smooth bool) bool {
+	index, ok := nextAvailablePresetIndex(a.presetNames, idx, a.presetHeavy)
+	if !ok {
+		return false
 	}
-	n := len(a.presetNames)
-	name := a.presetNames[((idx%n)+n)%n]
-	a.transitionPreset(name)
+	name := a.presetNames[index]
+	if a.presetNeedsProbe(name) {
+		smooth = false
+	}
+	a.requestPresetLoadWithTransition(name, smooth)
+	return true
+}
+
+func nextAvailablePresetIndex(names []string, start int, isHeavy func(string) bool) (int, bool) {
+	if len(names) == 0 {
+		return 0, false
+	}
+	for offset := range len(names) {
+		index := (start + offset) % len(names)
+		if index < 0 {
+			index += len(names)
+		}
+		if !isHeavy(names[index]) {
+			return index, true
+		}
+	}
+	return 0, false
 }
 
 // selectPreset confirms a preset on the Presets page without mutating the
 // running projectM instance. It is loaded when the page or menu closes.
 func (a *App) selectPreset(key string) {
+	if a.presetPackCalibrationActive() {
+		return
+	}
 	a.selectedPreset = key
 }
 
@@ -386,33 +423,82 @@ func (a *App) randPreset() {
 	}
 
 	// Build pool of normal (non-"!") presets.
-	key := a.presetProfileKey("")
+	key := a.presetTuning.active
 	var normals []string
+	var eligible []string
 	for _, n := range a.presetNames {
 		key.name = n
-		if n[0] != '!' && !a.presetTuning.profiles[key].heavy {
+		if a.presetTuning.isHeavy(key) {
+			continue
+		}
+		eligible = append(eligible, n)
+		if !presets.IsTransition(n) {
 			normals = append(normals, n)
 		}
 	}
 	if len(normals) == 0 {
-		normals = a.presetNames
+		normals = eligible
+	}
+	if len(normals) == 0 {
+		return
 	}
 
-	// Pick random target, avoid repeating current.
-	target := normals[rand.Intn(len(normals))]
-	if len(normals) > 1 {
-		for target == a.presetNames[a.presetIdx] {
-			target = normals[rand.Intn(len(normals))]
+	current := a.currentPresetName()
+	choices := make([]string, 0, len(normals))
+	for _, name := range normals {
+		if name != current || len(normals) == 1 {
+			choices = append(choices, name)
 		}
 	}
+	a.transitionPreset(choices[rand.Intn(len(choices))])
+}
 
-	a.transitionPreset(target)
+func (a *App) presetHeavy(name string) bool {
+	key := a.presetTuning.active
+	if key.width <= 0 || key.height <= 0 {
+		key = a.presetProfileKey(name)
+	} else {
+		key.name = name
+	}
+	return a.presetTuning.isHeavy(key)
+}
+
+func (a *App) presetNeedsProbe(name string) bool {
+	if name == "" {
+		return false
+	}
+	key := a.presetProfileKey(name)
+	profile, known := a.presetTuning.profiles[key]
+	return presetNeedsPerformanceProbe(a.settings.Graphics.Adaptive, len(a.adaptive.resolutions), profile, known)
+}
+
+func (a *App) refreshPresetTree() {
+	a.presetCats = a.presetCats[:0]
+	for _, name := range a.presetNames {
+		if !a.presetHeavy(name) {
+			a.presetCats = append(a.presetCats, name)
+		}
+	}
+	if a.overlay != nil {
+		a.overlay.SetPresetTree(a.presetCats)
+	}
 }
 
 // transitionPreset is the single entry point for all preset changes. The
 // request is read asynchronously and committed only after native preparation.
 func (a *App) transitionPreset(name string) {
-	a.requestPresetLoad(name)
+	if a.presetHeavy(name) {
+		for index, candidate := range a.presetNames {
+			if candidate == name {
+				if !a.loadPresetHard(index + 1) {
+					a.loadBuiltInPreset()
+				}
+				return
+			}
+		}
+		return
+	}
+	a.requestPresetLoadWithTransition(name, !a.presetNeedsProbe(name))
 }
 
 // applyPresetName updates the preset index and overlay after a load.

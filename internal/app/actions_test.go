@@ -3,13 +3,45 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/dendec/glitchscope/internal/config"
+	"github.com/dendec/glitchscope/internal/input"
 	"github.com/dendec/glitchscope/internal/player"
 	"github.com/dendec/glitchscope/internal/radio"
+	"github.com/dendec/glitchscope/internal/ui"
 )
+
+func TestPresetPackCalibrationDoesNotBlockPageNavigationFromLibrary(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		action     input.Action
+		wantPreset bool
+	}{
+		{name: "next", action: input.ActionNextPreset, wantPreset: true},
+		{name: "previous", action: input.ActionPrevPreset},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			o := &ui.Overlay{}
+			o.SetPresetPacks([]ui.PresetPackItem{{ID: "pack", Name: "Pack", Testing: true}})
+			o.ToggleUI()
+			a := &App{overlay: o, presetPackTest: &presetPackTestState{}}
+
+			a.handleAction(test.action, 0, 0)
+			if got := o.IsPresetsPage(); got != test.wantPreset {
+				t.Fatalf("IsPresetsPage() = %t after %s-page action", got, test.name)
+			}
+			if test.wantPreset {
+				a.handleAction(input.ActionPrevPreset, 0, 0)
+				if !o.IsPresetsPage() {
+					t.Fatal("page navigation left the active preset test without cancellation")
+				}
+			}
+		})
+	}
+}
 
 func TestWalkAudioFiles(t *testing.T) {
 	// Create temp dir with supported and unsupported files.
@@ -304,6 +336,36 @@ func TestSelectPresetDefersLoad(t *testing.T) {
 	}
 	if a.presetIdx != 0 {
 		t.Fatalf("presetIdx = %d, changed before leaving Presets page", a.presetIdx)
+	}
+}
+
+func TestNextAvailablePresetIndexSkipsHeavyAndWraps(t *testing.T) {
+	names := []string{"a.milk", "b.milk", "c.milk"}
+	heavy := map[string]bool{"a.milk": true, "c.milk": true}
+	index, ok := nextAvailablePresetIndex(names, 2, func(name string) bool { return heavy[name] })
+	if !ok || index != 1 {
+		t.Fatalf("next available = (%d, %t), want (1, true)", index, ok)
+	}
+	if _, ok := nextAvailablePresetIndex(names, 0, func(string) bool { return true }); ok {
+		t.Fatal("returned a preset when all presets are heavy")
+	}
+}
+
+func TestRefreshPresetTreeExcludesHeavyPresets(t *testing.T) {
+	activeKey := presetProfileKey{name: "slow.milk", width: 1280, height: 720}
+	a := App{
+		presetNames: []string{"fast.milk", "slow.milk", "!transition.milk"},
+		presetTuning: presetTuning{
+			active: activeKey,
+			profiles: map[presetProfileKey]presetProfile{
+				activeKey: {heavy: true},
+			},
+		},
+	}
+	a.refreshPresetTree()
+	want := []string{"fast.milk", "!transition.milk"}
+	if !slices.Equal(a.presetCats, want) {
+		t.Fatalf("preset tree = %v, want %v", a.presetCats, want)
 	}
 }
 

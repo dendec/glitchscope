@@ -9,6 +9,7 @@
       "**Genießen Sie den Visualizer**",
       "Schließen Sie das Menü, nachdem die Wiedergabe begonnen hat.",
       "Verwenden Sie Vorlagen, um einen visuellen Stil auszuwählen, und Einstellungen, um Qualität, Geschwindigkeit und Akkulaufzeit in Einklang zu bringen.",
+      "Wählen Sie unter Presets eine verfügbare Sammlung zum Herunterladen aus; heruntergeladene Sammlungen sind offline verfügbar.",
       "",
       "Der Fußbereich zeigt stets die für die aktuelle Auswahl verfügbaren Aktionen an."
     ],
@@ -134,7 +135,25 @@
           "Pausieren Sie bei einer Vorlage, um deren Vorschau anzuzeigen.",
           "{select} wählt sie aus; sie wird angewendet, sobald Sie die Seite verlassen.",
           "Die Einstellung zur automatischen Vorlagenwechsel steuert die automatischen Änderungen.",
-          "Erfolgreiche Auflösungen werden während des laufenden Betriebs gespeichert."
+          "Auflösungsergebnisse werden lokal gespeichert und nach einem Neustart wiederverwendet, solange Preset und Rendering-Kontext unverändert sind."
+        ]
+      },
+      {
+        "title": "Automatische Leistungsprüfung",
+        "lines": [
+          "Bei aktivierter adaptiver Auflösung wird ein neues Preset zuerst mit der kleinsten Rendergröße geprüft.",
+          "Bleibt die Leistung dort unter 20 FPS, wird das Preset als schwer markiert und bei der normalen Auswahl ausgelassen; kurze Hänger zählen nicht.",
+          "Besteht es die Prüfung, wird zuerst die eingestellte Auflösungsgrenze getestet. Bei einem Fehlschlag sucht eine binäre Suche die beste passende Größe.",
+          "Bei deaktivierter Anpassung bleibt die gewählte Größe fest; diese automatische Prüfung läuft dann nicht."
+        ]
+      },
+      {
+        "title": "Preset-Sammlungen",
+        "children": [
+          {"ref":"preset_pack.download","title":"Herunterladen","lines":["Lädt das ZIP der Sammlung in den Preset-Ordner und installiert sie.","Preset-Dateien werden direkt aus dem Archiv gelesen; benötigte Texturen extrahiert die App automatisch."]},
+          {"ref":"preset_pack.remove","title":"Löschen","lines":["Entfernt das Sammlungs-ZIP und den entpackten Textur-Cache.","Du kannst die Sammlung später erneut herunterladen."]},
+          {"ref":"preset_pack.test","title":"Testen","lines":["Misst alle Presets, findet die beste Auflösung und markiert dauerhaft langsame Presets als schwer.","Der Test funktioniert unabhängig von Adaptive und ändert die gespeicherte Auflösung nicht.","Jedes Preset startet mit der kleinsten Rendergröße. Bleibt die Leistung unter 20 FPS, wird es als schwer markiert; kurze Aussetzer zählen nicht.","Andernfalls wird zuerst die eingestellte Auflösungsgrenze geprüft. Schlägt sie fehl, findet eine binäre Suche die beste passende Größe.","Ergebnisse werden lokal gespeichert und nach Neustarts wiederverwendet, wenn Preset und Rendering-Kontext unverändert sind. Fortschritt und aktuelle FPS erscheinen hier; Zurück bricht ab und stellt Preset und Größe wieder her."]},
+          {"ref":"preset_pack.cancel","title":"Abbrechen","lines":["Beendet den laufenden Download oder Preset-Test.","Beim Abbrechen eines Tests werden das vorherige Preset und die Rendergröße wiederhergestellt."]}
         ]
       }
     ],

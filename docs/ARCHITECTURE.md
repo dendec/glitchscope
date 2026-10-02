@@ -15,6 +15,7 @@
 | Analog-stick response | `internal/input.StickDrive` | left-stick list scroll, right-stick seek |
 | Playback queue | `internal/app` playback state | player commands, overlay snapshot |
 | Удаление файлов | `internal/app/delete_service.go` | confirmation UI, rescan |
+| Preset collections | `internal/presets` | app download coordination, Presets UI, projectM texture paths |
 | Favorites | `internal/player` (`favorites.go`) | overlay navigation, input actions, JSON storage |
 | Outbound Go HTTP transport and policy | `internal/util` | catalogs, connectivity probe, Radio Browser and ICY metadata |
 | Remote catalogs | `internal/modland`, `internal/modarchive` | provider navigation and downloads |
@@ -85,6 +86,17 @@ Content` считается ошибкой. Прямые module entries расп
 или `deflate`; вложенные однотрековые ZIP после этого извлекаются локально.
 Виртуальный track path хранит имя entry во fragment внешнего URL, а итоговый
 cache path по-прежнему определяет только `internal/player.Resolver`.
+
+**Технический долг: формат GSA.** GSA — собственный контейнер проекта, который
+сейчас используется, в частности, для снапшотов ModArchive и shuffle-индексов.
+Стоит отдельно оценить полный отказ от него в пользу распространённого
+формата. JSON с gzip-сжатием подходит как кандидат для структурированных
+индексов; для больших наборов с требованием ленивого чтения и произвольного
+доступа нужно сравнить его с другими стандартными форматами (например, ZIP или
+SQLite). BSON тоже можно оценить, но формат не следует выбирать заранее. При
+миграции сохранить ограниченное потребление памяти, атомарную замену кэшей и
+восстановление/пересоздание производных данных; до выбора формата измерить
+размер, время запуска и стоимость случайного чтения на целевых устройствах.
 
 Для будущего lazy shuffle `internal/catalog` содержит только provider-neutral
 типы ключей, listing values, fingerprints и bounded directory cache. Провайдеры
@@ -187,11 +199,31 @@ Adaptive использует целевую частоту как единст�
 Повышение resolution требует нижнего порога; неудачная
 проба откатывается и блокируется до нового пресета. Снижение требует секунды
 устойчивого отставания, восстановление — 3 секунды. Между изменениями собираются
-свежие измерения. Новый или неизвестный пресет сохраняет текущую эффективную
-ступень; известный может выбрать только такую же или более низкую ступень из
-session cache. Повышение выполняется последующими измерениями adaptive policy.
+свежие измерения. Совместимый известный пресет восстанавливает последнюю
+подтверждённую ступень и границу неудачной пробы из profile cache; неизвестный
+проверяется на минимальной ступени. Если минимум укладывается в бюджет,
+сначала проверяется верхний допустимый предел; если он не проходит, приложение
+ищет максимальную допустимую ступень бинарным поиском по дискретной сетке.
+Пограничный провал подтверждается отдельным окном; явный провал, где медиана
+трёх кадров превышает 100 мс и двойной бюджет целевой частоты, подтверждать
+повторно не нужно. Поиск заканчивается на
+границе между лучшей подтверждённой и первой плохой ступенью. После калибровки
+обычная adaptive policy продолжает отслеживать нагрузку.
 Выбранная пользователем частота кадров всегда сохраняется.
-Измерения перехода не попадают в policy. Взаимодействие с UI не сбрасывает
+Измерения перехода не попадают в policy. Новый неизвестный обычный пресет при
+`Adaptive=true` начинает на минимальной ступени и проходит отдельную проверку
+производительности без плавного перехода, чтобы не измерять смешивание двух
+пресетов. Для обычной проверки первые пять кадров пропускаются; медиана
+последующих трёх кадров выше 50 мс (ниже 20 FPS) должна сохраняться 500 мс,
+прежде чем пресет помечается heavy. Для крайне медленного рендера медиана трёх
+кадров не ниже 100 мс позволяет принять решение сразу, не ожидая прогрев и
+подтверждение по времени. Медиана отсекает одиночные фризы; длинный интервал
+между кадрами не сбрасывает пробу, если сам предыдущий кадр был медленным.
+При успешной проверке adaptive быстро калибрует resolution бинарным поиском, сохраняя
+ограничения по целевой cadence. Heavy-пресеты скрыты из списка и пропускаются
+при ручной и случайной навигации; если проверка завершилась во время показа,
+приложение жёстко переключается на следующий доступный пресет. При выключенном
+Adaptive эта проверка не выполняется. Взаимодействие с UI не сбрасывает уже
 изученную чувствительность пресета к resolution.
 
 Удержание клавиши или крестовины навигации рассчитывает шаги по монотонному
@@ -240,10 +272,13 @@ cadence (средний интервал больше 110% назначенно�
 
 ## Проверки перед изменением
 
-Портативный архив `dist/presets.gsa` содержит только пресеты из benchmark CSV
-с результатом не ниже 20 FPS. Перед упаковкой Makefile проверяет его индекс;
-устаревший архив пересобирается, поэтому уже существующий файл не обходит
-фильтрацию.
+Preset collections are optional user downloads stored as ZIP files in
+`presets/`. The preset store reads `.milk` entries lazily from those ZIPs and
+from local loose files; only each installed collection's `Textures/` subtree is
+extracted to `.texture-cache/<collection-id>` because projectM uses filesystem
+search paths. Desktop and PortMaster release packaging excludes collection ZIPs,
+texture caches, and the legacy preset/texture GSA archives. ModArchive snapshot
+GSA files remain independent assets under `.cache/modarchive/`.
 
 ```text
 make test
@@ -304,14 +339,32 @@ up to its 25 FPS preview cap, and reuses the UI-owned 120 ms selection delay bef
 its shader. Resize preserves pending selections. The instance remains allocated
 until shutdown to avoid repeated driver initialization when reopening the page.
 
-App owns a bounded, session-only cache of 256 preset profiles, separated by name,
-frame rate, resolved target FPS, adaptive toggle and drawable size, and validated
-against the loaded preset's SHA-256 digest.
+App owns a bounded cache of up to 30,000 preset profiles, separated by name,
+frame rate, resolved target FPS, adaptive toggle, drawable size and resolution
+ceiling, and validated against both the preset's SHA-256 digest and its source
+fingerprint. The cache is
+stored atomically in `preset-profiles.json` beside `settings.json`; profile
+changes stay in memory during playback and one snapshot is written at shutdown.
+This avoids repeated storage writes while still preserving completed results
+between runs. The 30,000-entry bound covers every preset in a downloadable
+collection. The preset collection's Test action skips
+presets with a completed compatible profile and resumes incomplete tests; after
+every preset has a completed profile, the Test action stays hidden across
+restarts. Untested presets render from the minimum resolution: sustained
+performance below 20 FPS marks it heavy; otherwise the configured ceiling is tested first and,
+if it fails, the remaining discrete resolution interval is searched by binary
+search. Resolution probes use six frames normally and shorten to three when
+frame cost or cadence is already over budget. Borderline failures require an
+independent confirmation window; a median frame cost above 100 ms and twice the
+target frame budget is immediately treated as a failed probe. The best passing step is stored in the cache. Testing
+does not depend on the user's adaptive-resolution setting.
 Thirty consecutive stable visualization frames establish a reusable resolution.
 Soft-cut frames do not count. Automatic skipping of a preset that remains too
 heavy at the minimum resolution is temporarily disabled; reaching the minimum
-resolution only leaves the visualizer at that quality. Profiles never
-survive a process restart, so device/driver updates cannot reuse old measurements.
+resolution only leaves the visualizer at that quality. Profiles are local
+derived data and are isolated by rendering context and preset contents, so
+changed device dimensions, cadence, settings or preset data cannot reuse an
+incompatible measurement.
 
 UI shader attribute/uniform locations are queried at link time and released with
 their program. GL calls remain in the binding/rendering modules.

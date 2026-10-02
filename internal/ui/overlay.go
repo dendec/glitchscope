@@ -45,6 +45,33 @@ const (
 	PageHelp
 )
 
+// PresetPackAction is a user command issued from the preset collection tree.
+type PresetPackAction int
+
+const (
+	PresetPackInstall PresetPackAction = iota
+	PresetPackRemove
+	PresetPackCancel
+	PresetPackTest
+)
+
+// PresetPackItem is the UI projection of one downloadable collection.
+type PresetPackItem struct {
+	ID            string
+	Name          string
+	Installed     bool
+	Downloading   bool
+	Busy          bool
+	ProgressRead  int64
+	ProgressTotal int64
+	Testing       bool
+	Tested        bool
+	TestProgress  int
+	TestTotal     int
+	TestFPS       int
+	Error         string
+}
+
 type HelpTopicID int
 
 const (
@@ -68,6 +95,7 @@ type HelpTopic struct {
 }
 
 type HelpEntry struct {
+	Ref      string `json:"ref,omitempty"`
 	Title    string
 	Lines    []string
 	Children []HelpEntry `json:"children,omitempty"`
@@ -203,11 +231,16 @@ type Overlay struct {
 	helpVisibleRows     int
 
 	presetTreeRoot             []presetNode
+	presetTreeKeys             []string
 	presetNav                  presetNavigation
 	presetMeta                 presetMetaProvider
 	presetPreviewReq           func(key string)
 	presetPreviewTex           func(key string) (tex uint32, w, h int, ok bool)
 	presetPreviewFPS           func() float64
+	presetPacks                []PresetPackItem
+	presetPackAction           func(id string, action PresetPackAction)
+	presetPackRemoveConfirm    bool
+	presetPackActionCursor     int
 	presetPreviewDue           time.Time
 	presetDetailKey            string
 	radioFaviconReq            func(station radio.Station) bool

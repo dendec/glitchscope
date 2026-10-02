@@ -561,7 +561,16 @@ func (o *Overlay) pointerScrollStep(panel, direction, winW, winH int) {
 		o.focusPanel = panel
 		o.markPointerFocusDirty()
 	}
-	if o.uiPage == PagePresets && panel != 0 {
+	if o.uiPage == PagePresets && panel == 1 {
+		if item := o.selectedPresetPack(); item != nil {
+			count := o.presetPackActionCount(*item)
+			if next := o.presetPackActionCursor + direction; next >= 0 && next < count {
+				o.presetPackRemoveConfirm = false
+				o.presetPackActionCursor = next
+				o.focusPanel = 1
+				o.presetsDetailDirty = true
+			}
+		}
 		return
 	}
 	visible := o.pointerVisibleRows(winW, winH)
@@ -691,6 +700,9 @@ func (o *Overlay) pointerScrollbars(winW, winH int) []pointerScrollbar {
 			total := len(cur.nodes) + boolToInt(len(o.presetNav.stack) > 1)
 			add(0, leftX, float32(l.panelY), float32(l.panelH), total, visible, cur.scroll)
 		}
+		if item := o.selectedPresetPack(); item != nil {
+			add(1, rightX, float32(l.panelY), float32(l.panelH), o.presetPackActionCount(*item), visible, 0)
+		}
 	case PageHelp:
 		leftScroll := o.helpView.EntryTop
 		if o.helpView.InGrandChildren {
@@ -805,6 +817,8 @@ func pointerScrollbarTotal(o *Overlay, panel int) int {
 			if cur := o.presetNav.current(); cur != nil {
 				return len(cur.nodes) + boolToInt(len(o.presetNav.stack) > 1)
 			}
+		} else if item := o.selectedPresetPack(); item != nil {
+			return o.presetPackActionCount(*item)
 		}
 	case PageHelp:
 		if panel == 0 {
@@ -959,11 +973,29 @@ func (o *Overlay) setPointerCursor(target pointerTarget) {
 			}
 		}
 	case PagePresets:
+		if target.panel == 1 {
+			if item := o.selectedPresetPack(); item != nil && target.index >= 0 && target.index < o.presetPackActionCount(*item) {
+				if target.index != o.presetPackActionCursor {
+					o.presetPackRemoveConfirm = false
+				}
+				o.presetPackActionCursor = target.index
+				o.presetsDetailDirty = true
+			}
+			break
+		}
 		cur := o.presetNav.current()
 		if cur != nil && target.index >= 0 && target.index < len(cur.nodes)+boolToInt(len(o.presetNav.stack) > 1) {
+			previous := o.presetNav.Selected()
 			cur.cursor = target.index
 			o.presetCursorDirty = true
-			o.schedulePreviewForSelected(time.Now())
+			o.presetPackRemoveConfirm = false
+			selected := o.presetNav.Selected()
+			if (previous != nil && previous.packID != "") || (selected != nil && selected.packID != "") {
+				o.presetsDetailDirty = true
+				o.settlePresetSelection()
+			} else {
+				o.schedulePreviewForSelected(time.Now())
+			}
 		}
 	case PageHelp:
 		if target.panel == 0 {
@@ -1128,6 +1160,9 @@ func (o *Overlay) rowPointerTargets(l overlayLayout) []pointerTargetRect {
 		if cur := o.presetNav.current(); cur != nil {
 			addRows(0, 0, len(cur.nodes)+boolToInt(len(o.presetNav.stack) > 1), cur.scroll)
 		}
+		if item := o.selectedPresetPack(); item != nil {
+			addRows(1, 0, o.presetPackActionCount(*item), 0)
+		}
 	case PageHelp:
 		count := o.helpLeftCount()
 		scroll := o.helpView.EntryTop
@@ -1207,6 +1242,9 @@ func (o *Overlay) pointerActionTargets(l overlayLayout) []pointerTargetRect {
 }
 
 func (o *Overlay) pointerSetPage(page UIPage) {
+	if o.uiPage == PagePresets && o.presetPackTestRunning() {
+		return
+	}
 	if page == o.uiPage {
 		return
 	}

@@ -280,6 +280,11 @@ func (h *Handle) SetTextureSearchPaths(paths []string) {
 	C.projectm_set_texture_search_paths(h.p, &cPaths[0], C.size_t(len(paths)))
 }
 
+// ResetTextures refreshes projectM's texture list after search paths change.
+func (h *Handle) ResetTextures() {
+	C.projectm_reset_textures(h.p)
+}
+
 // BindFeedbackFramebuffer binds the internal image consumed by the next frame.
 func (h *Handle) BindFeedbackFramebuffer() {
 	C.projectm_opengl_bind_feedback_framebuffer(h.p)

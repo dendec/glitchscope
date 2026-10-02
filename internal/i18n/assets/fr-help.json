@@ -9,6 +9,7 @@
       "**Profitez du visualiseur**",
       "Fermez le menu une fois la lecture commencée.",
       "Utilisez les préréglages pour choisir un style visuel et les paramètres pour équilibrer la qualité, la vitesse et l’autonomie de la batterie.",
+      "Dans Presets, sélectionnez une collection disponible pour la télécharger ; les collections téléchargées restent disponibles hors ligne.",
       "",
       "Le pied de page affiche toujours les actions disponibles pour la sélection actuelle."
     ],
@@ -134,7 +135,25 @@
           "Pausez sur un préréglage pour en voir l’avant‑première.",
           "{select} le sélectionne ; il est appliqué dès que vous quittez la page.",
           "Les paramètres de basculement automatique contrôlent les changements automatiques.",
-          "Les résolutions réussies sont mémorisées pendant l’exécution en cours."
+          "Les résultats de résolution sont enregistrés localement et réutilisés après redémarrage si le preset et le contexte de rendu sont inchangés."
+        ]
+      },
+      {
+        "title": "Vérification automatique des performances",
+        "lines": [
+          "Lorsque la résolution adaptative est activée, un nouveau preset est d’abord testé avec la plus petite taille de rendu.",
+          "Si les performances restent sous 20 FPS, le preset est marqué comme lourd et exclu de la sélection normale ; les blocages brefs sont ignorés.",
+          "S’il réussit, la limite de résolution choisie est testée en premier ; en cas d’échec, une recherche dichotomique trouve la meilleure taille valide.",
+          "Lorsque l’adaptation est désactivée, la lecture conserve la taille choisie et n’effectue pas cette vérification automatique."
+        ]
+      },
+      {
+        "title": "Collections de presets",
+        "children": [
+          {"ref":"preset_pack.download","title":"Télécharger","lines":["Télécharge et installe le ZIP de la collection dans le dossier des presets.","Les presets sont lus depuis l’archive ; les textures nécessaires sont extraites automatiquement."]},
+          {"ref":"preset_pack.remove","title":"Supprimer","lines":["Supprime le ZIP de la collection et son cache de textures extraites.","Vous pourrez télécharger la collection à nouveau plus tard."]},
+          {"ref":"preset_pack.test","title":"Tester","lines":["Mesure tous les presets, cherche leur meilleure résolution et marque comme lourds ceux qui restent lents.","Le test fonctionne avec l’adaptation activée ou non et ne modifie pas la résolution enregistrée.","Chaque preset commence à la plus petite taille de rendu. Sous 20 FPS de façon durable, il est marqué comme lourd ; les à-coups brefs ne comptent pas.","Sinon, la limite de résolution choisie est testée en premier. Si elle échoue, une recherche dichotomique trouve la meilleure taille valide.","Les résultats sont enregistrés localement et réutilisés après redémarrage si le preset et le contexte de rendu sont inchangés. La progression et les FPS s’affichent ici ; Retour annule et restaure le preset et la taille précédents."]},
+          {"ref":"preset_pack.cancel","title":"Annuler","lines":["Arrête le téléchargement ou le test de presets en cours.","L’annulation d’un test restaure le preset et la taille de rendu précédents."]}
         ]
       }
     ],

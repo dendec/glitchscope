@@ -61,7 +61,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	if rebuildList {
 		var leftRows []listRow
 		for i := cur.scroll; i < leftEnd; i++ {
-			isCursor := i == cur.cursor && o.panelEntered
+			isCursor := i == cur.cursor && o.panelFocused(0)
 			var line string
 			if hasParent && i == 0 {
 				line = ".."
@@ -70,7 +70,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 				if hasParent {
 					nodeIdx--
 				}
-				line = nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
+				line = o.nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
 			}
 			leftRows = append(leftRows, listRow{text: line, active: isCursor})
 		}
@@ -78,7 +78,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	}
 
 	// Marquee for focused node name.
-	if o.panelEntered && cur.cursor >= cur.scroll && cur.cursor < leftEnd {
+	if o.panelFocused(0) && cur.cursor >= cur.scroll && cur.cursor < leftEnd {
 		var name string
 		if hasParent && cur.cursor == 0 {
 			name = ".."
@@ -87,7 +87,7 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 			if hasParent {
 				nodeIdx--
 			}
-			name = nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
+			name = o.nodeDisplayLine(&cur.nodes[nodeIdx], o.presetName)
 		}
 		o.rebuildMarqueeLine(&o.marqueeL, name, maxTextPx, false)
 	} else {
@@ -95,10 +95,14 @@ func (o *Overlay) renderPresetsPanels(winW, winH, viewW, viewH int, panelW, pane
 	}
 
 	if rebuildDetail {
-		// Right panel — metadata text for the last settled selection.
+		// Right panel — collection actions or preset metadata.
 		rightRows := o.buildPresetDetailRows()
 		o.rebuildListRows(&o.presetsColR, rightRows, maxTextPx, panelW)
-		o.marqueeR.invalidate(o)
+		if item := o.selectedPresetPack(); item != nil && o.panelFocused(1) && o.presetPackActionCursor < o.presetPackActionCount(*item) && o.presetPackActionCursor < len(rightRows) {
+			o.rebuildMarqueeLine(&o.marqueeR, rightRows[o.presetPackActionCursor].text, maxTextPx, false)
+		} else {
+			o.marqueeR.invalidate(o)
+		}
 		o.presetsRightRows = len(rightRows)
 	}
 
@@ -132,17 +136,26 @@ func (o *Overlay) drawPresetsTextures(winW, winH, viewW, viewH int, panelW, pane
 		leftCursor = cur.cursor
 		leftScroll = cur.scroll
 	}
-	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelEntered,
+	drawListColumn(o, lx, ly, colW, colH, o.presetsColL, o.panelFocused(0),
 		leftCursor, leftScroll, lh, winW, winH, viewW, viewH)
 	drawScrollbar(o, lx+colW-sbW, ly, colH, leftTotal, maxRows, leftScroll, winW, winH, viewW, viewH)
-	if o.panelEntered && leftTotal > 0 {
+	if o.panelFocused(0) && leftTotal > 0 {
 		rowY := ly + float32((leftCursor-leftScroll)*lh) - float32(textPadding(o.fontSize))
 		o.drawMarqueeCol(&o.marqueeL, lx, ly, textW, colH, lh, rowY, winW, winH, viewW, viewH)
 	}
+	if item := o.selectedPresetPack(); item != nil && o.panelFocused(1) && o.presetPackActionCursor < o.presetPackActionCount(*item) {
+		rowY := ry + float32(o.presetPackActionCursor*lh) - float32(textPadding(o.fontSize))
+		o.drawMarqueeCol(&o.marqueeR, rx, ry, textW, colH, lh, rowY, winW, winH, viewW, viewH)
+	}
 
-	// Right panel — metadata text.
-	drawListColumn(o, rx, ry, colW, colH, o.presetsColR, false,
-		0, 0, lh, winW, winH, viewW, viewH)
+	// Right panel — collection actions are selectable; metadata remains read-only.
+	rightCursor := 0
+	if item := o.selectedPresetPack(); item != nil {
+		rightCursor = o.presetPackActionCursor
+	}
+	drawListColumn(o, rx, ry, colW, colH, o.presetsColR,
+		o.panelFocused(1) && o.selectedPresetPack() != nil,
+		rightCursor, 0, lh, winW, winH, viewW, viewH)
 
 	// Thumbnail below text, centered in remaining space.
 	if o.presetPreviewTex == nil || nRightRows == 0 {

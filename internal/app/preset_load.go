@@ -26,16 +26,16 @@ type presetLoadResult struct {
 	commitDuration time.Duration
 }
 
-// requestPresetLoad replaces any older request. The worker only reads the
-// archive; all native preparation stays on the main GL thread.
-func (a *App) requestPresetLoad(name string) {
+// requestPresetLoadWithTransition replaces any older request. The worker only
+// reads the archive; all native preparation stays on the main GL thread.
+func (a *App) requestPresetLoadWithTransition(name string, smooth bool) {
 	if name == "" {
 		return
 	}
 
 	requestID := a.presetRequestID.Add(1)
 	a.presetSwitch.Store(false)
-	slog.Info("preset telemetry", "phase", "begin", "request_id", requestID, "preset", name, "smooth_transition", true)
+	slog.Debug("preset telemetry", "phase", "begin", "request_id", requestID, "preset", name, "smooth_transition", smooth)
 	if a.presetLoadCancel != nil {
 		a.presetLoadCancel()
 		a.presetLoadCancel = nil
@@ -65,7 +65,7 @@ func (a *App) requestPresetLoad(name string) {
 			requestID:    requestID,
 			name:         name,
 			data:         data,
-			smooth:       true,
+			smooth:       smooth,
 			readStarted:  started,
 			readFinished: time.Now(),
 			err:          err,
@@ -78,6 +78,20 @@ func (a *App) requestPresetLoad(name string) {
 		case <-ctx.Done():
 		}
 	}()
+}
+
+func (a *App) cancelPresetLoad() {
+	a.presetRequestID.Add(1)
+	if a.presetLoadCancel != nil {
+		a.presetLoadCancel()
+		a.presetLoadCancel = nil
+	}
+	if a.pm != nil {
+		a.pm.CancelPresetLoad()
+	}
+	a.presetLoadData = nil
+	a.presetLoadInFlight = false
+	a.presetLoadFrames = 0
 }
 
 // pollPresetLoad advances the worker/native pipeline once per main-loop
@@ -113,13 +127,13 @@ resultDrained:
 			a.finishPresetLoadFailure(latest, context.Canceled)
 			return
 		}
-		slog.Info("preset telemetry",
+		slog.Debug("preset telemetry",
 			"phase", "cpu_prepare",
 			"request_id", latest.requestID,
 			"preset", latest.name,
 			"bytes", len(latest.data),
 			"read_us", latest.readFinished.Sub(latest.readStarted).Microseconds())
-		slog.Info("preset telemetry", "phase", "gl_prepare_begin", "request_id", latest.requestID,
+		slog.Debug("preset telemetry", "phase", "gl_prepare_begin", "request_id", latest.requestID,
 			"preset", latest.name, "parallel_shader_compile", projectm.ParallelShaderCompile(),
 			"shader_compile_mode", projectm.ShaderCompileMode())
 		latest.beginStarted = time.Now()
@@ -133,7 +147,7 @@ resultDrained:
 		}
 		latest.beginDone = time.Now()
 		createMS, initializeMS, expressionsMS, framebuffersMS, warpShaderMS, compositeShaderMS := a.pm.PresetPrepareTimes()
-		slog.Info("preset telemetry", "phase", "gl_prepare_started", "request_id", latest.requestID, "preset", latest.name,
+		slog.Debug("preset telemetry", "phase", "gl_prepare_started", "request_id", latest.requestID, "preset", latest.name,
 			"gl_prepare_us", latest.beginDone.Sub(latest.beginStarted).Microseconds(),
 			"native_create_ms", createMS, "native_initialize_ms", initializeMS,
 			"native_expressions_ms", expressionsMS, "native_framebuffers_ms", framebuffersMS,
@@ -148,7 +162,7 @@ resultDrained:
 
 	switch status := a.pm.PollPresetLoad(); status {
 	case projectm.PresetLoadReady:
-		slog.Info("preset telemetry",
+		slog.Debug("preset telemetry",
 			"phase", "shader_compile_completed",
 			"request_id", data.requestID,
 			"preset", data.name,
@@ -175,7 +189,16 @@ resultDrained:
 
 func (a *App) finishPresetLoadCommit(data *presetLoadResult) {
 	committedAt := time.Now()
-	a.suspendAdaptiveForPresetTransition(committedAt)
+	if a.presetPackCalibrationActive() {
+		a.adaptive.RestartForPreset()
+		a.renderCost.Reset()
+		a.adaptiveResumeAt = committedAt
+	} else {
+		a.suspendAdaptiveForPresetTransition(committedAt)
+	}
+	if !data.smooth && !a.presetPackCalibrationActive() {
+		a.adaptiveResumeAt = committedAt
+	}
 	a.presetLoadProbe = &presetLoadProbe{name: data.name, loadedAt: committedAt}
 
 	meta := presets.ParseMeta(data.data)
@@ -186,7 +209,7 @@ func (a *App) finishPresetLoadCommit(data *presetLoadResult) {
 		}
 	}
 	renderW, renderH := a.rt.Size()
-	slog.Info("preset telemetry",
+	slog.Debug("preset telemetry",
 		"phase", "commit",
 		"request_id", data.requestID,
 		"preset", data.name,
@@ -210,6 +233,9 @@ func (a *App) finishPresetLoadCommit(data *presetLoadResult) {
 	a.presetLoadData = nil
 	a.presetLoadInFlight = false
 	a.presetLoadFrames = 0
+	if state := a.presetPackTest; state != nil && state.restoring && state.restoreName == data.name {
+		a.finishPresetPackTestRestore()
+	}
 }
 
 func (a *App) finishPresetLoadFailure(data *presetLoadResult, err error) {
@@ -221,4 +247,18 @@ func (a *App) finishPresetLoadFailure(data *presetLoadResult, err error) {
 	a.presetLoadData = nil
 	a.presetLoadInFlight = false
 	a.presetLoadFrames = 0
+	if data != nil {
+		if state := a.presetPackTest; state != nil {
+			if state.restoring && state.restoreName == data.name {
+				a.loadBuiltInPreset()
+				a.adaptive = state.adaptiveBefore
+				a.applyRenderResolution(state.originalResolution)
+				a.finishPresetPackTestRestore()
+				return
+			}
+			if !state.restoring && state.current == data.name {
+				a.recordPresetPackTestFailure(data.name, err)
+			}
+		}
+	}
 }

@@ -34,16 +34,26 @@ features and other limits.
 
 ## Data and asset sources
 
-- MilkDrop presets: [projectM Cream of the Crop](https://github.com/projectM-visualizer/presets-cream-of-the-crop).
-- Preset textures: [projectM Milkdrop Texture Pack](https://github.com/projectM-visualizer/presets-milkdrop-texture-pack).
+- Optional MilkDrop preset collections are available in **Presets**:
+  [Cream of the Crop](https://www.patreon.com/file?h=91682111&i=16310421),
+  [Isosceles Mashups 2020](https://www.patreon.com/file?h=91682111&i=16310422),
+  and [Isosceles Mashups 2024](https://www.patreon.com/file?h=115453098&m=375145864).
+  Downloads are optional, initiated by the user, and stored as ZIP files under
+  `presets/`; the app reads presets in-place and extracts only the textures
+  needed by projectM. The Presets page can test an installed collection for
+  performance, excluding presets below the 20 FPS minimum and recording a
+  suitable resolution for the current session. These collections are not
+  bundled with GlitchScope.
 - Tracker and chip music catalogs: [Modland](https://modland.com/) (the build
   uses its [`allmods.zip` listing](https://modland.antarctica.no/allmods.zip))
   and [The Mod Archive](https://modarchive.org/) (the app browses the
   [module mirror](http://modarchive.textfiles.com/)).
 - Internet radio directory: [Radio Browser](https://www.radio-browser.info/).
 
-Preset and texture collections retain their upstream terms. See the
-[release checklist](docs/PORTMASTER-RELEASE.md) for their redistribution status.
+Preset authors retain their rights. The author has authorized GlitchScope to
+offer direct downloads of these collections; this does not change their terms
+or make the collections part of the GPL application. See the
+[release checklist](docs/PORTMASTER-RELEASE.md) for packaging constraints.
 
 ## Build and run
 
@@ -51,8 +61,8 @@ Preset and texture collections retain their upstream terms. See the
 
 Requirements: Git with submodule support, Docker, Make, Python 3, and an internet
 connection for the first build. Docker builds the native audio and graphics
-dependencies; the packaging step also downloads the preset, texture, and online
-catalog data it needs.
+dependencies; packaging downloads online catalog data. Select a collection in
+Presets to download it on demand.
 
 ```sh
 git clone --recurse-submodules https://github.com/dendec/glitchscope.git

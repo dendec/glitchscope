@@ -137,11 +137,13 @@ func (a *App) Run() {
 		}
 		if a.targetVisualizerFPS != fps {
 			a.setVisualizerFPS(fps)
-			if a.settings.Graphics.Adaptive && a.rt != nil {
+			if a.adaptiveTuningEnabled() && a.rt != nil {
+				a.presetProbe.Stop()
 				a.resetAdaptiveState(int(w32), int(h32))
 				a.renderCost.Reset()
 			}
-		} else if displayChanged && a.settings.Graphics.Adaptive && a.rt != nil {
+		} else if displayChanged && a.adaptiveTuningEnabled() && a.rt != nil {
+			a.presetProbe.Stop()
 			a.resetAdaptiveState(int(w32), int(h32))
 			a.renderCost.Reset()
 		}
@@ -158,6 +160,7 @@ func (a *App) Run() {
 			return
 		}
 		a.pollPresetLoad()
+		a.pollPresetPackOperation(now)
 		a.updateFramePlayback(now)
 		a.renderFrame(now, w, h)
 	}
@@ -165,7 +168,7 @@ func (a *App) Run() {
 
 func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg float64, refreshRate int32) {
 	newVisualizerFrame := state.consumeAdaptiveFrame(&a.vizClock)
-	adaptiveReady := !a.vizClock.adaptivePaused && a.renderCost.Full()
+	adaptiveReady := !a.vizClock.adaptivePaused && a.adaptiveMeasurementReady()
 	params := defaultAdaptiveParams()
 	// Use the scheduled cadence so fewer renders actually release budget.
 	utilization := a.renderCost.Utilization(a.targetVisualizerFPS)
@@ -187,6 +190,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 	winChanged := w != state.prevW || h != state.prevH
 	if winChanged {
 		a.renderCost.Reset()
+		a.presetProbe.Stop()
 		adaptiveReady = false
 	}
 	if winChanged {
@@ -195,7 +199,7 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 
 	if winChanged && state.prevW > 0 && state.prevH > 0 {
 		ceiling := config.ResolutionAtMost(config.ComputeResolutions(w, h), a.configuredResolution)
-		if !a.settings.Graphics.Adaptive {
+		if !a.adaptiveTuningEnabled() {
 			a.applyRenderResolution(ceiling)
 		} else {
 			warm := currentRenderResolution(a.rt)
@@ -211,27 +215,47 @@ func (a *App) prepareFrame(state *runState, now time.Time, w, h int, fpsAvg floa
 	}
 	state.prevW, state.prevH = w, h
 
-	if a.settings.Graphics.Adaptive && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage &&
-		adaptiveReady && newVisualizerFrame && !a.adaptiveSuspended(now) {
+	if a.adaptiveTuningEnabled() && (!a.settings.Graphics.VisualizerOff || a.presetPackCalibrationActive()) && !a.onPresetsPage &&
+		adaptiveReady && newVisualizerFrame && !a.adaptiveSuspended(now) &&
+		(!a.presetPackCalibrationActive() || !a.presetLoadInFlight) {
 		// Reconfigure the active profile after setting/window changes without
 		// reusing an incompatible measurement.
 		key := a.presetProfileKeyAt(a.currentPresetName(), w, h)
+		profileChanged := false
 		if key != a.presetTuning.active {
+			profileChanged = true
 			if data, err := presets.Read(key.name); err == nil {
-				a.presetTuning.activate(key, data)
+				a.activatePresetProfile(key.name, data)
 			} else {
 				slog.Debug("preset profile read", "error", err)
 			}
 		}
-		a.presetTuning.observe(a.adaptive.index, a.adaptive.upscaleFloor, a.adaptive.trialAction == adaptiveNone && cadence <= cadenceTolerance)
-		if resolution, action := a.adaptive.Decide(utilization, cadence, now); action != adaptiveNone {
-			a.renderCost.Reset()
-			switch action {
-			case adaptiveResample:
-				slog.Debug("adaptive: confirming resolution trial", "cadence_ratio", cadence)
-			case adaptiveResolutionDown, adaptiveResolutionUp:
-				a.applyRenderResolution(resolution)
-				slog.Info("adaptive: resolution step", "resolution", resolution, "utilization", utilization, "cadence_ratio", cadence)
+		if !profileChanged {
+			a.presetTuning.observe(a.adaptive.index, a.adaptive.upscaleFloor,
+				a.adaptive.trialAction == adaptiveNone && !a.adaptive.searchActive && cadence <= cadenceTolerance)
+			searching := a.adaptive.searchActive
+			if searching && a.presetPackCalibrationMeasuring() &&
+				a.renderCost.CalibrationSeverelyOverBudget(a.targetVisualizerFPS) {
+				a.adaptive.confirmSearchTrial()
+			}
+			if resolution, action := a.adaptive.Decide(utilization, cadence, now); action != adaptiveNone {
+				a.renderCost.Reset()
+				switch action {
+				case adaptiveResample:
+					slog.Debug("adaptive: confirming resolution trial", "cadence_ratio", cadence)
+				case adaptiveResolutionDown, adaptiveResolutionUp:
+					a.applyRenderResolution(resolution)
+					slog.Info("adaptive: resolution step", "resolution", resolution, "utilization", utilization, "cadence_ratio", cadence)
+				}
+			}
+			if searching && !a.adaptive.searchActive {
+				a.presetTuning.recordResolution(a.adaptive.index, a.adaptive.upscaleFloor)
+				slog.Info("adaptive: resolution search complete",
+					"resolution", currentRenderResolution(a.rt),
+					"upscale_floor", a.adaptive.upscaleFloor)
+				if a.presetPackCalibrationMeasuring() {
+					a.finishPresetPackTestPreset(a.currentPresetName())
+				}
 			}
 		}
 	}
@@ -308,7 +332,7 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 
 	// Apply page transitions before timers so automatic preset changes are
 	// suspended on the same frame that the Presets page opens.
-	onPresets := a.overlay != nil && a.overlay.UIVisible() && a.overlay.IsPresetsPage()
+	onPresets := a.overlay != nil && a.overlay.UIVisible() && a.overlay.IsPresetsPage() && !a.presetPackCalibrationActive()
 	if onPresets && !a.onPresetsPage {
 		a.enterPresetsPage()
 		a.vizClock.Reset()
@@ -346,12 +370,12 @@ func (a *App) handleFrameInput(state *runState, now time.Time, dt float64, w, h 
 
 func (a *App) updateFramePlayback(now time.Time) {
 	a.pollRadio()
-	if !a.settings.Graphics.VisualizerOff && !a.onPresetsPage && a.pending.name != "" && now.After(a.pending.at) {
+	if !a.presetPackCalibrationActive() && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage && a.pending.name != "" && now.After(a.pending.at) {
 		a.transitionPreset(a.pending.name)
 		a.pending = pendingPreset{}
 	}
 
-	if a.presetTicker != nil && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage {
+	if !a.presetPackCalibrationActive() && a.presetTicker != nil && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage {
 		select {
 		case <-a.presetTicker.C:
 			if a.presetLoadInFlight {
@@ -363,7 +387,7 @@ func (a *App) updateFramePlayback(now time.Time) {
 		}
 	}
 
-	if !a.settings.Graphics.VisualizerOff && !a.onPresetsPage && a.settings.PresetInterval == config.PresetAuto && a.presetSwitch.Swap(false) {
+	if !a.presetPackCalibrationActive() && !a.settings.Graphics.VisualizerOff && !a.onPresetsPage && a.settings.PresetInterval == config.PresetAuto && a.presetSwitch.Swap(false) {
 		if a.presetLoadInFlight {
 			a.presetSwitch.Store(true)
 		} else {
@@ -425,7 +449,8 @@ func (a *App) updateFramePlayback(now time.Time) {
 func (a *App) renderFrame(now time.Time, w, h int) {
 	a.trackCacheOnce.Do(a.startTrackCacheCleanup)
 	uiVisible := a.overlay != nil && a.overlay.UIVisible()
-	uiOpaque := uiVisible && a.settings.UI.Transparency == 0
+	testingPack := a.presetPackCalibrationActive()
+	uiOpaque := uiVisible && a.settings.UI.Transparency == 0 && !testingPack
 	uiInteracting := uiVisible && a.overlay != nil && a.overlay.InteractionActive(now)
 	if a.overlay != nil {
 		if a.trackCacheReady.Swap(false) {
@@ -441,10 +466,11 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 			a.presentRequested = true
 		}
 	}
-	paused := uiVisible || a.settings.Graphics.VisualizerOff || a.onPresetsPage
+	paused := (uiVisible && !testingPack) || (a.settings.Graphics.VisualizerOff && !testingPack) || a.onPresetsPage
 	if paused != a.vizClock.adaptivePaused {
 		a.resetAdaptiveCounters()
 		a.renderCost.Reset()
+		a.presetProbe.resetWindow()
 		a.adaptive.policy.Restart()
 	}
 	// Service time belongs to UI/playback orchestration, not the visualizer.
@@ -482,7 +508,17 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 	presented := time.Now()
 	if rendered && !a.onPresetsPage {
 		if !paused && !a.adaptiveSuspended(presented) {
+			frameWork := renderCost + presentationCost
 			a.renderCost.AddFrame(renderCost, presentationCost, presented)
+			if a.adaptiveTuningEnabled() {
+				if a.presetLoadInFlight {
+					a.presetProbe.resetWindow()
+				} else {
+					a.observePresetProbe(frameWork, presented)
+				}
+			} else {
+				a.presetProbe.Stop()
+			}
 		}
 		if frameWork := renderCost + presentationCost; frameWork >= 100*time.Millisecond {
 			renderW, renderH := a.rt.Size()
@@ -496,6 +532,81 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 				"adaptive_paused", paused || a.adaptiveSuspended(presented))
 		}
 	}
+}
+
+func (a *App) observePresetProbe(frameWork time.Duration, now time.Time) {
+	switch a.presetProbe.Observe(frameWork, now) {
+	case presetProbePassed:
+		a.presetTuning.markScreened()
+		a.adaptive.policy.params = defaultAdaptiveParams()
+		a.adaptive.policy.params.upshiftAfter = presetFastUpshiftAfter
+		a.adaptive.policy.Restart()
+		if a.presetPackCalibrationMeasuring() && !a.adaptiveMeasurementReady() {
+			a.presetProbe.Start()
+			return
+		}
+		searchStarted := false
+		if a.adaptiveMeasurementReady() {
+			resolution, action := a.adaptive.startResolutionSearch(
+				a.renderCost.Utilization(a.targetVisualizerFPS),
+				a.renderCost.Cadence(a.targetVisualizerFPS),
+			)
+			if action != adaptiveNone {
+				searchStarted = true
+				a.renderCost.Reset()
+				a.applyRenderResolution(resolution)
+				slog.Info("adaptive: resolution search probe", "resolution", resolution)
+			} else {
+				a.presetTuning.recordResolution(a.adaptive.index, a.adaptive.upscaleFloor)
+			}
+		} else {
+			a.presetTuning.recordResolution(a.adaptive.index, a.adaptive.upscaleFloor)
+		}
+		if a.presetPackCalibrationMeasuring() && !searchStarted {
+			a.finishPresetPackTestPreset(a.currentPresetName())
+		}
+		slog.Info("preset performance probe passed",
+			"preset", a.currentPresetName(),
+			"minimum_fps", time.Second.Seconds()/heavyPresetFrameBudget.Seconds(),
+			"resolution", currentRenderResolution(a.rt))
+	case presetProbeHeavy:
+		name := a.currentPresetName()
+		a.presetTuning.markHeavy()
+		a.refreshPresetTree()
+		slog.Warn("preset excluded for low performance",
+			"preset", name,
+			"max_fps", time.Second.Seconds()/heavyPresetFrameBudget.Seconds(),
+			"resolution", currentRenderResolution(a.rt))
+		if a.presetPackCalibrationMeasuring() {
+			a.finishPresetPackTestPreset(name)
+			return
+		}
+		if !a.loadPresetHard(a.presetIdx + 1) {
+			a.loadBuiltInPreset()
+		}
+	}
+}
+
+func (a *App) loadBuiltInPreset() {
+	if a.pm != nil {
+		a.pm.LoadPresetData(string(presets.DefaultPreset()), false)
+	}
+	a.presetIdx = -1
+	a.presetTuning.active.name = ""
+	a.presetProbe.Stop()
+	a.presetLoadProbe = nil
+	a.adaptive.policy.params = defaultAdaptiveParams()
+	a.adaptive.RestartForPreset()
+	if len(a.adaptive.resolutions) > 0 {
+		a.adaptive.index = a.adaptive.ceilingIndex
+		a.applyRenderResolution(a.adaptive.resolutions[a.adaptive.index])
+	}
+	a.suspendAdaptiveForPresetTransition(time.Now())
+	a.adaptiveResumeAt = time.Now()
+	if a.overlay != nil {
+		a.overlay.SetPresetName("")
+	}
+	slog.Warn("no playable presets remain; using built-in preset")
 }
 
 func (a *App) renderVisualization(now time.Time, w, h int, opaque, interacting bool, budget *interactionBudget) bool {
@@ -520,7 +631,7 @@ func (a *App) renderVisualization(now time.Time, w, h int, opaque, interacting b
 		tW, tH := ui.PresetPreviewSize(w, h)
 		a.preview.Resize(tW, tH)
 	}
-	if a.settings.Graphics.VisualizerOff || opaque ||
+	if (a.settings.Graphics.VisualizerOff && !a.presetPackCalibrationActive()) || opaque ||
 		!budget.Due(now, a.vizClock.framePeriod, interacting) ||
 		!a.vizClock.Due(now) {
 		return false
@@ -529,6 +640,7 @@ func (a *App) renderVisualization(now time.Time, w, h int, opaque, interacting b
 	renderStarted := time.Now()
 	a.pm.RenderFrame()
 	renderFinished := time.Now()
+	a.recordPresetPackRender(renderFinished.Sub(renderStarted))
 	captureStarted := renderFinished
 	a.rt.Capture()
 	captureFinished := time.Now()
@@ -541,7 +653,7 @@ func (a *App) renderVisualization(now time.Time, w, h int, opaque, interacting b
 }
 
 func (a *App) presentFrame(now time.Time, w, h int, rendered, uiVisible, uiOpaque bool) time.Duration {
-	audioOnly := a.settings.Graphics.VisualizerOff && !a.onPresetsPage
+	audioOnly := a.settings.Graphics.VisualizerOff && !a.onPresetsPage && !a.presetPackCalibrationActive()
 	due := presentationDue(a.settings.Graphics.FrameRate, now, a.nextPresent, rendered, a.presentRequested, uiVisible)
 	if audioOnly {
 		due = a.presentRequested || !now.Before(a.nextPresent)
@@ -595,7 +707,7 @@ func (a *App) recordPresetRender(renderStarted, renderFinished, captureStarted, 
 		return
 	}
 	p.renderSamples++
-	slog.Info("preset telemetry",
+	slog.Debug("preset telemetry",
 		"phase", "render",
 		"preset", p.name,
 		"sample", p.renderSamples,
@@ -611,7 +723,7 @@ func (a *App) recordPresetPresentation(presentStarted time.Time, presentDuration
 		return
 	}
 	p.presentSamples++
-	slog.Info("preset telemetry",
+	slog.Debug("preset telemetry",
 		"phase", "present",
 		"preset", p.name,
 		"sample", p.presentSamples,
@@ -650,10 +762,12 @@ func (a *App) enterPresetsPage() {
 func (a *App) leavePresetsPage() {
 	a.onPresetsPage = false
 	if a.pm != nil {
-		a.pm.SetHardCutEnabled(!a.settings.Graphics.VisualizerOff && a.settings.PresetInterval == config.PresetAuto)
+		a.pm.SetHardCutEnabled(!a.presetPackCalibrationActive() && !a.settings.Graphics.VisualizerOff && a.settings.PresetInterval == config.PresetAuto)
 	}
 	a.presetSwitch.Store(false)
-	a.startPresetTicker()
+	if !a.presetPackCalibrationActive() {
+		a.startPresetTicker()
+	}
 
 	selected := a.selectedPreset
 	a.selectedPreset = ""
@@ -689,6 +803,9 @@ func (a *App) playNextTrack(track trackRef) {
 }
 
 func (a *App) startPresetTicker() {
+	if a.presetPackCalibrationActive() {
+		return
+	}
 	interval := a.settings.PresetInterval
 	if interval <= config.PresetOff {
 		return

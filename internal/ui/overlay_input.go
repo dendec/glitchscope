@@ -293,8 +293,11 @@ func (o *Overlay) CloseUI() {
 	slog.Debug("ui visibility", "visible", false)
 }
 
-// NextScreen cycles Library → Presets → Settings → Help → Library.
+// NextScreen cycles through the top-level pages in header order.
 func (o *Overlay) NextScreen() {
+	if o.uiPage == PagePresets && o.presetPackTestRunning() {
+		return
+	}
 	o.markInteraction()
 	o.pointerScroll = [2]bool{}
 	o.focusPanel = 0
@@ -317,8 +320,11 @@ func (o *Overlay) NextScreen() {
 	o.markAllDirty()
 }
 
-// PrevScreen cycles Library → Help → Settings → Presets → Library.
+// PrevScreen cycles through the top-level pages in reverse header order.
 func (o *Overlay) PrevScreen() {
+	if o.uiPage == PagePresets && o.presetPackTestRunning() {
+		return
+	}
 	o.markInteraction()
 	o.pointerScroll = [2]bool{}
 	o.focusPanel = 0
@@ -415,6 +421,19 @@ func (o *Overlay) moveCursor(dir int) {
 		return
 	}
 	if o.uiPage == PagePresets {
+		if o.focusPanel == 1 {
+			if item := o.selectedPresetPack(); item != nil {
+				if count := o.presetPackActionCount(*item); count > 0 {
+					if next := o.presetPackActionCursor + dir; next >= 0 && next < count {
+						o.presetPackRemoveConfirm = false
+						o.presetPackActionCursor = next
+						o.presetsDetailDirty = true
+					}
+				}
+				return
+			}
+			o.focusPanel = 0
+		}
 		cur := o.presetNav.current()
 		if cur != nil {
 			total := len(cur.nodes)
@@ -422,9 +441,17 @@ func (o *Overlay) moveCursor(dir int) {
 				total++ // ".." entry
 			}
 			if next := cur.cursor + dir; next >= 0 && next < total {
+				previous := o.presetNav.Selected()
 				cur.cursor = next
 				o.presetCursorDirty = true
-				o.schedulePreviewForSelected(time.Now())
+				o.presetPackRemoveConfirm = false
+				selected := o.presetNav.Selected()
+				if (previous != nil && previous.packID != "") || (selected != nil && selected.packID != "") {
+					o.presetsDetailDirty = true
+					o.settlePresetSelection()
+				} else {
+					o.schedulePreviewForSelected(time.Now())
+				}
 			}
 		}
 		return
@@ -586,9 +613,18 @@ func (o *Overlay) FocusLeft() {
 			o.settingsDirty = true
 		}
 	case PagePresets:
+		if o.focusPanel == 1 {
+			o.focusPanel = 0
+			o.presetPackRemoveConfirm = false
+			o.presetsDirty = true
+			o.presetsDetailDirty = true
+			return
+		}
 		if o.presetNav.Collapse() {
+			o.presetPackRemoveConfirm = false
 			o.presetsDirty = true
 			o.breadcrumbDirty = true
+			o.settlePresetSelection()
 		}
 	default: // Library
 		if o.isNC() {
@@ -643,7 +679,16 @@ func (o *Overlay) FocusRight() {
 		}
 	case PagePresets:
 		node := o.presetNav.Selected()
-		if node != nil && !node.isLeaf {
+		if node != nil && node.packID != "" {
+			if o.focusPanel != 1 {
+				o.presetPackRemoveConfirm = false
+				o.focusPanel = 1
+				o.presetPackActionCursor = 0
+				o.clampPresetPackActionCursor()
+				o.presetsDirty = true
+				o.presetsDetailDirty = true
+			}
+		} else if node != nil && !node.isLeaf {
 			o.presetNav.Expand(node)
 			o.presetsDirty = true
 			o.breadcrumbDirty = true
@@ -651,8 +696,10 @@ func (o *Overlay) FocusRight() {
 		} else if node == nil && len(o.presetNav.stack) > 1 {
 			// ".." entry — collapse.
 			o.presetNav.Collapse()
+			o.presetPackRemoveConfirm = false
 			o.presetsDirty = true
 			o.breadcrumbDirty = true
+			o.settlePresetSelection()
 		}
 	default: // Library
 		if o.isNC() {
@@ -751,6 +798,15 @@ func (o *Overlay) Select() bool {
 	}
 
 	if o.uiPage == PagePresets {
+		if o.focusPanel == 1 {
+			if item := o.selectedPresetPack(); item != nil {
+				if o.presetPackActionCursor < o.presetPackActionCount(*item) {
+					o.activatePresetPackAction()
+					o.presetsDetailDirty = true
+				}
+				return false
+			}
+		}
 		if !o.panelEntered {
 			o.panelEntered = true
 			o.presetsDirty = true
@@ -763,8 +819,10 @@ func (o *Overlay) Select() bool {
 		// ".." entry at position 0 when not at root.
 		if len(o.presetNav.stack) > 1 && cur.cursor == 0 {
 			o.presetNav.Collapse()
+			o.presetPackRemoveConfirm = false
 			o.presetsDirty = true
 			o.breadcrumbDirty = true
+			o.settlePresetSelection()
 			return false
 		}
 		node := o.presetNav.Selected()
@@ -913,6 +971,9 @@ func (o *Overlay) Select() bool {
 
 func (o *Overlay) Back() {
 	o.markInteraction()
+	if o.cancelPresetPackTestOnBack() {
+		return
+	}
 	if o.uiPage == PageHelp {
 		if o.panelEntered && o.focusPanel == 1 {
 			o.focusPanel = 0
@@ -967,10 +1028,22 @@ func (o *Overlay) Back() {
 	}
 
 	if o.uiPage == PagePresets {
+		if o.presetPackRemoveConfirm {
+			o.presetPackRemoveConfirm = false
+			o.presetsDetailDirty = true
+			return
+		}
+		if o.focusPanel == 1 {
+			o.focusPanel = 0
+			o.presetsDirty = true
+			o.presetsDetailDirty = true
+			return
+		}
 		if o.panelEntered {
 			if o.presetNav.Collapse() {
 				o.presetsDirty = true
 				o.breadcrumbDirty = true
+				o.settlePresetSelection()
 				return
 			}
 			o.panelEntered = false
@@ -1012,6 +1085,10 @@ func (o *Overlay) Back() {
 func (o *Overlay) TrackCursor() int { return o.trackCursor }
 
 func (o *Overlay) FocusPanel() int { return o.focusPanel }
+
+func (o *Overlay) panelFocused(panel int) bool {
+	return o.panelEntered && o.focusPanel == panel
+}
 
 // RestorePointerFocus reapplies the panel selected by the pointer after an
 // app-level action has run. Some actions reuse keyboard navigation and may

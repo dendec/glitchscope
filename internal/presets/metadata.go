@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 var samplerRE = regexp.MustCompile(`(?i)\bsampler\s+sampler_([a-z0-9_]+)\b`)
@@ -33,29 +34,47 @@ type PresetMeta struct {
 	Textures      int     // count of unique external texture names
 }
 
-// metaCache stores parsed metadata keyed by preset key.
-// Populated lazily by ReadMeta; invalidated on store reload.
-var metaCache = make(map[string]PresetMeta)
+var (
+	metaCacheMu         sync.Mutex
+	metaCache           = make(map[string]PresetMeta)
+	metaCacheGeneration uint64
+)
 
 // ReadMeta returns cached metadata for key, parsing on first access.
-// Safe to call from any goroutine (cache is populated once per key,
-// never mutated after; map reads are safe when no concurrent writes).
+// Safe to call from any goroutine and avoids caching results from a store that
+// was replaced while the preset was being read.
 func ReadMeta(key string) PresetMeta {
-	if m, ok := metaCache[key]; ok {
-		return m
+	metaCacheMu.Lock()
+	if cached, ok := metaCache[key]; ok {
+		metaCacheMu.Unlock()
+		return cached
 	}
+	generation := metaCacheGeneration
+	metaCacheMu.Unlock()
+
 	data, err := Read(key)
 	if err != nil {
 		return PresetMeta{}
 	}
-	m := ParseMeta(data)
-	metaCache[key] = m
-	return m
+	parsed := ParseMeta(data)
+
+	metaCacheMu.Lock()
+	defer metaCacheMu.Unlock()
+	if cached, ok := metaCache[key]; ok {
+		return cached
+	}
+	if generation == metaCacheGeneration {
+		metaCache[key] = parsed
+	}
+	return parsed
 }
 
 // InvalidateMetaCache clears the metadata cache (call on store reload).
 func InvalidateMetaCache() {
+	metaCacheMu.Lock()
 	metaCache = make(map[string]PresetMeta)
+	metaCacheGeneration++
+	metaCacheMu.Unlock()
 }
 
 // ParseMeta extracts metadata from .milk preset content.

@@ -486,6 +486,25 @@ func TestCatalogInfoFocusLeftScrollsBeforeChangingPanel(t *testing.T) {
 	}
 }
 
+func TestPanelFocusedIsExclusive(t *testing.T) {
+	o := &Overlay{panelEntered: true, focusPanel: 1}
+	if o.panelFocused(0) {
+		t.Fatal("left panel reported focused while focus is on the right")
+	}
+	if !o.panelFocused(1) {
+		t.Fatal("right panel did not report focused")
+	}
+	o.focusPanel = 0
+	if !o.panelFocused(0) || o.panelFocused(1) {
+		t.Fatal("left panel focus was not exclusive")
+	}
+
+	o.panelEntered = false
+	if o.panelFocused(0) || o.panelFocused(1) {
+		t.Fatal("a panel reported focused before panel interaction began")
+	}
+}
+
 func TestNCInfoFocusMovesToActionsAtScrollEnd(t *testing.T) {
 	o := &Overlay{
 		panelEntered:  true,

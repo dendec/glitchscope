@@ -1,107 +1,186 @@
-// Package presets loads .milk preset files from presets.gsa and presets/ dir.
+// Package presets indexes MilkDrop presets from downloaded ZIP packs and local files.
 package presets
 
 import (
+	"archive/zip"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/dendec/glitchscope/internal/archive"
+	"sync"
 )
 
+const maxPresetBytes = 32 << 20
+
 type entry struct {
-	name    string
-	dataOff int64 // offset in .gsa, -1 = filesystem
+	filesystem bool
+	file       *zip.File
 }
 
 type presetStore struct {
-	dir     string
-	gsaFile *archive.Archive
-	entries map[string]entry
-	names   []string
+	dir      string
+	archives []*zip.ReadCloser
+	entries  map[string]entry
+	names    []string
 }
 
-var store *presetStore
+var (
+	storeMu sync.RWMutex
+	store   *presetStore
+)
 
-// Open loads presets from dir/presets.gsa and scans dir/*.milk + dir/*/*.milk.
-// User .milk files override same-named entries from presets.gsa.
+// Open replaces the active index with installed ZIP packs and loose .milk files.
+// Presets are read lazily from their source archive; no .milk files are extracted.
 func Open(dir string) error {
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
+	s, err := loadStore(dir)
+	if err != nil {
 		return err
 	}
 
-	s := &presetStore{
-		dir:     dir,
-		entries: make(map[string]entry),
-	}
-
-	// Load presets.gsa if present.
-	gsaPath := filepath.Join(dir, "presets.gsa")
-	if a, err := archive.Open(gsaPath, 100000); err == nil {
-		s.gsaFile = a
-		s.loadGSA()
-	}
-
-	// Scan user .milk files (override same names from presets.gsa).
-	s.scanUser()
-
-	// Build sorted names list.
-	s.names = make([]string, 0, len(s.entries))
-	for n := range s.entries {
-		s.names = append(s.names, n)
-	}
-	sort.Strings(s.names)
-
+	storeMu.Lock()
+	previous := store
 	store = s
+	InvalidateMetaCache()
+	if previous != nil {
+		previous.close()
+	}
+	storeMu.Unlock()
 	return nil
 }
 
-func (s *presetStore) loadGSA() {
-	for _, item := range s.gsaFile.Entries() {
-		s.entries[item.Name] = entry{name: item.Name, dataOff: 0}
+func loadStore(dir string) (*presetStore, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create preset directory: %w", err)
 	}
+
+	s := &presetStore{dir: dir, entries: make(map[string]entry)}
+	for _, pack := range AvailablePacks() {
+		archivePath := filepath.Join(dir, pack.Filename)
+		zr, err := zip.OpenReader(archivePath)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			slog.Warn("preset pack open failed", "pack", pack.ID, "error", err)
+			continue
+		}
+		if err := validatePackReader(&zr.Reader); err != nil {
+			_ = zr.Close()
+			slog.Warn("preset pack invalid", "pack", pack.ID, "error", err)
+			continue
+		}
+		s.archives = append(s.archives, zr)
+		s.indexPack(pack, zr)
+	}
+	if err := s.scanUser(); err != nil {
+		s.close()
+		return nil, fmt.Errorf("scan preset directory: %w", err)
+	}
+	s.names = make([]string, 0, len(s.entries))
+	for name := range s.entries {
+		s.names = append(s.names, name)
+	}
+	sort.Strings(s.names)
+
+	return s, nil
 }
 
-func (s *presetStore) scanUser() {
-	entries, err := os.ReadDir(s.dir)
-	if err != nil {
-		return
+// Close releases ZIP handles and clears the active index.
+func Close() {
+	storeMu.Lock()
+	if store != nil {
+		store.close()
+		store = nil
 	}
+	InvalidateMetaCache()
+	storeMu.Unlock()
+}
 
-	for _, e := range entries {
-		if e.IsDir() {
-			// Level 2: dir/subdir/*.milk
-			sub, err := os.ReadDir(filepath.Join(s.dir, e.Name()))
-			if err != nil {
-				continue
-			}
-			for _, se := range sub {
-				if !se.IsDir() && strings.HasSuffix(se.Name(), ".milk") {
-					key := e.Name() + "/" + se.Name()
-					s.entries[key] = entry{name: key, dataOff: -1}
-				}
-			}
-		} else if strings.HasSuffix(e.Name(), ".milk") {
-			// Level 1: dir/*.milk
-			key := e.Name()
-			s.entries[key] = entry{name: key, dataOff: -1}
+func (s *presetStore) close() {
+	for _, archive := range s.archives {
+		if err := archive.Close(); err != nil {
+			slog.Debug("preset pack close failed", "error", err)
 		}
 	}
 }
 
+func (s *presetStore) indexPack(pack Pack, archive *zip.ReadCloser) {
+	for _, file := range archive.File {
+		if file.FileInfo().IsDir() || !regularZipFile(file) || file.UncompressedSize64 > maxPresetBytes || !strings.EqualFold(filepath.Ext(file.Name), ".milk") {
+			continue
+		}
+		name, ok := packPresetKey(pack, file.Name)
+		if !ok {
+			continue
+		}
+		if _, exists := s.entries[name]; exists {
+			continue
+		}
+		s.entries[name] = entry{file: file}
+	}
+}
+
+func packPresetKey(pack Pack, archiveName string) (string, bool) {
+	name, safe := safeZipName(archiveName)
+	if !safe {
+		return "", false
+	}
+	parts := strings.Split(name, "/")
+	if len(parts) < 2 || !strings.EqualFold(parts[0], "Presets") {
+		return "", false
+	}
+	if strings.EqualFold(filepath.Ext(name), ".milk") {
+		if len(parts) > 2 && pack.RedundantPresetRoot != "" && parts[1] == pack.RedundantPresetRoot {
+			parts = append(parts[:1], parts[2:]...)
+		}
+		return pack.Name + "/" + strings.Join(parts[1:], "/"), true
+	}
+	return "", false
+}
+
+func (s *presetStore) scanUser() error {
+	return filepath.WalkDir(s.dir, func(filePath string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if filePath != s.dir && (strings.HasPrefix(d.Name(), ".") || d.Type()&os.ModeSymlink != 0) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Type()&os.ModeSymlink != 0 || !strings.EqualFold(filepath.Ext(d.Name()), ".milk") {
+			return nil
+		}
+		relative, err := filepath.Rel(s.dir, filePath)
+		if err != nil {
+			return err
+		}
+		key := filepath.ToSlash(relative)
+		if _, exists := s.entries[key]; !exists {
+			s.entries[key] = entry{filesystem: true}
+		}
+		return nil
+	})
+}
+
 // Names returns sorted preset keys.
 func Names() []string {
+	storeMu.RLock()
+	defer storeMu.RUnlock()
 	if store == nil {
 		return nil
 	}
-	return store.names
+	return append([]string(nil), store.names...)
 }
 
 // Read returns decompressed preset bytes for the given key.
-// User .milk files take priority over presets.gsa entries.
 func Read(key string) ([]byte, error) {
+	storeMu.RLock()
+	defer storeMu.RUnlock()
 	if store == nil {
 		return nil, fmt.Errorf("presets not loaded")
 	}
@@ -109,13 +188,45 @@ func Read(key string) ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("preset %q not found", key)
 	}
-
-	if e.dataOff < 0 {
-		return os.ReadFile(filepath.Join(store.dir, key))
+	if e.filesystem {
+		return os.ReadFile(filepath.Join(store.dir, filepath.FromSlash(key)))
 	}
+	r, err := e.file.Open()
+	if err != nil {
+		return nil, fmt.Errorf("open preset %q in ZIP: %w", key, err)
+	}
+	defer r.Close()
+	data, err := io.ReadAll(io.LimitReader(r, maxPresetBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read preset %q in ZIP: %w", key, err)
+	}
+	if len(data) > maxPresetBytes {
+		return nil, fmt.Errorf("preset %q exceeds %d bytes", key, maxPresetBytes)
+	}
+	return data, nil
+}
 
-	// Read from presets.gsa archive.
-	return store.gsaFile.Read(key)
+// SourceFingerprint returns a cheap identity for the preset bytes currently
+// indexed by the store. ZIP entries use their central-directory checksum;
+// loose files use size and modification time.
+func SourceFingerprint(key string) (string, error) {
+	storeMu.RLock()
+	defer storeMu.RUnlock()
+	if store == nil {
+		return "", fmt.Errorf("presets not loaded")
+	}
+	e, ok := store.entries[key]
+	if !ok {
+		return "", fmt.Errorf("preset %q not found", key)
+	}
+	if e.file != nil {
+		return fmt.Sprintf("zip:%s:%08x:%d", e.file.Name, e.file.CRC32, e.file.UncompressedSize64), nil
+	}
+	info, err := os.Stat(filepath.Join(store.dir, filepath.FromSlash(key)))
+	if err != nil {
+		return "", fmt.Errorf("stat preset %q: %w", key, err)
+	}
+	return fmt.Sprintf("file:%d:%d", info.Size(), info.ModTime().UnixNano()), nil
 }
 
 // categoryOf returns the category a preset key belongs to.
@@ -133,6 +244,8 @@ func categoryOf(name string) string {
 
 // Categories returns sorted category names from subdirectory structure.
 func Categories() []string {
+	storeMu.RLock()
+	defer storeMu.RUnlock()
 	if store == nil {
 		return nil
 	}
@@ -150,6 +263,8 @@ func Categories() []string {
 
 // PresetsInCategory returns sorted preset keys belonging to cat.
 func PresetsInCategory(cat string) []string {
+	storeMu.RLock()
+	defer storeMu.RUnlock()
 	if store == nil {
 		return nil
 	}
@@ -160,6 +275,17 @@ func PresetsInCategory(cat string) []string {
 		}
 	}
 	return out
+}
+
+// IsTransition reports whether a preset is under a transition-marked folder or
+// has a transition-marked filename.
+func IsTransition(name string) bool {
+	for _, part := range strings.Split(name, "/") {
+		if strings.HasPrefix(part, "!") {
+			return true
+		}
+	}
+	return false
 }
 
 // DefaultPreset returns a minimal built-in preset.

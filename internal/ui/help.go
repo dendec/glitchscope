@@ -116,6 +116,27 @@ func (o *Overlay) effectiveHelpTopics() []HelpTopic {
 
 func (o *Overlay) helpTopicCount() int { return len(o.effectiveHelpTopics()) }
 
+func (o *Overlay) helpDescription(ref string) string {
+	var find func([]HelpEntry) string
+	find = func(entries []HelpEntry) string {
+		for _, entry := range entries {
+			if entry.Ref == ref && len(entry.Lines) > 0 {
+				return entry.Lines[0]
+			}
+			if description := find(entry.Children); description != "" {
+				return description
+			}
+		}
+		return ""
+	}
+	for _, topic := range o.effectiveHelpTopics() {
+		if description := find(topic.Children); description != "" {
+			return description
+		}
+	}
+	return ""
+}
+
 func helpMenuTitle(title string, hasSubmenu bool) string {
 	if hasSubmenu {
 		return title + "/"

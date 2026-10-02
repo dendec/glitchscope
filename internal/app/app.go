@@ -13,11 +13,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/dendec/glitchscope/internal/archive"
 	"github.com/dendec/glitchscope/internal/catalog"
 	"github.com/dendec/glitchscope/internal/config"
 	"github.com/dendec/glitchscope/internal/filesystem"
@@ -74,17 +74,18 @@ type App struct {
 	settings          *config.Settings
 	settingsPath      string
 	textureDir        string
-	texturesOnce      sync.Once // ensures textures are extracted at most once
+	texturePaths      []string
 	connectivityWg    sync.WaitGroup
 	connectivity      *connectivityCache
 	trackCacheWg      sync.WaitGroup
 	trackCacheOnce    sync.Once
 	shuffleWg         sync.WaitGroup // tracks background shuffle build goroutine
 	presetLoadWg      sync.WaitGroup
+	presetPackWg      sync.WaitGroup
 	shaderCompiler    *shaderCompiler
 	presetNames       []string
 	presetIdx         int
-	presetCats        []string // all preset keys for presets page tree
+	presetCats        []string // visible preset keys for presets page tree
 	transitionPresets []string // "!"-prefixed presets for smooth transitions
 
 	startupFile string
@@ -96,6 +97,7 @@ type App struct {
 	adaptive             resolutionState
 	configuredResolution config.RenderResolution
 	presetTuning         presetTuning
+	presetProbe          presetPerformanceProbe
 	presetLoadProbe      *presetLoadProbe
 	presentRequested     bool
 	nextPresent          time.Time
@@ -117,6 +119,14 @@ type App struct {
 	presetLoadData     *presetLoadResult
 	presetLoadInFlight bool
 	presetLoadFrames   int
+	presetPackCancel   context.CancelFunc
+	presetPackResults  chan presetPackResult
+	presetPackID       string
+	presetPackItems    []ui.PresetPackItem
+	presetPackRead     atomic.Int64
+	presetPackTotal    atomic.Int64
+	presetPackLastUI   time.Time
+	presetPackTest     *presetPackTestState
 
 	pending           pendingPreset // pending preset name + scheduled load time
 	adaptiveResumeAt  time.Time
@@ -295,10 +305,10 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 		slog.Warn("resolution list empty at startup", "window", fmt.Sprintf("%dx%d", int(w), int(h)))
 	}
 	var renderW, renderH int
+	a.adaptive.Reset(int(w), int(h), a.configuredResolution, defaultAdaptiveParams())
 	if !gs.Graphics.Adaptive || len(resolutions) == 0 {
 		renderW, renderH = a.configuredResolution.Width, a.configuredResolution.Height
 	} else {
-		a.adaptive.Reset(int(w), int(h), a.configuredResolution, defaultAdaptiveParams())
 		renderW, renderH = a.adaptive.resolutions[a.adaptive.index].Width, a.adaptive.resolutions[a.adaptive.index].Height
 	}
 	gs.Graphics.RenderWidth, gs.Graphics.RenderHeight = a.configuredResolution.Width, a.configuredResolution.Height
@@ -324,6 +334,8 @@ func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
 	if err := presets.Open(presetDirPath()); err != nil {
 		slog.Warn("presets dir not found", "error", err)
 	}
+	a.presetProfileCacheLoaded(presetProfileCachePath(a.settingsPath))
+	a.presetTuning.active = a.presetProfileKey("")
 	a.presetNames = presets.Names()
 
 	return a, nil
@@ -337,6 +349,9 @@ func (a *App) Close() {
 	if a.appCancel != nil {
 		a.appCancel()
 	}
+	if a.presetPackCancel != nil {
+		a.presetPackCancel()
+	}
 	if a.presetLoadCancel != nil {
 		a.presetLoadCancel()
 	}
@@ -348,6 +363,9 @@ func (a *App) Close() {
 	}
 	a.shuffleWg.Wait()
 	a.presetLoadWg.Wait()
+	a.presetPackWg.Wait()
+	a.savePresetProfileCache(presetProfileCachePath(a.settingsPath))
+	presets.Close()
 	a.shaderCompiler.Close()
 	a.connectivityWg.Wait()
 	a.trackCacheWg.Wait()
@@ -464,6 +482,10 @@ func (a *App) testSignal() []float32 {
 
 func (a *App) Init() {
 	a.initAudio()
+	if a.overlay != nil {
+		a.overlay.SetPresetPackAction(a.handlePresetPackAction)
+		a.refreshPresetPackItems()
+	}
 	// TrackCache must exist before the background shuffle indexes are built so
 	// the offline projection can reconcile existing cached files atomically.
 	a.trackCache = player.NewTrackCache(baseDir())
@@ -1046,66 +1068,36 @@ func (a *App) initInput() {
 }
 
 func (a *App) initPreset() {
+	a.refreshPresetCatalog(false)
 	if len(a.presetNames) == 0 {
 		a.pm.LoadPresetData(string(presets.DefaultPreset()), false)
 		slog.Warn("no external presets, using minimal built-in")
-		return
-	}
-
-	// Cache transition presets ("!" prefix).
-	for _, n := range a.presetNames {
-		if n[0] == '!' {
-			a.transitionPresets = append(a.transitionPresets, n)
+	} else {
+		name := a.currentPresetName()
+		d, err := presets.Read(name)
+		if err != nil {
+			slog.Warn("preset read error", "name", name, "error", err)
+			a.pm.LoadPresetData(string(presets.DefaultPreset()), false)
+		} else {
+			a.pm.LoadPresetData(string(d), false)
+			a.activatePresetProfile(name, d)
+			slog.Info("preset loaded", "name", name, "count", len(a.presetNames))
 		}
 	}
-
-	// Pick a random non-transition preset for startup.
-	var normals []string
-	for _, n := range a.presetNames {
-		if n[0] != '!' {
-			normals = append(normals, n)
-		}
-	}
-	if len(normals) == 0 {
-		normals = a.presetNames
-	}
-	normIdx := rand.Intn(len(normals))
-	for i, n := range a.presetNames {
-		if n == normals[normIdx] {
-			a.presetIdx = i
-			break
-		}
-	}
-	d, err := presets.Read(a.presetNames[a.presetIdx])
-	if err != nil {
-		slog.Warn("preset read error", "name", a.presetNames[a.presetIdx], "error", err)
-		a.pm.LoadPresetData(string(presets.DefaultPreset()), false)
-		return
-	}
-	a.pm.LoadPresetData(string(d), false)
-	a.activatePresetProfile(a.presetNames[a.presetIdx], d)
 	if a.overlay != nil {
-		a.overlay.SetPresetName(a.presetNames[a.presetIdx])
-	}
-	slog.Info("preset loaded", "name", a.presetNames[a.presetIdx], "count", len(a.presetNames))
-
-	// Build tree for presets page. Static for the process lifetime,
-	// so push once here rather than every frame.
-	a.presetCats = presets.Names()
-	if a.overlay != nil {
-		a.overlay.SetPresetTree(a.presetCats)
+		a.overlay.SetPresetName(a.currentPresetName())
 		a.overlay.SetPresetMetaProvider(presets.ReadMeta)
 		a.overlay.SetPresetPreviewRequest(func(key string) {
 			if a.preview == nil {
 				a.preview = newPreviewRenderer()
 				a.preview.SetFPS(a.targetVisualizerFPS)
+				a.preview.SetTextureSearchPaths(a.texturePaths)
 			}
 			data, err := presets.Read(key)
 			if err != nil {
 				slog.Debug("preview read preset", "key", key, "error", err)
 				return
 			}
-			slog.Debug("preview: read data", "key", key, "bytes", len(data))
 			a.preview.Enqueue(key, string(data))
 		})
 		a.overlay.SetPresetPreviewTex(func(key string) (uint32, int, int, bool) {
@@ -1127,35 +1119,113 @@ func (a *App) initPreset() {
 	}
 }
 
-// ensureTextures extracts the texture archive exactly once, on first call.
-// Subsequent calls are no-ops. This is safe to call from any goroutine
-// thanks to sync.Once, but the caller must ensure the GL context is current
-// if pm.SetTextureSearchPaths needs it (it doesn't — it just stores paths).
+func (a *App) refreshPresetCatalog(preserveCurrent bool) {
+	current := a.currentPresetName()
+	a.presetNames = presets.Names()
+	if a.selectedPreset != "" && !slices.Contains(a.presetNames, a.selectedPreset) {
+		a.selectedPreset = ""
+	}
+	if a.pending.name != "" && !slices.Contains(a.presetNames, a.pending.name) {
+		a.pending = pendingPreset{}
+	}
+	a.refreshPresetTree()
+	a.transitionPresets = a.transitionPresets[:0]
+	var eligible, normals []string
+	for _, name := range a.presetNames {
+		if a.presetHeavy(name) {
+			continue
+		}
+		eligible = append(eligible, name)
+		if presets.IsTransition(name) {
+			a.transitionPresets = append(a.transitionPresets, name)
+		} else {
+			normals = append(normals, name)
+		}
+	}
+	if len(normals) == 0 {
+		normals = eligible
+	}
+	if preserveCurrent {
+		for index, name := range a.presetNames {
+			if name == current {
+				a.presetIdx = index
+				if a.overlay != nil {
+					a.overlay.SetPresetTree(a.presetCats)
+				}
+				return
+			}
+		}
+	}
+	a.presetIdx = 0
+	if len(normals) > 0 {
+		selected := normals[rand.Intn(len(normals))]
+		for index, name := range a.presetNames {
+			if name == selected {
+				a.presetIdx = index
+				break
+			}
+		}
+	}
+	if a.overlay != nil {
+		a.overlay.SetPresetTree(a.presetCats)
+	}
+	if preserveCurrent {
+		if len(a.presetNames) > 0 {
+			a.transitionPreset(a.presetNames[a.presetIdx])
+		} else {
+			a.cancelPresetLoad()
+			a.presetSwitch.Store(false)
+			if a.pm != nil {
+				a.pm.LoadPresetData(string(presets.DefaultPreset()), false)
+				a.activatePresetProfile("", presets.DefaultPreset())
+			}
+			if a.overlay != nil {
+				a.overlay.SetPresetName("")
+			}
+		}
+	}
+}
+
+// ensureTextures extracts the small texture subsets required by installed packs.
 func (a *App) ensureTextures(pm *projectm.Handle) {
-	a.texturesOnce.Do(func() {
-		t := time.Now()
-		extractedDir, extractErr := os.MkdirTemp("", "glitchscope-textures-")
-		if extractErr != nil {
-			slog.Warn("texture temporary directory creation failed", "error", extractErr)
+	t := time.Now()
+	if a.textureDir == "" {
+		extractedDir, err := os.MkdirTemp("", "glitchscope-textures-")
+		if err != nil {
+			slog.Warn("texture temporary directory creation failed", "error", err)
 			return
 		}
 		a.textureDir = extractedDir
-		textureArchive, archiveErr := archive.Open(filepath.Join(presetDirPath(), "textures.gsa"), 10000)
-		if archiveErr == nil {
-			_, extractErr = textureArchive.Extract(extractedDir)
-			_ = textureArchive.Close()
-			if extractErr != nil {
-				slog.Warn("texture archive extract failed", "error", extractErr)
-			}
-		} else if !os.IsNotExist(archiveErr) {
-			slog.Warn("texture archive open failed", "error", archiveErr)
+		if err := copyPresetTextures(presetDirPath(), extractedDir); err != nil {
+			slog.Warn("preset texture copy failed", "error", err)
 		}
-		if copyErr := copyPresetTextures(presetDirPath(), extractedDir); copyErr != nil {
-			slog.Warn("preset texture copy failed", "error", copyErr)
+	}
+	paths := []string{a.textureDir}
+	for _, status := range presets.PackStatuses(presetDirPath()) {
+		if !status.Installed {
+			continue
 		}
-		pm.SetTextureSearchPaths([]string{extractedDir})
-		slog.Info("textures extracted", "ms", time.Since(t).Milliseconds())
-	})
+		texturePath, err := presets.EnsureTextureCache(status.Pack.ID, presetDirPath())
+		if err != nil {
+			slog.Warn("preset texture cache unavailable", "pack", status.Pack.ID, "error", err)
+			continue
+		}
+		paths = append(paths, texturePath)
+	}
+	if !slices.Equal(paths, a.texturePaths) {
+		pm.SetTextureSearchPaths(paths)
+		pm.ResetTextures()
+		a.texturePaths = paths
+		if a.preview != nil {
+			a.preview.SetTextureSearchPaths(paths)
+		}
+		slog.Info("texture search paths updated", "count", len(paths), "ms", time.Since(t).Milliseconds())
+	} else {
+		pm.ResetTextures()
+		if a.preview != nil {
+			a.preview.ResetTextures()
+		}
+	}
 }
 
 func baseDir() string {
@@ -1187,10 +1257,16 @@ func copyPresetTextures(sourceDir, targetDir string) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || !entry.Type().IsRegular() {
+		if entry.IsDir() {
+			if path != sourceDir && strings.HasPrefix(entry.Name(), ".") {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		ext := filepath.Ext(entry.Name())
+		if !entry.Type().IsRegular() {
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
 		switch ext {
 		case ".jpg", ".jpeg", ".png", ".dds", ".tga", ".bmp", ".dib":
 		default:

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ type presetNode struct {
 	name     string       // display name (category dir or .milk basename without ext)
 	key      string       // full preset key (empty for directories)
 	children []presetNode // subcategories + presets (sorted; immutable after build)
+	packID   string       // downloadable collection root
 	isLeaf   bool         // true = .milk file, false = directory
 }
 
@@ -144,9 +146,18 @@ func sortedTreeNodes(m map[string]*treeEntry) []presetNode {
 			dirs = append(dirs, *e.node)
 		}
 	}
-	sort.Slice(dirs, func(i, j int) bool { return dirs[i].name < dirs[j].name })
-	sort.Slice(files, func(i, j int) bool { return files[i].name < files[j].name })
-	return append(dirs, files...)
+	dirs = append(dirs, files...)
+	sortPresetNodes(dirs)
+	return dirs
+}
+
+func sortPresetNodes(nodes []presetNode) {
+	sort.Slice(nodes, func(i, j int) bool {
+		if nodes[i].isLeaf != nodes[j].isLeaf {
+			return !nodes[i].isLeaf
+		}
+		return nodes[i].name < nodes[j].name
+	})
 }
 
 // presetMetaProvider returns metadata for a preset key.
@@ -218,20 +229,16 @@ func (o *Overlay) PresetPreviewFPS() float64 {
 	return 0
 }
 
-// SetPresetTree updates the preset tree and resets navigation to root.
+// SetPresetTree updates the preset tree while retaining the selected collection.
 // Only marks dirty if the tree actually changed.
 func (o *Overlay) SetPresetTree(keys []string) {
-	tree := buildPresetTree(keys)
+	selectedPackID := o.selectedPresetPackID()
+	o.presetTreeKeys = slices.Clone(keys)
+	tree := o.buildPresetTree()
 	if presetTreeEqual(o.presetTreeRoot, tree) {
 		return
 	}
-	o.presetTreeRoot = tree
-	o.presetNav = presetNavigation{
-		stack: []presetNavLevel{{nodes: tree}},
-	}
-	o.syncPresetTree()
-	o.presetsDirty = true
-	o.breadcrumbDirty = true
+	o.replacePresetTree(tree, selectedPackID)
 }
 
 func presetTreeEqual(a, b []presetNode) bool {
@@ -239,7 +246,7 @@ func presetTreeEqual(a, b []presetNode) bool {
 		return false
 	}
 	for i := range a {
-		if a[i].name != b[i].name || a[i].key != b[i].key || a[i].isLeaf != b[i].isLeaf {
+		if a[i].name != b[i].name || a[i].key != b[i].key || a[i].packID != b[i].packID || a[i].isLeaf != b[i].isLeaf {
 			return false
 		}
 		if !presetTreeEqual(a[i].children, b[i].children) {
@@ -247,6 +254,57 @@ func presetTreeEqual(a, b []presetNode) bool {
 		}
 	}
 	return true
+}
+
+func (o *Overlay) buildPresetTree() []presetNode {
+	tree := buildPresetTree(o.presetTreeKeys)
+	for _, item := range o.presetPacks {
+		rootIndex := -1
+		for i := range tree {
+			if !tree[i].isLeaf && tree[i].name == item.Name {
+				rootIndex = i
+				break
+			}
+		}
+		if rootIndex < 0 {
+			tree = append(tree, presetNode{name: item.Name, children: []presetNode{}})
+			rootIndex = len(tree) - 1
+		}
+		root := &tree[rootIndex]
+		root.packID = item.ID
+	}
+	sortPresetNodes(tree)
+	return tree
+}
+
+func (o *Overlay) replacePresetTree(tree []presetNode, selectedPackID string) {
+	o.presetTreeRoot = tree
+	o.presetNav = presetNavigation{stack: []presetNavLevel{{nodes: tree}}}
+	if selectedPackID == "" || !o.selectPresetPackRoot(selectedPackID) {
+		o.syncPresetTree()
+	}
+	o.presetsDirty = true
+	o.presetsDetailDirty = true
+	o.breadcrumbDirty = true
+	o.settlePresetSelection()
+}
+
+func (o *Overlay) selectedPresetPackID() string {
+	node := o.presetNav.Selected()
+	if node == nil {
+		return ""
+	}
+	return node.packID
+}
+
+func (o *Overlay) selectPresetPackRoot(id string) bool {
+	for i := range o.presetTreeRoot {
+		if o.presetTreeRoot[i].packID == id {
+			o.presetNav.stack[0].cursor = i
+			return true
+		}
+	}
+	return false
 }
 
 // SelectedPresetKey returns the full key of the selected preset, or "".
@@ -313,7 +371,14 @@ func (o *Overlay) syncPresetTree() {
 
 // nodeDisplayLine formats a preset node for display in the left panel.
 // Leaf nodes show a playing indicator ("\u25b8 "); directories show a trailing "/".
-func nodeDisplayLine(node *presetNode, playingKey string) string {
+func (o *Overlay) nodeDisplayLine(node *presetNode, playingKey string) string {
+	if node.packID != "" {
+		line := node.name + "/"
+		if status := o.presetPackStatusByID(node.packID); status != "" {
+			line += " [" + status + "]"
+		}
+		return line
+	}
 	if node.isLeaf {
 		prefix := "  "
 		if node.key == playingKey {
@@ -327,6 +392,11 @@ func nodeDisplayLine(node *presetNode, playingKey string) string {
 // buildPresetDetailRows returns the text lines for the right panel detail.
 // Returns nil when the selected node is a directory or has no metadata.
 func (o *Overlay) buildPresetDetailRows() []listRow {
+	if node := o.presetNav.Selected(); node != nil {
+		if item := o.presetPackByID(node.packID); item != nil {
+			return o.presetPackActionRows(*item)
+		}
+	}
 	if o.presetDetailKey == "" || o.presetMeta == nil {
 		return nil
 	}

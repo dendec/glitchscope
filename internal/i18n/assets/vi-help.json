@@ -9,6 +9,7 @@
       "**Thưởng thức hiển thị hình ảnh**",
       "Đóng menu sau khi việc phát nhạc bắt đầu.",
       "Sử dụng Tùy chọn sẵn để chọn phong cách hiển thị và Cài đặt để cân bằng chất lượng, tốc độ và thời lượng pin.",
+      "Trong Presets, hãy chọn một bộ sưu tập khả dụng để tải xuống; các bộ đã tải vẫn dùng được khi ngoại tuyến.",
       "",
       "Phần chân trang luôn hiển thị các thao tác có sẵn cho lựa chọn hiện tại."
     ],
@@ -134,7 +135,25 @@
           "Dừng ở một mục đặt sẵn để xem trước nội dung.",
           "{select} sẽ chọn mục đó; nó sẽ được áp dụng ngay khi bạn rời khỏi trang.",
           "Cài đặt chuyển đổi tự động kiểm soát việc thay đổi mục đặt sẵn.",
-          "Các cài đặt đã được áp dụng thành công sẽ được lưu lại trong suốt lần chạy hiện tại."
+          "Kết quả kiểm tra độ phân giải được lưu cục bộ và dùng lại sau khi khởi động lại nếu preset và ngữ cảnh kết xuất không thay đổi."
+        ]
+      },
+      {
+        "title": "Kiểm tra hiệu năng tự động",
+        "lines": [
+          "Khi bật độ phân giải thích ứng, mục đặt sẵn mới sẽ được kiểm tra trước ở kích thước kết xuất nhỏ nhất.",
+          "Nếu hiệu năng duy trì dưới 20 FPS, mục đó được đánh dấu là nặng và bị loại khỏi lựa chọn thông thường; các lần khựng ngắn không được tính.",
+          "Nếu đạt, giới hạn độ phân giải đã chọn được kiểm tra trước; nếu không đạt, tìm kiếm nhị phân sẽ tìm kích thước tốt nhất đáp ứng được.",
+          "Khi tắt chế độ thích ứng, phát nhạc thông thường giữ nguyên kích thước đã chọn và không chạy kiểm tra tự động này."
+        ]
+      },
+      {
+        "title": "Bộ sưu tập mục đặt sẵn",
+        "children": [
+          {"ref":"preset_pack.download","title":"Tải xuống","lines":["Tải và cài đặt tệp ZIP của bộ sưu tập vào thư mục preset.","Preset được đọc trực tiếp từ tệp nén; kết cấu cần thiết sẽ tự động được giải nén."]},
+          {"ref":"preset_pack.remove","title":"Xóa","lines":["Xóa tệp ZIP của bộ sưu tập và bộ nhớ đệm kết cấu đã giải nén.","Bạn có thể tải lại bộ sưu tập sau."]},
+          {"ref":"preset_pack.test","title":"Kiểm tra","lines":["Đo mọi preset, tìm độ phân giải tốt nhất và đánh dấu các preset liên tục chậm là nặng.","Có thể kiểm tra khi bật hoặc tắt chế độ thích ứng; thiết lập độ phân giải đã lưu không bị thay đổi.","Mỗi preset bắt đầu ở kích thước kết xuất nhỏ nhất. Nếu duy trì dưới 20 FPS, preset sẽ bị đánh dấu nặng; hiện tượng khựng ngắn không được tính.","Nếu đạt, giới hạn độ phân giải đã chọn được thử trước. Nếu không đạt, tìm kiếm nhị phân sẽ tìm kích thước tốt nhất đáp ứng được.","Kết quả được lưu cục bộ và dùng lại sau khi khởi động lại nếu preset và ngữ cảnh kết xuất không thay đổi. Tiến độ và FPS hiện tại hiển thị tại đây; nút Quay lại sẽ hủy và khôi phục preset cùng kích thước trước đó."]},
+          {"ref":"preset_pack.cancel","title":"Hủy","lines":["Dừng lượt tải xuống hoặc kiểm tra preset hiện tại.","Khi hủy kiểm tra, preset và kích thước kết xuất trước đó sẽ được khôi phục."]}
         ]
       }
     ],

@@ -9,6 +9,7 @@
       "**Görselleştiriciyi keyfin çıkarın**",
       "Çalma işlemi başladıktan sonra menüyü kapatın.",
       "Görsel stil seçmek için Ön Ayarlar’ı, kalite, hız ve batarya ömrünü dengelemek için Ayarlar’ı kullanın.",
+      "Presets bölümünde kullanılabilir bir koleksiyon seçerek indirebilirsiniz; indirilen koleksiyonlar çevrimdışı kullanılabilir.",
       "",
       "Alt kısım her zaman mevcut seçim için kullanılabilen eylemleri gösterir."
     ],
@@ -134,7 +135,25 @@
           "Bir önceden ayarı duraklatarak ön izlemesini görün.",
           "{select} bu ayarı seçer; sayfadan ayrıldığınızda uygulanır.",
           "Önceden ayar otomatik değişimi kontrol eder.",
-          "Başarılı çözünürlükler mevcut çalışma sırasında hatırlanır."
+          "Çözünürlük sonuçları yerel olarak kaydedilir ve preset ile işleme bağlamı değişmediyse yeniden başlatma sonrasında kullanılır."
+        ]
+      },
+      {
+        "title": "Otomatik performans denetimi",
+        "lines": [
+          "Uyarlanabilir çözünürlük açıkken yeni bir ön ayar önce en küçük işleme boyutunda sınanır.",
+          "Performans sürekli 20 FPS altında kalırsa ön ayar ağır olarak işaretlenir ve normal seçimden çıkarılır; kısa takılmalar sayılmaz.",
+          "Geçerse önce seçilen çözünürlük üst sınırı denenir; başarısız olursa ikili arama çalışan en büyük boyutu bulur.",
+          "Uyarlama kapalıyken normal oynatma seçilen boyutu korur ve bu otomatik denetimi çalıştırmaz."
+        ]
+      },
+      {
+        "title": "Ön ayar koleksiyonları",
+        "children": [
+          {"ref":"preset_pack.download","title":"İndir","lines":["Koleksiyon ZIP dosyasını ön ayar klasörüne indirip kurar.","Ön ayarlar arşivden okunur; gereken dokular otomatik olarak çıkarılır."]},
+          {"ref":"preset_pack.remove","title":"Sil","lines":["Koleksiyon ZIP dosyasını ve çıkarılan doku önbelleğini siler.","Koleksiyonu daha sonra yeniden indirebilirsiniz."]},
+          {"ref":"preset_pack.test","title":"Test et","lines":["Tüm ön ayarları ölçer, en iyi çözünürlüğü bulur ve sürekli yavaş olanları ağır olarak işaretler.","Test, uyarlama açık veya kapalıyken çalışır ve kayıtlı çözünürlük ayarını değiştirmez.","Her ön ayar en küçük işleme boyutunda başlar. Sürekli 20 FPS altındaysa ağır olarak işaretlenir; kısa takılmalar sayılmaz.","Geçerse önce seçilen çözünürlük üst sınırı denenir. Başarısız olursa ikili arama çalışan en büyük boyutu bulur.","Sonuçlar yerel olarak kaydedilir ve preset ile işleme bağlamı değişmediyse yeniden başlatma sonrasında kullanılır. İlerleme ve güncel FPS burada görünür; Geri test eder ve önceki ön ayarla boyutu geri yükler."]},
+          {"ref":"preset_pack.cancel","title":"İptal","lines":["Devam eden indirmeyi veya ön ayar testini durdurur.","Test iptal edildiğinde önceki ön ayar ve işleme boyutu geri yüklenir."]}
         ]
       }
     ],

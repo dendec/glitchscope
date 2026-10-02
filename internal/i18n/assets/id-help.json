@@ -9,6 +9,7 @@
       "**Nikmati visualisernya**",
       "Tutup menu setelah pemutaran dimulai.",
       "Gunakan Preset untuk memilih gaya visual, dan Settings untuk menyeimbangkan kualitas, kecepatan, dan daya baterai.",
+      "Di Preset, pilih koleksi yang tersedia untuk mengunduhnya; koleksi yang sudah diunduh tetap dapat digunakan secara offline.",
       "",
       "Bagian kaki halaman selalu menampilkan tindakan-tindakan yang tersedia untuk pilihan saat ini."
     ],
@@ -134,7 +135,25 @@
           "Diamkan pilihan pada suatu preset untuk melihat pratinjauannya.",
           "{select} akan memilihnya; preset tersebut akan diterapkan saat Anda meninggalkan halaman.",
           "Pengaturan otomatis preset mengontrol perubahan secara otomatis.",
-          "Resolusi yang berhasil diatur akan diingat selama sesi pemutaran berlangsung."
+          "Hasil resolusi disimpan secara lokal dan digunakan kembali setelah aplikasi dimulai ulang jika preset dan konteks render tidak berubah."
+        ]
+      },
+      {
+        "title": "Pemeriksaan kinerja otomatis",
+        "lines": [
+          "Saat resolusi adaptif aktif, preset baru diuji terlebih dahulu pada ukuran render terkecil.",
+          "Jika kinerjanya terus di bawah 20 FPS, preset ditandai berat dan dikecualikan dari pilihan biasa; jeda singkat diabaikan.",
+          "Jika lolos, batas resolusi yang dipilih diuji lebih dulu. Jika gagal, pencarian biner mencari ukuran terbaik yang mampu berjalan.",
+          "Saat adaptif nonaktif, pemutaran biasa mempertahankan ukuran pilihan dan tidak menjalankan pemeriksaan otomatis ini."
+        ]
+      },
+      {
+        "title": "Koleksi preset",
+        "children": [
+          {"ref":"preset_pack.download","title":"Unduh","lines":["Mengunduh dan memasang ZIP koleksi ke folder preset.","Preset dibaca langsung dari arsip; tekstur yang diperlukan diekstrak otomatis."]},
+          {"ref":"preset_pack.remove","title":"Hapus","lines":["Menghapus ZIP koleksi dan cache tekstur yang diekstrak.","Koleksi dapat diunduh kembali nanti."]},
+          {"ref":"preset_pack.test","title":"Uji","lines":["Mengukur semua preset, mencari resolusi terbaik, dan menandai preset yang terus lambat sebagai berat.","Pengujian berfungsi saat adaptif aktif maupun nonaktif dan tidak mengubah resolusi tersimpan.","Setiap preset dimulai pada ukuran render terkecil. Jika terus di bawah 20 FPS, preset ditandai berat; jeda sesaat tidak dihitung.","Jika lolos, batas resolusi pilihan diuji lebih dahulu. Jika gagal, pencarian biner menemukan ukuran terbaik yang mampu berjalan.","Hasil disimpan secara lokal dan digunakan kembali setelah aplikasi dimulai ulang jika preset dan konteks render tidak berubah. Progres dan FPS saat ini tampil di sini; Kembali membatalkan dan memulihkan preset serta ukuran sebelumnya."]},
+          {"ref":"preset_pack.cancel","title":"Batal","lines":["Menghentikan unduhan atau pengujian preset yang sedang berlangsung.","Jika pengujian dibatalkan, preset dan ukuran render sebelumnya akan dipulihkan."]}
         ]
       }
     ],

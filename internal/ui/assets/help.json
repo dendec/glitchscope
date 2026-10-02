@@ -9,6 +9,7 @@
       "**Enjoy the visualizer**",
       "Close the menu after playback starts.",
       "Use Presets to choose a visual style and Settings to choose frame rate and resolution behavior.",
+      "In Presets, choose a collection and use the right panel to download, test, or remove it.",
       "",
       "The footer always shows the actions available for the current selection."
     ],
@@ -135,7 +136,56 @@
           "Pause on a preset to see its preview.",
           "{select} selects it; it is applied when you leave the page.",
           "Preset auto-switch controls automatic changes.",
-          "Successful resolutions are remembered during the current run."
+          "Resolution measurements are saved locally and reused after restart when the preset and rendering context are unchanged."
+        ]
+      },
+      {
+        "title": "Automatic performance check",
+        "lines": [
+          "When Adaptive is on, a new preset is checked at the smallest render size before the visualizer raises resolution.",
+          "If performance stays below 20 FPS there, the preset is marked heavy and excluded from normal selection; a brief freeze is ignored.",
+          "If it passes, the configured resolution limit is checked first, then the best passing size is found by binary search.",
+          "When Adaptive is off, normal playback keeps the selected size and does not run this automatic check."
+        ]
+      },
+      {
+        "title": "Preset collections",
+        "children": [
+          {
+            "ref": "preset_pack.download",
+            "title": "Download",
+            "lines": [
+              "Downloads and installs the collection ZIP in the presets folder.",
+              "Preset files are read from the archive; required textures are extracted automatically."
+            ]
+          },
+          {
+            "ref": "preset_pack.remove",
+            "title": "Delete",
+            "lines": [
+              "Removes the collection ZIP and its extracted texture cache.",
+              "You can download the collection again later."
+            ]
+          },
+          {
+            "ref": "preset_pack.test",
+            "title": "Test",
+            "lines": [
+              "Measures every preset, finds its best resolution, and marks persistently slow presets as heavy.",
+              "Testing works whether Adaptive is on or off and does not change your saved resolution setting.",
+              "Each preset starts at the smallest render size. If it stays below 20 FPS, it is marked heavy; short stalls do not count.",
+              "Otherwise the configured resolution limit is tested first. If it fails, binary search finds the best passing size.",
+              "Results are saved locally and reused after restart when the preset and rendering context are unchanged. Progress and current FPS appear here; Back cancels and restores the previous preset and size."
+            ]
+          },
+          {
+            "ref": "preset_pack.cancel",
+            "title": "Cancel",
+            "lines": [
+              "Stops the current download or preset test.",
+              "Canceling a test restores the preset and render size that were active before testing."
+            ]
+          }
         ]
       }
     ],

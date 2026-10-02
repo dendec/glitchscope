@@ -20,6 +20,7 @@ func TestCategories_and_PresetsInCategory(t *testing.T) {
 	if err := Open(dir); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(Close)
 
 	cats := Categories()
 	if len(cats) != 3 {
@@ -61,20 +62,14 @@ func TestCategories_and_PresetsInCategory(t *testing.T) {
 }
 
 func TestCategories_nestedSubcategory(t *testing.T) {
-	// scanUser only walks two directory levels, but presets.gsa can
-	// contain deeper keys, so set up the store directly to exercise that.
-	names := []string{
-		"Particles/Blobby/royal.milk",
-		"Particles/Blobby/sparkle.milk",
-		"Particles/Fireflies/glow.milk",
+	dir := t.TempDir()
+	writeFake(t, dir, "Particles", "Blobby", "royal.milk")
+	writeFake(t, dir, "Particles", "Blobby", "sparkle.milk")
+	writeFake(t, dir, "Particles", "Fireflies", "glow.milk")
+	if err := Open(dir); err != nil {
+		t.Fatal(err)
 	}
-	s := &presetStore{entries: make(map[string]entry)}
-	for _, n := range names {
-		s.entries[n] = entry{name: n, dataOff: -1}
-	}
-	s.names = append(s.names, names...)
-	sort.Strings(s.names)
-	store = s
+	t.Cleanup(Close)
 
 	cats := Categories()
 	sort.Strings(cats)
@@ -91,6 +86,96 @@ func TestCategories_nestedSubcategory(t *testing.T) {
 	blobby := PresetsInCategory("Particles/Blobby")
 	if len(blobby) != 2 {
 		t.Fatalf("Particles/Blobby: expected 2, got %d: %v", len(blobby), blobby)
+	}
+}
+
+func TestReadMetaCacheInvalidatedOnStoreReload(t *testing.T) {
+	dir := t.TempDir()
+	presetPath := filepath.Join(dir, "alpha.milk")
+	if err := os.WriteFile(presetPath, []byte("[preset00]\nfRating=1.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Open(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(Close)
+	if got := ReadMeta("alpha.milk").Rating; got != 1 {
+		t.Fatalf("initial rating = %v, want 1", got)
+	}
+	if err := os.WriteFile(presetPath, []byte("[preset00]\nfRating=4.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Open(dir); err != nil {
+		t.Fatal(err)
+	}
+	if got := ReadMeta("alpha.milk").Rating; got != 4 {
+		t.Fatalf("reloaded rating = %v, want 4", got)
+	}
+}
+
+func TestSourceFingerprintTracksIndexedPresetContents(t *testing.T) {
+	dir := t.TempDir()
+	presetPath := filepath.Join(dir, "example.milk")
+	if err := os.WriteFile(presetPath, []byte("first"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Open(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(Close)
+	first, err := SourceFingerprint("example.milk")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(presetPath, []byte("second"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Open(dir); err != nil {
+		t.Fatal(err)
+	}
+	second, err := SourceFingerprint("example.milk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatalf("source fingerprint did not change: %q", first)
+	}
+}
+
+func TestOpenFailureKeepsCurrentStore(t *testing.T) {
+	dir := t.TempDir()
+	writeFake(t, dir, "alpha.milk")
+	if err := Open(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(Close)
+
+	filePath := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(filePath, []byte("file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Open(filePath); err == nil {
+		t.Fatal("Open() unexpectedly accepted a file as the preset directory")
+	}
+	if names := Names(); len(names) != 1 || names[0] != "alpha.milk" {
+		t.Fatalf("failed Open replaced active names: %v", names)
+	}
+}
+
+func TestCloseClearsPresetStore(t *testing.T) {
+	dir := t.TempDir()
+	writeFake(t, dir, "alpha.milk")
+	if err := Open(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	Close()
+	if names := Names(); len(names) != 0 {
+		t.Fatalf("Names() after Close = %v, want empty", names)
+	}
+	if _, err := Read("alpha.milk"); err == nil {
+		t.Fatal("Read() succeeded after Close")
 	}
 }
 

@@ -9,6 +9,7 @@
       "**Nikmati visualizer**",
       "Tutup menu setelah pemutaran bermula.",
       "Gunakan Presets untuk memilih gaya visual dan Settings untuk menyeimbangkan kualiti, kelajuan serta jangka hayat bateri.",
+      "Dalam Presets, pilih koleksi yang tersedia untuk memuat turunnya; koleksi yang telah dimuat turun boleh digunakan di luar talian.",
       "",
       "Bahagian kaki halaman sentiasa menunjukkan tindakan yang tersedia untuk pilihan semasa."
     ],
@@ -134,7 +135,25 @@
           "Tetapkan pada tetapan sedia ada untuk melihat pratontonnya.",
           "{select} memilihnya; ia akan digunakan apabila anda meninggalkan halaman tersebut.",
           "Preset auto-switch mengawal perubahan secara automatik.",
-          "Resolusi yang berjaya akan diingati semasa sesi pemainan semasa."
+          "Hasil resolusi disimpan secara setempat dan digunakan semula selepas mula semula jika pratetap serta konteks pemaparan tidak berubah."
+        ]
+      },
+      {
+        "title": "Pemeriksaan prestasi automatik",
+        "lines": [
+          "Apabila resolusi adaptif dihidupkan, pratetap baharu diuji dahulu pada saiz render terkecil.",
+          "Jika prestasi kekal di bawah 20 FPS, pratetap ditandakan berat dan dikecualikan daripada pilihan biasa; jeda singkat diabaikan.",
+          "Jika lulus, had resolusi yang dipilih diuji dahulu; jika gagal, carian binari mencari saiz terbaik yang lulus.",
+          "Apabila adaptif dimatikan, main balik biasa mengekalkan saiz pilihan dan tidak menjalankan pemeriksaan automatik ini."
+        ]
+      },
+      {
+        "title": "Koleksi pratetap",
+        "children": [
+          {"ref":"preset_pack.download","title":"Muat turun","lines":["Muat turun dan pasang ZIP koleksi ke dalam folder pratetap.","Pratetap dibaca daripada arkib; tekstur yang diperlukan diekstrak secara automatik."]},
+          {"ref":"preset_pack.remove","title":"Padam","lines":["Memadam ZIP koleksi dan cache tekstur yang diekstrak.","Anda boleh memuat turun koleksi itu semula kemudian."]},
+          {"ref":"preset_pack.test","title":"Uji","lines":["Mengukur semua pratetap, mencari resolusi terbaik dan menandakan pratetap yang sentiasa perlahan sebagai berat.","Ujian berfungsi sama ada adaptif dihidupkan atau dimatikan dan tidak mengubah tetapan resolusi tersimpan.","Setiap pratetap bermula pada saiz render terkecil. Jika kekal di bawah 20 FPS, ia ditandakan berat; gangguan singkat tidak dikira.","Jika lulus, had resolusi pilihan diuji dahulu. Jika gagal, carian binari mencari saiz terbaik yang lulus.","Hasil disimpan secara setempat dan digunakan semula selepas mula semula jika pratetap serta konteks pemaparan tidak berubah. Kemajuan dan FPS semasa dipaparkan di sini; Kembali membatalkan dan memulihkan pratetap serta saiz sebelumnya."]},
+          {"ref":"preset_pack.cancel","title":"Batal","lines":["Menghentikan muat turun atau ujian pratetap yang sedang berjalan.","Pembatalan ujian memulihkan pratetap dan saiz render yang digunakan sebelum ujian."]}
         ]
       }
     ],

@@ -7,18 +7,22 @@ import (
 )
 
 type resolutionState struct {
-	resolutions  []config.RenderResolution
-	index        int
-	ceilingIndex int
-	upscaleFloor int
-	floorIndex   int
-	downBlocked  bool
-	trialAction  adaptiveAction
-	trialIndex   int
-	trialCost    float64
-	trialCadence float64
-	trialConfirm bool
-	policy       adaptivePolicy
+	resolutions   []config.RenderResolution
+	index         int
+	ceilingIndex  int
+	upscaleFloor  int
+	floorIndex    int
+	downBlocked   bool
+	trialAction   adaptiveAction
+	trialIndex    int
+	trialCost     float64
+	trialCadence  float64
+	trialConfirm  bool
+	searchActive  bool
+	searchGood    int
+	searchBad     int
+	searchConfirm bool
+	policy        adaptivePolicy
 }
 
 // Configure sets the resolution list and starts at the configured ceiling.
@@ -64,13 +68,38 @@ func (s *resolutionState) restartPolicy() {
 	s.downBlocked = false
 	s.trialAction = adaptiveNone
 	s.trialConfirm = false
+	s.searchActive = false
+	s.searchConfirm = false
 }
 
 func (s *resolutionState) RestartForPreset() {
 	s.restartPolicy()
 }
 
+// startResolutionSearch treats the measured minimum as the known-good bound
+// and probes the configured ceiling first. If it fails, the remaining interval
+// is bisected between that known-bad ceiling and the passing minimum.
+func (s *resolutionState) startResolutionSearch(utilization, cadence float64) (config.RenderResolution, adaptiveAction) {
+	if len(s.resolutions) < 2 || s.ceilingIndex == s.floorIndex || s.index != s.floorIndex {
+		return config.RenderResolution{}, adaptiveNone
+	}
+	s.searchGood = s.floorIndex
+	s.searchBad = s.ceilingIndex
+	s.searchConfirm = false
+	s.searchActive = false
+	if utilization > s.policy.params.utilizationHigh*0.95 || cadence > cadenceTolerance {
+		s.upscaleFloor = s.ceilingIndex
+		s.policy.Restart()
+		return config.RenderResolution{}, adaptiveNone
+	}
+	s.searchActive = true
+	return s.setResolutionSearchTrial(s.ceilingIndex)
+}
+
 func (s *resolutionState) Decide(utilization, cadence float64, now time.Time) (config.RenderResolution, adaptiveAction) {
+	if s.searchActive {
+		return s.decideResolutionSearch(utilization, cadence)
+	}
 	// The caller supplies a fresh full measurement window after every change.
 	cost := utilization
 	if s.trialAction != adaptiveNone {
@@ -121,4 +150,64 @@ func (s *resolutionState) Decide(utilization, cadence float64, now time.Time) (c
 		}
 	}
 	return config.RenderResolution{}, adaptiveNone
+}
+
+func (s *resolutionState) decideResolutionSearch(utilization, cadence float64) (config.RenderResolution, adaptiveAction) {
+	tooExpensive := utilization > s.policy.params.utilizationHigh*0.95 || cadence > cadenceTolerance
+	if tooExpensive {
+		if !s.searchConfirm {
+			s.searchConfirm = true
+			return config.RenderResolution{}, adaptiveResample
+		}
+		s.searchBad = s.index
+	} else {
+		s.searchGood = s.index
+	}
+	s.searchConfirm = false
+	if !tooExpensive && s.index == s.ceilingIndex {
+		return s.finishResolutionSearch()
+	}
+	if s.searchGood-s.searchBad <= 1 {
+		return s.finishResolutionSearch()
+	}
+	return s.nextResolutionSearchTrial()
+}
+
+func (s *resolutionState) confirmSearchTrial() {
+	if s.searchActive {
+		s.searchConfirm = true
+	}
+}
+
+func (s *resolutionState) nextResolutionSearchTrial() (config.RenderResolution, adaptiveAction) {
+	if s.searchGood-s.searchBad <= 1 {
+		return s.finishResolutionSearch()
+	}
+	candidate := s.searchBad + (s.searchGood-s.searchBad)/2
+	return s.setResolutionSearchTrial(candidate)
+}
+
+func (s *resolutionState) setResolutionSearchTrial(candidate int) (config.RenderResolution, adaptiveAction) {
+	previous := s.index
+	s.index = candidate
+	if candidate < previous {
+		return s.resolutions[candidate], adaptiveResolutionUp
+	}
+	return s.resolutions[candidate], adaptiveResolutionDown
+}
+
+func (s *resolutionState) finishResolutionSearch() (config.RenderResolution, adaptiveAction) {
+	previous := s.index
+	s.index = s.searchGood
+	s.upscaleFloor = s.searchGood
+	s.searchActive = false
+	s.searchConfirm = false
+	s.policy.Restart()
+	if previous == s.index {
+		return config.RenderResolution{}, adaptiveNone
+	}
+	if s.index < previous {
+		return s.resolutions[s.index], adaptiveResolutionUp
+	}
+	return s.resolutions[s.index], adaptiveResolutionDown
 }

@@ -26,6 +26,61 @@ func TestFrameCostIncludesPresentationButNotSchedulerWait(t *testing.T) {
 	}
 }
 
+func TestCalibrationWindowAdaptsToMeasuredFrameTime(t *testing.T) {
+	now := time.Unix(100, 0)
+	var slow frameCostMeter
+	for i := range calibrationSlowRenderSamples {
+		slow.AddFrame(time.Second, 0, now.Add(time.Duration(i)*time.Second))
+	}
+	if !slow.CalibrationFull(60) {
+		t.Fatal("three 1 FPS frames did not complete the shortened calibration window")
+	}
+
+	var fast frameCostMeter
+	for i := range calibrationSlowRenderSamples {
+		fast.AddFrame(10*time.Millisecond, 0, now.Add(time.Duration(i)*time.Second/60))
+	}
+	if fast.CalibrationFull(60) {
+		t.Fatal("fast frames completed calibration before the normal six-sample window")
+	}
+	for i := calibrationSlowRenderSamples; i < calibrationRenderSamples; i++ {
+		fast.AddFrame(10*time.Millisecond, 0, now.Add(time.Duration(i)*time.Second/60))
+	}
+	if !fast.CalibrationFull(60) {
+		t.Fatal("normal six-sample calibration window did not complete")
+	}
+}
+
+func TestCalibrationWindowShortensForSlowCadence(t *testing.T) {
+	var meter frameCostMeter
+	now := time.Unix(100, 0)
+	for i := range calibrationSlowRenderSamples {
+		meter.AddFrame(10*time.Millisecond, 0, now.Add(time.Duration(i)*time.Second))
+	}
+	if !meter.CalibrationFull(60) {
+		t.Fatal("slow cadence did not complete the shortened calibration window")
+	}
+}
+
+func TestCalibrationSevereFailureUsesThreeFrameMedian(t *testing.T) {
+	now := time.Unix(100, 0)
+	var meter frameCostMeter
+	for i := range calibrationSlowRenderSamples {
+		meter.AddFrame(time.Second, 0, now.Add(time.Duration(i)*time.Second))
+	}
+	if !meter.CalibrationSeverelyOverBudget(60) {
+		t.Fatal("sustained 1 FPS render was not classified as a severe failure")
+	}
+
+	var stalled frameCostMeter
+	for i, cost := range []time.Duration{time.Second, 16 * time.Millisecond, 16 * time.Millisecond} {
+		stalled.AddFrame(cost, 0, now.Add(time.Duration(i)*time.Second))
+	}
+	if stalled.CalibrationSeverelyOverBudget(60) {
+		t.Fatal("a single stalled frame bypassed the independent confirmation window")
+	}
+}
+
 func TestFrameCostDetectsDeferredPresentationWork(t *testing.T) {
 	var meter frameCostMeter
 	now := time.Unix(100, 0)

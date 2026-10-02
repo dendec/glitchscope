@@ -105,6 +105,20 @@ func (r *previewRenderer) isReady() bool {
 	return r.ready && r.pm != nil
 }
 
+func (r *previewRenderer) SetTextureSearchPaths(paths []string) {
+	if !r.isReady() {
+		return
+	}
+	r.pm.SetTextureSearchPaths(paths)
+	r.pm.ResetTextures()
+}
+
+func (r *previewRenderer) ResetTextures() {
+	if r.isReady() {
+		r.pm.ResetTextures()
+	}
+}
+
 // RenderFPS returns the measured render time FPS of the preview instance.
 // This is throughput (how fast a single frame renders), not display cadence.
 func (r *previewRenderer) RenderFPS() float64 {

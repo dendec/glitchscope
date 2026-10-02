@@ -210,6 +210,32 @@ func (o *Overlay) presetsHints() []UIHint {
 	if node == nil {
 		return hints
 	}
+	if item := o.presetPackByID(node.packID); item != nil {
+		if o.focusPanel != 1 {
+			hints = append(hints, UIHint{Key: o.controlLabel(hintFocus), Label: o.catalog.Text(i18n.ActionOpen)})
+			return hints
+		}
+		if item.Busy {
+			return hints
+		}
+		label := o.catalog.Text(i18n.ActionDownload)
+		switch {
+		case item.Downloading || item.Testing:
+			label = o.catalog.Text(i18n.ActionCancel)
+		case item.Installed && o.presetPackActionCursor == 0:
+			label = o.catalog.Text(i18n.ActionDelete)
+		case item.Installed:
+			label = o.catalog.Text(i18n.ActionTest)
+		}
+		if o.presetPackRemoveConfirm {
+			label = o.catalog.Text(i18n.ActionConfirm)
+		}
+		return []UIHint{
+			{Key: o.controlLabel(hintSelect), Label: label},
+			{Key: o.controlLabel(hintBack), Label: o.catalog.Text(i18n.ActionLeftPanel)},
+			{Key: o.controlLabel(hintMove), Label: o.catalog.Text(i18n.ActionMove)},
+		}
+	}
 	if !node.isLeaf {
 		hints = append(hints, UIHint{Key: o.controlLabel(hintSelect), Label: o.catalog.Text(i18n.ActionOpen)})
 	} else {

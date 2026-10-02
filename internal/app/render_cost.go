@@ -2,7 +2,11 @@ package app
 
 import "time"
 
-const renderCostWindow = 10
+const (
+	renderCostWindow             = 10
+	calibrationRenderSamples     = 6
+	calibrationSlowRenderSamples = 3
+)
 
 // renderCostMeter is a fixed rolling window of positive durations.
 // frameCostMeter uses separate windows for active work and presentation intervals.
@@ -33,6 +37,18 @@ func (m *renderCostMeter) Full() bool {
 
 func (m *renderCostMeter) Count() int {
 	return m.count
+}
+
+func (m *renderCostMeter) LastThreeMedian() time.Duration {
+	if m.count < calibrationSlowRenderSamples {
+		return 0
+	}
+	last := (m.next + len(m.values) - 1) % len(m.values)
+	previous := (last + len(m.values) - 1) % len(m.values)
+	first := (previous + len(m.values) - 1) % len(m.values)
+	return medianDuration3([calibrationSlowRenderSamples]time.Duration{
+		m.values[first], m.values[previous], m.values[last],
+	})
 }
 
 func (m *renderCostMeter) Average() time.Duration {
@@ -77,6 +93,28 @@ func (m *frameCostMeter) AddFrame(render, presentation time.Duration, presented 
 
 func (m *frameCostMeter) Full() bool {
 	return m.renderCostMeter.Full() && m.intervals.Full()
+}
+
+func (m *frameCostMeter) FullFor(samples int) bool {
+	samples = min(max(samples, 1), renderCostWindow)
+	return m.renderCostMeter.Count() >= samples && m.intervals.Count() >= samples-1
+}
+
+func (m *frameCostMeter) CalibrationFull(fps int32) bool {
+	samples := calibrationRenderSamples
+	if fps > 0 && m.renderCostMeter.Count() >= calibrationSlowRenderSamples &&
+		(m.Utilization(fps) > 1 || m.Cadence(fps) > cadenceTolerance) {
+		samples = calibrationSlowRenderSamples
+	}
+	return m.FullFor(samples)
+}
+
+func (m *frameCostMeter) CalibrationSeverelyOverBudget(fps int32) bool {
+	if fps <= 0 {
+		return false
+	}
+	threshold := max(presetProbeFastFrame, 2*time.Second/time.Duration(fps))
+	return m.renderCostMeter.LastThreeMedian() >= threshold
 }
 
 // Cadence is the mean presentation interval divided by the scheduled period.

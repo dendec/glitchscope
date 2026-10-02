@@ -340,3 +340,109 @@ func TestResolutionTrialConfirmsNoisyFirstWindow(t *testing.T) {
 		t.Fatal("fresh confirmation showing improvement was not retained")
 	}
 }
+
+func TestResolutionSearchFindsHighestPassingLevelWithBinaryProbes(t *testing.T) {
+	var state resolutionState
+	if !state.Reset(1280, 720, config.RenderResolution{Width: 1280, Height: 720}, defaultAdaptiveParams()) {
+		t.Fatal("resolution state did not initialize")
+	}
+	state.index = state.floorIndex
+	now := time.Unix(100, 0)
+	if got, action := state.startResolutionSearch(0.5, 1); action != adaptiveResolutionUp || got != state.resolutions[0] {
+		t.Fatalf("first ceiling probe = (%v, %v), want (%v, up)", got, action, state.resolutions[0])
+	}
+	if _, action := state.Decide(1.1, 1.2, now); action != adaptiveResample {
+		t.Fatalf("first failing ceiling window = %v, want confirmation", action)
+	}
+	if _, action := state.Decide(1.1, 1.2, now); action != adaptiveResolutionDown || state.index != 3 {
+		t.Fatalf("confirmed ceiling failure did not bisect interval at 360p: index=%d action=%v", state.index, action)
+	}
+	if _, action := state.Decide(0.7, 1, now); action != adaptiveResolutionUp || state.index != 1 {
+		t.Fatalf("passing midpoint did not bisect upper interval: index=%d action=%v", state.index, action)
+	}
+	if _, action := state.Decide(1.1, 1.2, now); action != adaptiveResample {
+		t.Fatalf("first failing 540p window = %v, want confirmation", action)
+	}
+	if _, action := state.Decide(1.1, 1.2, now); action != adaptiveResolutionDown || state.index != 2 {
+		t.Fatalf("confirmed 540p failure did not bisect at 450p: index=%d action=%v", state.index, action)
+	}
+	if _, action := state.Decide(0.7, 1, now); action != adaptiveNone || state.searchActive {
+		t.Fatalf("search did not finish at the passing boundary: index=%d active=%t action=%v", state.index, state.searchActive, action)
+	}
+	if state.index != 2 || state.upscaleFloor != 2 {
+		t.Fatalf("best resolution boundary = index %d, floor %d; want 2, 2", state.index, state.upscaleFloor)
+	}
+}
+
+func TestResolutionSearchAcceptsPreconfirmedSevereFailure(t *testing.T) {
+	var state resolutionState
+	if !state.Reset(1280, 720, config.RenderResolution{Width: 1280, Height: 720}, defaultAdaptiveParams()) {
+		t.Fatal("resolution state did not initialize")
+	}
+	state.index = state.floorIndex
+	if _, action := state.startResolutionSearch(0.5, 1); action != adaptiveResolutionUp {
+		t.Fatalf("first ceiling probe action = %v, want up", action)
+	}
+	state.confirmSearchTrial()
+	if _, action := state.Decide(10, 10, time.Unix(100, 0)); action != adaptiveResolutionDown || state.index != 3 {
+		t.Fatalf("preconfirmed ceiling failure did not bisect immediately: index=%d action=%v", state.index, action)
+	}
+}
+
+func TestResolutionSearchFinishesWhenCeilingPasses(t *testing.T) {
+	var state resolutionState
+	state.Reset(1280, 720, config.RenderResolution{Width: 1280, Height: 720}, defaultAdaptiveParams())
+	state.index = state.floorIndex
+	resolution, action := state.startResolutionSearch(0.5, 1)
+	if action != adaptiveResolutionUp || resolution != state.resolutions[state.ceilingIndex] {
+		t.Fatalf("first trial = (%v, %v), want configured ceiling and up", resolution, action)
+	}
+	if resolution, action = state.Decide(0.7, 1, time.Unix(100, 0)); action != adaptiveNone || state.searchActive {
+		t.Fatalf("passing ceiling did not finish search: resolution=%v action=%v active=%t", resolution, action, state.searchActive)
+	}
+	if state.index != state.ceilingIndex || state.upscaleFloor != state.ceilingIndex {
+		t.Fatalf("passing ceiling result = index %d, floor %d; want %d", state.index, state.upscaleFloor, state.ceilingIndex)
+	}
+}
+
+func TestResolutionSearchReturnsToBestPassingLevel(t *testing.T) {
+	var state resolutionState
+	state.Reset(1280, 720, config.RenderResolution{Width: 1280, Height: 720}, defaultAdaptiveParams())
+	state.index = state.floorIndex
+	state.startResolutionSearch(0.5, 1)
+	now := time.Unix(100, 0)
+	state.Decide(1.1, 1.2, now) // fail at ceiling; request a confirmation window.
+	state.Decide(1.1, 1.2, now) // confirmed failure; next probe is midpoint 3.
+	state.Decide(0.7, 1, now)   // midpoint passes; next probe is index 1.
+	state.Decide(1.1, 1.2, now) // request confirmation at index 1.
+	state.Decide(1.1, 1.2, now) // confirmed failure; next probe is index 2.
+	state.Decide(1.1, 1.2, now) // request confirmation at index 2.
+	resolution, action := state.Decide(1.1, 1.2, now)
+	if action != adaptiveResolutionDown || state.searchActive || state.index != 3 || resolution != state.resolutions[3] {
+		t.Fatalf("search did not restore best passing level: index=%d active=%t resolution=%v action=%v", state.index, state.searchActive, resolution, action)
+	}
+}
+
+func TestResolutionSearchWaitsForTargetHeadroomAtMinimum(t *testing.T) {
+	var state resolutionState
+	state.Reset(1280, 720, config.RenderResolution{Width: 1280, Height: 720}, defaultAdaptiveParams())
+	state.index = state.floorIndex
+	if _, action := state.startResolutionSearch(1.1, 1.2); action != adaptiveNone || state.searchActive {
+		t.Fatalf("search started without target headroom: active=%t action=%v", state.searchActive, action)
+	}
+	if state.upscaleFloor != state.ceilingIndex {
+		t.Fatal("regular adaptive policy was not retained for a noisy baseline")
+	}
+}
+
+func TestResolutionSearchHonorsConfiguredCeiling(t *testing.T) {
+	var state resolutionState
+	if !state.Reset(1280, 720, config.RenderResolution{Width: 640, Height: 360}, defaultAdaptiveParams()) {
+		t.Fatal("resolution state did not initialize")
+	}
+	state.index = state.floorIndex
+	resolution, action := state.startResolutionSearch(0.5, 1)
+	if action != adaptiveResolutionUp || resolution != state.resolutions[state.ceilingIndex] {
+		t.Fatalf("first probe = (%v, %v), want configured ceiling %v and up", resolution, action, state.resolutions[state.ceilingIndex])
+	}
+}

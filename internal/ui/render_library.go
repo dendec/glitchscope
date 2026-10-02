@@ -51,7 +51,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 			}
 		}
 		drawPanelBg(o, px, py, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
-		if o.panelEntered && len(o.albums) > 0 {
+		if o.panelFocused(0) && len(o.albums) > 0 {
 			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh) - textOffset
 			o.drawCursorHighlight(px, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 		}
@@ -64,7 +64,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		}
 		drawScrollbar(o, px+float32(panelW)-sbW, py, float32(panelH), len(o.albums), am, o.albumsScroll, winW, winH, viewW, viewH)
 		// Cursor highlight row — drawn as separate overlay, no texture rebuild needed.
-		if o.panelEntered && len(o.albums) > 0 {
+		if o.panelFocused(0) && len(o.albums) > 0 {
 			rowY := py + float32((o.albumCursor-o.albumsScroll)*lh) - textOffset
 			o.drawMarqueeCol(&o.marqueeL, marqueeX, py, marqueeW, float32(panelH), lh, rowY, winW, winH, viewW, viewH)
 		}
@@ -112,7 +112,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 		}
 		isInfoPanel := isNCInfo || isCatalogInfo || isLocalInfo || isRadioInfo
 		if !isInfoPanel {
-			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
+			if o.panelFocused(1) && len(o.trackInfos) > 0 {
 				rowY := ty + float32((o.trackCursor-o.tracksScroll)*lh)
 				o.drawCursorHighlight(tx, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 			}
@@ -147,7 +147,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 			}
 			tracksCount := len(o.trackInfos)
 			drawScrollbar(o, tx+float32(panelW)-sbW, ty, remainH, tracksCount, tm, o.tracksScroll, winW, winH, viewW, viewH)
-			if o.panelEntered && o.focusPanel == 1 && len(o.trackInfos) > 0 {
+			if o.panelFocused(1) && len(o.trackInfos) > 0 {
 				rowY := contentY + float32((o.trackCursor-o.tracksScroll)*lh)
 				o.drawMarqueeCol(&o.marqueeR, tx, contentY, float32(textW), remainH, lh, rowY, winW, winH, viewW, viewH)
 			}
@@ -253,7 +253,7 @@ func (o *Overlay) rebuildAlbumsTex(maxW, maxH int) {
 			prefix = "▸ "
 		}
 		line := prefix + name
-		rows = append(rows, listRow{text: line, active: i == cursor && o.panelEntered && o.focusPanel == 0})
+		rows = append(rows, listRow{text: line, active: i == cursor && o.panelFocused(0)})
 		if i == cursor && o.focusPanel == 0 {
 			o.rebuildMarqueeLine(&o.marqueeL, line, maxTextPx, false)
 		}
