@@ -608,6 +608,12 @@ func (o *Overlay) FocusLeft() {
 		}
 	case PagePresets:
 		if o.focusPanel == 1 {
+			if o.presetPackActionCursor > 0 {
+				o.presetPackActionCursor--
+				o.presetPackRemoveConfirm = false
+				o.presetsDetailDirty = true
+				return
+			}
 			o.focusPanel = 0
 			o.presetPackRemoveConfirm = false
 			o.presetsDirty = true
@@ -680,6 +686,10 @@ func (o *Overlay) FocusRight() {
 				o.presetPackActionCursor = 0
 				o.clampPresetPackActionCursor()
 				o.presetsDirty = true
+				o.presetsDetailDirty = true
+			} else if item := o.selectedPresetPack(); item != nil && o.presetPackActionCursor+1 < o.presetPackActionCount(*item) {
+				o.presetPackActionCursor++
+				o.presetPackRemoveConfirm = false
 				o.presetsDetailDirty = true
 			}
 		} else if node != nil && !node.isLeaf {

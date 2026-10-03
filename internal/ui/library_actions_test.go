@@ -70,3 +70,21 @@ func TestFavoriteBadgesReserveFullRowCell(t *testing.T) {
 		t.Fatal("source icons must not reserve a trailing badge")
 	}
 }
+
+func TestActionPanelHeightsKeepButtonsInsideBackground(t *testing.T) {
+	o := &Overlay{fontSize: 13}
+	for _, panelH := range []int{0, 8, 390} {
+		for _, hasActions := range []bool{false, true} {
+			metadataH, actionH := o.actionPanelHeights(panelH, 16, hasActions)
+			if metadataH < 0 || actionH < 0 || metadataH+actionH != panelH {
+				t.Fatalf("panel %d, actions %t: metadata %d + buttons %d", panelH, hasActions, metadataH, actionH)
+			}
+			if !hasActions && actionH != 0 {
+				t.Fatal("panel without actions reserved button space")
+			}
+			if hasActions && actionH != min(panelH, o.actionBarHeight(16)) {
+				t.Fatal("button row does not match shared action height")
+			}
+		}
+	}
+}

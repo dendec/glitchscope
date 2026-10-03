@@ -188,8 +188,9 @@ Adaptive использует целевую частоту как единст�
 в пределах 110% периода. Если первое окно не доказывает пользу, запрашивается
 второе независимое окно без изменения FPS/resolution. Только повторное отсутствие
 пользы возвращает resolution и запрещает дальнейшее снижение до нового пресета.
-Пределом является нижняя ступень общей сетки. Глобальная сетка: 1, 3/4, 5/8, 1/2, 3/8, 1/4, 3/16, 1/8
-размера экрана (720, 540, 450, 360, 270, 180, 135, 90p на экране 720p).
+Пределом является нижняя ступень общей сетки. Глобальная сетка с равномерным шагом 1/8: 1, 7/8, 3/4, 5/8, 1/2, 3/8, 1/4
+размера экрана (720, 630, 540, 450, 360, 270, 180p на экране 720p).
+Минимум — четверть ширины и высоты экрана; меньшие ступени исключены ради качества изображения.
 Близкие ступени 2/5 и 1/5 убраны, чтобы проба давала измеримый выигрыш. Используются только
 целочисленные размеры; граница округляется к большей доступной ступени.
 После достижения нижней ступени фактический FPS может быть ниже цели на тяжёлом
@@ -299,7 +300,10 @@ no filesystem or network reads to obtain them. `internal/presets.InstallProgress
 reports source-download bytes, then an installation phase covering texture
 downloads, normalization, validation and publication. App publishes one atomic
 progress snapshot; UI displays Installing without a percentage during that phase
-and retains the Cancel action.
+and retains the Cancel action. Library and Presets share action-bar layout and
+icon rendering, full-panel background/focus frame, action-row geometry and
+button drawing; each page owns its texture lifecycle. Collection actions sit at
+the bottom of the right panel, with matching pointer hit regions.
 Desktop and PortMaster release packaging excludes collection ZIPs,
 texture caches, and the legacy preset/texture GSA archives. ModArchive snapshot
 GSA files remain independent assets under `.cache/modarchive/`.

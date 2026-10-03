@@ -298,6 +298,9 @@ type Overlay struct {
 	albumsTexW, albumsTexH                   int
 	tracksTex                                uint32
 	tracksTexW, tracksTexH                   int
+	presetActionsTex                         uint32
+	presetActionsTexW, presetActionsTexH     int
+	presetActionPlacements                   []actionPlacement
 	ncActionsTex                             uint32
 	ncActionsTexW, ncActionsTexH             int
 	coverArtTex                              uint32
@@ -484,6 +487,7 @@ func (o *Overlay) Close() {
 	o.deleteTex(&o.albumsTex)
 	o.deleteTex(&o.tracksTex)
 	o.deleteTex(&o.ncActionsTex)
+	o.deleteTex(&o.presetActionsTex)
 	o.deleteTex(&o.coverArtTex)
 	o.deleteTex(&o.radioFaviconTex)
 	o.deleteTex(&o.bottomTex)

@@ -408,7 +408,9 @@ Max value; a numeric cap equal to the refresh is omitted to avoid duplication.
 Adaptive resolution is independently enabled or disabled. When enabled, the
 selected Resolution is a ceiling: the visualizer may lower or restore it to
 approach the selected frame rate, never exceeding that ceiling. When disabled,
-the selected resolution is fixed. Preview rendering remains capped at 25 FPS so
+the selected resolution is fixed. The resolution grid stops at one quarter of
+the display width and height, including the adaptive minimum. Scale steps are
+1, 0.875, 0.75, 0.625, 0.5, 0.375, and 0.25. Preview rendering remains capped at 25 FPS so
 browsing presets does not consume the full main visualizer budget. First-run
 defaults are Max (the active display refresh), adaptive on, and the largest
 resolution available on the display.
@@ -497,3 +499,15 @@ ZIP и число уникальных индексируемых `.milk` entrie
 и публикацию ZIP. Cancel остаётся доступным. Butterchurn скачивается из ZIP
 официального репозитория; в итоговый ZIP входят только `presets/milkdrop/`,
 стандартные текстуры и upstream notices.
+
+Кнопки коллекций Presets используют общий с Library layout: нижняя строка
+правой панели, bitmap-иконка и подпись в квадратных скобках, маркер выбора `>`.
+Metadata и описание действия находятся выше. Download использует download.svg,
+Delete — trash.svg, Test (проверка FPS) — speed-fast.svg, Cancel — close.svg.
+Подтверждение удаления показывает `[Delete?]` с локализованной подписью.
+Left/Right переключают соседние кнопки; Up/Down также сохраняют выбор действий.
+Мышь и касание используют области тех же кнопок внизу панели.
+
+Затемнение и рамка фокуса информационной панели покрывают всю её высоту,
+включая кнопки. Library и Presets используют общую отрисовку рамки и кнопок
+и общую геометрию разделения metadata/actions с pointer hit-testing.

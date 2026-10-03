@@ -1,5 +1,9 @@
 {
-  "sizes": [16, 24, 36],
+  "sizes": [
+    16,
+    24,
+    36
+  ],
   "icons": [
     {
       "name": "app",
@@ -73,6 +77,10 @@
     {
       "name": "close",
       "source": "lib/pixelarticons/svg/close.svg"
+    },
+    {
+      "name": "test",
+      "source": "lib/pixelarticons/svg/speed-fast.svg"
     }
   ]
 }

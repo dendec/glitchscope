@@ -194,8 +194,8 @@ func TestNewPresetRestoresCompatibleLearnedResolution(t *testing.T) {
 	if state.index != 5 || state.downBlocked || state.trialAction != adaptiveNone || state.upscaleFloor != state.ceilingIndex {
 		t.Fatalf("new preset did not preserve warm start: %+v", state)
 	}
-	state.startPreset(presetProfile{ready: true, index: 6, floor: 6}, 5)
-	if state.index != 6 || state.upscaleFloor != 6 {
+	state.startPreset(presetProfile{ready: true, index: 5, floor: 5}, 5)
+	if state.index != 5 || state.upscaleFloor != 5 {
 		t.Fatal("known lower-resolution profile was not restored")
 	}
 	state.startPreset(presetProfile{ready: true, index: 4, floor: 4}, 5)

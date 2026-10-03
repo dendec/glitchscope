@@ -223,16 +223,8 @@ func TestComputeResolutions_640x480(t *testing.T) {
 			t.Fatalf("invalid resolution %s", r)
 		}
 	}
-	// Should include the classic low-end 80x60 (80/640=0.125, 60/480=0.125)
-	found := false
-	for _, r := range res {
-		if r.Width == 80 && r.Height == 60 {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatal("640x480 should yield 80x60 at scale 0.125")
+	if got := res[len(res)-1]; got != (RenderResolution{Width: 160, Height: 120}) {
+		t.Fatalf("minimum resolution = %v, want 160x120", got)
 	}
 }
 
@@ -700,7 +692,7 @@ func TestShuffleModeJSONInSettings(t *testing.T) {
 
 func TestResolutionGrid720p(t *testing.T) {
 	resolutions := ComputeResolutions(1280, 720)
-	heights := []int{720, 540, 450, 360, 270, 180, 135, 90}
+	heights := []int{720, 630, 540, 450, 360, 270, 180}
 	if len(resolutions) != len(heights) {
 		t.Fatalf("grid has %d entries, want %d", len(resolutions), len(heights))
 	}

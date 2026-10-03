@@ -195,7 +195,7 @@ func TestResolutionUsesCompleteGridBelowSelectedCeiling(t *testing.T) {
 	if !state.Reset(1280, 720, config.RenderResolution{Width: 960, Height: 540}, defaultAdaptiveParams()) {
 		t.Fatal("resolution state did not initialize")
 	}
-	if got, want := state.resolutions[state.floorIndex].Height, 90; got != want {
+	if got, want := state.resolutions[state.floorIndex].Height, 180; got != want {
 		t.Fatalf("adaptive floor = %dp, want %dp", got, want)
 	}
 }
@@ -355,19 +355,19 @@ func TestResolutionSearchFindsHighestPassingLevelWithBinaryProbes(t *testing.T) 
 		t.Fatalf("first failing ceiling window = %v, want confirmation", action)
 	}
 	if _, action := state.Decide(1.1, 1.2, now); action != adaptiveResolutionDown || state.index != 3 {
-		t.Fatalf("confirmed ceiling failure did not bisect interval at 360p: index=%d action=%v", state.index, action)
+		t.Fatalf("confirmed ceiling failure did not probe 450p: index=%d action=%v", state.index, action)
 	}
 	if _, action := state.Decide(0.7, 1, now); action != adaptiveResolutionUp || state.index != 1 {
-		t.Fatalf("passing midpoint did not bisect upper interval: index=%d action=%v", state.index, action)
+		t.Fatalf("passing midpoint did not probe 630p: index=%d action=%v", state.index, action)
 	}
 	if _, action := state.Decide(1.1, 1.2, now); action != adaptiveResample {
-		t.Fatalf("first failing 540p window = %v, want confirmation", action)
+		t.Fatalf("first failing 630p window = %v, want confirmation", action)
 	}
 	if _, action := state.Decide(1.1, 1.2, now); action != adaptiveResolutionDown || state.index != 2 {
-		t.Fatalf("confirmed 540p failure did not bisect at 450p: index=%d action=%v", state.index, action)
+		t.Fatalf("confirmed 630p failure did not probe 540p: index=%d action=%v", state.index, action)
 	}
 	if _, action := state.Decide(0.7, 1, now); action != adaptiveNone || state.searchActive {
-		t.Fatalf("search did not finish at the passing boundary: index=%d active=%t action=%v", state.index, state.searchActive, action)
+		t.Fatalf("passing 540p did not finish search: index=%d action=%v", state.index, action)
 	}
 	if state.index != 2 || state.upscaleFloor != 2 {
 		t.Fatalf("best resolution boundary = index %d, floor %d; want 2, 2", state.index, state.upscaleFloor)
@@ -411,11 +411,11 @@ func TestResolutionSearchReturnsToBestPassingLevel(t *testing.T) {
 	state.index = state.floorIndex
 	state.startResolutionSearch(0.5, 1)
 	now := time.Unix(100, 0)
-	state.Decide(1.1, 1.2, now) // fail at ceiling; request a confirmation window.
-	state.Decide(1.1, 1.2, now) // confirmed failure; next probe is midpoint 3.
-	state.Decide(0.7, 1, now)   // midpoint passes; next probe is index 1.
+	state.Decide(1.1, 1.2, now) // fail at ceiling; request confirmation.
+	state.Decide(1.1, 1.2, now) // confirmed failure; probe midpoint 3.
+	state.Decide(0.7, 1, now)   // midpoint passes; probe index 1.
 	state.Decide(1.1, 1.2, now) // request confirmation at index 1.
-	state.Decide(1.1, 1.2, now) // confirmed failure; next probe is index 2.
+	state.Decide(1.1, 1.2, now) // confirmed failure; probe index 2.
 	state.Decide(1.1, 1.2, now) // request confirmation at index 2.
 	resolution, action := state.Decide(1.1, 1.2, now)
 	if action != adaptiveResolutionDown || state.searchActive || state.index != 3 || resolution != state.resolutions[3] {

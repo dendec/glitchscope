@@ -31,6 +31,7 @@ const (
 	iconHelp       = "help"
 	iconPlay       = "play"
 	iconDelete     = "delete"
+	iconTest       = "test"
 	iconStar       = "star"
 	iconPagePrev   = "page-prev"
 	iconPageNext   = "page-next"
@@ -51,6 +52,7 @@ var iconNames = []string{
 	iconHelp,
 	iconPlay,
 	iconDelete,
+	iconTest,
 	iconStar,
 	iconPagePrev,
 	iconPageNext,

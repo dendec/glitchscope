@@ -112,29 +112,13 @@ func (o *Overlay) cancelPresetPackTestOnBack() bool {
 }
 
 func (o *Overlay) presetPackActionRows(item PresetPackItem) []listRow {
-	var actions []string
-	switch {
-	case item.Busy:
-		actions = []string{o.catalog.Text(i18n.ValueLoading)}
-	case item.Downloading:
-		actions = []string{o.catalog.Text(i18n.ActionCancel)}
-	case item.Testing:
-		actions = []string{o.catalog.Text(i18n.ActionCancel)}
-	case item.Installed:
-		remove := o.catalog.Text(i18n.ActionDelete)
-		if o.presetPackRemoveConfirm {
-			remove = o.catalog.Format(i18n.PresetPacksRemovePrompt, item.Name)
-		}
-		actions = []string{remove}
-		if !item.Tested {
-			actions = append(actions, o.catalog.Text(i18n.ActionTest))
-		}
-	default:
-		actions = []string{o.catalog.Text(i18n.ActionDownload)}
-	}
+	actions := o.presetPackButtons(item)
 	rows := make([]listRow, 0, len(actions)+2)
-	for i, action := range actions {
-		rows = append(rows, listRow{text: action, active: !item.Busy && o.focusPanel == 1 && o.panelEntered && i == o.presetPackActionCursor})
+	for _, action := range actions {
+		rows = append(rows, listRow{text: action.label, active: action.selected})
+	}
+	if item.Busy {
+		rows = append(rows, listRow{text: o.catalog.Text(i18n.ValueLoading)})
 	}
 	size, count := "—", "—"
 	if item.ArchiveBytes > 0 {
@@ -171,6 +155,28 @@ func (o *Overlay) presetPackActionRows(item PresetPackItem) []listRow {
 		rows = append(rows, listRow{text: strings.TrimSpace(item.Error)})
 	}
 	return rows
+}
+
+// presetPackButtons shares Library's icon, bracket, and confirmation layout.
+func (o *Overlay) presetPackButtons(item PresetPackItem) []libraryAction {
+	var actions []libraryAction
+	switch {
+	case item.Busy:
+		return nil
+	case item.Downloading, item.Testing:
+		actions = []libraryAction{{icon: iconClose, label: o.catalog.Text(i18n.ActionCancel)}}
+	case item.Installed:
+		actions = []libraryAction{{icon: iconDelete, label: o.catalog.Text(i18n.ActionDelete), confirm: o.presetPackRemoveConfirm}}
+		if !item.Tested {
+			actions = append(actions, libraryAction{icon: iconTest, label: o.catalog.Text(i18n.ActionTest)})
+		}
+	default:
+		actions = []libraryAction{{icon: iconDownloads, label: o.catalog.Text(i18n.ActionDownload)}}
+	}
+	for i := range actions {
+		actions[i].selected = o.panelFocused(1) && i == o.presetPackActionCursor
+	}
+	return actions
 }
 
 func presetPackActionHelpRef(item PresetPackItem, cursor int) string {

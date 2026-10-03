@@ -52,9 +52,12 @@ func (o *Overlay) rebuildCatalogActionsTex() {
 
 func (o *Overlay) rebuildActionBar(actions []libraryAction) {
 	o.deleteTex(&o.ncActionsTex)
-	o.actionPlacements = nil
+	o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH, o.actionPlacements = o.buildActionBar(actions)
+}
+
+func (o *Overlay) buildActionBar(actions []libraryAction) (uint32, int, int, []actionPlacement) {
 	if o.face == nil || len(actions) == 0 {
-		return
+		return 0, 0, 0, nil
 	}
 	metrics := o.face.Metrics()
 	lh := metrics.Height.Ceil()
@@ -72,16 +75,42 @@ func (o *Overlay) rebuildActionBar(actions []libraryAction) {
 			d.DrawString(item.label)
 		}
 	})
-	o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH = glUploadTexture(rgba), w, h
-	o.actionPlacements = placements
+	return glUploadTexture(rgba), w, h, placements
 }
 
-func (o *Overlay) drawActionIcons(x, y, w, h float32, winW, winH, viewW, viewH int) {
+// actionPanelHeights reserves the bottom action row inside the full panel.
+func (o *Overlay) actionPanelHeights(panelH, lh int, hasActions bool) (metadataH, actionH int) {
+	panelH = max(0, panelH)
+	if hasActions {
+		actionH = min(panelH, o.actionBarHeight(lh))
+	}
+	return panelH - actionH, actionH
+}
+
+// drawInfoPanelFrame always covers the complete panel, including its buttons.
+func (o *Overlay) drawInfoPanelFrame(x, y, w, h float32, focused bool, winW, winH, viewW, viewH int) {
+	drawPanelBg(o, x, y, w, h, winW, winH, viewW, viewH)
+	if focused {
+		drawPanelBorder(o, x, y, w, h, winW, winH, viewW, viewH)
+	}
+}
+
+func (o *Overlay) drawPanelActions(tex uint32, texW, texH int, placements []actionPlacement, x, y, w, h float32, winW, winH, viewW, viewH int) {
+	if tex == 0 || h <= 0 {
+		return
+	}
+	glDrawOverlayTextClipped(o.programText, tex, 1,
+		x, y, float32(texW), float32(texH), x, y, w, h,
+		winW, winH, viewW, viewH)
+	o.drawActionPlacementIcons(placements, x, y, w, h, winW, winH, viewW, viewH)
+}
+
+func (o *Overlay) drawActionPlacementIcons(placements []actionPlacement, x, y, w, h float32, winW, winH, viewW, viewH int) {
 	lh := o.face.Metrics().Height.Ceil()
 	if !o.ensureIconTextures(lh, o.textColor()) {
 		return
 	}
-	for _, item := range o.actionPlacements {
+	for _, item := range placements {
 		o.drawIconClipped(item.icon, x+float32(textPadding(o.fontSize)+item.iconX), y+float32(textPadding(o.fontSize)), float32(lh), x, y, w, h, winW, winH, viewW, viewH)
 	}
 }

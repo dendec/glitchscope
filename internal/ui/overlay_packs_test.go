@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dendec/glitchscope/internal/i18n"
+	"golang.org/x/image/font/basicfont"
 )
 
 func TestPresetPackDetailsShowArchiveSizeAndPresetCount(t *testing.T) {
@@ -329,5 +330,62 @@ func TestPresetPackInstallationStatusAndCancel(t *testing.T) {
 	o.Select()
 	if action != PresetPackCancel {
 		t.Fatal("installation cannot be cancelled")
+	}
+}
+
+func TestPresetPackButtonsUseLibraryLayoutAndIcons(t *testing.T) {
+	for _, test := range []struct {
+		item  PresetPackItem
+		icons []string
+	}{
+		{PresetPackItem{}, []string{iconDownloads}},
+		{PresetPackItem{Installed: true}, []string{iconDelete, iconTest}},
+		{PresetPackItem{Installed: true, Tested: true}, []string{iconDelete}},
+		{PresetPackItem{Downloading: true}, []string{iconClose}},
+		{PresetPackItem{Testing: true}, []string{iconClose}},
+		{PresetPackItem{Busy: true}, nil},
+	} {
+		o := newPresetPackOverlay(test.item)
+		actions := o.presetPackButtons(test.item)
+		if len(actions) != len(test.icons) {
+			t.Fatalf("buttons for %+v: %v", test.item, actions)
+		}
+		for i, icon := range test.icons {
+			if actions[i].icon != icon {
+				t.Fatalf("button %d icon = %s, want %s", i, actions[i].icon, icon)
+			}
+		}
+	}
+}
+
+func TestPresetPackBottomButtonsPointerAndHorizontalNavigation(t *testing.T) {
+	item := PresetPackItem{ID: "cream", Name: "Cream", Installed: true}
+	o := newPresetPackOverlay(item)
+	o.face = basicfont.Face7x13
+	o.fontSize = 13
+	o.screenW, o.screenH = 640, 480
+	selectPresetPackRoot(t, o, item.ID)
+	o.FocusRight()
+	o.FocusRight()
+	if o.presetPackActionCursor != 1 {
+		t.Fatal("Right did not select the next button")
+	}
+	o.FocusLeft()
+	if o.focusPanel != 1 || o.presetPackActionCursor != 0 {
+		t.Fatal("Left did not select the previous button")
+	}
+	o.presetPackRemoveConfirm = true
+	placements := o.pointerActionPlacements()
+	if placements[0].label != "[Delete?]" {
+		t.Fatalf("confirmation label = %q", placements[0].label)
+	}
+	layout := o.overlayLayout(640, 480)
+	targets := o.pointerActionTargets(layout)
+	if len(targets) != 2 || targets[0].rect.y != float32(layout.panelY+layout.panelH-o.actionBarHeight(layout.lineH)) || targets[1].rect.x <= targets[0].rect.x {
+		t.Fatalf("bottom horizontal button targets = %+v", targets)
+	}
+	o.applyPointerActionFocus(1)
+	if o.presetPackActionCursor != 1 || o.presetPackRemoveConfirm {
+		t.Fatal("pointer did not select Test and clear deletion confirmation")
 	}
 }

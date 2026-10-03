@@ -700,9 +700,7 @@ func (o *Overlay) pointerScrollbars(winW, winH int) []pointerScrollbar {
 			total := len(cur.nodes) + boolToInt(len(o.presetNav.stack) > 1)
 			add(0, leftX, float32(l.panelY), float32(l.panelH), total, visible, cur.scroll)
 		}
-		if item := o.selectedPresetPack(); item != nil {
-			add(1, rightX, float32(l.panelY), float32(l.panelH), o.presetPackActionCount(*item), visible, 0)
-		}
+
 	case PageHelp:
 		leftScroll := o.helpView.EntryTop
 		if o.helpView.InGrandChildren {
@@ -926,6 +924,10 @@ func (o *Overlay) markPointerFocusDirty() {
 }
 
 func (o *Overlay) applyPointerActionFocus(index int) {
+	if o.uiPage == PagePresets {
+		o.setPointerCursor(pointerTarget{panel: 1, index: index})
+		return
+	}
 	if o.uiPage != PageLibrary || !o.isNC() {
 		return
 	}
@@ -1161,7 +1163,7 @@ func (o *Overlay) rowPointerTargets(l overlayLayout) []pointerTargetRect {
 			addRows(0, 0, len(cur.nodes)+boolToInt(len(o.presetNav.stack) > 1), cur.scroll)
 		}
 		if item := o.selectedPresetPack(); item != nil {
-			addRows(1, 0, o.presetPackActionCount(*item), 0)
+			result = append(result, o.pointerActionTargets(l)...)
 		}
 	case PageHelp:
 		count := o.helpLeftCount()
@@ -1203,6 +1205,12 @@ func (o *Overlay) pointerActionPlacements() []actionPlacement {
 		return nil
 	}
 	measure := func(s string) int { return font.MeasureString(o.face, s).Ceil() }
+	if o.uiPage == PagePresets {
+		if item := o.selectedPresetPack(); item != nil {
+			return layoutLibraryActions(o.presetPackButtons(*item), o.lineHeight(), o.scalePx(4), measure(">"), measure)
+		}
+		return nil
+	}
 	actions := []libraryAction{{icon: iconPlay, label: o.catalog.Text(i18n.ActionPlay)}}
 	if o.isNC() {
 		if o.ncInfoFile != "" || (o.ncInfoIsDir && o.ncInfoDir != o.baseDir) {
@@ -1223,8 +1231,8 @@ func (o *Overlay) pointerActionBarVisible() bool {
 }
 
 func (o *Overlay) pointerActionTargets(l overlayLayout) []pointerTargetRect {
-	actionY := l.panelY + l.panelH - o.actionBarHeight(l.lineH)
-	actionH := o.actionBarHeight(l.lineH)
+	metadataH, actionH := o.actionPanelHeights(l.panelH, l.lineH, true)
+	actionY := l.panelY + metadataH
 	placements := o.pointerActionPlacements()
 	result := make([]pointerTargetRect, 0, len(placements))
 	for i, item := range placements {

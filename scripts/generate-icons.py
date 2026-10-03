@@ -132,6 +132,12 @@ def main() -> None:
             json.dump(generated_manifest, manifest_file, indent=2)
             manifest_file.write("\n")
 
+        # mkdtemp creates a private 0700 directory. Published assets must remain
+        # readable by the host user when generation runs inside Docker.
+        staging.chmod(0o755)
+        for generated in staging.rglob("*"):
+            generated.chmod(0o755 if generated.is_dir() else 0o644)
+
         if output_path.exists():
             shutil.rmtree(output_path)
         os.replace(staging, output_path)

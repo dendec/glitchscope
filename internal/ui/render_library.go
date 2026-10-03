@@ -82,7 +82,7 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 	}
 	if o.tracksTex != 0 || o.hasNCSelection() {
 		tx, ty := float32(tracksX), float32(panelY)
-		drawPanelBg(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
+		o.drawInfoPanelFrame(tx, ty, float32(panelW), float32(panelH), o.focusPanel == 1, winW, winH, viewW, viewH)
 		// NC, catalog-track, and local-album info panels are static info views.
 		isNCInfo := o.hasNCSelection()
 		isCatalogInfo := o.currentEntry() != nil && o.currentEntry().IsCatalogTrack()
@@ -91,16 +91,9 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 
 		// The info image and metadata share one vertical scroll offset. Clip both
 		// to the complete panel so neither can escape or overlap outside it.
-		actionH := float32(0)
-		metadataH := float32(panelH)
 		catalogDelete := isCatalogInfo && o.isTrackCached != nil && o.isTrackCached(o.currentEntry().filePath)
-		if isNCInfo || catalogDelete {
-			actionH = float32(o.actionBarHeight(lh))
-			metadataH -= actionH
-			if metadataH < float32(lh) {
-				metadataH = float32(lh)
-			}
-		}
+		metadataHeight, actionHeight := o.actionPanelHeights(panelH, lh, isNCInfo || catalogDelete)
+		metadataH, actionH := float32(metadataHeight), float32(actionHeight)
 		var scrollPx float32
 		if isNCInfo || isLocalInfo || isCatalogInfo || isRadioInfo {
 			scrollPx = float32(o.ncInfoScroll * lh)
@@ -152,15 +145,9 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 				o.drawMarqueeCol(&o.marqueeR, tx, contentY, float32(textW), remainH, lh, rowY, winW, winH, viewW, viewH)
 			}
 		}
-		if o.focusPanel == 1 {
-			drawPanelBorder(o, tx, ty, float32(panelW), float32(panelH), winW, winH, viewW, viewH)
-		}
-		if (isNCInfo || catalogDelete) && o.ncActionsTex != 0 {
-			actionY := ty + metadataH
-			glDrawOverlayTextClipped(o.programText, o.ncActionsTex, 1,
-				tx, actionY, float32(o.ncActionsTexW), float32(o.ncActionsTexH),
-				tx, actionY, float32(panelW), actionH, winW, winH, viewW, viewH)
-			o.drawActionIcons(tx, actionY, float32(panelW), actionH, winW, winH, viewW, viewH)
+		if isNCInfo || catalogDelete {
+			o.drawPanelActions(o.ncActionsTex, o.ncActionsTexW, o.ncActionsTexH, o.actionPlacements,
+				tx, ty+metadataH, float32(panelW), actionH, winW, winH, viewW, viewH)
 		}
 	}
 }
