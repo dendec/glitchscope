@@ -105,9 +105,12 @@ make release-archives VERSION=1.1 # Versioned archives for all supported targets
 ```
 
 `make release-archives` builds Linux AMD64, Linux ARM64, Windows AMD64, and
-PortMaster packages, then writes versioned assets to `dist/releases/`. Linux
-archives use `.tar.gz`; Windows and PortMaster use `.zip`. The Linux ARM64
-archive is a regular Linux package with its own launcher; the PortMaster ZIP is
+PortMaster packages, then writes versioned ZIP archives to `dist/releases/`.
+Each desktop archive has one versioned root directory containing the executable,
+`README.md`, `licenses/`, empty `music/` and `presets/`, and offline catalogs
+in `.cache/`. Both Linux packages include `libs/`, `run-glitchscope.sh`, and
+`runtime-requirements.txt`; Windows includes `SDL2.dll` beside the EXE.
+The PortMaster ZIP keeps the layout required by its installer and is
 prepared separately by the PortMaster packager. `SHA256SUMS` contains checksums
 for all four release archives. Desktop archives include the collected
 third-party licenses and omit local music, settings, favorites, and the local
@@ -120,28 +123,25 @@ For PortMaster packaging, device checks, and asset redistribution notes, see
 
 The release archives bundle the application and its native decoders, but Linux
 still needs the system graphics, audio, and C runtime libraries listed below.
-The Linux AMD64 package also uses system Vorbis and mpg123 libraries; Linux
-ARM64 and PortMaster bundle their codec and C++ runtime libraries. You do not
+Both Linux desktop packages and PortMaster bundle their codec and C++ runtime
+libraries. Windows links native decoders and the C++ runtime into the EXE and
+ships SDL2 as a DLL. You do not
 need to install the `ffmpeg` command-line tool.
 
 ### Linux AMD64
 
-Requires x86-64 Linux, glibc 2.35 or newer, a C++ runtime providing
-`GLIBCXX_3.4.30`, SDL2, desktop OpenGL, ALSA, Vorbis, mpg123, and zlib. Debian 12
-(Bookworm) provides a compatible runtime. Install the dependencies with:
+Requires x86-64 Linux, glibc compatible with the bundled libraries (see
+`runtime-requirements.txt`), SDL2, desktop OpenGL, OpenGL ES 2, ALSA, and working
+system audio and graphics drivers. Codec libraries and the C++ runtime are
+included in `libs/`. On Debian 12 (Bookworm), install the system dependencies:
 
 ```sh
 sudo apt update
-sudo apt install \
-  libsdl2-2.0-0 libgl1 \
-  libvorbisfile3 libvorbis0a libmpg123-0 \
-  zlib1g libstdc++6 libasound2
+sudo apt install libsdl2-2.0-0 libgl1 libgles2 libasound2
 ```
 
-The `libstdc++` symbol requirement matters in addition to the glibc version:
-an older C++ runtime can prevent startup even when glibc is new enough.
-On Debian 13 (Trixie), use `libmpg123-0t64` and `libasound2t64` in place of
-`libmpg123-0` and `libasound2`.
+On Debian 13 (Trixie), use `libasound2t64` in place of `libasound2`.
+Extract the archive and start `./run-glitchscope.sh`.
 
 ### Linux ARM64
 

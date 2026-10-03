@@ -181,7 +181,6 @@ release-archives: dist dist-arm64 dist-windows dist-portmaster
 		--linux-arm64 "$(ARM64_DIST_DIR)/glitchscope" \
 		--windows-amd64 "$(WINDOWS_DIST_DIR)" \
 		--portmaster "$(DIST_DIR)/glitchscope.zip" \
-		--arm64-runtime-requirements "$(DIST_DIR)/portmaster-submit/ports/glitchscope/glitchscope/runtime-requirements.txt" \
 		--licenses "$(ARM64_DIST_DIR)/glitchscope/licenses" \
 		--output "$(RELEASE_DIR)"
 

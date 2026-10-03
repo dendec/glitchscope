@@ -59,19 +59,21 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     fi
 
 # Prepare output layout in /dist
-RUN mkdir -p /dist/glitchscope/presets \
+RUN mkdir -p /dist/glitchscope/music /dist/glitchscope/presets \
     && cp glitchscope /dist/glitchscope/ \
     && if [ "$TARGETARCH" = "arm64" ]; then \
         cp portmaster/GlitchScope.sh /dist/ \
         && cp portmaster/port.json /dist/ \
         && cp portmaster/screenshot.png /dist/ \
-        && mkdir -p /dist/glitchscope/libs.aarch64 \
-        && for library in libvorbisfile.so.3 libvorbis.so.0 libogg.so.0 libFLAC.so.12 libmpg123.so.0 libz.so.1 libstdc++.so.6 libgcc_s.so.1; do \
-            cp -L "/usr/lib/aarch64-linux-gnu/$library" /dist/glitchscope/libs.aarch64/ || exit 1; \
-        done \
-        && bash scripts/collect-portmaster-licenses.sh /dist/glitchscope/licenses \
         && cp portmaster/README.md /dist/glitchscope/; \
-    fi
+    fi \
+    && if [ "$TARGETARCH" = "arm64" ]; then triplet=aarch64-linux-gnu; libdir=libs.aarch64; \
+       else triplet=x86_64-linux-gnu; libdir=libs.amd64; fi \
+    && mkdir -p "/dist/glitchscope/$libdir" \
+    && for library in libvorbisfile.so.3 libvorbis.so.0 libogg.so.0 libFLAC.so.12 libmpg123.so.0 libz.so.1 libstdc++.so.6 libgcc_s.so.1; do \
+        cp -L "/usr/lib/$triplet/$library" "/dist/glitchscope/$libdir/" || exit 1; \
+    done \
+    && bash scripts/collect-portmaster-licenses.sh /dist/glitchscope/licenses
 
 # The image is an artifact carrier; Makefile targets extract /dist with docker cp.
 FROM scratch AS runner

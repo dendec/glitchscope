@@ -304,6 +304,16 @@ and retains the Cancel action. Library and Presets share action-bar layout and
 icon rendering, full-panel background/focus frame, action-row geometry and
 button drawing; each page owns its texture lifecycle. Collection actions sit at
 the bottom of the right panel, with matching pointer hit regions.
+
+Release archives use ZIP for every platform. Desktop packages share a versioned
+root with the executable, README, licenses, empty music/presets directories, and
+offline catalogs. Both Linux desktop packages bundle codec/C++ runtime libraries
+under `libs/` and use the same launcher; SDL2, graphics/audio drivers and glibc
+remain system dependencies. Windows embeds native decoders/C++ runtime in the
+EXE and ships SDL2.dll alongside it. PortMaster retains its installer-specific
+layout and `libs.aarch64/`. `scripts/package-release.py` owns desktop archive
+layout and derives Linux runtime requirements from all shipped ELF files.
+
 Desktop and PortMaster release packaging excludes collection ZIPs,
 texture caches, and the legacy preset/texture GSA archives. ModArchive snapshot
 GSA files remain independent assets under `.cache/modarchive/`.
