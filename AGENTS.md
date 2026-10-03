@@ -31,7 +31,7 @@ runs on any Linux/Windows desktop.
 | `cmd/modland-catalog/` `cmd/modarchive-catalog/` | Build remote music catalogs from Modland / ModArchive. |
 | `cmd/validate-catalog/` | Validates a downloaded catalog by loading each format. |
 | `cmd/texture-report/` | Reports texture usage of presets (CSV). |
-| `internal/app/` | **Orchestration**: app lifecycle, main loop, adaptive resolution, playback state, actions, benchmark, delete service. |
+| `internal/app/` | **Orchestration**: app lifecycle, main loop, adaptive resolution, playback state, actions, delete service. |
 | `internal/ui/` | **Overlay**: SDL/GL rendering of the 2-column UI, navigation, help, presets page, themes. Largest package (~9k lines), split by concern into `overlay*.go`, `render_*.go`, `help.go`, `device.go`, `gl.go`. |
 | `internal/player/` | SoLoud-backed audio playback, async loading, music library/scanner, metadata. |
 | `internal/config/` | Persisted settings types, validation, atomic JSON storage. |
@@ -195,7 +195,7 @@ mechanical wrappers. Keep them thin — put business logic in the caller.
 - **Async playback** (`internal/player/player.go`): `PlayFileAsync` loads in a
   background goroutine, publishes to `pendingCh`, and `CheckPending()` picks it up
   **once per frame**. Stale results are identified by `requestID` and destroyed,
-  never applied. `PlayFile` is the synchronous path (used by tests/benchmark).
+  never applied. `PlayFile` is the synchronous path (used by tests).
 - **Seek & pre-render layer** (`internal/player/player.go`, see
   `docs/SEEK-DESIGN.md`): formats whose native decoder can't seek cleanly in
   both directions (openmpt, xmp, YM, SID) are **pre-rendered once at load**

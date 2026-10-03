@@ -1,4 +1,4 @@
-// Package app wires the application — initialization, main loop, and benchmark.
+// Package app wires the application — initialization and main loop.
 package app
 
 import (
@@ -88,7 +88,8 @@ type App struct {
 	presetCats        []string // visible preset keys for presets page tree
 	transitionPresets []string // "!"-prefixed presets for smooth transitions
 
-	startupFile string
+	startupPath      string
+	startupPathIsDir bool
 
 	albumMetadata        *metadataLoader
 	fileMetadata         *metadataLoader
@@ -169,16 +170,35 @@ type radioFaviconEvent struct {
 	err  error
 }
 
-// New creates an App with display initialised. Player/overlay/input/library
-// are created later by Init().
-func New(fullscreen bool, width, height int, startupFile string) (*App, error) {
+// New creates an App with display initialised. A startup folder becomes the
+// Local Music root; a startup file uses its parent as the root and starts
+// playback. Player/overlay/input/library are created later by Init().
+func New(fullscreen bool, width, height int, startupPath string) (*App, error) {
+	startupPathIsDir := false
+	if startupPath != "" {
+		absolutePath, err := filepath.Abs(startupPath)
+		if err != nil {
+			return nil, fmt.Errorf("resolve startup path: %w", err)
+		}
+		info, err := os.Stat(absolutePath)
+		if err != nil {
+			return nil, fmt.Errorf("startup path %q: %w", absolutePath, err)
+		}
+		if !info.IsDir() && !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("startup path %q is not a regular file or directory", absolutePath)
+		}
+		startupPath = absolutePath
+		startupPathIsDir = info.IsDir()
+	}
+
 	a := &App{
-		prof:         prof.NewCollector(),
-		settingsPath: config.SettingsPath(),
-		startupFile:  startupFile,
-		modlandSizes: make(map[string]int64),
-		presenter:    newOverlayPresenter(nil),
-		connectivity: newConnectivityCache(),
+		prof:             prof.NewCollector(),
+		settingsPath:     config.SettingsPath(),
+		startupPath:      startupPath,
+		startupPathIsDir: startupPathIsDir,
+		modlandSizes:     make(map[string]int64),
+		presenter:        newOverlayPresenter(nil),
+		connectivity:     newConnectivityCache(),
 	}
 	a.presetLoadResults = make(chan presetLoadResult, 4)
 	a.playbackState.shuffle.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -499,10 +519,14 @@ func (a *App) Init() {
 	}
 	a.initInput()
 	a.initPreset()
-	if a.startupFile != "" && a.pl != nil {
-		a.playTrack(a.startupFile, "command line")
-	} else if a.startupFile != "" {
-		slog.Warn("startup file skipped, audio unavailable", "path", a.startupFile)
+	if a.startupPath != "" {
+		if !a.startupPathIsDir {
+			if a.pl != nil {
+				a.playTrack(a.startupPath, "command line")
+			} else {
+				slog.Warn("startup file skipped, audio unavailable", "path", a.startupPath)
+			}
+		}
 	} else {
 		position := a.settings.Playback.LastPosition.Path
 		cachedRemote := a.trackCache != nil && a.trackCache.IsCached(position)
@@ -676,9 +700,19 @@ func (a *App) configureTrackerRenderBudget() {
 
 func (a *App) initLibrary() {
 	musicDir := a.findMusicDir()
-	// Ensure the music directory exists so the scanner always has a root.
-	if err := os.MkdirAll(musicDir, 0o755); err != nil {
-		slog.Warn("cannot create music dir", "path", musicDir, "error", err)
+	if a.startupPath != "" {
+		if a.startupPathIsDir {
+			musicDir = a.startupPath
+		} else {
+			musicDir = filepath.Dir(a.startupPath)
+		}
+	}
+	// Ensure the default music directory exists so the scanner always has a
+	// root. A command-line path was validated by New and should not be created.
+	if a.startupPath == "" {
+		if err := os.MkdirAll(musicDir, 0o755); err != nil {
+			slog.Warn("cannot create music dir", "path", musicDir, "error", err)
+		}
 	}
 	if a.overlay != nil {
 		a.overlay.SetMusicDir(musicDir)
@@ -877,7 +911,7 @@ func (a *App) startTrackCacheCleanup() {
 }
 
 func (a *App) restoreSavedPosition(allowRemote bool) {
-	if a.pl == nil || a.startupFile != "" || a.resumeAttempted {
+	if a.pl == nil || a.startupPath != "" || a.resumeAttempted {
 		return
 	}
 	position := a.settings.Playback.LastPosition

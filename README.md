@@ -87,11 +87,13 @@ make dist
 ```
 
 The package is created in `dist/linux-amd64/`. Put music in the `music/`
-directory beside the executable and launch `./dist/linux-amd64/glitchscope`,
-or start with one track:
+directory beside the executable and launch `./dist/linux-amd64/glitchscope`.
+Pass a folder to use it as the Local Music root without starting playback, or
+pass a track to use its containing folder as the root and play that track:
 
 ```sh
-./dist/linux-amd64/glitchscope -file /path/to/track.flac
+./dist/linux-amd64/glitchscope /path/to/track.flac
+./dist/linux-amd64/glitchscope /path/to/music/
 ```
 
 ### Other release packages

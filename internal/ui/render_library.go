@@ -110,28 +110,32 @@ func (o *Overlay) renderLibraryPanels(winW, winH, viewW, viewH int, panelW, pane
 				o.drawCursorHighlight(tx, rowY, float32(panelW), float32(lh), winW, winH, viewW, viewH)
 			}
 		}
+		textY := contentY
+		// Track covers and radio favicons share the same image-first layout.
+		if imageTex != 0 && imageH > 0 {
+			textY += float32(imageH + o.scalePx(8))
+		}
 		remainH := metadataH
 		glDrawOverlayTextClipped(o.programText, o.tracksTex, 1,
-			tx, contentY, float32(o.tracksTexW), float32(o.tracksTexH),
+			tx, textY, float32(o.tracksTexW), float32(o.tracksTexH),
 			tx, ty, float32(panelW), remainH, winW, winH, viewW, viewH)
 		if imageTex != 0 && imageW > 0 {
-			pad := float32(o.scalePx(8))
 			imgW := float32(imageW)
 			imgH := float32(imageH)
 			imgX := tx + (float32(panelW)-imgW)/2
-			imgY := contentY + float32(o.tracksTexH) + pad
+			imgY := contentY
 			glDrawOverlayImageClipped(o.programImage, imageTex, 1,
 				imgX, imgY, imgW, imgH, tx, ty, float32(panelW), metadataH,
 				winW, winH, viewW, viewH)
 		}
 		if isInfoPanel {
-			o.setPointerTextLines(o.infoLines, tx, contentY, ty, float32(panelW), metadataH, lh)
+			o.setPointerTextLines(o.infoLines, tx, textY, ty, float32(panelW), metadataH, lh)
 			o.drawPointerLinks(winW, winH, viewW, viewH)
 		}
 		if isLocalInfo || isNCInfo || isCatalogInfo {
 			drawScrollbar(o, tx+float32(panelW)-sbW, ty, remainH, o.ncInfoLines, o.ncInfoVisible, o.ncInfoScroll, winW, winH, viewW, viewH)
 			if isNCInfo || isCatalogInfo {
-				o.drawInfoMarquee(tx, contentY, float32(textW), ty, remainH, winW, winH, viewW, viewH)
+				o.drawInfoMarquee(tx, textY, float32(textW), ty, remainH, winW, winH, viewW, viewH)
 			}
 		} else {
 			tm := panelH / lh
@@ -453,7 +457,7 @@ func (o *Overlay) rebuildLocalTrackInfoTex(maxW, maxH int) {
 	}
 	// Load cover art for the selected track.
 	o.loadCoverArt(ti.Path, o.availableRowTextWidth(maxW))
-	lines := trackInfoLines(o.catalog, player.TrackTitle(ti.Path), ti)
+	lines := o.boundedInfoLines(trackInfoLines(o.catalog, player.TrackTitle(ti.Path), ti))
 	if len(lines) == 0 {
 		return
 	}
@@ -677,6 +681,7 @@ func (o *Overlay) rebuildNCInfoTex(maxW, maxH int) {
 		o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, maxTextPx, maxW)
 		return
 	}
+	lines = o.boundedInfoLines(lines)
 	o.infoLines = append([]string(nil), lines...)
 	o.infoComment = infoComment
 
@@ -796,7 +801,7 @@ func trackInfoLines(catalog i18n.Catalog, title string, ti *player.TrackInfo) []
 
 func shouldHideExtraTag(key, value string) bool {
 	normalizedKey := strings.ToLower(strings.TrimSpace(key))
-	if normalizedKey == "handler_name" || normalizedKey == "handlername" {
+	if normalizedKey == "handler_name" || normalizedKey == "handlername" || normalizedKey == "prompt" || normalizedKey == "workflow" {
 		return true
 	}
 	return normalizedKey == "language" && isUnknownMetadataValue(value)
@@ -872,6 +877,7 @@ func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 	if len(lines) == 0 {
 		return
 	}
+	lines = o.boundedInfoLines(lines)
 	o.infoLines = append([]string(nil), lines...)
 	o.infoComment = comment
 	o.rebuildCatalogActionsTex()
@@ -898,6 +904,30 @@ func (o *Overlay) rebuildCatalogTrackInfoTex(e *navEntry, maxW, maxH int) {
 	}
 	o.tracksTex, o.tracksTexW, o.tracksTexH = o.renderListRows(rows, infoTextW, maxW)
 	o.rebuildInfoMarquee(lines, maxTextPx, infoTextW)
+}
+
+// boundedInfoLines caps both dimensions of metadata textures, including the
+// full-width marquee. Keep ordinary long lines scrollable, but mark omitted
+// text with an ellipsis. Limits include room for the text outline.
+func (o *Overlay) boundedInfoLines(lines []string) []string {
+	const maxInfoTextureSize = 1024
+	const maxInfoLineRunes = 512
+	padding := 2*textPadding(o.fontSize) + 8
+	lh := max(1, o.face.Metrics().Height.Ceil())
+	maxLines := max(1, (maxInfoTextureSize-padding)/lh)
+	bounded := make([]string, min(len(lines), maxLines))
+	for i := range bounded {
+		runes := []rune(lines[i])
+		line := lines[i]
+		if len(runes) > maxInfoLineRunes {
+			line = string(runes[:maxInfoLineRunes-1]) + "…"
+		}
+		bounded[i] = o.truncateEnd(line, maxInfoTextureSize-padding)
+	}
+	if len(lines) > len(bounded) {
+		bounded[len(bounded)-1] = "…"
+	}
+	return bounded
 }
 
 func (o *Overlay) rebuildInfoMarquee(lines []string, viewportW, contentW int) {

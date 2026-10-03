@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -12,16 +13,20 @@ import (
 )
 
 var (
-	flagFullscreen  = flag.Bool("fullscreen", false, "fullscreen mode")
-	flagWidth       = flag.Int("w", 1280, "window width")
-	flagHeight      = flag.Int("h", 720, "window height")
-	flagBenchmark   = flag.Bool("benchmark", false, "benchmark every preset and write CSV, then exit")
-	flagBenchFrames = flag.Int("benchmark-frames", 120, "frames per preset in benchmark mode")
-	flagBenchOut    = flag.String("benchmark-out", "benchmark.csv", "output path for benchmark CSV")
-	flagBenchWorker = flag.Bool("benchmark-worker", false, "internal: run as benchmark worker subprocess")
-	flagFile        = flag.String("file", "", "audio file to play on startup")
-	flagVerbose     = flag.Bool("v", false, "verbose debug logging (incl. modarchive navigation)")
+	flagFullscreen = flag.Bool("fullscreen", false, "fullscreen mode")
+	flagWidth      = flag.Int("w", 1280, "window width")
+	flagHeight     = flag.Int("h", 720, "window height")
+	flagVerbose    = flag.Bool("v", false, "verbose debug logging (incl. modarchive navigation)")
 )
+
+func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options] [path]\n", os.Args[0])
+		fmt.Fprintln(flag.CommandLine.Output(), "path is an optional audio file or folder to open on startup")
+		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
+		flag.PrintDefaults()
+	}
+}
 
 func main() {
 	runtime.LockOSThread()
@@ -35,12 +40,18 @@ func main() {
 	}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
 
-	if *flagBenchmark && !*flagBenchWorker {
-		app.RunBenchmarkSupervisor(*flagBenchFrames, *flagBenchOut)
+	args := flag.Args()
+	if len(args) > 1 {
+		slog.Error("expected at most one path argument", "arguments", args)
+		flag.Usage()
 		return
 	}
+	var startupPath string
+	if len(args) == 1 {
+		startupPath = args[0]
+	}
 
-	a, err := app.New(*flagFullscreen, *flagWidth, *flagHeight, *flagFile)
+	a, err := app.New(*flagFullscreen, *flagWidth, *flagHeight, startupPath)
 	if err != nil {
 		slog.Error("app init", "error", err)
 		return
@@ -53,11 +64,6 @@ func main() {
 		<-quitSignals
 		a.RequestQuit()
 	}()
-
-	if *flagBenchWorker {
-		a.RunBenchmarkWorker(*flagBenchFrames)
-		return
-	}
 
 	a.Init()
 	a.Run()
