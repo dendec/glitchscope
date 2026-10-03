@@ -67,12 +67,48 @@ func TestRecordPresetPackRenderPublishesCurrentPresetFPS(t *testing.T) {
 		t.Fatalf("first measured FPS = %d, want 30", got)
 	}
 	a.recordPresetPackRender(time.Second / 60)
-	if got := a.presetPackItems[0].TestFPS; got != 45 {
-		t.Fatalf("averaged measured FPS = %d, want 45", got)
+	if got := a.presetPackItems[0].TestFPS; got != 40 {
+		t.Fatalf("averaged measured FPS = %d, want 40", got)
 	}
 	a.presetPackTest.restoring = true
 	a.recordPresetPackRender(time.Second / 20)
-	if got := a.presetPackItems[0].TestFPS; got != 45 {
-		t.Fatalf("restore-phase FPS = %d, want unchanged 45", got)
+	if got := a.presetPackItems[0].TestFPS; got != 40 {
+		t.Fatalf("restore-phase FPS = %d, want unchanged 40", got)
+	}
+}
+
+func TestPresetPackTelemetryUsesFrameCostAndResetsMeasurements(t *testing.T) {
+	a := &App{
+		presetNames:    []string{"Cream/test.milk"},
+		presetPackTest: &presetPackTestState{id: "cream", current: "Cream/test.milk"},
+		presetPackItems: []ui.PresetPackItem{{
+			ID: "cream", Testing: true,
+		}},
+	}
+	a.vizClock.meter.AddDuration(time.Second / 30)
+	a.recordPresetPackRender(100 * time.Millisecond)
+	if got := a.visualizerTelemetryFPS(); got != 10 || a.presetPackItems[0].TestFPS != 10 {
+		t.Fatalf("telemetry=%f panel=%d, want measured 10 FPS rather than 30 FPS cadence", got, a.presetPackItems[0].TestFPS)
+	}
+	a.resetPresetPackRender()
+	if a.visualizerTelemetryFPS() != 0 || a.presetPackItems[0].TestFPS != 0 {
+		t.Fatal("measurement reset retained FPS from the previous preset or resolution")
+	}
+	a.presetLoadInFlight = true
+	a.recordPresetPackRender(time.Millisecond)
+	a.presetLoadInFlight = false
+	a.presetPackTest.current = "Cream/next.milk"
+	a.recordPresetPackRender(time.Millisecond)
+	if a.visualizerTelemetryFPS() != 0 {
+		t.Fatal("loading frames or previous-preset frames contaminated test FPS")
+	}
+	a.presetPackTest.current = a.currentPresetName()
+	a.recordPresetPackRender(200 * time.Millisecond)
+	if got := a.visualizerTelemetryFPS(); got != 5 || a.presetPackItems[0].TestFPS != 5 {
+		t.Fatalf("new measurement=%f panel=%d, want 5 FPS", got, a.presetPackItems[0].TestFPS)
+	}
+	a.presetPackTest = nil
+	if got := int(a.visualizerTelemetryFPS() + 0.5); got != 30 {
+		t.Fatalf("normal telemetry=%d, want restored 30 FPS cadence", got)
 	}
 }

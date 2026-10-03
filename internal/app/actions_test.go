@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -27,7 +28,10 @@ func TestPresetPackCalibrationDoesNotBlockPageNavigationFromLibrary(t *testing.T
 			o := &ui.Overlay{}
 			o.SetPresetPacks([]ui.PresetPackItem{{ID: "pack", Name: "Pack", Testing: true}})
 			o.ToggleUI()
-			a := &App{overlay: o, presetPackTest: &presetPackTestState{}}
+			connectivity := newConnectivityCache()
+			connectivity.probe = func(context.Context) bool { return false }
+			a := &App{overlay: o, presetPackTest: &presetPackTestState{}, connectivity: connectivity, appCtx: t.Context()}
+			defer a.connectivityWg.Wait()
 
 			a.handleAction(test.action, 0, 0)
 			if got := o.IsPresetsPage(); got != test.wantPreset {
@@ -35,9 +39,12 @@ func TestPresetPackCalibrationDoesNotBlockPageNavigationFromLibrary(t *testing.T
 			}
 			if test.wantPreset {
 				a.handleAction(input.ActionPrevPreset, 0, 0)
-				if !o.IsPresetsPage() {
-					t.Fatal("page navigation left the active preset test without cancellation")
+				if !o.IsLibraryPage() {
+					t.Fatal("previous-page action did not leave the Presets page")
 				}
+			}
+			if !a.presetPackCalibrationActive() {
+				t.Fatal("page navigation stopped collection calibration")
 			}
 		})
 	}

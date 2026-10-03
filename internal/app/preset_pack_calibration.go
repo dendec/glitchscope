@@ -19,7 +19,7 @@ type presetPackTestState struct {
 	originalPreset     string
 	originalResolution config.RenderResolution
 	adaptiveBefore     resolutionState
-	renderFPS          fpsMeter
+	frameCost          renderCostMeter
 	complete           bool
 	restoring          bool
 }
@@ -146,7 +146,7 @@ func (a *App) startNextPresetPackTest() {
 	}
 	if state.index < len(state.names) {
 		state.current = state.names[state.index]
-		state.renderFPS.Reset()
+		a.resetPresetPackRender()
 		a.requestPresetLoadWithTransition(state.current, false)
 		return
 	}
@@ -180,11 +180,11 @@ func (a *App) publishPresetPackTestProgress() {
 
 func (a *App) recordPresetPackRender(duration time.Duration) {
 	state := a.presetPackTest
-	if state == nil || state.restoring || duration <= 0 {
+	if state == nil || state.restoring || a.presetLoadInFlight || state.current != a.currentPresetName() || duration <= 0 {
 		return
 	}
-	state.renderFPS.AddDuration(duration)
-	fps := int(state.renderFPS.Average() + 0.5)
+	state.frameCost.Add(duration)
+	fps := int(a.visualizerTelemetryFPS() + 0.5)
 	for i := range a.presetPackItems {
 		if a.presetPackItems[i].ID == state.id && a.presetPackItems[i].TestFPS != fps {
 			a.presetPackItems[i].TestFPS = fps
@@ -192,6 +192,32 @@ func (a *App) recordPresetPackRender(duration time.Duration) {
 			return
 		}
 	}
+}
+
+// During calibration report full-frame throughput, excluding scheduler waits,
+// rather than the configured display cadence. Swap may expose deferred GPU work.
+func (a *App) visualizerTelemetryFPS() float64 {
+	if a.presetPackCalibrationMeasuring() {
+		if cost := a.presetPackTest.frameCost.Average(); cost > 0 {
+			return 1 / cost.Seconds()
+		}
+		return 0
+	}
+	return a.vizClock.meter.Average()
+}
+
+func (a *App) resetPresetPackRender() {
+	if !a.presetPackCalibrationMeasuring() {
+		return
+	}
+	a.presetPackTest.frameCost.Reset()
+	for i := range a.presetPackItems {
+		if a.presetPackItems[i].ID == a.presetPackTest.id {
+			a.presetPackItems[i].TestFPS = 0
+			break
+		}
+	}
+	a.publishPresetPackItems()
 }
 
 func (a *App) cancelPresetPackTest(id string) {

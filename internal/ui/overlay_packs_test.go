@@ -9,17 +9,20 @@ func TestPresetPackDownloadIsRightPanelAction(t *testing.T) {
 	o := newPresetPackOverlay(PresetPackItem{ID: "cream", Name: "Cream"})
 	selectPresetPackRoot(t, o, "cream")
 	var gotAction PresetPackAction
-	o.SetPresetPackAction(func(_ string, action PresetPackAction) { gotAction = action })
+	var calls int
+	o.SetPresetPackAction(func(_ string, action PresetPackAction) { gotAction = action; calls++ })
 
-	o.FocusRight()
+	if o.Select() || calls != 0 {
+		t.Fatal("selecting an unavailable collection should only focus its action")
+	}
 	if o.focusPanel != 1 || o.presetPackActionCursor != 0 {
 		t.Fatalf("focus/cursor = %d/%d, want right/first action", o.focusPanel, o.presetPackActionCursor)
 	}
 	if o.Select() {
 		t.Fatal("collection action selected a preset")
 	}
-	if gotAction != PresetPackInstall {
-		t.Fatalf("action = %d, want download", gotAction)
+	if gotAction != PresetPackInstall || calls != 1 {
+		t.Fatalf("action/calls = %d/%d, want one download", gotAction, calls)
 	}
 	if o.presetNav.Depth() != 1 {
 		t.Fatalf("action changed collection navigation depth to %d", o.presetNav.Depth())
@@ -35,6 +38,9 @@ func TestInstalledPresetPackActionsAreOnRightPanel(t *testing.T) {
 	selectPresetPackRoot(t, o, "cream")
 	if o.Select() {
 		t.Fatal("opening collection selected a preset")
+	}
+	if o.focusPanel != 0 || o.presetNav.Depth() != 2 {
+		t.Fatal("selecting an installed collection should open its tree in the left panel")
 	}
 	o.presetNav.current().cursor = 1 // Skip the parent entry.
 	if node := o.presetNav.Selected(); node == nil || node.name != "Fractal" {
@@ -159,6 +165,55 @@ func packRowTexts(rows []listRow) []string {
 		texts[i] = rows[i].text
 	}
 	return texts
+}
+
+func TestRunningPresetPackTestAllowsPageNavigation(t *testing.T) {
+	for _, forward := range []bool{true, false} {
+		o := &Overlay{uiPage: PagePresets, panelEntered: true, focusPanel: 1}
+		o.SetPresetPacks([]PresetPackItem{{ID: "cream", Name: "Cream", Testing: true}})
+		var actions int
+		o.SetPresetPackAction(func(string, PresetPackAction) { actions++ })
+		pages := []UIPage{PageSettings, PageHelp, PageLibrary, PagePresets}
+		if !forward {
+			pages = []UIPage{PageLibrary, PageHelp, PageSettings, PagePresets}
+		}
+		for _, want := range pages {
+			if forward {
+				o.NextScreen()
+			} else {
+				o.PrevScreen()
+			}
+			if o.uiPage != want || o.focusPanel != 0 || !o.panelEntered {
+				t.Fatalf("forward=%t: page=%d focus=%d entered=%t, want page=%d with left panel focused", forward, o.uiPage, o.focusPanel, o.panelEntered, want)
+			}
+			if !o.presetPackTestRunning() || actions != 0 {
+				t.Fatal("page navigation modified the running preset test")
+			}
+		}
+	}
+}
+
+func TestPresetPackCalibrationKeepsCollectionDetailsVisible(t *testing.T) {
+	o := newPresetPackOverlay(PresetPackItem{ID: "cream", Name: "Cream", Installed: true, Testing: true, TestFPS: 10})
+	o.SetPresetTree([]string{"Cream/first.milk", "Cream/second.milk"})
+	selectPresetPackRoot(t, o, "cream")
+	o.FocusRight()
+	o.presetPreviewFPSNow = 25
+	for _, name := range []string{"Cream/first.milk", "Cream/second.milk"} {
+		o.SetPresetName(name)
+		if node := o.presetNav.Selected(); node == nil || node.packID != "cream" || o.focusPanel != 1 {
+			t.Fatal("test preset change moved focus away from collection actions")
+		}
+		rows := o.buildPresetDetailRows()
+		if rows[len(rows)-1].text != "FPS: 10" {
+			t.Fatalf("collection details = %#v, want current test FPS", rows)
+		}
+	}
+	o.SetPresetPacks([]PresetPackItem{{ID: "cream", Name: "Cream", Installed: true, Testing: true, TestFPS: 5}})
+	rows := o.buildPresetDetailRows()
+	if !o.presetsDetailDirty || rows[len(rows)-1].text != "FPS: 5" {
+		t.Fatal("new test FPS did not update the collection detail panel")
+	}
 }
 
 func TestBackCancelsRunningPresetPackTest(t *testing.T) {

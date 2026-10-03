@@ -153,7 +153,7 @@ func (a *App) Run() {
 		a.uiFramePeriod = period
 		dt := now.Sub(state.lastLoop).Seconds()
 		state.lastLoop = now
-		fpsAvg := a.vizClock.meter.Average()
+		fpsAvg := a.visualizerTelemetryFPS()
 
 		a.prepareFrame(&state, now, w, h, fpsAvg, refreshRate)
 		if !a.handleFrameInput(&state, now, dt, w, h) {
@@ -489,8 +489,9 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 	}
 	// Publish input before entering a potentially slow, non-preemptible GL call.
 	// The newly captured visualizer texture is presented on the next UI tick.
+	var presentationCost time.Duration
 	if uiInteracting {
-		a.presentFrame(time.Now(), w, h, false, uiVisible, uiOpaque)
+		presentationCost = a.presentFrame(time.Now(), w, h, false, uiVisible, uiOpaque)
 	}
 	started := time.Now()
 	rendered := a.renderVisualization(started, w, h, uiOpaque, uiInteracting, budget)
@@ -500,13 +501,15 @@ func (a *App) renderFrame(now time.Time, w, h int) {
 	}
 	if uiInteracting {
 		if rendered {
+			a.recordPresetPackRender(renderCost + presentationCost)
 			a.presentRequested = true
 		}
 		return
 	}
-	presentationCost := a.presentFrame(time.Now(), w, h, rendered, uiVisible, uiOpaque)
+	presentationCost = a.presentFrame(time.Now(), w, h, rendered, uiVisible, uiOpaque)
 	presented := time.Now()
 	if rendered && !a.onPresetsPage {
+		a.recordPresetPackRender(renderCost + presentationCost)
 		if !paused && !a.adaptiveSuspended(presented) {
 			frameWork := renderCost + presentationCost
 			a.renderCost.AddFrame(renderCost, presentationCost, presented)
@@ -640,7 +643,6 @@ func (a *App) renderVisualization(now time.Time, w, h int, opaque, interacting b
 	renderStarted := time.Now()
 	a.pm.RenderFrame()
 	renderFinished := time.Now()
-	a.recordPresetPackRender(renderFinished.Sub(renderStarted))
 	captureStarted := renderFinished
 	a.rt.Capture()
 	captureFinished := time.Now()
@@ -837,6 +839,7 @@ func (a *App) resizeRenderTarget(r config.RenderResolution) {
 	if currentW, currentH := a.rt.Size(); currentW == r.Width && currentH == r.Height {
 		return
 	}
+	a.resetPresetPackRender()
 	a.rt.Resize(r.Width, r.Height)
 	a.pm.SetWindowSize(r.Width, r.Height)
 	a.pm.BindFeedbackFramebuffer()

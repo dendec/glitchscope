@@ -295,9 +295,6 @@ func (o *Overlay) CloseUI() {
 
 // NextScreen cycles through the top-level pages in header order.
 func (o *Overlay) NextScreen() {
-	if o.uiPage == PagePresets && o.presetPackTestRunning() {
-		return
-	}
 	o.markInteraction()
 	o.pointerScroll = [2]bool{}
 	o.focusPanel = 0
@@ -322,9 +319,6 @@ func (o *Overlay) NextScreen() {
 
 // PrevScreen cycles through the top-level pages in reverse header order.
 func (o *Overlay) PrevScreen() {
-	if o.uiPage == PagePresets && o.presetPackTestRunning() {
-		return
-	}
 	o.markInteraction()
 	o.pointerScroll = [2]bool{}
 	o.focusPanel = 0
@@ -827,6 +821,10 @@ func (o *Overlay) Select() bool {
 		}
 		node := o.presetNav.Selected()
 		if node == nil {
+			return false
+		}
+		if item := o.selectedPresetPack(); item != nil && !item.Installed {
+			o.FocusRight()
 			return false
 		}
 		if !node.isLeaf {

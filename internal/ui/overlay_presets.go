@@ -318,6 +318,9 @@ func (o *Overlay) SelectedPresetKey() string {
 
 // syncPresetTree positions the navigation on the currently playing preset.
 func (o *Overlay) syncPresetTree() {
+	if o.presetPackTestRunning() {
+		return
+	}
 	key := o.presetName
 	if key == "" || len(o.presetTreeRoot) == 0 {
 		return

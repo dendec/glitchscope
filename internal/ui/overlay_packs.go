@@ -140,10 +140,10 @@ func (o *Overlay) presetPackActionRows(item PresetPackItem) []listRow {
 		}
 	}
 	if item.Testing {
-		rows = append(rows, listRow{text: o.catalog.Format(i18n.PresetPacksTesting, item.TestProgress, item.TestTotal)})
-		if item.TestFPS > 0 {
-			rows = append(rows, listRow{text: fmt.Sprintf("FPS: %d", item.TestFPS)})
-		}
+		rows = append(rows,
+			listRow{text: o.catalog.Format(i18n.PresetPacksTesting, item.TestProgress, item.TestTotal)},
+			listRow{text: fmt.Sprintf("FPS: %d", item.TestFPS)},
+		)
 	} else if item.Tested {
 		rows = append(rows, listRow{text: o.catalog.Format(i18n.PresetPacksTested, item.TestProgress, item.TestTotal)})
 	}
