@@ -106,6 +106,31 @@ the author's and contributors' works; this permission does not transfer
 intellectual-property rights or change the terms applying to their contents.
 GlitchScope does not sell the collections. No third-party demo tracks are bundled.
 
+The Presets page also offers optional downloads from the projectM repositories:
+- En D: https://github.com/projectM-visualizer/presets-en-d
+- MilkDrop Original: https://github.com/projectM-visualizer/presets-milkdrop-original
+- projectM Classic: https://github.com/projectM-visualizer/presets-projectm-classic
+- Textures for these collections: https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
+
+These assets retain their authors' rights and upstream terms; they are not
+licensed as part of GlitchScope. Installation retains upstream README and license
+notices under Sources/ in the combined ZIP. The Isosceles permission above applies
+to the Patreon collections only.
+
+MilkDrop2077 is an optional download from
+https://github.com/milkdrop2077/milkdrop2077 . Its PRESETS.RES text payloads are
+preserved without modification in the installed ZIP, alongside the projectM
+MilkDrop texture pack and a source/license link under Sources/Presets/.
+Upstream license: https://github.com/milkdrop2077/milkdrop2077/blob/main/LICENSE .
+These downloaded assets are excluded from GlitchScope release archives.
+
 Upstream notice sources retrieved for this release preparation:
 - GNU Unifont: https://unifoundry.com/LICENSE.txt
 - Device-Info: https://github.com/PortsMaster/Device-Info/blob/main/LICENSE
+
+Butterchurn is an optional user download from
+https://github.com/jberg/butterchurn-presets . Installation retains the original
+`presets/milkdrop/` files and upstream README/license notices, and adds the
+MilkDrop texture pack as above. The upstream repository uses the MIT license:
+https://github.com/jberg/butterchurn-presets/blob/master/LICENSE .
+The collection is not bundled in release packages.

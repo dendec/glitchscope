@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "Ukuran: %s",
+  "preset_packs.preset_count": "Preset: %s",
   "cache.none": "Jangan simpan",
   "cache.one_day": "1 hari",
   "cache.seven_days": "7 hari",
@@ -138,6 +140,7 @@
   "presets.equations": "Persamaan: %d per frame, %d per piksel",
   "presets.textures": "Tekstur: %d",
   "presets.preview_fps": "FPS pratinjau: %d",
+  "preset_packs.installing": "Memasang",
   "preset_packs.downloading": "Mengunduh: %d%%",
   "preset_packs.remove_prompt": "Hapus koleksi %s?",
   "preset_packs.testing": "Menguji: %d/%d",

@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "Размер: %s",
+  "preset_packs.preset_count": "Пресетов: %s",
   "cache.none": "Не сохранять",
   "cache.one_day": "1 день",
   "cache.seven_days": "7 дней",
@@ -145,6 +147,7 @@
   "presets.equations": "Уравнения: %d на кадр, %d на пиксель",
   "presets.textures": "Текстуры: %d",
   "presets.preview_fps": "Скорость рендера: %d кадров/с",
+  "preset_packs.installing": "Установка",
   "preset_packs.downloading": "Загрузка: %d%%",
   "preset_packs.remove_prompt": "Удалить коллекцию «%s»?",
   "preset_packs.testing": "Тестирование: %d/%d",

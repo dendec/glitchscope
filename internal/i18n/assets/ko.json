@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "크기: %s",
+  "preset_packs.preset_count": "프리셋 수: %s",
   "cache.none": "보관 안 함",
   "cache.one_day": "1일",
   "cache.seven_days": "7일",
@@ -138,6 +140,7 @@
   "presets.equations": "수식: 프레임당 %d, 픽셀당 %d",
   "presets.textures": "텍스처: %d",
   "presets.preview_fps": "미리 보기 FPS: %d",
+  "preset_packs.installing": "설치 중",
   "preset_packs.downloading": "다운로드 중: %d%%",
   "preset_packs.remove_prompt": "%s 컬렉션을 삭제할까요?",
   "preset_packs.testing": "테스트 중: %d/%d",

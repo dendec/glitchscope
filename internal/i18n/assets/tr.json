@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "Boyut: %s",
+  "preset_packs.preset_count": "Ön ayarlar: %s",
   "cache.none": "Saklama",
   "cache.one_day": "1 gün",
   "cache.seven_days": "7 gün",
@@ -138,6 +140,7 @@
   "presets.equations": "Denklemler: kare başına %d, piksel başına %d",
   "presets.textures": "Dokular: %d",
   "presets.preview_fps": "Önizleme FPS: %d",
+  "preset_packs.installing": "Kuruluyor",
   "preset_packs.downloading": "İndiriliyor: %d%%",
   "preset_packs.remove_prompt": "%s koleksiyonu kaldırılsın mı?",
   "preset_packs.testing": "Test ediliyor: %d/%d",

@@ -4,7 +4,13 @@
 submission directory under `dist/portmaster-submit/ports/glitchscope/`, and
 creates `dist/glitchscope.zip`. Packaging fails on missing required inputs.
 No third-party music or preset collections are bundled during packaging.
-Users can download author-approved preset collections from the Presets page.
+Users can download optional preset collections from the Presets page, including
+En D, MilkDrop Original and projectM Classic from the projectM repositories.
+These repository collections download the MilkDrop texture pack during installation.
+Butterchurn is optional and downloads its official repository ZIP, retaining
+only `presets/milkdrop/` plus the standard texture pack and upstream notices.
+MilkDrop2077 is also optional: its `PRESETS.RES` is converted to a managed ZIP
+with the same texture pack. The resource file and resulting ZIP are not bundled.
 Release archives must contain an empty `presets/` directory only: never
 include downloaded ZIP collections, extracted texture caches, or legacy
 `presets.gsa` / `textures.gsa` archives. ModArchive catalog snapshots remain
@@ -12,6 +18,10 @@ separate GSA assets under `.cache/modarchive/`.
 
 ## Remaining external verification
 
+- MilkDrop2077's 300 resources were checked for ZIP conversion and store reads;
+  rendering still needs device verification. Five source presets reference
+  `grad3` or `rose`, absent from the standard texture pack; projectM uses its
+  placeholder for missing textures, so their appearance may differ.
 - `portmaster/screenshot.png` is now a 640x480 English capture of the player,
   local music list and visualization. Keep this composition when refreshing
   the image on the device.

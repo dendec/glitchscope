@@ -146,6 +146,41 @@ func TestAvailablePacksDoesNotExposeSpoutJamming(t *testing.T) {
 	}
 }
 
+func TestPackStatusesUsesCatalogThenInstalledMetadata(t *testing.T) {
+	dir := t.TempDir()
+	pack, _ := packByID("en-d")
+	var before PackStatus
+	for _, status := range PackStatuses(dir) {
+		if status.Pack.ID == pack.ID {
+			before = status
+		}
+	}
+	if before.Installed || before.ArchiveBytes != pack.ArchiveBytes || before.PresetCount != pack.PresetCount {
+		t.Fatalf("catalog status = %+v", before)
+	}
+	archive := filepath.Join(dir, pack.Filename)
+	writePackZIP(t, archive, map[string]string{
+		"Presets/category/one.milk": "preset",
+		"Presets/!transition.milk":  "transition",
+		"Presets/../unsafe.milk":    "unsafe",
+		"Textures/test.jpg":         "texture",
+		"Sources/README.md":         "notice",
+	})
+	info, err := os.Stat(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range PackStatuses(dir) {
+		if status.Pack.ID == pack.ID {
+			if !status.Installed || status.Error != "" || status.ArchiveBytes != info.Size() || status.PresetCount != 2 {
+				t.Fatalf("installed status = %+v, want size %d and 2 presets", status, info.Size())
+			}
+			return
+		}
+	}
+	t.Fatal("installed collection missing from statuses")
+}
+
 func TestDownloadPackArchiveEnforcesFinalSizeLimit(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("archive exceeds limit"))

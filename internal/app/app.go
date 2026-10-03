@@ -123,8 +123,7 @@ type App struct {
 	presetPackResults  chan presetPackResult
 	presetPackID       string
 	presetPackItems    []ui.PresetPackItem
-	presetPackRead     atomic.Int64
-	presetPackTotal    atomic.Int64
+	presetPackProgress atomic.Pointer[presets.InstallProgress]
 	presetPackLastUI   time.Time
 	presetPackTest     *presetPackTestState
 

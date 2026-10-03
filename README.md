@@ -37,22 +37,38 @@ features and other limits.
 - Optional MilkDrop preset collections are available in **Presets**:
   [Cream of the Crop](https://www.patreon.com/file?h=91682111&i=16310421),
   [Isosceles Mashups 2020](https://www.patreon.com/file?h=91682111&i=16310422),
-  and [Isosceles Mashups 2024](https://www.patreon.com/file?h=115453098&m=375145864).
+  [Isosceles Mashups 2024](https://www.patreon.com/file?h=115453098&m=375145864),
+  [En D](https://github.com/projectM-visualizer/presets-en-d),
+  [MilkDrop Original](https://github.com/projectM-visualizer/presets-milkdrop-original),
+  [projectM Classic](https://github.com/projectM-visualizer/presets-projectm-classic),
+  [Butterchurn](https://github.com/jberg/butterchurn-presets),
+  and [MilkDrop2077](https://github.com/milkdrop2077/milkdrop2077).
   Downloads are optional, initiated by the user, and stored as ZIP files under
   `presets/`; the app reads presets in-place and extracts only the textures
   needed by projectM. The Presets page can test an installed collection for
   performance, excluding presets below the 20 FPS minimum and recording a
   suitable resolution for the current session. These collections are not
-  bundled with GlitchScope.
+  bundled with GlitchScope. For the projectM and Butterchurn repository collections,
+  installation also downloads the [MilkDrop texture pack](https://github.com/projectM-visualizer/presets-milkdrop-texture-pack)
+  and combines the ZIPs into the managed archive; no manual extraction is needed.
+  Butterchurn retains only `presets/milkdrop/` from its repository ZIP. After
+  the source download, the collection shows Installing while textures and the
+  managed archive are prepared.
+  MilkDrop2077 downloads `PRESETS.RES`, converts its 300 text resources to `.milk`
+  entries without modification, and adds the same texture pack to its ZIP.
 - Tracker and chip music catalogs: [Modland](https://modland.com/) (the build
   uses its [`allmods.zip` listing](https://modland.antarctica.no/allmods.zip))
   and [The Mod Archive](https://modarchive.org/) (the app browses the
   [module mirror](http://modarchive.textfiles.com/)).
 - Internet radio directory: [Radio Browser](https://www.radio-browser.info/).
 
-Preset authors retain their rights. The author has authorized GlitchScope to
-offer direct downloads of these collections; this does not change their terms
-or make the collections part of the GPL application. See the
+Preset authors retain their rights. The Isosceles author has authorized
+GlitchScope to offer direct downloads of the three Patreon collections.
+The projectM collections and their textures are downloaded from the projectM
+repositories; upstream README and license notices are retained in the installed
+ZIP under `Sources/`. Butterchurn also retains upstream notices there. MilkDrop2077 retains a source and license link in the same
+directory. Downloads do not change the assets' terms or make them
+part of the GPL application. See the
 [release checklist](docs/PORTMASTER-RELEASE.md) for packaging constraints.
 
 ## Build and run

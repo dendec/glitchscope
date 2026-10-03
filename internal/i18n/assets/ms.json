@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "Saiz: %s",
+  "preset_packs.preset_count": "Pratetap: %s",
   "cache.none": "Jangan simpan",
   "cache.one_day": "1 hari",
   "cache.seven_days": "7 hari",
@@ -138,6 +140,7 @@
   "presets.equations": "Persamaan: %d setiap bingkai, %d setiap piksel",
   "presets.textures": "Tekstur: %d",
   "presets.preview_fps": "FPS pratonton: %d",
+  "preset_packs.installing": "Memasang",
   "preset_packs.downloading": "Memuat turun: %d%%",
   "preset_packs.remove_prompt": "Buang koleksi %s?",
   "preset_packs.testing": "Menguji: %d/%d",

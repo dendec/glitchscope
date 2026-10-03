@@ -59,6 +59,9 @@ func (o *Overlay) presetPackByID(id string) *PresetPackItem {
 
 func (o *Overlay) presetPackStatusByID(id string) string {
 	if item := o.presetPackByID(id); item != nil {
+		if item.Downloading && item.Installing {
+			return o.catalog.Text(i18n.PresetPacksInstalling)
+		}
 		if item.Downloading && item.ProgressTotal > 0 {
 			percent := min(100, int(item.ProgressRead*100/item.ProgressTotal))
 			return o.catalog.Format(i18n.PresetPacksDownloading, percent)
@@ -112,7 +115,7 @@ func (o *Overlay) presetPackActionRows(item PresetPackItem) []listRow {
 	var actions []string
 	switch {
 	case item.Busy:
-		return []listRow{{text: o.catalog.Text(i18n.ValueLoading)}}
+		actions = []string{o.catalog.Text(i18n.ValueLoading)}
 	case item.Downloading:
 		actions = []string{o.catalog.Text(i18n.ActionCancel)}
 	case item.Testing:
@@ -131,8 +134,25 @@ func (o *Overlay) presetPackActionRows(item PresetPackItem) []listRow {
 	}
 	rows := make([]listRow, 0, len(actions)+2)
 	for i, action := range actions {
-		rows = append(rows, listRow{text: action, active: o.focusPanel == 1 && o.panelEntered && i == o.presetPackActionCursor})
+		rows = append(rows, listRow{text: action, active: !item.Busy && o.focusPanel == 1 && o.panelEntered && i == o.presetPackActionCursor})
 	}
+	size, count := "—", "—"
+	if item.ArchiveBytes > 0 {
+		size = formatSize(item.ArchiveBytes)
+		if !item.Installed {
+			size = "≈ " + size
+		}
+	}
+	if item.Installed || item.PresetCount > 0 {
+		count = fmt.Sprintf("%d", item.PresetCount)
+		if !item.Installed {
+			count = "≈ " + count
+		}
+	}
+	rows = append(rows, listRow{},
+		listRow{text: o.catalog.Format(i18n.PresetPacksArchiveSize, size)},
+		listRow{text: o.catalog.Format(i18n.PresetPacksPresetCount, count)},
+	)
 	if description := o.helpDescription(presetPackActionHelpRef(item, o.presetPackActionCursor)); description != "" {
 		rows = append(rows, listRow{})
 		for _, line := range wrapHelpLines([]string{description}, o.face, o.helpTextWidth()) {

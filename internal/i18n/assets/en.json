@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "Size: %s",
+  "preset_packs.preset_count": "Presets: %s",
   "cache.none": "Do not keep",
   "cache.one_day": "1 day",
   "cache.seven_days": "7 days",
@@ -76,6 +78,7 @@
   "presets.equations": "Equations: %d per-frame, %d per-pixel",
   "presets.textures": "Textures: %d",
   "presets.preview_fps": "Preview FPS: %d",
+  "preset_packs.installing": "Installing",
   "preset_packs.downloading": "Downloading: %d%%",
   "preset_packs.remove_prompt": "Remove %s?",
   "preset_packs.testing": "Testing: %d/%d",

@@ -24,7 +24,7 @@ const (
 	textureStampFileName = ".source"
 )
 
-// Pack describes an author-approved downloadable preset collection.
+// Pack describes an optional downloadable preset collection.
 type Pack struct {
 	ID       string
 	Name     string
@@ -32,27 +32,49 @@ type Pack struct {
 	URL      string
 	// RedundantPresetRoot is an archive folder omitted from visible preset paths.
 	RedundantPresetRoot string
+	// SourcePresetRoot enables normalization of a repository ZIP to Presets/.
+	SourcePresetRoot string
+	// SourceResource enables extraction of TEXT/MILK resources from a Windows RES.
+	SourceResource bool
+	// ArchiveBytes and PresetCount are catalog snapshots for uninstalled packs.
+	// Zero means unknown; installed archives supply their actual metadata.
+	ArchiveBytes int64
+	PresetCount  int
+}
+
+// InstallProgress is a snapshot of download bytes or archive installation.
+// Installing starts after the source download and includes texture preparation.
+type InstallProgress struct {
+	Read       int64
+	Total      int64
+	Installing bool
 }
 
 // PackStatus is the installed state used by the collection manager UI.
 type PackStatus struct {
-	Pack      Pack
-	Installed bool
-	Error     string
+	Pack         Pack
+	Installed    bool
+	Error        string
+	ArchiveBytes int64
+	PresetCount  int
 }
 
 var availablePacks = []Pack{
 	{
-		ID:       "cream-of-the-crop",
-		Name:     "Cream of the Crop",
-		Filename: "isosceles-cream-of-the-crop.zip",
-		URL:      "https://www.patreon.com/file?h=91682111&i=16310421",
+		ID:           "cream-of-the-crop",
+		Name:         "Cream of the Crop",
+		Filename:     "isosceles-cream-of-the-crop.zip",
+		URL:          "https://www.patreon.com/file?h=91682111&i=16310421",
+		ArchiveBytes: 143372759,
+		PresetCount:  9795,
 	},
 	{
-		ID:       "mashups-2020",
-		Name:     "Isosceles Mashups 2020",
-		Filename: "isosceles-mashups-2020.zip",
-		URL:      "https://www.patreon.com/file?h=91682111&i=16310422",
+		ID:           "mashups-2020",
+		Name:         "Isosceles Mashups 2020",
+		Filename:     "isosceles-mashups-2020.zip",
+		URL:          "https://www.patreon.com/file?h=91682111&i=16310422",
+		ArchiveBytes: 26062090,
+		PresetCount:  1131,
 	},
 	{
 		ID:                  "mashups-2024",
@@ -60,6 +82,53 @@ var availablePacks = []Pack{
 		Filename:            "isosceles-mashups-2024.zip",
 		URL:                 "https://www.patreon.com/file?h=115453098&m=375145864",
 		RedundantPresetRoot: "Mashups 2024",
+		ArchiveBytes:        21127796,
+		PresetCount:         986,
+	},
+	{
+		ID:               "en-d",
+		Name:             "En D",
+		Filename:         "projectm-en-d.zip",
+		URL:              "https://github.com/projectM-visualizer/presets-en-d/archive/refs/heads/master.zip",
+		SourcePresetRoot: "presets-en-d-master/",
+		ArchiveBytes:     2456500,
+		PresetCount:      40,
+	},
+	{
+		ID:               "milkdrop-original",
+		Name:             "MilkDrop Original",
+		Filename:         "projectm-milkdrop-original.zip",
+		URL:              "https://github.com/projectM-visualizer/presets-milkdrop-original/archive/refs/heads/master.zip",
+		SourcePresetRoot: "presets-milkdrop-original-master/Milkdrop-Original/",
+		ArchiveBytes:     1384556,
+		PresetCount:      552,
+	},
+	{
+		ID:               "projectm-classic",
+		Name:             "projectM Classic",
+		Filename:         "projectm-classic.zip",
+		URL:              "https://github.com/projectM-visualizer/presets-projectm-classic/archive/refs/heads/master.zip",
+		SourcePresetRoot: "presets-projectm-classic-master/",
+		ArchiveBytes:     8539406,
+		PresetCount:      4189,
+	},
+	{
+		ID:             "milkdrop2077",
+		Name:           "MilkDrop2077",
+		Filename:       "milkdrop2077.zip",
+		URL:            "https://github.com/milkdrop2077/milkdrop2077/raw/refs/heads/main/PRESETS.RES",
+		SourceResource: true,
+		ArchiveBytes:   3383392,
+		PresetCount:    300,
+	},
+	{
+		ID:               "butterchurn",
+		Name:             "Butterchurn",
+		Filename:         "butterchurn.zip",
+		URL:              "https://github.com/jberg/butterchurn-presets/archive/refs/heads/master.zip",
+		SourcePresetRoot: "butterchurn-presets-master/presets/milkdrop/",
+		ArchiveBytes:     4397602,
+		PresetCount:      504,
 	},
 }
 
@@ -73,13 +142,15 @@ func AvailablePacks() []Pack {
 func PackStatuses(dir string) []PackStatus {
 	statuses := make([]PackStatus, 0, len(availablePacks))
 	for _, pack := range availablePacks {
-		status := PackStatus{Pack: pack}
+		status := PackStatus{Pack: pack, ArchiveBytes: pack.ArchiveBytes, PresetCount: pack.PresetCount}
 		archivePath := filepath.Join(dir, pack.Filename)
-		if _, err := os.Stat(archivePath); err == nil {
-			if err := ValidatePackArchive(archivePath); err != nil {
+		if info, err := os.Stat(archivePath); err == nil {
+			if count, err := installedPresetCount(pack, archivePath); err != nil {
 				status.Error = err.Error()
 			} else {
 				status.Installed = true
+				status.ArchiveBytes = info.Size()
+				status.PresetCount = count
 			}
 		} else if !os.IsNotExist(err) {
 			status.Error = err.Error()
@@ -89,9 +160,30 @@ func PackStatuses(dir string) []PackStatus {
 	return statuses
 }
 
+func installedPresetCount(pack Pack, archivePath string) (int, error) {
+	zr, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return 0, fmt.Errorf("open ZIP: %w", err)
+	}
+	defer zr.Close()
+	if err := validatePackReader(&zr.Reader); err != nil {
+		return 0, err
+	}
+	keys := make(map[string]struct{})
+	for _, file := range zr.File {
+		if file.FileInfo().IsDir() || !regularZipFile(file) || file.UncompressedSize64 > maxPresetBytes {
+			continue
+		}
+		if key, ok := packPresetKey(pack, file.Name); ok {
+			keys[key] = struct{}{}
+		}
+	}
+	return len(keys), nil
+}
+
 // InstallPack downloads, validates, and atomically publishes a pack and its
 // extracted texture cache. Preset files and preview images stay in the ZIP.
-func InstallPack(ctx context.Context, id, dir string, onProgress func(read, total int64)) error {
+func InstallPack(ctx context.Context, id, dir string, onProgress func(InstallProgress)) error {
 	pack, ok := packByID(id)
 	if !ok {
 		return fmt.Errorf("unknown preset pack %q", id)
@@ -109,8 +201,25 @@ func InstallPack(ctx context.Context, id, dir string, onProgress func(read, tota
 	stagedArchive := filepath.Join(dir, "."+pack.ID+".download.zip")
 	_ = os.Remove(stagedArchive)
 	defer os.Remove(stagedArchive)
-	if err := downloadPackArchive(ctx, pack.URL, stagedArchive, maxPackDownloadBytes, onProgress); err != nil {
+	downloadLimit := int64(maxPackDownloadBytes)
+	if pack.SourceResource {
+		downloadLimit = maxResourceBytes
+	}
+	downloadProgress := func(read, total int64) {
+		if onProgress != nil {
+			onProgress(InstallProgress{Read: read, Total: total})
+		}
+	}
+	if err := downloadPackArchive(ctx, pack.URL, stagedArchive, downloadLimit, downloadProgress); err != nil {
 		return fmt.Errorf("download %s: %w", pack.Name, err)
+	}
+	if onProgress != nil {
+		onProgress(InstallProgress{Installing: true})
+	}
+	if pack.SourcePresetRoot != "" || pack.SourceResource {
+		if err := prepareRepositoryPack(ctx, pack, stagedArchive); err != nil {
+			return fmt.Errorf("prepare %s: %w", pack.Name, err)
+		}
 	}
 	if err := ValidatePackArchive(stagedArchive); err != nil {
 		return fmt.Errorf("validate %s: %w", pack.Name, err)

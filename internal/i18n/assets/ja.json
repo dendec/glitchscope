@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "サイズ：%s",
+  "preset_packs.preset_count": "プリセット数: %s",
   "cache.none": "保存しない",
   "cache.one_day": "1日",
   "cache.seven_days": "7日",
@@ -138,6 +140,7 @@
   "presets.equations": "数式：フレームごと %d、ピクセルごと %d",
   "presets.textures": "テクスチャ：%d",
   "presets.preview_fps": "プレビュー FPS：%d",
+  "preset_packs.installing": "インストール中",
   "preset_packs.downloading": "ダウンロード中：%d%%",
   "preset_packs.remove_prompt": "「%s」を削除しますか？",
   "preset_packs.testing": "テスト中：%d/%d",

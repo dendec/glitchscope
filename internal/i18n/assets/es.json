@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "Tamaño: %s",
+  "preset_packs.preset_count": "Preajustes: %s",
   "cache.none": "No conservar",
   "cache.one_day": "1 día",
   "cache.seven_days": "7 días",
@@ -138,6 +140,7 @@
   "presets.equations": "Ecuaciones: %d por fotograma, %d por píxel",
   "presets.textures": "Texturas: %d",
   "presets.preview_fps": "FPS de vista previa: %d",
+  "preset_packs.installing": "Instalando",
   "preset_packs.downloading": "Descargando: %d%%",
   "preset_packs.remove_prompt": "¿Eliminar la colección «%s»?",
   "preset_packs.testing": "Probando: %d/%d",

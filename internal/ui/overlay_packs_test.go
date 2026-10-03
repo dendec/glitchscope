@@ -3,7 +3,50 @@ package ui
 import (
 	"strings"
 	"testing"
+
+	"github.com/dendec/glitchscope/internal/i18n"
 )
+
+func TestPresetPackDetailsShowArchiveSizeAndPresetCount(t *testing.T) {
+	for _, state := range []string{"available", "installed", "downloading", "testing", "busy"} {
+		t.Run(state, func(t *testing.T) {
+			item := PresetPackItem{ID: "cream", Name: "Cream", ArchiveBytes: 2 << 20, PresetCount: 40}
+			item.Installed = state == "installed" || state == "testing" || state == "busy"
+			item.Downloading = state == "downloading"
+			item.Testing = state == "testing"
+			item.Busy = state == "busy"
+			o := newPresetPackOverlay(item)
+			selectPresetPackRoot(t, o, item.ID)
+			size, count := "2.0 MB", "40"
+			if !item.Installed {
+				size, count = "≈ "+size, "≈ "+count
+			}
+			texts := strings.Join(packRowTexts(o.buildPresetDetailRows()), "\n")
+			for _, want := range []string{
+				o.catalog.Format(i18n.PresetPacksArchiveSize, size),
+				o.catalog.Format(i18n.PresetPacksPresetCount, count),
+			} {
+				if !strings.Contains(texts, want) {
+					t.Fatalf("details %q missing %q", texts, want)
+				}
+			}
+			if state == "installed" && o.presetPackActionCount(item) != 2 {
+				t.Fatal("metadata changed action navigation")
+			}
+		})
+	}
+}
+
+func TestPresetPackDetailsShowUnknownMetadata(t *testing.T) {
+	item := PresetPackItem{ID: "cream", Name: "Cream"}
+	o := newPresetPackOverlay(item)
+	texts := strings.Join(packRowTexts(o.presetPackActionRows(item)), "\n")
+	for _, key := range []i18n.Key{i18n.PresetPacksArchiveSize, i18n.PresetPacksPresetCount} {
+		if !strings.Contains(texts, o.catalog.Format(key, "—")) {
+			t.Fatalf("unknown metadata missing from %q", texts)
+		}
+	}
+}
 
 func TestPresetPackDownloadIsRightPanelAction(t *testing.T) {
 	o := newPresetPackOverlay(PresetPackItem{ID: "cream", Name: "Cream"})
@@ -268,4 +311,23 @@ func selectPresetPackRoot(t *testing.T, o *Overlay, id string) {
 		}
 	}
 	t.Fatalf("preset pack %q not found in tree", id)
+}
+
+func TestPresetPackInstallationStatusAndCancel(t *testing.T) {
+	item := PresetPackItem{ID: "butterchurn", Name: "Butterchurn", Downloading: true, Installing: true}
+	o := newPresetPackOverlay(item)
+	selectPresetPackRoot(t, o, item.ID)
+	if got := o.presetPackStatusByID(item.ID); got != o.catalog.Text(i18n.PresetPacksInstalling) || strings.Contains(got, "%") {
+		t.Fatalf("installation status = %q", got)
+	}
+	if o.presetPackActionCount(item) != 1 {
+		t.Fatal("installation must retain Cancel")
+	}
+	o.FocusRight()
+	var action PresetPackAction
+	o.SetPresetPackAction(func(_ string, got PresetPackAction) { action = got })
+	o.Select()
+	if action != PresetPackCancel {
+		t.Fatal("installation cannot be cancelled")
+	}
 }

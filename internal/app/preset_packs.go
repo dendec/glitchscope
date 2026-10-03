@@ -50,13 +50,13 @@ func (a *App) handlePresetPackAction(id string, action ui.PresetPackAction) {
 	ctx, cancel := context.WithCancel(parent)
 	a.presetPackCancel = cancel
 	a.presetPackID = id
-	a.presetPackRead.Store(0)
-	a.presetPackTotal.Store(0)
+	a.presetPackProgress.Store(nil)
 	for i := range a.presetPackItems {
 		if a.presetPackItems[i].ID != id {
 			continue
 		}
 		a.presetPackItems[i].Error = ""
+		a.presetPackItems[i].Installing = false
 		a.presetPackItems[i].Downloading = action == ui.PresetPackInstall
 		a.presetPackItems[i].Busy = action == ui.PresetPackRemove
 	}
@@ -72,9 +72,8 @@ func (a *App) handlePresetPackAction(id string, action ui.PresetPackAction) {
 		var err error
 		switch action {
 		case ui.PresetPackInstall:
-			installErr := presets.InstallPack(ctx, id, dir, func(read, total int64) {
-				a.presetPackRead.Store(read)
-				a.presetPackTotal.Store(total)
+			installErr := presets.InstallPack(ctx, id, dir, func(progress presets.InstallProgress) {
+				a.presetPackProgress.Store(&progress)
 			})
 			reloadErr := presets.Open(dir)
 			if reloadErr != nil {
@@ -106,10 +105,12 @@ func (a *App) refreshPresetPackItems() {
 	a.presetPackItems = make([]ui.PresetPackItem, 0, len(statuses))
 	for _, status := range statuses {
 		item := ui.PresetPackItem{
-			ID:        status.Pack.ID,
-			Name:      status.Pack.Name,
-			Installed: status.Installed,
-			Error:     status.Error,
+			ID:           status.Pack.ID,
+			Name:         status.Pack.Name,
+			Installed:    status.Installed,
+			Error:        status.Error,
+			ArchiveBytes: status.ArchiveBytes,
+			PresetCount:  status.PresetCount,
 		}
 		if item.Installed {
 			names := presetPackPresetNames(a.presetNames, status.Pack.Name)
@@ -144,8 +145,7 @@ func (a *App) pollPresetPackOperation(now time.Time) {
 		a.presetPackCancel()
 		a.presetPackCancel = nil
 		a.presetPackID = ""
-		a.presetPackRead.Store(0)
-		a.presetPackTotal.Store(0)
+		a.presetPackProgress.Store(nil)
 		if result.action == ui.PresetPackInstall || result.action == ui.PresetPackRemove {
 			for _, pack := range presets.AvailablePacks() {
 				if pack.ID == result.id {
@@ -189,11 +189,15 @@ func (a *App) pollPresetPackOperation(now time.Time) {
 		return
 	}
 	a.presetPackLastUI = now
-	read, total := a.presetPackRead.Load(), a.presetPackTotal.Load()
+	progress := a.presetPackProgress.Load()
+	if progress == nil {
+		return
+	}
 	for i := range a.presetPackItems {
 		if a.presetPackItems[i].ID == a.presetPackID {
-			a.presetPackItems[i].ProgressRead = read
-			a.presetPackItems[i].ProgressTotal = total
+			a.presetPackItems[i].ProgressRead = progress.Read
+			a.presetPackItems[i].ProgressTotal = progress.Total
+			a.presetPackItems[i].Installing = progress.Installing
 			break
 		}
 	}

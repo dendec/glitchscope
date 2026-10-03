@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "Kích thước: %s",
+  "preset_packs.preset_count": "Số preset: %s",
   "cache.none": "Không lưu",
   "cache.one_day": "1 ngày",
   "cache.seven_days": "7 ngày",
@@ -138,6 +140,7 @@
   "presets.equations": "Phương trình: %d mỗi khung hình, %d mỗi pixel",
   "presets.textures": "Họa tiết: %d",
   "presets.preview_fps": "FPS xem trước: %d",
+  "preset_packs.installing": "Đang cài đặt",
   "preset_packs.downloading": "Đang tải: %d%%",
   "preset_packs.remove_prompt": "Xóa bộ sưu tập %s?",
   "preset_packs.testing": "Đang kiểm tra: %d/%d",

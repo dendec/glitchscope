@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "ขนาด: %s",
+  "preset_packs.preset_count": "จำนวนพรีเซ็ต: %s",
   "cache.none": "ไม่เก็บ",
   "cache.one_day": "1 วัน",
   "cache.seven_days": "7 วัน",
@@ -138,6 +140,7 @@
   "presets.equations": "สมการ: %d ต่อเฟรม, %d ต่อพิกเซล",
   "presets.textures": "พื้นผิว: %d",
   "presets.preview_fps": "FPS ตัวอย่าง: %d",
+  "preset_packs.installing": "กำลังติดตั้ง",
   "preset_packs.downloading": "กำลังดาวน์โหลด: %d%%",
   "preset_packs.remove_prompt": "ลบชุด %s หรือไม่?",
   "preset_packs.testing": "กำลังทดสอบ: %d/%d",

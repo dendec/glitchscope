@@ -60,7 +60,10 @@ type PresetPackItem struct {
 	ID            string
 	Name          string
 	Installed     bool
+	ArchiveBytes  int64
+	PresetCount   int
 	Downloading   bool
+	Installing    bool
 	Busy          bool
 	ProgressRead  int64
 	ProgressTotal int64

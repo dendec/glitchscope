@@ -280,7 +280,27 @@ Preset collections are optional user downloads stored as ZIP files in
 `presets/`. The preset store reads `.milk` entries lazily from those ZIPs and
 from local loose files; only each installed collection's `Textures/` subtree is
 extracted to `.texture-cache/<collection-id>` because projectM uses filesystem
-search paths. Desktop and PortMaster release packaging excludes collection ZIPs,
+search paths. `internal/presets` also owns normalization of the En D, MilkDrop
+Original, projectM Classic and Butterchurn repository ZIPs: installation strips the configured
+repository root, preserves preset categories under `Presets/`, and adds the
+separately downloaded MilkDrop texture pack under `Textures/`. Upstream notices
+are retained under `Sources/`. The combined ZIP passes the same bounds and
+required-root validation before publication; cancellation and failure leave it
+uninstalled. MilkDrop2077 uses the same lifecycle and textures, with a bounded
+Win32 RES parser owned by `internal/presets`: only named `TEXT/MILK<n>` resources
+become `Presets/MilkDrop2077.R<n>.milk` entries, with unchanged payloads and no
+loose-file extraction. Invalid bounds, duplicate identities, malformed preset
+payloads and empty resources fail installation. A source/license link is retained
+under `Sources/`. Each collection owns its texture cache independently. `internal/presets.PackStatuses`
+also owns collection metadata: catalog snapshots for absent archives and actual
+ZIP size plus unique indexed preset count for valid installed archives. App
+publishes these values to the read-only collection detail rows; the UI performs
+no filesystem or network reads to obtain them. `internal/presets.InstallProgress`
+reports source-download bytes, then an installation phase covering texture
+downloads, normalization, validation and publication. App publishes one atomic
+progress snapshot; UI displays Installing without a percentage during that phase
+and retains the Cancel action.
+Desktop and PortMaster release packaging excludes collection ZIPs,
 texture caches, and the legacy preset/texture GSA archives. ModArchive snapshot
 GSA files remain independent assets under `.cache/modarchive/`.
 

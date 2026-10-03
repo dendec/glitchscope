@@ -1,4 +1,6 @@
 {
+  "preset_packs.archive_size": "大小：%s",
+  "preset_packs.preset_count": "预设数量：%s",
   "cache.none": "不保留",
   "cache.one_day": "1 天",
   "cache.seven_days": "7 天",
@@ -138,6 +140,7 @@
   "presets.equations": "方程：每帧 %d，每像素 %d",
   "presets.textures": "纹理：%d",
   "presets.preview_fps": "预览 FPS：%d",
+  "preset_packs.installing": "安装中",
   "preset_packs.downloading": "下载中：%d%%",
   "preset_packs.remove_prompt": "要删除“%s”吗？",
   "preset_packs.testing": "测试中：%d/%d",
